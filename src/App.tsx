@@ -13,7 +13,10 @@ import {
   AlertCircle,
   Database,
   ArrowRight,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  ShieldCheck,
+  User as LucideUser,
+  CalendarDays
 } from 'lucide-react';
 import { initAuth, googleSignIn, logout } from './services/auth';
 import { 
@@ -25,7 +28,10 @@ import {
   fetchPayrollHistory, 
   saveEmployees, 
   saveAttendance, 
-  savePayrollHistory 
+  savePayrollHistory,
+  initHeaders,
+  fetchAdminSettings,
+  saveAdminSettings
 } from './services/sheets';
 import { Employee, Attendance, PayrollRecord, AdminSettings } from './types';
 
@@ -35,8 +41,29 @@ import EmployeeList from './components/EmployeeList';
 import AttendanceTracker from './components/AttendanceTracker';
 import PayrollCalculator from './components/PayrollCalculator';
 import Settings, { INITIAL_ADMIN_SETTINGS } from './components/Settings';
+import EmployeePortal from './components/EmployeePortal';
+import LeavesHolidays from './components/LeavesHolidays';
+
+export interface PortalUser {
+  id: string;
+  name: string;
+  role: 'admin' | 'employee';
+  employee?: Employee;
+}
 
 export default function App() {
+  const [portalUser, setPortalUser] = useState<PortalUser | null>(() => {
+    const saved = localStorage.getItem('payroll_portal_user');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse portal user session', e);
+      }
+    }
+    return null;
+  });
+
   const [needsAuth, setNeedsAuth] = useState<boolean>(true);
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -49,14 +76,41 @@ export default function App() {
   const [spreadsheetLink, setSpreadsheetLink] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
 
-  // Application Data States
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
+  // Application Data States (with local cache fallbacks for instant offline load)
+  const [employees, setEmployees] = useState<Employee[]>(() => {
+    const saved = localStorage.getItem('cached_employees');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [attendance, setAttendance] = useState<Attendance[]>(() => {
+    const saved = localStorage.getItem('cached_attendance');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [payroll, setPayroll] = useState<PayrollRecord[]>(() => {
+    const saved = localStorage.getItem('cached_payroll');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Portal login states
+  const [loginId, setLoginId] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [loginErr, setLoginErr] = useState<string | null>(null);
+
+  // Sync state changes to local storage caches automatically
+  useEffect(() => {
+    localStorage.setItem('cached_employees', JSON.stringify(employees));
+  }, [employees]);
+
+  useEffect(() => {
+    localStorage.setItem('cached_attendance', JSON.stringify(attendance));
+  }, [attendance]);
+
+  useEffect(() => {
+    localStorage.setItem('cached_payroll', JSON.stringify(payroll));
+  }, [payroll]);
 
   // UI States
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'admin'>('dashboard');
-  const [language, setLanguage] = useState<'en' | 'hi'>('hi'); // Defaulting to Hindi/Hinglish as requested
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin'>('dashboard');
+  const [language, setLanguage] = useState<'en' | 'hi'>('en'); // Set default to English as bilingual toggle is disabled
   const [showSeedDialog, setShowSeedDialog] = useState<boolean>(false);
 
   // Admin settings loaded from localStorage with standard static fallback
@@ -72,9 +126,19 @@ export default function App() {
     return INITIAL_ADMIN_SETTINGS;
   });
 
-  const handleSaveSettings = (updated: AdminSettings) => {
+  const handleSaveSettings = async (updated: AdminSettings) => {
     setAdminSettings(updated);
     localStorage.setItem('payroll_admin_settings', JSON.stringify(updated));
+    if (spreadsheetId && token) {
+      try {
+        setSyncStatus('syncing');
+        await saveAdminSettings(spreadsheetId, updated, token);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.error('Failed to save settings to Google Sheets:', e);
+        setSyncStatus('error');
+      }
+    }
   };
 
   // Initialize Firebase Auth
@@ -113,6 +177,13 @@ export default function App() {
         sheetId = await createSpreadsheet(accessToken);
         // Newly created spreadsheet is empty, offer to seed demo data
         setShowSeedDialog(true);
+      } else {
+        // If the spreadsheet already exists, ensure all new headers/columns are added to row 1
+        try {
+          await initHeaders(sheetId, accessToken);
+        } catch (e) {
+          console.warn('Failed to update Google Sheet headers on load:', e);
+        }
       }
       setSpreadsheetId(sheetId);
 
@@ -120,7 +191,7 @@ export default function App() {
       const webLink = await getSpreadsheetLink(sheetId, accessToken);
       setSpreadsheetLink(webLink);
 
-      // 3. Load Employees, Attendance, Payroll
+      // 3. Load Employees, Attendance, Payroll, and Admin Settings
       const fetchedEmployees = await fetchEmployees(sheetId, accessToken);
       const fetchedAttendance = await fetchAttendance(sheetId, accessToken);
       const fetchedPayroll = await fetchPayrollHistory(sheetId, accessToken);
@@ -128,6 +199,30 @@ export default function App() {
       setEmployees(fetchedEmployees);
       setAttendance(fetchedAttendance);
       setPayroll(fetchedPayroll);
+
+      // Load Settings from Google Sheets
+      try {
+        const fetchedSettings = await fetchAdminSettings(sheetId, accessToken);
+        if (fetchedSettings) {
+          setAdminSettings(fetchedSettings);
+          localStorage.setItem('payroll_admin_settings', JSON.stringify(fetchedSettings));
+        } else {
+          // If the sheet doesn't have settings yet, write current local settings to Google Sheets
+          await saveAdminSettings(sheetId, adminSettings, accessToken);
+        }
+      } catch (e) {
+        console.warn('Failed to load/sync settings from Google Sheets:', e);
+      }
+
+      // Sync portalUser with fresh details from Google Sheets
+      if (portalUser && portalUser.role === 'employee') {
+        const freshEmp = fetchedEmployees.find(e => e.id.toLowerCase() === portalUser.id.toLowerCase());
+        if (freshEmp) {
+          const updatedUser: PortalUser = { ...portalUser, name: freshEmp.name, employee: freshEmp };
+          setPortalUser(updatedUser);
+          localStorage.setItem('payroll_portal_user', JSON.stringify(updatedUser));
+        }
+      }
 
       // If existing employees are found, hide seed dialog
       if (fetchedEmployees.length > 0) {
@@ -167,21 +262,31 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {
+  const handlePortalLogout = () => {
     const confirmLogout = window.confirm(
-      language === 'en' ? 'Are you sure you want to sign out?' : 'क्या आप लॉग आउट करना चाहते हैं?'
+      language === 'en' ? 'Are you sure you want to log out from the portal?' : 'क्या आप पोर्टल से लॉग आउट करना चाहते हैं?'
     );
     if (!confirmLogout) return;
+
+    setPortalUser(null);
+    localStorage.removeItem('payroll_portal_user');
+    setCurrentTab('dashboard');
+  };
+
+  const handleLogout = async () => {
+    const confirmLogout = window.confirm(
+      language === 'en' ? 'Are you sure you want to sign out from the Admin Dashboard?' : 'क्या आप एडमिन डैशबोर्ड से लॉग आउट करना चाहते हैं?'
+    );
+    if (!confirmLogout) return;
+
+    setPortalUser(null);
+    localStorage.removeItem('payroll_portal_user');
+    setCurrentTab('dashboard');
 
     try {
       await logout();
       setUser(null);
       setToken(null);
-      setEmployees([]);
-      setAttendance([]);
-      setPayroll([]);
-      setSpreadsheetId(null);
-      setSpreadsheetLink(null);
       setNeedsAuth(true);
     } catch (err) {
       console.error('Logout error', err);
@@ -348,6 +453,32 @@ export default function App() {
     }
   };
 
+  const handleUpdateAttendanceRecords = async (updatedRecords: Attendance[]) => {
+    if (!spreadsheetId || !token) return;
+    setSyncStatus('syncing');
+
+    const updated = attendance.map(rec => {
+      const match = updatedRecords.find(ur => ur.employeeId === rec.employeeId && ur.date === rec.date);
+      return match ? { ...rec, ...match } : rec;
+    });
+
+    updatedRecords.forEach(ur => {
+      const exists = updated.some(rec => rec.employeeId === ur.employeeId && rec.date === ur.date);
+      if (!exists) {
+        updated.push(ur);
+      }
+    });
+
+    setAttendance(updated);
+    try {
+      await saveAttendance(spreadsheetId, updated, token);
+      setSyncStatus('synced');
+    } catch (err) {
+      setSyncStatus('error');
+      throw err;
+    }
+  };
+
   const handleSavePayroll = async (records: PayrollRecord[]) => {
     if (!spreadsheetId || !token) return;
     setSyncStatus('syncing');
@@ -367,173 +498,246 @@ export default function App() {
 
   // Translations
   const uiTexts = {
-    en: {
-      appName: "Payroll Portal",
-      tagline: "Secure Employee Payroll & Attendance Tracking synced to Google Sheets",
-      googleSheets: "Google Sheets",
-      sheetsConnected: "Google Sheets connected",
-      viewSheets: "View Spreadsheet",
-      signout: "Sign out",
-      dashboard: "Dashboard",
-      employees: "Employees",
-      attendance: "Attendance",
-      payroll: "Salary & Payroll",
-      adminSettings: "Admin Settings",
-      syncing: "Syncing...",
-      synced: "Saved in Sheets",
-      syncError: "Sync Error!",
-      refresh: "Force Refresh",
-      welcomeBack: "Payroll Management Portal",
-      googleSignIn: "Sign in with Google",
-      secureDriveSheets: "Securely connects to your personal Google Drive & Google Sheets with permissions.",
-      seedingTitle: "New Database Created!",
-      seedingDesc: "We found an empty sheet named 'Payroll_Management_System_Data' in your Google Drive. Would you like to seed 3 demo employees and 5 days of attendance history so you can see how calculations and charts work immediately?",
-      seedYes: "Yes, Seed Demo Data",
-      seedNo: "No, keep it blank",
-      benefitOffline: "Cloud Storage",
-      benefitOfflineText: "All payroll sheets are created and saved directly inside your personal Google Drive account.",
-      benefitHinglish: "Bilingual System",
-      benefitHinglishText: "Built with comprehensive Hindi & English translation toggles for seamless business control.",
-      benefitSlips: "Professional Payslips",
-      benefitSlipsText: "Auto-calculate pro-rated salaries, deductions, overtime, and generate beautiful printable receipts.",
-    },
-    hi: {
-      appName: "पेरोल पोर्टल",
-      tagline: "कर्मचारी उपस्थिति और वेतन गणना प्रणाली - गूगल शीट्स के साथ सिंक",
-      googleSheets: "गूगल शीट्स",
-      sheetsConnected: "गूगल शीट्स कनेक्टेड है",
-      viewSheets: "स्प्रेडशीट खोलें",
-      signout: "लॉग आउट",
-      dashboard: "डैशबोर्ड",
-      employees: "कर्मचारी सूची",
-      attendance: "दैनिक उपस्थिति",
-      payroll: "सैलरी और पेरोल",
-      adminSettings: "एडमिन सेटिंग्स",
-      syncing: "सिंक हो रहा है...",
-      synced: "गूगल शीट्स में सुरक्षित",
-      syncError: "सिंक एरर!",
-      refresh: "पुनः लोड करें",
-      welcomeBack: "पेरोल मैनेजमेंट सिस्टम",
-      googleSignIn: "गूगल के साथ साइन-इन करें",
-      secureDriveSheets: "यह ऐप सुरक्षित रूप से आपकी अनुमति से आपके व्यक्तिगत गूगल ड्राइव और गूगल शीट्स का उपयोग करता है।",
-      seedingTitle: "नया डेटाबेस तैयार है!",
-      seedingDesc: "आपके गूगल ड्राइव में एक खाली स्प्रेडशीट बनाई गई है। क्या आप 3 सैंपल कर्मचारियों का डेटा और 5 दिनों की उपस्थिति इतिहास लोड करना चाहते हैं, ताकि आप तुरंत सिस्टम की वेतन गणना को लाइव देख सकें?",
-      seedYes: "हाँ, सैंपल डेटा लोड करें",
-      seedNo: "नहीं, खाली रखें",
-      benefitOffline: "सुरक्षित क्लाउड स्टोरेज",
-      benefitOfflineText: "सभी कर्मचारी रिकॉर्ड और पेरोल सीधे आपके अपने गूगल ड्राइव अकाउंट की शीट्स फाइल में सुरक्षित होते हैं।",
-      benefitHinglish: "द्विभाषी व्यवस्था",
-      benefitHinglishText: "आसानी से काम करने के लिए हिंदी और अंग्रेजी भाषाओं के बीच तुरंत बदलने की सुविधा उपलब्ध है।",
-      benefitSlips: "प्रोफेशनल पे-स्लिप",
-      benefitSlipsText: "उपस्थिति के आधार पर कटे हुए वेतन, ओवरटाइम बोनस, और भत्तों की गणना कर आकर्षक रसीदें प्रिंट करें।",
-    }
-  }[language];
+    appName: "Payroll Portal",
+    tagline: "Secure Employee Payroll & Attendance Tracking synced to Google Sheets",
+    googleSheets: "Google Sheets",
+    sheetsConnected: "Google Sheets connected",
+    viewSheets: "View Spreadsheet",
+    signout: "Sign out",
+    dashboard: "Dashboard",
+    employees: "Employees",
+    attendance: "Attendance",
+    payroll: "Salary & Payroll",
+    adminSettings: "Admin Settings",
+    leaves: language === 'en' ? "Leaves & Holidays" : "अवकाश और छुट्टियां",
+    syncing: "Syncing...",
+    synced: "Saved in Sheets",
+    syncError: "Sync Error!",
+    refresh: "Force Refresh",
+    welcomeBack: "Payroll Management Portal",
+    googleSignIn: "Sign in with Google",
+    secureDriveSheets: "Securely connects to your personal Google Drive & Google Sheets with permissions.",
+    seedingTitle: "New Database Created!",
+    seedingDesc: "We found an empty sheet named 'Payroll_Management_System_Data' in your Google Drive. Would you like to seed 3 demo employees and 5 days of attendance history so you can see how calculations and charts work immediately?",
+    seedYes: "Yes, Seed Demo Data",
+    seedNo: "No, keep it blank",
+    benefitOffline: "Cloud Storage",
+    benefitOfflineText: "All payroll sheets are created and saved directly inside your personal Google Drive account.",
+    benefitHinglish: "Bilingual System",
+    benefitHinglishText: "Built with comprehensive Hindi & English translation toggles for seamless business control.",
+    benefitSlips: "Professional Payslips",
+    benefitSlipsText: "Auto-calculate pro-rated salaries, deductions, overtime, and generate beautiful printable receipts.",
+  };
 
-  // 1. Loading Authentication state
-  if (isLoadingAuth) {
+  // 1. Loading Portal Session state
+  if (!portalUser && isLoadingAuth) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-sm font-semibold text-gray-500 font-display">Please wait...</p>
+      <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-xs font-extrabold text-slate-500 uppercase tracking-widest font-mono">Loading Portal Workspace...</p>
       </div>
     );
   }
 
-  // 2. Render Login Screen if not authenticated
-  if (needsAuth) {
+  // 2. Render Custom Login Screen if not authenticated via Portal
+  if (!portalUser) {
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
         
-        {/* Language switch button */}
-        <div className="absolute top-4 right-4 z-10">
-          <button
-            onClick={toggleLanguage}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-xs font-semibold rounded-lg text-gray-600 cursor-pointer shadow-xs"
-          >
-            <Languages className="w-4 h-4 text-gray-400" />
-            {language === 'en' ? 'हिंदी में बदलें' : 'English'}
-          </button>
-        </div>
+        {/* Subtle Decorative Background Gradients */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
+
+
 
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-          <div className="inline-flex bg-blue-100 text-blue-700 p-4 rounded-3xl mb-4">
+          <div className="inline-flex bg-white text-emerald-700 p-4 rounded-3xl mb-4 border border-emerald-500/10 shadow-lg shadow-emerald-500/5">
             <CreditCard className="w-10 h-10" />
           </div>
-          <h2 className="text-3xl font-extrabold text-gray-900 font-display tracking-tight leading-none">
-            {uiTexts.welcomeBack}
+          <h2 className="text-3xl font-black text-slate-900 font-display tracking-tight leading-none">
+            {language === 'en' ? 'PaySmart Portal' : 'पे-स्मार्ट पोर्टल'}
           </h2>
-          <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto font-medium">
-            {uiTexts.tagline}
+          <p className="mt-2 text-xs text-slate-500 max-w-sm mx-auto font-bold uppercase tracking-widest font-mono">
+            {adminSettings.companyName || 'Rathi Build Mart'}
           </p>
         </div>
 
         {/* Floating login Card */}
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-white py-8 px-6 border border-gray-100 shadow-2xl rounded-2xl space-y-6">
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md font-sans">
+          <div className="bg-white py-8 px-6 border border-slate-200 shadow-xl rounded-2xl space-y-6">
             
-            <div className="text-center">
-              <button
-                onClick={handleLogin}
-                disabled={isLoggingIn}
-                className="gsi-material-button w-full flex items-center justify-center"
-              >
-                <div className="gsi-material-button-state"></div>
-                <div className="gsi-material-button-content-wrapper">
-                  <div className="gsi-material-button-icon">
-                    <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style={{ display: 'block' }}>
-                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                      <path fill="none" d="M0 0h48v48H0z"></path>
-                    </svg>
-                  </div>
-                  <span className="gsi-material-button-contents">{uiTexts.googleSignIn}</span>
-                </div>
-              </button>
-            </div>
+            <h3 className="text-center text-xs font-black text-slate-400 uppercase tracking-widest pb-2 border-b border-slate-100">
+              Credential Access
+            </h3>
 
-            <p className="text-xxs text-center text-gray-400 font-medium">
-              {uiTexts.secureDriveSheets}
+            {loginErr && (
+              <div className="bg-rose-50 text-rose-700 border border-rose-200/50 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                <span>{loginErr}</span>
+              </div>
+            )}
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const inputID = loginId.trim();
+              const inputPass = loginPass;
+              if (!inputID || !inputPass) {
+                setLoginErr('Please fill in all fields.');
+                return;
+              }
+
+              const adminUsername = adminSettings.adminUsername || 'admin';
+              const adminPassword = adminSettings.adminPassword || 'admin123';
+
+              if (inputID.toLowerCase() === adminUsername.toLowerCase() && inputPass === adminPassword) {
+                const adminUser: PortalUser = {
+                  id: 'admin',
+                  name: 'Administrator',
+                  role: 'admin'
+                };
+                setPortalUser(adminUser);
+                localStorage.setItem('payroll_portal_user', JSON.stringify(adminUser));
+                setLoginId('');
+                setLoginPass('');
+                setLoginErr(null);
+              } else {
+                const emp = employees.find(e => e.id.toLowerCase() === inputID.toLowerCase());
+                if (emp) {
+                  const targetPass = emp.password || emp.id;
+                  const isDefaultPass = !emp.password && inputPass === '123456';
+                  const isEmpIdPass = !emp.password && inputPass === emp.id;
+                  const isCorrectPass = inputPass === targetPass || isDefaultPass || isEmpIdPass;
+
+                  if (isCorrectPass) {
+                    const empUser: PortalUser = {
+                      id: emp.id,
+                      name: emp.name,
+                      role: 'employee',
+                      employee: emp
+                    };
+                    setPortalUser(empUser);
+                    localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                    setLoginId('');
+                    setLoginPass('');
+                    setLoginErr(null);
+                  } else {
+                    setLoginErr("Incorrect Password! Standard password is your Employee ID or '123456'.");
+                  }
+                } else {
+                  setLoginErr("User ID / Employee ID not found. Contact administration.");
+                }
+              }
+            }} className="space-y-4">
+              
+              {/* User ID Field */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  User ID / Employee ID
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={loginId}
+                  onChange={(e) => setLoginId(e.target.value)}
+                  placeholder="e.g., admin or EMP001"
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                />
+              </div>
+
+              {/* Password Field */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={loginPass}
+                  onChange={(e) => setLoginPass(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-3 px-4 rounded-xl cursor-pointer shadow-md hover:shadow-lg hover:shadow-emerald-600/10 transition-all duration-150 text-center uppercase tracking-wider active:scale-98"
+              >
+                Sign In to Portal
+              </button>
+
+            </form>
+
+            <p className="text-[10px] text-center text-slate-400 font-bold leading-normal">
+              Standard employee password is their Employee ID or "123456".
             </p>
 
-            <hr className="border-gray-100" />
+            <hr className="border-slate-100" />
 
             {/* Feature benefits list */}
             <div className="space-y-4">
-              <div className="flex gap-3">
+              <div className="flex gap-3 text-xs font-bold text-slate-800">
                 <div className="bg-emerald-50 text-emerald-600 p-2 rounded-xl h-fit">
                   <Database className="w-4 h-4" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-gray-900">{uiTexts.benefitOffline}</h4>
-                  <p className="text-xxs text-gray-500 mt-0.5">{uiTexts.benefitOfflineText}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <div className="bg-blue-50 text-blue-600 p-2 rounded-xl h-fit">
-                  <Languages className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900">{uiTexts.benefitHinglish}</h4>
-                  <p className="text-xxs text-gray-500 mt-0.5">{uiTexts.benefitHinglishText}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <div className="bg-purple-50 text-purple-600 p-2 rounded-xl h-fit">
-                  <FileSpreadsheet className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900">{uiTexts.benefitSlips}</h4>
-                  <p className="text-xxs text-gray-500 mt-0.5">{uiTexts.benefitSlipsText}</p>
+                  <h4 className="text-xs font-bold text-slate-900">
+                    Cloud Sync & Storage
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-normal font-semibold font-sans">
+                    Admins can sync all payroll records safely to secure Google Sheets.
+                  </p>
                 </div>
               </div>
             </div>
 
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // 3. Render Employee Portal if user is logged in as employee
+  if (portalUser?.role === 'employee') {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans">
+        {/* Portal Header */}
+        <header className="bg-slate-950 text-white border-b border-slate-900 py-4 px-6 md:px-8 flex items-center justify-between shadow-md relative no-print shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-extrabold text-xs font-display">R</div>
+            <div>
+              <h1 className="text-sm font-black uppercase tracking-widest">{adminSettings.companyName || 'Rathi Build Mart'}</h1>
+              <p className="text-[9px] font-mono font-bold text-emerald-400 tracking-wider">Employee Workspace Portal</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Logout Button */}
+            <button
+              onClick={handlePortalLogout}
+              className="bg-rose-600/10 hover:bg-rose-600 hover:text-white border border-rose-600/20 text-rose-400 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 transition-all"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>{language === 'en' ? 'Sign Out' : 'लॉग आउट'}</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 w-full">
+          <EmployeePortal 
+            employee={portalUser.employee!}
+            attendanceRecords={attendance}
+            payrollRecords={payroll}
+            language={language}
+            adminSettings={adminSettings}
+          />
+        </main>
+
+        <footer className="bg-white border-t border-slate-200 py-3 text-center text-[9px] font-mono text-gray-400 font-semibold no-print shrink-0">
+          &copy; {new Date().getFullYear()} {adminSettings.companyName || 'Rathi Build Mart'} | Verified Cloud Payroll Receipt System
+        </footer>
       </div>
     );
   }
@@ -565,6 +769,7 @@ export default function App() {
               { id: 'employees' as const, label: uiTexts.employees, icon: Users },
               { id: 'attendance' as const, label: uiTexts.attendance, icon: Calendar },
               { id: 'payroll' as const, label: uiTexts.payroll, icon: CreditCard },
+              { id: 'leaves' as const, label: uiTexts.leaves, icon: CalendarDays },
               { id: 'admin' as const, label: uiTexts.adminSettings, icon: SettingsIcon },
             ].map((item) => {
               const IconComponent = item.icon;
@@ -617,19 +822,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Languages Button */}
-          <div className="relative group flex items-center justify-center">
-            <button
-              onClick={toggleLanguage}
-              className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
-              title="Switch Language"
-            >
-              <Languages className="w-5 h-5" />
-            </button>
-            <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
-              {language === 'en' ? 'Switch to Hindi' : 'English में बदलें'}
-            </div>
-          </div>
+
 
           {/* Light/Dark Toggle Mock representing premium dashboard details */}
           <div className="flex flex-col items-center gap-1.5 py-1">
@@ -747,13 +940,41 @@ export default function App() {
 
         {/* Scrollable Workspace Wrapper */}
         <main className="flex-1 overflow-y-auto p-4 space-y-4">
+          {portalUser?.role === 'admin' && needsAuth && !isLoadingAuth && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm bg-amber-50 text-amber-900 mb-2 font-sans">
+              <div className="flex items-center gap-3">
+                <div className="bg-amber-100 text-amber-850 p-2.5 rounded-xl shrink-0">
+                  <Database className="w-5 h-5 text-amber-800" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold tracking-tight">Google Sheets Database Disconnected</h4>
+                  <p className="text-[11px] text-slate-700 font-medium mt-0.5 leading-normal font-semibold">
+                    Sign in with your administrator Google account to automatically sync and save all payroll data to Google Sheets.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogin}
+                disabled={isLoggingIn}
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shrink-0 cursor-pointer transition-all flex items-center gap-2 shadow-sm"
+              >
+                {isLoggingIn ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <Database className="w-3.5 h-3.5" />
+                )}
+                <span>Authorize Google Sheets</span>
+              </button>
+            </div>
+          )}
+
           {isLoadingData && employees.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 bg-white/50 rounded-lg border border-gray-200">
               <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
               <p className="mt-2 text-xs text-gray-400 font-semibold">{uiTexts.syncing}</p>
             </div>
           ) : (
-            <div className="max-w-[1500px] mx-auto">
+            <div className="w-full">
               {currentTab === 'dashboard' && (
                 <Dashboard 
                   employees={employees} 
@@ -778,6 +999,7 @@ export default function App() {
                   employees={employees} 
                   attendanceRecords={attendance} 
                   onSaveAttendance={handleSaveAttendance} 
+                  onUpdateAttendanceRecords={handleUpdateAttendanceRecords}
                   language={language} 
                 />
               )}
@@ -789,6 +1011,13 @@ export default function App() {
                   onSavePayroll={handleSavePayroll} 
                   onUpdateEmployees={handleBulkAddEmployees}
                   language={language} 
+                />
+              )}
+              {currentTab === 'leaves' && (
+                <LeavesHolidays 
+                  employees={employees}
+                  attendance={attendance}
+                  language={language}
                 />
               )}
               {currentTab === 'admin' && (

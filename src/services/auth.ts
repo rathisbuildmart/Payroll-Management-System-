@@ -13,6 +13,15 @@ provider.addScope('https://www.googleapis.com/auth/spreadsheets');
 let isSigningIn = false;
 let cachedAccessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('google_access_token') : null;
 
+// Helper to check if the stored token has expired
+const isTokenExpired = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const expiresAt = localStorage.getItem('google_access_token_expires_at');
+  if (!expiresAt) return true;
+  // If current time is past expiration, it is expired
+  return Date.now() >= Number(expiresAt);
+};
+
 // Initialize auth listener
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
@@ -20,24 +29,27 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (!cachedAccessToken && typeof window !== 'undefined') {
+      if (typeof window !== 'undefined') {
+        if (isTokenExpired()) {
+          // Token is expired. Don't auto-success, clear it.
+          cachedAccessToken = null;
+          localStorage.removeItem('google_access_token');
+          localStorage.removeItem('google_access_token_expires_at');
+          if (onAuthFailure) onAuthFailure();
+          return;
+        }
         cachedAccessToken = localStorage.getItem('google_access_token');
       }
+      
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
-        // Clear token cache if state changed but we have no cached token
-        cachedAccessToken = null;
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('google_access_token');
-        }
         if (onAuthFailure) onAuthFailure();
       }
     } else {
-      cachedAccessToken = null;
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('google_access_token');
-      }
+      // NOTE: Do NOT clear the google_access_token from localStorage here, 
+      // as onAuthStateChanged can fire null briefly on page reload before restoring the session.
+      // This is the key fix that prevents users from being forced to authorize repeatedly.
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -56,6 +68,8 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     cachedAccessToken = credential.accessToken;
     if (typeof window !== 'undefined') {
       localStorage.setItem('google_access_token', cachedAccessToken);
+      // Set expiration to 55 minutes from now (Google tokens last 1 hour)
+      localStorage.setItem('google_access_token_expires_at', String(Date.now() + 55 * 60 * 1000));
     }
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
@@ -67,6 +81,14 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
+  if (isTokenExpired()) {
+    cachedAccessToken = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('google_access_token');
+      localStorage.removeItem('google_access_token_expires_at');
+    }
+    return null;
+  }
   if (!cachedAccessToken && typeof window !== 'undefined') {
     cachedAccessToken = localStorage.getItem('google_access_token');
   }
@@ -77,6 +99,7 @@ export const setAccessToken = (token: string) => {
   cachedAccessToken = token;
   if (typeof window !== 'undefined') {
     localStorage.setItem('google_access_token', token);
+    localStorage.setItem('google_access_token_expires_at', String(Date.now() + 55 * 60 * 1000));
   }
 };
 
@@ -85,5 +108,6 @@ export const logout = async () => {
   cachedAccessToken = null;
   if (typeof window !== 'undefined') {
     localStorage.removeItem('google_access_token');
+    localStorage.removeItem('google_access_token_expires_at');
   }
 };

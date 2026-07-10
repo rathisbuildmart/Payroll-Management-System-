@@ -100,6 +100,8 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   weeklyOffProfiles: ['Sunday Off', 'Saturday & Sunday Off', 'Rotational Off'],
   leaveTypes: ['Casual Leave (CL)', 'Sick Leave (SL)', 'Earned Leave (EL)', 'Maternity Leave', 'LWP'],
   fields: DEFAULT_FIELDS_CONFIG,
+  adminUsername: 'admin',
+  adminPassword: 'admin123',
 };
 
 export default function Settings({ settings, onSaveSettings, language }: SettingsProps) {
@@ -378,7 +380,7 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
           
           {/* Sub Tab: Company Profile */}
           {activeSubTab === 'company' && (
-            <div className="space-y-4 max-w-xl">
+            <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5">{t.compName}</label>
                 <input 
@@ -419,6 +421,35 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
                     className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
                   />
                 </div>
+              </div>
+
+              {/* Admin login credentials card */}
+              <div className="border-t border-dashed border-gray-200 pt-4 mt-4 space-y-4">
+                <h4 className="text-xs font-black text-[#03623c] uppercase tracking-wider flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5" />
+                  Admin Login Credentials (एडमिन क्रेडेंशियल्स)
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Admin Username (लॉगिन आईडी)</label>
+                    <input 
+                      type="text" 
+                      value={localSettings.adminUsername || 'admin'}
+                      onChange={(e) => setLocalSettings({...localSettings, adminUsername: e.target.value})}
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Admin Password (पासवर्ड)</label>
+                    <input 
+                      type="text" 
+                      value={localSettings.adminPassword || 'admin123'}
+                      onChange={(e) => setLocalSettings({...localSettings, adminPassword: e.target.value})}
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-400 font-medium">Use these credentials on the portal login screen to sign in as the System Administrator.</p>
               </div>
             </div>
           )}
@@ -533,7 +564,7 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
           {/* Sub Tab: Dropdown Masters Dynamic Management */}
           {activeSubTab === 'masters' && (
             <div className="space-y-4">
-              <div className="max-w-md">
+              <div>
                 <label className="block text-xs font-bold text-gray-700 mb-2">{t.masterSelect}</label>
                 <select
                   value={activeMasterList}
@@ -551,7 +582,7 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
               </div>
 
               {/* Master options listing */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-slate-50/50 space-y-3.5 max-w-lg shadow-2xs">
+              <div className="border border-gray-200 rounded-lg p-4 bg-slate-50/50 space-y-3.5 shadow-2xs">
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -594,7 +625,7 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
 
           {/* Sub Tab: Policy and Payroll Default Rules */}
           {activeSubTab === 'policy' && (
-            <div className="space-y-4 max-w-xl">
+            <div className="space-y-4">
               <h3 className="text-xs font-bold text-gray-800 border-b border-gray-100 pb-2 flex items-center gap-1.5">
                 <SettingsIcon className="w-4 h-4 text-[#03623c]" />
                 {t.policyTitle}

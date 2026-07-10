@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera } from 'lucide-react';
+import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock } from 'lucide-react';
 import { Employee, AdminSettings } from '../types';
 
 interface EmployeeListProps {
@@ -28,6 +28,19 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   const [isImportSaving, setIsImportSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sub Tab Selector State
+  const [activeSubTab, setActiveSubTab] = useState<'directory' | 'increments'>('directory');
+
+  // Salary Increment Tracker States
+  const [selectedEmployeeForIncrement, setSelectedEmployeeForIncrement] = useState<Employee | null>(null);
+  const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] = useState<Employee | null>(null);
+  const [incDate, setIncDate] = useState(new Date().toISOString().split('T')[0]);
+  const [incAmount, setIncAmount] = useState<number>(0);
+  const [incNewSalary, setIncNewSalary] = useState<number>(0);
+  const [incNextDate, setIncNextDate] = useState<string>('');
+  const [incRemarks, setIncRemarks] = useState<string>('');
+  const [isSavingIncrement, setIsSavingIncrement] = useState(false);
 
   // Form states with all custom sub-fields
   const [formData, setFormData] = useState<Partial<Employee>>({
@@ -94,6 +107,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     leaveType: '',
     referenceNumber: '',
     photoUrl: '',
+    password: '',
   });
 
   const t = {
@@ -634,6 +648,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       leaveType: emp.leaveType || '',
       referenceNumber: emp.referenceNumber || '',
       photoUrl: emp.photoUrl || '',
+      password: emp.password || '',
     });
     setIsModalOpen(true);
   };
@@ -683,6 +698,43 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     } catch (err) {
       console.error(err);
       alert('Failed to update status in Google Sheets.');
+    }
+  };
+
+  const handleRecordIncrement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEmployeeForIncrement) return;
+    setIsSavingIncrement(true);
+    try {
+      const newIncrement = {
+        id: Date.now().toString(),
+        date: incDate,
+        amount: Number(incAmount),
+        previousSalary: selectedEmployeeForIncrement.basicSalary,
+        newSalary: Number(incNewSalary),
+        remarks: incRemarks
+      };
+
+      const updatedEmployee: Employee = {
+        ...selectedEmployeeForIncrement,
+        basicSalary: Number(incNewSalary),
+        increments: [...(selectedEmployeeForIncrement.increments || []), newIncrement],
+        nextIncrementDate: incNextDate || undefined
+      };
+
+      await onUpdateEmployee(updatedEmployee);
+      alert('Salary increment successfully recorded and synced to Google Sheets!');
+      setSelectedEmployeeForIncrement(null);
+      // Reset values
+      setIncAmount(0);
+      setIncNewSalary(0);
+      setIncNextDate('');
+      setIncRemarks('');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to record salary increment. Please verify network connection.');
+    } finally {
+      setIsSavingIncrement(false);
     }
   };
 
@@ -748,7 +800,34 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
 
   return (
     <div className="space-y-6">
-      {/* Search and Filters panel */}
+      
+      {/* 2026 Admin Navigation Tabs for Employee Section */}
+      <div className="flex border-b border-gray-200 bg-white p-1 rounded-xl border shadow-xs">
+        <button
+          onClick={() => setActiveSubTab('directory')}
+          className={`flex-1 md:flex-initial text-center py-2 px-6 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+            activeSubTab === 'directory'
+              ? 'bg-[#03623c] text-white shadow-sm'
+              : 'text-gray-500 hover:text-gray-950 hover:bg-gray-50'
+          }`}
+        >
+          {language === 'en' ? 'Employee Directory' : 'कर्मचारी सूची'}
+        </button>
+        <button
+          onClick={() => setActiveSubTab('increments')}
+          className={`flex-1 md:flex-initial text-center py-2 px-6 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+            activeSubTab === 'increments'
+              ? 'bg-[#03623c] text-white shadow-sm'
+              : 'text-gray-500 hover:text-gray-950 hover:bg-gray-50'
+          }`}
+        >
+          {language === 'en' ? 'Salary Increments Report' : 'वेतन वृद्धि इतिहास'}
+        </button>
+      </div>
+
+      {activeSubTab === 'directory' ? (
+        <>
+          {/* Search and Filters panel */}
       <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-1 flex-col sm:flex-row gap-3">
           {/* Search Input */}
@@ -1124,6 +1203,24 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         {renderFormInput('elBalance', 'EL Balance (Earned)', 'number')}
                       </div>
                     </div>
+
+                    <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
+                      <h5 className="text-[10px] font-extrabold text-[#03623c] uppercase tracking-wide mb-1.5">Portal Access (पोर्टल लॉगिन पासवर्ड)</h5>
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-semibold text-gray-500 uppercase">
+                          Login Password (पासवर्ड)
+                        </label>
+                        <input
+                          type="text"
+                          name="password"
+                          value={formData.password as string || ''}
+                          onChange={handleInputChange}
+                          placeholder="Password (default: ID or 123456)"
+                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-medium"
+                        />
+                        <p className="text-[9px] text-gray-400 font-medium">If left blank, employee can log in using their ID or "123456" as password.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1373,6 +1470,336 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+        </>
+      ) : (
+        /* Render Increment History Report */
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-1 flex-col sm:flex-row gap-3">
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                  <Search className="w-5 h-5" />
+                </span>
+                <input
+                  type="text"
+                  placeholder={language === 'en' ? "Search for employee increments..." : "कर्मचारी वेतन वृद्धि खोजें..."}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm font-semibold text-gray-900"
+                />
+              </div>
+
+              {/* Department Filter */}
+              <div className="relative min-w-[200px]">
+                <select
+                  value={selectedDept}
+                  onChange={(e) => setSelectedDept(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-semibold text-gray-700"
+                >
+                  <option value="All">{language === 'en' ? 'All Departments' : 'सभी विभाग'}</option>
+                  {DEPARTMENTS.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden">
+            {filteredEmployees.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-widest font-display">
+                      <th className="py-4 px-6">ID &amp; Employee</th>
+                      <th className="py-4 px-6">Department</th>
+                      <th className="py-4 px-6">Current Salary</th>
+                      <th className="py-4 px-6 text-center">Last Increment Date</th>
+                      <th className="py-4 px-6 text-center">Last Increment Amount</th>
+                      <th className="py-4 px-6 text-center">Next Increment Due</th>
+                      <th className="py-4 px-6 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-medium">
+                    {filteredEmployees.map((emp) => {
+                      const increments = emp.increments || [];
+                      const lastInc = increments.length > 0 ? increments[increments.length - 1] : null;
+                      return (
+                        <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="py-4 px-6">
+                            <div className="font-extrabold text-gray-900 text-sm">{emp.name}</div>
+                            <div className="text-[11px] text-gray-400 font-mono font-bold">{emp.id} &bull; {emp.designation}</div>
+                          </td>
+                          <td className="py-4 px-6">
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-gray-100 text-gray-600">
+                              {emp.department}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 font-mono font-extrabold text-gray-900 text-sm">
+                            ₹{emp.basicSalary.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-6 text-center font-mono text-gray-500 font-bold">
+                            {lastInc ? lastInc.date : '—'}
+                          </td>
+                          <td className="py-4 px-6 text-center font-mono text-emerald-600 font-bold">
+                            {lastInc ? `+₹${lastInc.amount.toLocaleString('en-IN')}` : '—'}
+                          </td>
+                          <td className="py-4 px-6 text-center">
+                            {emp.nextIncrementDate ? (
+                              <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono">
+                                {emp.nextIncrementDate}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 font-bold">Not Scheduled</span>
+                            )}
+                          </td>
+                          <td className="py-4 px-6 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setSelectedEmployeeForHistory(emp)}
+                                className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-all active:scale-97 shadow-xxs"
+                                title="View Appraisal History"
+                              >
+                                <Clock className="w-3.5 h-3.5 text-gray-400" />
+                                <span>History ({increments.length})</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedEmployeeForIncrement(emp);
+                                  setIncAmount(0);
+                                  setIncNewSalary(emp.basicSalary);
+                                  setIncDate(new Date().toISOString().split('T')[0]);
+                                }}
+                                className="bg-[#03623c]/10 hover:bg-[#03623c]/20 text-[#03623c] border border-[#03623c]/20 px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-all active:scale-97 shadow-xxs"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Record Appraisal</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-16 text-gray-400">
+                <AlertCircle className="w-10 h-10 mx-auto text-gray-200 mb-3" />
+                <p className="text-xs font-bold leading-relaxed">No matching employees found for increments tracking.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* RECORD INCREMENT MODAL */}
+      {selectedEmployeeForIncrement && (
+        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-150 pb-3 font-display">
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                <DollarSign className="w-4 h-4 text-[#03623c]" />
+                Record Salary Increment
+              </h3>
+              <button 
+                onClick={() => setSelectedEmployeeForIncrement(null)}
+                className="text-gray-400 hover:text-gray-600 rounded-lg p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRecordIncrement} className="space-y-4 text-xs font-semibold">
+              <div>
+                <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Employee Details</span>
+                <p className="mt-1 font-extrabold text-sm text-gray-800">
+                  {selectedEmployeeForIncrement.name} <span className="font-mono text-xs text-gray-400">({selectedEmployeeForIncrement.id})</span>
+                </p>
+                <p className="text-[11px] text-gray-500 font-medium mt-0.5">{selectedEmployeeForIncrement.designation} &bull; {selectedEmployeeForIncrement.department}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Salary (₹)</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={`₹${selectedEmployeeForIncrement.basicSalary.toLocaleString('en-IN')}`}
+                    className="w-full px-3 py-2 border border-gray-150 bg-gray-50 rounded-xl mt-1 font-mono font-bold text-gray-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Increment Amount (₹) <span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    placeholder="e.g. 5000"
+                    value={incAmount || ''}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setIncAmount(val);
+                      setIncNewSalary(selectedEmployeeForIncrement.basicSalary + val);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-mono font-bold text-gray-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">New Salary (₹) <span className="text-red-500">*</span></label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={incNewSalary || ''}
+                    onChange={(e) => setIncNewSalary(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-mono font-bold text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Increment Date <span className="text-red-500">*</span></label>
+                  <input
+                    type="date"
+                    required
+                    value={incDate}
+                    onChange={(e) => setIncDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-semibold text-gray-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Next Increment Due Date</label>
+                <input
+                  type="date"
+                  value={incNextDate}
+                  onChange={(e) => setIncNextDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-semibold text-gray-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Remarks / Notes</label>
+                <textarea
+                  placeholder="Reason for increment, e.g., Annual Performance appraisal"
+                  value={incRemarks}
+                  onChange={(e) => setIncRemarks(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] text-xs h-16 font-semibold"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedEmployeeForIncrement(null)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold text-gray-600 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingIncrement}
+                  className="px-5 py-2 bg-[#03623c] hover:bg-[#024a2d] text-white rounded-xl font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingIncrement ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      Save & Sync
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* INCREMENT HISTORY MODAL */}
+      {selectedEmployeeForHistory && (
+        <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b border-gray-150 pb-3 shrink-0">
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-[#03623c]" />
+                Increment History
+              </h3>
+              <button 
+                onClick={() => setSelectedEmployeeForHistory(null)}
+                className="text-gray-400 hover:text-gray-600 rounded-lg p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="shrink-0">
+              <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Employee Details</span>
+              <p className="mt-1 font-extrabold text-sm text-gray-800">
+                {selectedEmployeeForHistory.name} <span className="font-mono text-xs text-gray-400">({selectedEmployeeForHistory.id})</span>
+              </p>
+              <p className="text-[11px] text-gray-500 font-medium mt-0.5">{selectedEmployeeForHistory.designation} &bull; {selectedEmployeeForHistory.department}</p>
+              <p className="text-[11px] text-[#03623c] font-black mt-1 uppercase">Current Basic Salary: ₹{selectedEmployeeForHistory.basicSalary.toLocaleString('en-IN')}</p>
+            </div>
+
+            <div className="overflow-y-auto pr-2 py-2 flex-1 scrollbar-thin">
+              {selectedEmployeeForHistory.increments && selectedEmployeeForHistory.increments.length > 0 ? (
+                <div className="relative border-l-2 border-emerald-100 ml-3 pl-5 space-y-6">
+                  {selectedEmployeeForHistory.increments
+                    .slice()
+                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .map((inc, index) => (
+                      <div key={inc.id || index} className="relative">
+                        {/* Timeline Bullet Point */}
+                        <span className="absolute -left-[27px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 ring-4 ring-white">
+                          <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                        </span>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-[11px] text-gray-500 bg-gray-50 border px-2 py-0.5 rounded-md font-mono">{inc.date}</span>
+                            <span className="font-black text-emerald-600 text-xs font-mono">+₹{inc.amount.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="text-xs font-semibold text-gray-800">
+                            Salary Raised from <span className="font-mono text-gray-500">₹{inc.previousSalary?.toLocaleString('en-IN') || '—'}</span> &rarr; <span className="font-mono text-emerald-700">₹{inc.newSalary?.toLocaleString('en-IN') || '—'}</span>
+                          </div>
+                          {inc.remarks && (
+                            <p className="text-[11px] text-gray-500 italic bg-gray-50 p-2 rounded-lg border border-gray-100 font-medium mt-1">
+                              &ldquo;{inc.remarks}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 text-gray-400 space-y-2">
+                  <AlertCircle className="w-8 h-8 mx-auto text-gray-200" />
+                  <p className="text-xs font-bold">No increments history found.</p>
+                  <p className="text-[10px] text-gray-400 max-w-xs mx-auto">Use the &ldquo;Record Increment&rdquo; button to log salary appraisal events.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedEmployeeForHistory(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold text-gray-600 text-xs cursor-pointer"
+              >
+                Close View
+              </button>
+            </div>
           </div>
         </div>
       )}

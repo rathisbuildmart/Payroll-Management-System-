@@ -10,6 +10,7 @@ export interface Employee {
   hourlyRate: number;
   paymentMethod: 'Bank Transfer' | 'Cash' | 'Cheque';
   isActive: boolean;
+  password?: string; // Optional portal login password
 
   // Custom salary structures (recurring values)
   hra?: number;
@@ -77,6 +78,17 @@ export interface Employee {
   leaveType?: string;
   referenceNumber?: string;
   photoUrl?: string; // base64 or link
+  increments?: SalaryIncrement[];
+  nextIncrementDate?: string;
+}
+
+export interface SalaryIncrement {
+  id: string;
+  date: string;       // YYYY-MM-DD
+  amount: number;     // how much was the increment
+  previousSalary: number;
+  newSalary: number;
+  remarks?: string;
 }
 
 export interface FieldSetting {
@@ -105,6 +117,8 @@ export interface AdminSettings {
   weeklyOffProfiles: string[];
   leaveTypes: string[];
   fields: FieldSetting[];
+  adminUsername?: string;
+  adminPassword?: string;
 }
 
 export interface Attendance {
@@ -115,6 +129,7 @@ export interface Attendance {
   checkOut: string; // HH:MM
   overtimeHours: number;
   remarks: string;
+  approvalStatus?: 'Pending' | 'Approved' | 'Rejected';
 }
 
 export interface PayrollRecord {
