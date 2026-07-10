@@ -1,0 +1,144 @@
+export interface Employee {
+  id: string;
+  name: string;
+  department: string;
+  designation: string;
+  joiningDate: string;
+  basicSalary: number;
+  allowances: number;
+  deductions: number;
+  hourlyRate: number;
+  paymentMethod: 'Bank Transfer' | 'Cash' | 'Cheque';
+  isActive: boolean;
+
+  // Custom salary structures (recurring values)
+  hra?: number;
+  da?: number;
+  conveyanceAllowance?: number;
+  advanceSalaryBalance?: number; // Total loan/advance outstanding
+  advanceSalaryDeduction?: number; // Repayment deduction amount per month
+  clBalance?: number; // Casual Leave balance
+  elBalance?: number; // Earned Leave balance
+
+  // Personal Detail Custom Fields
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  mobileNo?: string;
+  personalMobileNo?: string;
+  personalEmail?: string;
+  dob?: string;
+  bloodGroup?: string;
+  emergencyContactNo?: string;
+  ctcOffered?: number;
+  gender?: 'Male' | 'Female' | 'Other';
+  employmentType?: 'Fresher' | 'Experienced';
+  linkUser?: string;
+  probationDate?: string;
+
+  // Residential Address Custom Fields
+  resLine1?: string;
+  resLine2?: string;
+  resCountry?: string;
+  resState?: string;
+  resCity?: string;
+  resPinCode?: string;
+
+  // Permanent Address Custom Fields
+  permLine1?: string;
+  permLine2?: string;
+  permCountry?: string;
+  permState?: string;
+  permCity?: string;
+  permPinCode?: string;
+
+  // Bank Detail Custom Fields
+  bankAccountNo?: string;
+  bankAccountHolderName?: string;
+  bankName?: string;
+  ifscCode?: string;
+
+  // Other Detail Custom Fields
+  panNo?: string;
+  pfAccountNo?: string;
+  esicNo?: string;
+  aadhaarNo?: string;
+  uan?: string;
+
+  // Employment Detail Custom Fields
+  confirmationDate?: string;
+  branch?: string;
+  costCenter?: string;
+  reportingTo?: string;
+  noticePeriod?: string;
+  workTiming?: string;
+  employeeGroup?: string;
+  weeklyOffProfile?: string;
+  leaveType?: string;
+  referenceNumber?: string;
+  photoUrl?: string; // base64 or link
+}
+
+export interface FieldSetting {
+  id: keyof Employee;
+  label: string;
+  group: 'detail' | 'residential' | 'permanent' | 'bank' | 'other' | 'employment';
+  isHidden: boolean;
+  isMandatory: boolean;
+}
+
+export interface AdminSettings {
+  companyName: string;
+  companyAddress: string;
+  companyLogo?: string;
+  currency: string;
+  defaultCheckIn: string; // "09:00"
+  defaultCheckOut: string; // "18:00"
+  defaultOvertimeRate: number; // 150
+  pfContributionRate: number; // 12
+  esicContributionRate: number; // 0.75
+  departments: string[];
+  branches: string[];
+  costCenters: string[];
+  employeeGroups: string[];
+  workTimings: string[];
+  weeklyOffProfiles: string[];
+  leaveTypes: string[];
+  fields: FieldSetting[];
+}
+
+export interface Attendance {
+  date: string; // YYYY-MM-DD
+  employeeId: string;
+  status: 'Present' | 'Absent' | 'Half Day' | 'Leave' | 'Miss Punch';
+  checkIn: string; // HH:MM
+  checkOut: string; // HH:MM
+  overtimeHours: number;
+  remarks: string;
+}
+
+export interface PayrollRecord {
+  monthYear: string; // YYYY-MM
+  employeeId: string;
+  basicSalary: number;
+  allowances: number;
+  deductions: number;
+  overtimePay: number;
+  totalSalary: number; // Gross total salary (Basic + Allowances + Bonuses + Overtime)
+  paymentDate: string; // YYYY-MM-DD or empty
+  paymentStatus: 'Paid' | 'Pending';
+
+  // Custom structures detail breakdown
+  hra?: number;
+  da?: number;
+  conveyanceAllowance?: number;
+  festivalBonus?: number;
+  performanceIncentive?: number;
+  leaveAdjustment?: number; // Paid leaves salary re-add/adjustment
+  advanceDeduction?: number; // Monthly advance deduction
+  tds?: number; // Tax Deducted at Source
+  professionalTax?: number; // Professional Tax
+  providentFund?: number; // PF deduction
+  esic?: number; // ESIC deduction
+  netSalary?: number; // Net payable salary (Gross - Deductions - Advance - TDS - PT - PF - ESIC)
+}

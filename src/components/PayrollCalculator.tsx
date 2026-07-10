@@ -1,0 +1,1763 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, CreditCard, Check, Printer, FileText, DollarSign, Calculator, AlertCircle, Save, TrendingUp, Users, ArrowUpRight, ShieldCheck, ArrowDownRight, Landmark, Building, Sparkles } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import { Employee, Attendance, PayrollRecord } from '../types';
+
+interface PayrollCalculatorProps {
+  employees: Employee[];
+  attendanceRecords: Attendance[];
+  payrollRecords: PayrollRecord[];
+  onSavePayroll: (records: PayrollRecord[]) => Promise<void>;
+  onUpdateEmployees?: (updatedEmployees: Employee[]) => Promise<void>;
+  language: 'en' | 'hi';
+}
+
+const MONTHS = [
+  { name: 'January', hindi: 'जनवरी', value: '01' },
+  { name: 'February', hindi: 'फरवरी', value: '02' },
+  { name: 'March', hindi: 'मार्च', value: '03' },
+  { name: 'April', hindi: 'अप्रैल', value: '04' },
+  { name: 'May', hindi: 'मई', value: '05' },
+  { name: 'June', hindi: 'जून', value: '06' },
+  { name: 'July', hindi: 'जुलाई', value: '07' },
+  { name: 'August', hindi: 'अगस्त', value: '08' },
+  { name: 'September', hindi: 'सितंबर', value: '09' },
+  { name: 'October', hindi: 'अक्टूबर', value: '10' },
+  { name: 'November', hindi: 'नवंबर', value: '11' },
+  { name: 'December', hindi: 'दिसंबर', value: '12' },
+];
+
+export default function PayrollCalculator({ employees, attendanceRecords, payrollRecords, onSavePayroll, onUpdateEmployees, language }: PayrollCalculatorProps) {
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
+  const [workingDays, setWorkingDays] = useState<number>(26);
+  const [localPayroll, setLocalPayroll] = useState<PayrollRecord[]>([]);
+  const [activePayslip, setActivePayslip] = useState<any | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // States for manual payroll adjustments modal
+  const [editingRecord, setEditingRecord] = useState<PayrollRecord | null>(null);
+  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+
+  const activeEmployees = employees.filter(e => e.isActive);
+  const selectedMonthYear = `${selectedYear}-${selectedMonth}`;
+
+  // Unified Payroll Calculation Engine (Supports HRA, DA, Conveyance, PF, ESIC, PT, TDS, Advances & Leaves)
+  const calculateSingleEmployeePayroll = (emp: Employee, overrideRecord?: Partial<PayrollRecord>): PayrollRecord => {
+    const empAtt = attendanceRecords.filter(r => r.employeeId === emp.id && r.date.startsWith(selectedMonthYear));
+    
+    const daysPresent = empAtt.filter(r => r.status === 'Present').length;
+    const daysHalfDay = empAtt.filter(r => r.status === 'Half Day').length;
+    const daysLeave = empAtt.filter(r => r.status === 'Leave').length; // Paid Leave
+    const daysMissPunch = empAtt.filter(r => r.status === 'Miss Punch').length;
+    
+    // Compute pro-rated earned basic (Miss punches or pending aren't fully counted unless approved, keeping simple)
+    const workedDaysVal = daysPresent + (0.5 * daysHalfDay) + daysLeave;
+    const earnedRatio = Math.min(1, workedDaysVal / workingDays);
+    const earnedBasic = Math.round(emp.basicSalary * (workedDaysVal === 0 ? 0 : earnedRatio));
+
+    // Overtime
+    const overtimeHoursTotal = empAtt.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
+    const overtimePay = Math.round(overtimeHoursTotal * (emp.hourlyRate || 150));
+
+    // Base default structures from employee profile or Indian standards
+    const defaultHra = emp.hra !== undefined && emp.hra > 0 ? emp.hra : Math.round(emp.basicSalary * 0.40);
+    const defaultDa = emp.da !== undefined && emp.da > 0 ? emp.da : Math.round(emp.basicSalary * 0.10);
+    const defaultConveyance = emp.conveyanceAllowance !== undefined && emp.conveyanceAllowance > 0 ? emp.conveyanceAllowance : (emp.basicSalary > 25000 ? 1600 : 800);
+    const defaultAdvanceDeduction = emp.advanceSalaryDeduction !== undefined && emp.advanceSalaryDeduction > 0 ? Math.min(emp.advanceSalaryBalance || 0, emp.advanceSalaryDeduction) : 0;
+
+    // Use current overrides or default values
+    const hra = overrideRecord?.hra !== undefined ? overrideRecord.hra : defaultHra;
+    const da = overrideRecord?.da !== undefined ? overrideRecord.da : defaultDa;
+    const conveyanceAllowance = overrideRecord?.conveyanceAllowance !== undefined ? overrideRecord.conveyanceAllowance : defaultConveyance;
+    const festivalBonus = overrideRecord?.festivalBonus !== undefined ? overrideRecord.festivalBonus : 0;
+    const performanceIncentive = overrideRecord?.performanceIncentive !== undefined ? overrideRecord.performanceIncentive : 0;
+    const leaveAdjustment = overrideRecord?.leaveAdjustment !== undefined ? overrideRecord.leaveAdjustment : 0;
+    const advanceDeduction = overrideRecord?.advanceDeduction !== undefined ? overrideRecord.advanceDeduction : defaultAdvanceDeduction;
+
+    // Prorate standard HRA/DA/Conveyance based on attendance ratio (standard practice) or keep fixed?
+    // Let's keep HRA/DA/Conveyance fixed/monthly full, but pro-rate Basic (very common to prevent penalizing allowances, or we can proration, let's keep them fully paid as configured)
+    const standardAllowancesTotal = emp.allowances;
+    const customAllowancesTotal = hra + da + conveyanceAllowance;
+    const grossSalary = earnedBasic + standardAllowancesTotal + customAllowancesTotal + overtimePay + festivalBonus + performanceIncentive + leaveAdjustment;
+
+    // PF contribution: 12% of pro-rated basic salary
+    const providentFund = Math.round(earnedBasic * 0.12);
+
+    // ESIC contribution: 0.75% of Gross Salary if gross is <= 21,000 INR
+    const esic = grossSalary <= 21000 ? Math.round(grossSalary * 0.0075) : 0;
+
+    // Professional Tax (PT): ₹200 if Gross >= 10000 INR
+    const professionalTax = grossSalary >= 10000 ? 200 : 0;
+
+    // Indian Income Tax TDS (Estimated Bracket based on annual projected Gross)
+    const annualEstGross = grossSalary * 12;
+    let computedTds = 0;
+    if (annualEstGross > 700000) {
+      if (annualEstGross <= 1000000) {
+        computedTds = Math.round(((annualEstGross - 700000) * 0.05) / 12);
+      } else if (annualEstGross <= 1200000) {
+        computedTds = Math.round((15000 + (annualEstGross - 1000000) * 0.10) / 12);
+      } else {
+        computedTds = Math.round((35000 + (annualEstGross - 1200000) * 0.15) / 12);
+      }
+    }
+
+    const finalTds = overrideRecord?.tds !== undefined ? overrideRecord.tds : computedTds;
+    const finalPt = overrideRecord?.professionalTax !== undefined ? overrideRecord.professionalTax : professionalTax;
+    const finalPf = overrideRecord?.providentFund !== undefined ? overrideRecord.providentFund : providentFund;
+    const finalEsic = overrideRecord?.esic !== undefined ? overrideRecord.esic : esic;
+
+    // Statutory deductions total
+    const statutoryDeductionsTotal = finalPf + finalEsic + finalPt + finalTds;
+    
+    // Total standard and custom deductions
+    const totalDeductions = emp.deductions + statutoryDeductionsTotal;
+
+    // Net Payable = Gross - Deductions - Advance repaid
+    const netSalary = Math.max(0, grossSalary - totalDeductions - advanceDeduction);
+
+    return {
+      monthYear: selectedMonthYear,
+      employeeId: emp.id,
+      basicSalary: emp.basicSalary,
+      allowances: standardAllowancesTotal + customAllowancesTotal + festivalBonus + performanceIncentive + leaveAdjustment,
+      deductions: totalDeductions,
+      overtimePay,
+      totalSalary: grossSalary, // Gross Salary
+      paymentDate: overrideRecord?.paymentDate || '',
+      paymentStatus: overrideRecord?.paymentStatus || 'Pending',
+
+      // Detailed breakdown fields saved in metadata
+      hra,
+      da,
+      conveyanceAllowance,
+      festivalBonus,
+      performanceIncentive,
+      leaveAdjustment,
+      advanceDeduction,
+      tds: finalTds,
+      professionalTax: finalPt,
+      providentFund: finalPf,
+      esic: finalEsic,
+      netSalary,
+    };
+  };
+
+  // 1. PDF Payslip Generation using jspdf
+  const downloadPayslipPDF = (record: PayrollRecord, emp: any) => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const navyColor = [15, 23, 42]; // Slate-900 theme
+    const goldColor = [16, 185, 129]; // Emerald-500
+    const lightGray = [248, 250, 252]; // Slate-50 background
+    
+    // Header banner
+    doc.setFillColor(navyColor[0], navyColor[1], navyColor[2]);
+    doc.rect(0, 0, 210, 18, 'F');
+    
+    // Header Text
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('RATHI BUILD MART - PAYSLIP', 105, 11, { align: 'center' });
+
+    // Company address
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(8);
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Headquarters: NH-6, Rathi Estate, Raipur, Chhattisgarh, India', 105, 24, { align: 'center' });
+    doc.text(`Salary Slip for the Pay Period: ${record.monthYear}`, 105, 28, { align: 'center' });
+
+    // Separator line
+    doc.setDrawColor(226, 232, 240);
+    doc.line(10, 32, 200, 32);
+
+    // Section 1: Employee metadata
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(navyColor[0], navyColor[1], navyColor[2]);
+    doc.text('EMPLOYEE DETAILS', 10, 39);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(51, 65, 85);
+    
+    // Column 1
+    doc.text(`Employee ID: ${record.employeeId}`, 10, 45);
+    doc.text(`Employee Name: ${emp?.name || 'N/A'}`, 10, 50);
+    doc.text(`Designation: ${emp?.designation || 'N/A'}`, 10, 55);
+    doc.text(`Department: ${emp?.department || 'N/A'}`, 10, 60);
+    doc.text(`Joining Date: ${emp?.joiningDate || 'N/A'}`, 10, 65);
+
+    // Column 2
+    doc.text(`Bank Account No: ${emp?.bankAccountNo || 'N/A'}`, 110, 45);
+    doc.text(`Bank Name: ${emp?.bankName || 'N/A'}`, 110, 50);
+    doc.text(`IFSC Code: ${emp?.ifscCode || 'N/A'}`, 110, 55);
+    doc.text(`PAN Number: ${emp?.panNo || 'N/A'}`, 110, 60);
+    doc.text(`UAN / PF Number: ${emp?.uan || emp?.pfAccountNo || 'N/A'}`, 110, 65);
+
+    doc.line(10, 70, 200, 70);
+
+    // Attendance Overview
+    const empAtt = attendanceRecords.filter(r => r.employeeId === record.employeeId && r.date.startsWith(selectedMonthYear));
+    const daysPresent = empAtt.filter(r => r.status === 'Present').length;
+    const daysHalfDay = empAtt.filter(r => r.status === 'Half Day').length;
+    const daysLeave = empAtt.filter(r => r.status === 'Leave').length;
+    const daysAbsent = empAtt.filter(r => r.status === 'Absent').length;
+    const workedDays = daysPresent + (0.5 * daysHalfDay) + daysLeave;
+    const overtimeHoursTotal = empAtt.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
+    
+    doc.setFont('Helvetica', 'bold');
+    doc.text('ATTENDANCE RECORD', 10, 76);
+    doc.setFont('Helvetica', 'normal');
+    doc.text(`Calendar Days: ${workingDays} Days`, 10, 81);
+    doc.text(`Days Present: ${daysPresent} Days`, 55, 81);
+    doc.text(`Paid Leaves: ${daysLeave} Days`, 105, 81);
+    doc.text(`Effective Worked: ${workedDays} Days`, 155, 81);
+
+    doc.line(10, 85, 200, 85);
+
+    // Header of breakdown table
+    doc.setFillColor(navyColor[0], navyColor[1], navyColor[2]);
+    doc.rect(10, 90, 90, 7, 'F');
+    doc.rect(110, 90, 90, 7, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('SALARY ALLOWANCES (EARNINGS)', 15, 95);
+    doc.text('AMOUNT (₹)', 80, 95);
+    doc.text('STATUTORY DEDUCTIONS', 115, 95);
+    doc.text('AMOUNT (₹)', 180, 95);
+
+    // Custom allowances/deductions values
+    const hra = record.hra !== undefined ? record.hra : Math.round(record.basicSalary * 0.40);
+    const da = record.da !== undefined ? record.da : 0;
+    const conv = record.conveyanceAllowance !== undefined ? record.conveyanceAllowance : 0;
+    const festBonus = record.festivalBonus !== undefined ? record.festivalBonus : 0;
+    const perfInc = record.performanceIncentive !== undefined ? record.performanceIncentive : 0;
+    const leaveAdj = record.leaveAdjustment !== undefined ? record.leaveAdjustment : 0;
+    const standardAllowances = emp?.allowances || 0;
+
+    const pf = record.providentFund !== undefined ? record.providentFund : Math.round(record.basicSalary * 0.12);
+    const esic = record.esic !== undefined ? record.esic : 0;
+    const pt = record.professionalTax !== undefined ? record.professionalTax : 0;
+    const tds = record.tds !== undefined ? record.tds : 0;
+    const advDec = record.advanceDeduction !== undefined ? record.advanceDeduction : 0;
+    const standardDeductions = emp?.deductions || 0;
+
+    const earnings = [
+      { name: 'Basic Pay (Earned)', amount: record.basicSalary },
+      { name: 'House Rent Allowance (HRA)', amount: hra },
+      { name: 'Dearness Allowance (DA)', amount: da },
+      { name: 'Conveyance Allowance', amount: conv },
+      { name: 'Standard Allowances', amount: standardAllowances },
+      { name: 'Overtime Earnings', amount: record.overtimePay },
+      { name: 'Festival / Diwali Bonus', amount: festBonus },
+      { name: 'Performance Incentives', amount: perfInc },
+      { name: 'CL/EL Leave Adjustment', amount: leaveAdj },
+    ];
+
+    const deductions = [
+      { name: 'Provident Fund (PF 12%)', amount: pf },
+      { name: 'Employee State Insur (ESIC)', amount: esic },
+      { name: 'Professional Tax (PT)', amount: pt },
+      { name: 'Income Tax (TDS)', amount: tds },
+      { name: 'Advance Outstanding Repay', amount: advDec },
+      { name: 'Other Deductions', amount: standardDeductions },
+    ];
+
+    const maxLength = Math.max(earnings.length, deductions.length);
+    let currentY = 102;
+    doc.setTextColor(51, 65, 85);
+    doc.setFont('Helvetica', 'normal');
+
+    for (let i = 0; i < maxLength; i++) {
+      const earn = earnings[i];
+      const deduct = deductions[i];
+
+      // Alternating row styling
+      if (i % 2 === 0) {
+        doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+        if (earn) doc.rect(10, currentY - 3, 90, 5, 'F');
+        if (deduct) doc.rect(110, currentY - 3, 90, 5, 'F');
+      }
+
+      if (earn) {
+        doc.text(earn.name, 15, currentY);
+        doc.text(`Rs. ${earn.amount.toLocaleString('en-IN')}`, 80, currentY);
+      }
+
+      if (deduct) {
+        doc.text(deduct.name, 115, currentY);
+        doc.text(`Rs. ${deduct.amount.toLocaleString('en-IN')}`, 180, currentY);
+      }
+
+      currentY += 5;
+    }
+
+    // Dividers
+    doc.line(10, currentY, 200, currentY);
+    currentY += 5;
+    doc.setFont('Helvetica', 'bold');
+    
+    const grossSalary = earnings.reduce((sum, e) => sum + e.amount, 0);
+    const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
+    const netSalaryPay = Math.max(0, grossSalary - totalDeductions);
+
+    doc.text('GROSS SALARY:', 15, currentY);
+    doc.text(`Rs. ${grossSalary.toLocaleString('en-IN')}`, 80, currentY);
+    
+    doc.text('TOTAL DEDUCTIONS:', 115, currentY);
+    doc.text(`Rs. ${totalDeductions.toLocaleString('en-IN')}`, 180, currentY);
+
+    currentY += 8;
+    // Draw Net Payout Highlights Block
+    doc.setFillColor(241, 245, 249);
+    doc.rect(10, currentY - 4, 190, 8, 'F');
+    doc.setTextColor(2, 24, 16);
+    doc.setFontSize(9.5);
+    doc.text('NET SALARY DISBURSED:', 15, currentY);
+    doc.text(`Rs. ${netSalaryPay.toLocaleString('en-IN')}  /-  (Rupees Only)`, 110, currentY);
+
+    currentY += 15;
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(7.5);
+    doc.setFont('Helvetica', 'normal');
+    doc.text('This is a computer-generated salary statement certificate synced securely to company Google Drive ledger and does not require a physical stamp.', 10, currentY);
+
+    currentY += 14;
+    doc.line(10, currentY, 50, currentY);
+    doc.line(150, currentY, 190, currentY);
+    currentY += 4;
+    doc.text('Employee Signature', 20, currentY);
+    doc.text('Authorized Signatory', 160, currentY);
+
+    doc.save(`Payslip_${emp?.name?.replace(/\s+/g, '_') || 'Employee'}_${record.monthYear}.pdf`);
+  };
+
+  // 2. Bank Bulk Upload CSV Format Generator (HDFC, SBI, ICICI)
+  const handleBankExport = (bank: 'SBI' | 'HDFC' | 'ICICI') => {
+    let headers: string[] = [];
+    let rows: string[][] = [];
+    
+    localPayroll.forEach((rec, idx) => {
+      const emp = employees.find(e => e.id === rec.employeeId);
+      const accNo = emp?.bankAccountNo || '';
+      const name = emp?.bankAccountHolderName || emp?.name || 'Unknown';
+      const ifsc = emp?.ifscCode || '';
+      const amount = rec.netSalary !== undefined ? rec.netSalary : rec.totalSalary;
+
+      if (bank === 'SBI') {
+        if (idx === 0) {
+          headers = ['Serial No', 'Beneficiary Name', 'Account Number', 'Amount (INR)', 'IFSC Code', 'Transaction Type'];
+        }
+        rows.push([
+          String(idx + 1),
+          `"${name}"`,
+          `"${accNo}"`,
+          String(amount),
+          `"${ifsc}"`,
+          'NEFT'
+        ]);
+      } else if (bank === 'HDFC') {
+        if (idx === 0) {
+          headers = ['Beneficiary Account Number', 'Amount', 'Beneficiary Name', 'IFSC Code', 'Remarks'];
+        }
+        rows.push([
+          `"${accNo}"`,
+          String(amount),
+          `"${name}"`,
+          `"${ifsc}"`,
+          `Salary_${selectedMonthYear}`
+        ]);
+      } else if (bank === 'ICICI') {
+        if (idx === 0) {
+          headers = ['Payment Mode', 'Beneficiary Name', 'Beneficiary Account Number', 'Amount', 'IFSC', 'Remarks'];
+        }
+        rows.push([
+          'NEFT',
+          `"${name}"`,
+          `"${accNo}"`,
+          String(amount),
+          `"${ifsc}"`,
+          `Salary_${selectedMonthYear}`
+        ]);
+      }
+    });
+
+    if (rows.length === 0) {
+      alert('No payroll data to export.');
+      return;
+    }
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${bank}_Bulk_Salary_Disbursal_${selectedMonthYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 3. Historical Annual Financial Summary Data Loader
+  const getAnnualAnalytics = () => {
+    const monthsGrouped: { [key: string]: { gross: number; net: number; pf: number; esic: number; tds: number; pt: number; count: number } } = {};
+    
+    payrollRecords.forEach(p => {
+      const my = p.monthYear;
+      if (!monthsGrouped[my]) {
+        monthsGrouped[my] = { gross: 0, net: 0, pf: 0, esic: 0, tds: 0, pt: 0, count: 0 };
+      }
+      monthsGrouped[my].gross += p.totalSalary || 0;
+      monthsGrouped[my].net += p.netSalary !== undefined ? p.netSalary : p.totalSalary;
+      monthsGrouped[my].pf += p.providentFund || 0;
+      monthsGrouped[my].esic += p.esic || 0;
+      monthsGrouped[my].tds += p.tds || 0;
+      monthsGrouped[my].pt += p.professionalTax || 0;
+      monthsGrouped[my].count += 1;
+    });
+
+    return Object.entries(monthsGrouped).map(([monthYear, data]) => ({
+      monthYear,
+      ...data
+    })).sort((a, b) => a.monthYear.localeCompare(b.monthYear));
+  };
+
+  const t = {
+    en: {
+      title: "Salary slips & Payroll",
+      selectMonth: "Select Payroll Month",
+      year: "Year",
+      month: "Month",
+      workingDays: "Total Working Days",
+      calculateBtn: "Recalculate Sheet",
+      saveBtn: "Save & Sync Payroll",
+      saving: "Saving Payroll...",
+      markAllPaid: "Mark All Paid",
+      colEmp: "Employee",
+      colAttendance: "Attendance Info",
+      colSalary: "Earnings & Deducts",
+      colOvertime: "Overtime Pay",
+      colTotal: "Net Salary",
+      colStatus: "Payment Status",
+      colAction: "Payslip / Actions",
+      paid: "Paid",
+      pending: "Pending",
+      markPaidBtn: "Mark Paid",
+      payslipBtn: "Payslip",
+      noRecords: "No attendance or payroll records found for this period. Mark attendance first, then compute.",
+      savedSuccess: "Payroll records saved to Google Sheets!",
+      confirmPay: "Mark Rajesh's salary as paid?",
+      confirmAllPay: "Are you sure you want to mark ALL pending payroll records for this month as paid?",
+      payslipHeader: "EMPLOYEE SALARY SLIP",
+      payslipTitle: "Payroll Management System",
+      payslipMonth: "Salary Month/Year",
+      payslipEmpDetails: "Employee Details",
+      empId: "ID",
+      empName: "Name",
+      empDept: "Department",
+      empRole: "Designation",
+      joiningDate: "Joining Date",
+      paymentMethod: "Payment Method",
+      slipEarnings: "Earnings (क्र. संख्या)",
+      slipDeductions: "Deductions (क्र. संख्या)",
+      basicPay: "Basic Salary",
+      allowance: "Allowances",
+      overtime: "Overtime Pay",
+      earnedBasic: "Earned Basic",
+      deducts: "Total Deductions",
+      netPayable: "Net Payable Amount",
+      authorizedSign: "Authorized Signatory",
+      receiptSign: "Employee Signature",
+      attendanceBreakdown: "Attendance Breakdown",
+      attPresent: "Present",
+      attHalf: "Half Day",
+      attAbsent: "Absent",
+      attLeave: "Leave",
+      printSlip: "Print Payslip",
+      closeSlip: "Close"
+    },
+    hi: {
+      title: "वेतन और पेरोल",
+      selectMonth: "पेरोल महीना चुनें",
+      year: "वर्ष",
+      month: "महीना",
+      workingDays: "कुल कार्य दिवस",
+      calculateBtn: "पुनर्गणना करें",
+      saveBtn: "पेरोल सुरक्षित करें",
+      saving: "पेरोल सिंक हो रहा है...",
+      markAllPaid: "सभी का भुगतान करें",
+      colEmp: "कर्मचारी",
+      colAttendance: "उपस्थिति विवरण",
+      colSalary: "कमाई और कटौती",
+      colOvertime: "ओवरटाइम भुगतान",
+      colTotal: "नेट वेतन",
+      colStatus: "भुगतान की स्थिति",
+      colAction: "पे-स्लिप / कार्रवाई",
+      paid: "भुगतान हुआ",
+      pending: "लंबित",
+      markPaidBtn: "भुगतान करें",
+      payslipBtn: "पे-स्लिप",
+      noRecords: "इस अवधि के लिए कोई उपस्थिति या पेरोल रिकॉर्ड नहीं मिला। पहले उपस्थिति दर्ज करें, फिर गणना करें।",
+      savedSuccess: "पेरोल रिकॉर्ड सफलतापूर्वक गूगल शीट्स में सुरक्षित किए गए!",
+      confirmPay: "क्या आप इस कर्मचारी का वेतन भुगतान चिह्नित करना चाहते हैं?",
+      confirmAllPay: "क्या आप वाकई इस महीने के सभी लंबित पेरोल भुगतानों को पूरा करना चाहते हैं?",
+      payslipHeader: "कर्मचारी वेतन पर्ची (पे-स्लिप)",
+      payslipTitle: "पेरोल मैनेजमेंट सिस्टम",
+      payslipMonth: "वेतन का महीना / वर्ष",
+      payslipEmpDetails: "कर्मचारी का विवरण",
+      empId: "आईडी",
+      empName: "नाम",
+      empDept: "विभाग",
+      empRole: "पद",
+      joiningDate: "शामिल होने की तिथि",
+      paymentMethod: "भुगतान का माध्यम",
+      slipEarnings: "कमाई विवरण",
+      slipDeductions: "कटौती विवरण",
+      basicPay: "मूल वेतन",
+      allowance: "भत्ते",
+      overtime: "ओवरटाइम भुगतान",
+      earnedBasic: "अर्जित मूल वेतन",
+      deducts: "कुल कटौती",
+      netPayable: "शुद्ध देय राशि (नेट सैलरी)",
+      authorizedSign: "प्राधिकृत हस्ताक्षरकर्ता",
+      receiptSign: "कर्मचारी के हस्ताक्षर",
+      attendanceBreakdown: "उपस्थिति का विवरण",
+      attPresent: "उपस्थित दिन",
+      attHalf: "हाफ डे",
+      attAbsent: "अनुपस्थित",
+      attLeave: "छुट्टियां",
+      printSlip: "प्रिंट करें",
+      closeSlip: "बंद करें"
+    }
+  }[language];
+
+  // Calculate or load payroll records
+  useEffect(() => {
+    // Check if payroll records exist for this MonthYear in state
+    const savedRecords = payrollRecords.filter(p => p.monthYear === selectedMonthYear);
+
+    if (savedRecords.length > 0) {
+      // Use saved records
+      setLocalPayroll(savedRecords);
+    } else {
+      // Automatically compute payroll based on employees + attendance
+      const computed: PayrollRecord[] = activeEmployees.map(emp => {
+        return calculateSingleEmployeePayroll(emp);
+      });
+
+      setLocalPayroll(computed);
+    }
+  }, [selectedMonthYear, attendanceRecords, payrollRecords, employees, workingDays]);
+
+  const handleRecalculate = () => {
+    const computed: PayrollRecord[] = activeEmployees.map(emp => {
+      return calculateSingleEmployeePayroll(emp);
+    });
+
+    setLocalPayroll(computed);
+  };
+
+  const handleMarkPaid = async (empId: string) => {
+    const confirmation = window.confirm(t.confirmPay);
+    if (!confirmation) return;
+
+    let advanceDeductionAmt = 0;
+    const updated = localPayroll.map(p => {
+      if (p.employeeId === empId) {
+        advanceDeductionAmt = p.advanceDeduction || 0;
+        return {
+          ...p,
+          paymentStatus: 'Paid' as const,
+          paymentDate: new Date().toISOString().split('T')[0]
+        };
+      }
+      return p;
+    });
+
+    setLocalPayroll(updated);
+    
+    // Save to Google sheets directly
+    setIsSaving(true);
+    try {
+      // Deduct advance balance in employee profile if callback is registered and deduction is positive
+      if (onUpdateEmployees && advanceDeductionAmt > 0) {
+        const empToUpdate = employees.find(e => e.id === empId);
+        if (empToUpdate) {
+          const currentBalance = empToUpdate.advanceSalaryBalance || 0;
+          const updatedEmp = {
+            ...empToUpdate,
+            advanceSalaryBalance: Math.max(0, currentBalance - advanceDeductionAmt)
+          };
+          await onUpdateEmployees([updatedEmp]);
+        }
+      }
+
+      // Merge with non-selected-month history so we don't wipe out other months
+      const otherMonthsHistory = payrollRecords.filter(p => p.monthYear !== selectedMonthYear);
+      const combined = [...otherMonthsHistory, ...updated];
+      await onSavePayroll(combined);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save to Google Sheets.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleMarkAllPaid = async () => {
+    const confirmation = window.confirm(t.confirmAllPay);
+    if (!confirmation) return;
+
+    const updated = localPayroll.map(p => ({
+      ...p,
+      paymentStatus: 'Paid' as const,
+      paymentDate: new Date().toISOString().split('T')[0]
+    }));
+
+    setLocalPayroll(updated);
+    
+    setIsSaving(true);
+    try {
+      // Bulk update employees who had advance deductions
+      if (onUpdateEmployees) {
+        const empsToUpdate: Employee[] = [];
+        localPayroll.forEach(p => {
+          if (p.advanceDeduction && p.advanceDeduction > 0) {
+            const empToUpdate = employees.find(e => e.id === p.employeeId);
+            if (empToUpdate) {
+              const currentBalance = empToUpdate.advanceSalaryBalance || 0;
+              empsToUpdate.push({
+                ...empToUpdate,
+                advanceSalaryBalance: Math.max(0, currentBalance - p.advanceDeduction)
+              });
+            }
+          }
+        });
+        if (empsToUpdate.length > 0) {
+          await onUpdateEmployees(empsToUpdate);
+        }
+      }
+
+      const otherMonthsHistory = payrollRecords.filter(p => p.monthYear !== selectedMonthYear);
+      const combined = [...otherMonthsHistory, ...updated];
+      await onSavePayroll(combined);
+      alert('All marked as Paid and synchronized!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save to Google Sheets.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSavePayroll = async () => {
+    setIsSaving(true);
+    try {
+      const otherMonthsHistory = payrollRecords.filter(p => p.monthYear !== selectedMonthYear);
+      const combined = [...otherMonthsHistory, ...localPayroll];
+      await onSavePayroll(combined);
+      alert(t.savedSuccess);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save to Google Sheets.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openPayslip = (record: PayrollRecord) => {
+    const emp = employees.find(e => e.id === record.employeeId);
+    const empAtt = attendanceRecords.filter(r => r.employeeId === record.employeeId && r.date.startsWith(selectedMonthYear));
+    
+    const daysPresent = empAtt.filter(r => r.status === 'Present').length;
+    const daysHalfDay = empAtt.filter(r => r.status === 'Half Day').length;
+    const daysLeave = empAtt.filter(r => r.status === 'Leave').length;
+    const daysAbsent = empAtt.filter(r => r.status === 'Absent').length;
+    const overtimeHoursTotal = empAtt.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
+
+    // Compute earned basic for slip
+    const workedDaysVal = daysPresent + (0.5 * daysHalfDay) + daysLeave;
+    const earnedRatio = Math.min(1, workedDaysVal / workingDays);
+    const earnedBasic = Math.round(record.basicSalary * (workedDaysVal === 0 ? 0 : earnedRatio));
+
+    setActivePayslip({
+      record,
+      employee: emp,
+      attendance: {
+        present: daysPresent,
+        halfDay: daysHalfDay,
+        leave: daysLeave,
+        absent: daysAbsent,
+        overtimeHrs: overtimeHoursTotal
+      },
+      earnedBasic,
+    });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const statsTranslations = {
+    en: {
+      totalNetSalary: "Total Net Payroll",
+      totalPaid: "Disbursed (Paid)",
+      totalPending: "Outstanding (Pending)",
+      disbursalCompletion: "Disbursal Status",
+      averageSalary: "Average Net Payout",
+      activeEmployees: "Employees Evaluated",
+      paidText: "Paid",
+      pendingText: "Pending",
+      of: "of",
+      slips: "slips paid"
+    },
+    hi: {
+      totalNetSalary: "कुल नेट पेरोल",
+      totalPaid: "भुगतान की गई राशि",
+      totalPending: "लंबित राशि (बाकी)",
+      disbursalCompletion: "भुगतान की स्थिति",
+      averageSalary: "औसत नेट भुगतान",
+      activeEmployees: "मूल्यांकित कर्मचारी",
+      paidText: "भुगतान हुआ",
+      pendingText: "लंबित",
+      of: "का",
+      slips: "पर्चियों का भुगतान"
+    }
+  }[language];
+
+  // Live recalculate on adjustment input changes
+  const handleAdjustmentChange = (field: keyof PayrollRecord, value: number) => {
+    if (!editingRecord) return;
+    
+    const nextRecord = {
+      ...editingRecord,
+      [field]: value
+    } as PayrollRecord;
+    
+    // Live update allowances
+    const allowances = Number(nextRecord.hra || 0) + 
+                       Number(nextRecord.da || 0) + 
+                       Number(nextRecord.conveyanceAllowance || 0) + 
+                       Number(nextRecord.festivalBonus || 0) + 
+                       Number(nextRecord.performanceIncentive || 0) + 
+                       Number(nextRecord.leaveAdjustment || 0);
+
+    // Live update deductions
+    const deductions = Number(nextRecord.providentFund || 0) + 
+                       Number(nextRecord.esic || 0) + 
+                       Number(nextRecord.professionalTax || 0) + 
+                       Number(nextRecord.tds || 0) + 
+                       Number(nextRecord.advanceDeduction || 0);
+
+    // Gross = Earned Basic + Overtime Pay + Allowances
+    const totalSalary = Number(nextRecord.basicSalary || 0) + 
+                        Number(nextRecord.overtimePay || 0) + 
+                        Number(allowances);
+    
+    nextRecord.allowances = allowances;
+    nextRecord.deductions = deductions;
+    nextRecord.totalSalary = totalSalary;
+    nextRecord.netSalary = Math.max(0, totalSalary - deductions);
+
+    setEditingRecord(nextRecord);
+  };
+
+  const handleSaveAdjustment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRecord) return;
+
+    setLocalPayroll(prev => prev.map(r => r.employeeId === editingRecord.employeeId ? editingRecord : r));
+    setIsAdjustModalOpen(false);
+    setEditingRecord(null);
+  };
+
+  // Stats calculations
+  const totalNetSalary = localPayroll.reduce((sum, r) => sum + r.totalSalary, 0);
+  const totalPaid = localPayroll.filter(r => r.paymentStatus === 'Paid').reduce((sum, r) => sum + r.totalSalary, 0);
+  const totalPending = localPayroll.filter(r => r.paymentStatus === 'Pending').reduce((sum, r) => sum + r.totalSalary, 0);
+  const totalEmployeesCount = localPayroll.length;
+  const paidCount = localPayroll.filter(r => r.paymentStatus === 'Paid').length;
+  const pendingCount = localPayroll.filter(r => r.paymentStatus === 'Pending').length;
+  const completionPercentage = totalEmployeesCount > 0 ? Math.round((paidCount / totalEmployeesCount) * 100) : 0;
+
+  return (
+    <div className="space-y-6">
+      
+      {/* 2026 Premium Bento Stat Grid - Enhanced high contrast with beautiful modern glowing highlights */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        
+        {/* KPI Card 1: Total Net Payroll */}
+        <div className="relative overflow-hidden bg-white/95 border border-slate-200/90 p-5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all duration-300 hover:shadow-[0_12px_30px_rgba(3,98,60,0.06)] hover:border-[#03623c]/20 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#03623c]/5 rounded-full blur-2xl -mr-8 -mt-8 transition-all duration-500 group-hover:bg-[#03623c]/10"></div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{statsTranslations.totalNetSalary}</span>
+            <span className="p-2 rounded-lg bg-emerald-50/70 text-[#03623c] shrink-0 border border-emerald-100/50">
+              <TrendingUp className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-2xl font-extrabold text-slate-900 font-display tracking-tight leading-none">
+              ₹{totalNetSalary.toLocaleString('en-IN')}
+            </h3>
+            <div className="flex items-center gap-1.5 mt-2.5 text-xs font-extrabold text-slate-800">
+              <Users className="w-3.5 h-3.5 text-[#03623c]" />
+              <span>{totalEmployeesCount} <span className="text-slate-700 font-bold">{statsTranslations.activeEmployees}</span></span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI Card 2: Paid Disbursed */}
+        <div className="relative overflow-hidden bg-white/95 border border-slate-200/90 p-5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all duration-300 hover:shadow-[0_12px_30px_rgba(16,185,129,0.06)] hover:border-emerald-200 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl -mr-8 -mt-8 transition-all duration-500 group-hover:bg-emerald-500/10"></div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{statsTranslations.totalPaid}</span>
+            <span className="p-2 rounded-lg bg-emerald-50/70 text-emerald-600 shrink-0 border border-emerald-100/50">
+              <Check className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-2xl font-extrabold text-slate-900 font-display tracking-tight leading-none">
+              ₹{totalPaid.toLocaleString('en-IN')}
+            </h3>
+            <div className="flex items-center gap-1.5 mt-2.5 text-xs font-extrabold text-slate-800">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+              <span>{paidCount} <span className="text-slate-700 font-bold">{statsTranslations.paidText}</span></span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI Card 3: Pending Outstanding */}
+        <div className="relative overflow-hidden bg-white/95 border border-slate-200/90 p-5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all duration-300 hover:shadow-[0_12px_30px_rgba(245,158,11,0.06)] hover:border-amber-200 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl -mr-8 -mt-8 transition-all duration-500 group-hover:bg-amber-500/10"></div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{statsTranslations.totalPending}</span>
+            <span className="p-2 rounded-lg bg-amber-50/70 text-amber-600 shrink-0 border border-amber-100/50">
+              <CreditCard className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-2xl font-extrabold text-slate-900 font-display tracking-tight leading-none">
+              ₹{totalPending.toLocaleString('en-IN')}
+            </h3>
+            <div className="flex items-center gap-1.5 mt-2.5 text-xs font-extrabold text-slate-800">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+              <span>{pendingCount} <span className="text-slate-700 font-bold">{statsTranslations.pendingText}</span></span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI Card 4: Disbursal Meter */}
+        <div className="relative overflow-hidden bg-white/95 border border-slate-200/90 p-5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all duration-300 hover:shadow-[0_12px_30px_rgba(3,98,60,0.06)] hover:border-[#03623c]/20">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{statsTranslations.disbursalCompletion}</span>
+            <span className="text-xs font-extrabold text-[#03623c] font-mono bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">{completionPercentage}%</span>
+          </div>
+          <div className="mt-5">
+            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200/40 p-[2px]">
+              <div 
+                className="bg-gradient-to-r from-emerald-500 via-[#03623c] to-[#024d2e] h-1.5 rounded-full transition-all duration-500 shadow-3xs" 
+                style={{ width: `${completionPercentage}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between items-center mt-3 text-xs font-extrabold text-slate-800">
+              <span>{paidCount} {statsTranslations.of} {totalEmployeesCount} {statsTranslations.slips}</span>
+              <span className="font-mono text-[10px] text-slate-600">{completionPercentage}% Completed</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Dynamic Annual Analytics Dashboard Panel */}
+      {showAnalytics && (
+        <div className="bg-slate-900 text-slate-100 p-6 rounded-xl border border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-300">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-4 mb-6">
+            <div>
+              <h3 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
+                <span>Annual Financial Summary & Statutory Ledger (वार्षिक वित्तीय सारांश)</span>
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-1 font-medium">Aggregated real-time statutory payments, taxes collected (TDS/PT) & PF accumulations</p>
+            </div>
+            <button 
+              onClick={() => setShowAnalytics(false)} 
+              className="text-slate-400 hover:text-white text-xs font-bold bg-slate-800 border border-slate-750 px-3 py-1.5 rounded-lg cursor-pointer"
+            >
+              Close Panel ✕
+            </button>
+          </div>
+
+          {getAnnualAnalytics().length === 0 ? (
+            <div className="text-center py-10 bg-slate-950/40 rounded-lg border border-dashed border-slate-800">
+              <AlertCircle className="w-10 h-10 mx-auto text-amber-500/80 mb-2.5" />
+              <h4 className="text-xs font-bold text-slate-300">No Historical Records Saved Yet</h4>
+              <p className="text-xxs text-slate-500 max-w-sm mx-auto mt-1 leading-normal">
+                Save and sync this month's payroll ledger below to generate professional statutory charts and annual reporting.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Dynamic Bar/Trend lines representing historical payouts */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                
+                {/* Statutory summary box 1 */}
+                <div className="bg-slate-950/40 p-4 rounded-lg border border-slate-800/80">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total PF Deposited (EPF/MP)</span>
+                  <div className="text-xl font-extrabold text-white mt-1">
+                    ₹{getAnnualAnalytics().reduce((sum, item) => sum + item.pf, 0).toLocaleString('en-IN')}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1.5 font-bold font-mono">Accumulated 12% employee share ledger</p>
+                </div>
+
+                {/* Statutory summary box 2 */}
+                <div className="bg-slate-950/40 p-4 rounded-lg border border-slate-800/80">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total TDS Tax Collected</span>
+                  <div className="text-xl font-extrabold text-[#10b981] mt-1">
+                    ₹{getAnnualAnalytics().reduce((sum, item) => sum + item.tds, 0).toLocaleString('en-IN')}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1.5 font-bold font-mono">Deducted for direct Central IT Dept filing</p>
+                </div>
+
+                {/* Statutory summary box 3 */}
+                <div className="bg-slate-950/40 p-4 rounded-lg border border-slate-800/80">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Professional Tax (PT)</span>
+                  <div className="text-xl font-extrabold text-blue-400 mt-1">
+                    ₹{getAnnualAnalytics().reduce((sum, item) => sum + item.pt, 0).toLocaleString('en-IN')}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1.5 font-bold font-mono">Chhattisgarh State Treasury allocation</p>
+                </div>
+
+              </div>
+
+              {/* Table ledger */}
+              <div className="overflow-x-auto rounded-lg border border-slate-800">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-950/80 text-slate-400 border-b border-slate-800 text-[10px] font-bold uppercase tracking-wider">
+                      <th className="py-3.5 px-4">Period Month</th>
+                      <th className="py-3.5 px-4">Gross Disbursed</th>
+                      <th className="py-3.5 px-4">Net Paid Salary</th>
+                      <th className="py-3.5 px-4 text-slate-300">PF Contribution</th>
+                      <th className="py-3.5 px-4 text-slate-300">ESIC Share</th>
+                      <th className="py-3.5 px-4 text-amber-400">TDS Tax</th>
+                      <th className="py-3.5 px-4">State PT</th>
+                      <th className="py-3.5 px-4 text-center">Active Slips</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-850 bg-slate-950/20 font-mono">
+                    {getAnnualAnalytics().map((item) => (
+                      <tr key={item.monthYear} className="hover:bg-slate-850/50 transition-colors">
+                        <td className="py-3 px-4 font-bold text-white font-sans">{item.monthYear}</td>
+                        <td className="py-3 px-4 text-slate-300">₹{item.gross.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-emerald-400 font-bold">₹{item.net.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-indigo-300">₹{item.pf.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-blue-300">₹{item.esic.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-amber-400 font-bold">₹{item.tds.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-slate-400">₹{item.pt.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-center font-sans font-bold text-slate-300 bg-slate-950/40">{item.count} slips</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modern High-End Selector & Controls Dock */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.02)] flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 flex-1 max-w-3xl">
+          
+          {/* Year selector */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t.year}</label>
+            <div className="relative">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full appearance-none border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white shadow-2xs text-slate-800 transition-all cursor-pointer"
+                id="payroll-year"
+              >
+                {['2025', '2026', '2027', '2028'].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                <Calendar className="w-3.5 h-3.5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Month selector */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t.month}</label>
+            <div className="relative">
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full appearance-none border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white shadow-2xs text-slate-800 transition-all cursor-pointer"
+                id="payroll-month"
+              >
+                {MONTHS.map(m => (
+                  <option key={m.value} value={m.value}>
+                    {language === 'en' ? m.name : m.hindi}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                <Calendar className="w-3.5 h-3.5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Working days input */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t.workingDays}</label>
+            <div className="relative">
+              <input
+                type="number"
+                min="1"
+                max="31"
+                value={workingDays}
+                onChange={(e) => setWorkingDays(Number(e.target.value))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white shadow-2xs text-slate-800 transition-all"
+                id="payroll-working-days"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Buttons strip with elegant styling */}
+        <div className="flex flex-wrap gap-2.5 pt-2 lg:pt-0">
+          <button
+            onClick={() => setShowAnalytics(!showAnalytics)}
+            className={`px-4 py-2.5 border text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all active:scale-98 ${
+              showAnalytics 
+                ? 'bg-amber-600 border-amber-600 text-white shadow-md hover:bg-amber-700' 
+                : 'border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700'
+            }`}
+            id="toggle-analytics"
+          >
+            <TrendingUp className="w-4 h-4 text-amber-500" />
+            <span>{language === 'en' ? 'Annual Analytics' : 'वार्षिक विश्लेषण'}</span>
+          </button>
+
+          <div className="relative group">
+            <button className="px-4 py-2.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all hover:shadow-2xs active:scale-98">
+              <Landmark className="w-4 h-4 text-indigo-600" />
+              <span>{language === 'en' ? 'Export Bank File 🏦' : 'बैंक फ़ाइल निर्यात'}</span>
+            </button>
+            <div className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 z-20 hidden group-hover:block hover:block">
+              <button 
+                onClick={() => handleBankExport('SBI')} 
+                className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-100 font-semibold flex items-center gap-2"
+              >
+                <Building className="w-3.5 h-3.5 text-blue-600" />
+                <span>SBI Bulk Upload</span>
+              </button>
+              <button 
+                onClick={() => handleBankExport('HDFC')} 
+                className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-100 font-semibold flex items-center gap-2"
+              >
+                <Building className="w-3.5 h-3.5 text-indigo-600" />
+                <span>HDFC Bank Format</span>
+              </button>
+              <button 
+                onClick={() => handleBankExport('ICICI')} 
+                className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-100 font-semibold flex items-center gap-2"
+              >
+                <Building className="w-3.5 h-3.5 text-orange-600" />
+                <span>ICICI Bulk Format</span>
+              </button>
+            </div>
+          </div>
+
+          <button
+            onClick={handleRecalculate}
+            className="px-4 py-2.5 border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer text-slate-700 transition-all hover:shadow-2xs active:scale-98"
+            id="recalc-payroll"
+          >
+            <Calculator className="w-4 h-4 text-slate-500" />
+            <span>{t.calculateBtn}</span>
+          </button>
+          
+          <button
+            onClick={handleMarkAllPaid}
+            className="px-4 py-2.5 border border-emerald-200/80 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-800 text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all hover:shadow-2xs active:scale-98"
+            id="mark-all-paid"
+          >
+            <Check className="w-4 h-4 text-emerald-600" />
+            <span>{t.markAllPaid}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main List Box with exquisite, clean modern table design */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.015)] overflow-hidden">
+        {localPayroll.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                  <th className="py-4 px-6">{t.colEmp}</th>
+                  <th className="py-4 px-6">{t.colAttendance}</th>
+                  <th className="py-4 px-6">{t.colSalary}</th>
+                  <th className="py-4 px-6">{t.colOvertime}</th>
+                  <th className="py-4 px-6 text-slate-800 font-bold">{t.colTotal}</th>
+                  <th className="py-4 px-6 text-center">{t.colStatus}</th>
+                  <th className="py-4 px-6 text-right">{t.colAction}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {localPayroll.map((rec) => {
+                  const emp = employees.find(e => e.id === rec.employeeId);
+                  const empAtt = attendanceRecords.filter(r => r.employeeId === rec.employeeId && r.date.startsWith(selectedMonthYear));
+                  
+                  const daysPresent = empAtt.filter(r => r.status === 'Present').length;
+                  const daysHalfDay = empAtt.filter(r => r.status === 'Half Day').length;
+                  const daysLeave = empAtt.filter(r => r.status === 'Leave').length;
+                  const daysAbsent = empAtt.filter(r => r.status === 'Absent').length;
+                  const daysMissPunch = empAtt.filter(r => r.status === 'Miss Punch').length;
+
+                  return (
+                    <tr key={rec.employeeId} className="hover:bg-slate-50/60 transition-colors duration-200">
+                      
+                      {/* Employee Cell */}
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3.5">
+                          {emp?.photoUrl ? (
+                            <img 
+                              src={emp.photoUrl} 
+                              alt={emp.name} 
+                              className="w-9 h-9 rounded-full object-cover border border-slate-200/80 shrink-0 shadow-2xs"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-indigo-50/80 text-indigo-700 flex items-center justify-center font-bold text-xs border border-indigo-100 uppercase shrink-0">
+                              {emp?.name ? emp.name.split(' ').map(n => n[0]).join('').substring(0, 2) : 'EM'}
+                            </div>
+                          )}
+                          <div className="space-y-0.5">
+                            <div className="font-bold text-slate-900 text-sm leading-snug">{emp?.name || 'Unknown'}</div>
+                            <div className="text-[10px] text-slate-400 font-semibold font-mono flex items-center gap-1.5">
+                              <span>{rec.employeeId}</span>
+                              <span className="text-slate-200">•</span>
+                              <span className="bg-slate-100 px-1.5 py-0.2 rounded-sm text-[9px] font-sans text-slate-500 font-bold">{emp?.designation}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Attendance breakdown pills */}
+                      <td className="py-4 px-6">
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold font-mono">
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md shadow-3xs" title="Present Days">{daysPresent}P</span>
+                          <span className="bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-md shadow-3xs" title="Half Days">{daysHalfDay}H</span>
+                          <span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-md shadow-3xs" title="Paid Leaves">{daysLeave}L</span>
+                          <span className="bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-md shadow-3xs" title="Absent">{daysAbsent}A</span>
+                          {daysMissPunch > 0 && (
+                            <span className="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-md shadow-3xs animate-pulse font-sans font-bold flex items-center gap-1 shrink-0" title="Pending Miss Punch Approvals">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                              <span>{daysMissPunch} {language === 'en' ? 'Miss Punch (Pending)' : 'लंबित मिस पंच'}</span>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Pro-rated basic & allowance details */}
+                      <td className="py-4 px-6">
+                        <div className="space-y-0.5">
+                          <div className="font-bold text-slate-800 text-sm">₹{rec.basicSalary.toLocaleString('en-IN')}</div>
+                          <div className="text-[10px] text-slate-400 font-semibold leading-none flex items-center gap-1">
+                            <span className="text-emerald-600">+₹{rec.allowances}</span>
+                            <span>/</span>
+                            <span className="text-rose-600">-₹{rec.deductions}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Overtime display */}
+                      <td className="py-4 px-6">
+                        <span className="font-bold text-slate-700 font-mono">₹{rec.overtimePay.toLocaleString('en-IN')}</span>
+                      </td>
+
+                      {/* Total calculated pay */}
+                      <td className="py-4 px-6">
+                        <span className="font-extrabold text-slate-900 text-sm font-mono tracking-tight bg-slate-100/50 border border-slate-150 px-2.5 py-1 rounded-lg">
+                          ₹{rec.totalSalary.toLocaleString('en-IN')}
+                        </span>
+                      </td>
+
+                      {/* Micro glowing badge for status */}
+                      <td className="py-4 px-6 text-center">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border transition-all duration-300 ${
+                          rec.paymentStatus === 'Paid' 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-[0_2px_10px_rgba(16,185,129,0.06)]' 
+                            : 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse shadow-[0_2px_10px_rgba(245,158,11,0.06)]'
+                        }`}>
+                          {rec.paymentStatus === 'Paid' ? (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"></span>
+                              <span>{t.paid}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                              <span>{t.pending}</span>
+                            </>
+                          )}
+                        </span>
+                      </td>
+
+                      {/* Responsive row actions */}
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex justify-end items-center gap-2">
+                          
+                          {/* Adjustments on-the-fly */}
+                          <button
+                            onClick={() => {
+                              setEditingRecord(rec);
+                              setIsAdjustModalOpen(true);
+                            }}
+                            className="bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-250 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-3xs active:scale-97"
+                            title="Adjust Salary Components"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                            <span>{language === 'en' ? 'Adjust' : 'बदलाव'}</span>
+                          </button>
+
+                          {/* Payslip View */}
+                          <button
+                            onClick={() => openPayslip(rec)}
+                            className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-3xs active:scale-97"
+                            id={`slip-${rec.employeeId}`}
+                            title="View Slip"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{t.payslipBtn}</span>
+                          </button>
+
+                          {/* Pay Now Gradient */}
+                          {rec.paymentStatus === 'Pending' && (
+                            <button
+                              onClick={() => handleMarkPaid(rec.employeeId)}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-3xs active:scale-97 hover:shadow-[0_4px_12px_rgba(79,70,229,0.2)]"
+                              id={`pay-${rec.employeeId}`}
+                            >
+                              <CreditCard className="w-3.5 h-3.5" />
+                              <span>{t.markPaidBtn}</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-16 text-slate-400 bg-slate-50/50">
+            <AlertCircle className="w-10 h-10 mx-auto text-slate-300 mb-3" />
+            <p className="text-xs font-bold text-slate-400 max-w-md mx-auto leading-relaxed">{t.noRecords}</p>
+          </div>
+        )}
+
+        {/* Sync panel footer with glass reflection */}
+        {localPayroll.length > 0 && (
+          <div className="bg-slate-50/80 border-t border-slate-150 p-5 flex justify-end">
+            <button
+              onClick={handleSavePayroll}
+              disabled={isSaving}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-xs cursor-pointer active:scale-98 hover:shadow-[0_4px_15px_rgba(79,70,229,0.25)]"
+              id="sync-payroll"
+            >
+              {isSaving ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span>{t.saving}</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>{t.saveBtn}</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 2026 Ultra-Premium Payslip Modal - Beautifully frosted glass effect with double border & invoice aesthetics */}
+      {activePayslip && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto transition-all duration-300">
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_24px_70px_rgba(0,0,0,0.15)] max-w-2xl w-full p-8 space-y-6 relative transition-all duration-300" id="printable-payslip">
+            
+            {/* Elegant Background Watermark for 2026 feel */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden select-none opacity-[0.015] flex items-center justify-center">
+              <Sparkles className="w-96 h-96 text-indigo-900" />
+            </div>
+
+            {/* Header / Brand info with distinct luxury styling */}
+            <div className="border-b border-slate-200 pb-5 text-center relative">
+              <div className="flex items-center justify-center gap-2 mb-1.5">
+                <div className="w-6 h-6 rounded bg-indigo-600 text-white flex items-center justify-center font-extrabold text-[10px] shadow-3xs font-display">P</div>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-widest font-display">{t.payslipTitle}</h2>
+              </div>
+              <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest leading-none">Verified Corporate Cloud Records System</p>
+              
+              <div className="mt-4 inline-block">
+                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/60 px-4 py-1.5 rounded-full uppercase tracking-wider">{t.payslipHeader}</span>
+              </div>
+              <p className="text-xs text-slate-500 font-mono font-bold mt-3 bg-slate-50 inline-block px-3 py-1 rounded-md border border-slate-150">{t.payslipMonth}: {selectedMonthYear}</p>
+            </div>
+
+            {/* Employee details with crisp grid layouts */}
+            <div className="bg-slate-50/80 p-5 rounded-lg border border-slate-200/60 relative">
+              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3.5 flex items-center gap-1">
+                <Users className="w-3 h-3 text-indigo-500" />
+                <span>{t.payslipEmpDetails}</span>
+              </h4>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs">
+                <div className="space-y-1.5">
+                  <p className="text-slate-500 font-medium flex justify-between border-b border-slate-100 pb-1">
+                    <span>{t.empId}:</span> 
+                    <span className="font-mono font-bold text-slate-900">{activePayslip.employee?.id}</span>
+                  </p>
+                  <p className="text-slate-500 font-medium flex justify-between border-b border-slate-100 pb-1">
+                    <span>{t.empName}:</span> 
+                    <span className="font-bold text-slate-900">{activePayslip.employee?.name}</span>
+                  </p>
+                  <p className="text-slate-500 font-medium flex justify-between pb-0">
+                    <span>{t.empDept}:</span> 
+                    <span className="font-bold text-slate-900">{activePayslip.employee?.department}</span>
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-slate-500 font-medium flex justify-between border-b border-slate-100 pb-1">
+                    <span>{t.empRole}:</span> 
+                    <span className="font-bold text-slate-900">{activePayslip.employee?.designation}</span>
+                  </p>
+                  <p className="text-slate-500 font-medium flex justify-between border-b border-slate-100 pb-1">
+                    <span>{t.joiningDate}:</span> 
+                    <span className="font-bold text-slate-800">{activePayslip.employee?.joiningDate}</span>
+                  </p>
+                  <p className="text-slate-500 font-medium flex justify-between pb-0">
+                    <span>{t.paymentMethod}:</span> 
+                    <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.2 rounded text-[10px]">{activePayslip.employee?.paymentMethod}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Attendance detailed layout */}
+            <div className="bg-indigo-50/40 p-4 rounded-lg border border-indigo-100/50">
+              <h4 className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest mb-3 flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                <span>{t.attendanceBreakdown}</span>
+              </h4>
+              <div className="grid grid-cols-5 text-center text-xs divide-x divide-indigo-100/30">
+                <div className="px-1">
+                  <p className="text-slate-400 text-[10px] mb-1 font-bold">{t.attPresent}</p>
+                  <p className="font-extrabold text-slate-800 text-sm font-mono">{activePayslip.attendance.present}</p>
+                </div>
+                <div className="px-1">
+                  <p className="text-slate-400 text-[10px] mb-1 font-bold">{t.attHalf}</p>
+                  <p className="font-extrabold text-slate-800 text-sm font-mono">{activePayslip.attendance.halfDay}</p>
+                </div>
+                <div className="px-1">
+                  <p className="text-slate-400 text-[10px] mb-1 font-bold">{t.attLeave}</p>
+                  <p className="font-extrabold text-slate-800 text-sm font-mono">{activePayslip.attendance.leave}</p>
+                </div>
+                <div className="px-1">
+                  <p className="text-slate-400 text-[10px] mb-1 font-bold">{t.attAbsent}</p>
+                  <p className="font-extrabold text-rose-600 text-sm font-mono">{activePayslip.attendance.absent}</p>
+                </div>
+                <div className="px-1">
+                  <p className="text-slate-400 text-[10px] mb-1 font-bold">Overtime</p>
+                  <p className="font-extrabold text-[#03623c] text-sm font-mono">{activePayslip.attendance.overtimeHrs} hr</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Financial columns detail setup */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 border border-slate-200 rounded-lg overflow-hidden divide-y sm:divide-y-0 sm:divide-x divide-slate-200 text-xs shadow-3xs">
+              {/* Earnings column */}
+              <div>
+                <div className="bg-slate-50 p-3 border-b border-slate-200 font-bold uppercase tracking-wider text-slate-700 text-[10px] flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span>{t.slipEarnings} (अर्जित भत्ते)</span>
+                </div>
+                <div className="p-4 space-y-2 text-slate-600">
+                  <div className="flex justify-between font-medium pb-1 border-b border-slate-100">
+                    <span>Basic Salary (Earned)</span>
+                    <span className="font-bold text-slate-800 font-mono">₹{activePayslip.earnedBasic.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>House Rent (HRA)</span>
+                    <span className="font-bold text-slate-800 font-mono">₹{(activePayslip.record.hra !== undefined ? activePayslip.record.hra : Math.round(activePayslip.record.basicSalary * 0.40)).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>Dearness (DA)</span>
+                    <span className="font-bold text-slate-800 font-mono">₹{(activePayslip.record.da || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>Conveyance Allowance</span>
+                    <span className="font-bold text-slate-800 font-mono">₹{(activePayslip.record.conveyanceAllowance || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>Overtime Pay</span>
+                    <span className="font-bold text-slate-800 font-mono">₹{activePayslip.record.overtimePay.toLocaleString('en-IN')}</span>
+                  </div>
+                  {activePayslip.record.festivalBonus > 0 && (
+                    <div className="flex justify-between font-bold text-indigo-700 bg-indigo-50/50 px-1.5 py-0.5 rounded">
+                      <span>Festival Bonus 🎁</span>
+                      <span className="font-mono">₹{activePayslip.record.festivalBonus.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {activePayslip.record.performanceIncentive > 0 && (
+                    <div className="flex justify-between font-bold text-emerald-700 bg-emerald-50/50 px-1.5 py-0.5 rounded">
+                      <span>Performance Incentive</span>
+                      <span className="font-mono">₹{activePayslip.record.performanceIncentive.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {activePayslip.record.leaveAdjustment > 0 && (
+                    <div className="flex justify-between font-bold text-blue-700 bg-blue-50/50 px-1.5 py-0.5 rounded">
+                      <span>Paid Leave Adjust</span>
+                      <span className="font-mono">₹{activePayslip.record.leaveAdjustment.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-dashed border-slate-200 pt-2 font-bold text-slate-800">
+                    <span>Gross Salary</span>
+                    <span className="font-mono">₹{activePayslip.record.totalSalary.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Deductions column */}
+              <div>
+                <div className="bg-slate-50 p-3 border-b border-slate-200 font-bold uppercase tracking-wider text-slate-700 text-[10px] flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                  <span>{t.slipDeductions} (कटौतियां)</span>
+                </div>
+                <div className="p-4 space-y-2 text-slate-600">
+                  <div className="flex justify-between font-medium">
+                    <span>Provident Fund (PF 12%)</span>
+                    <span className="font-bold text-slate-800 font-mono">₹{(activePayslip.record.providentFund || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>Employee Insurance (ESIC)</span>
+                    <span className="font-bold text-slate-800 font-mono">₹{(activePayslip.record.esic || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>Professional Tax (PT)</span>
+                    <span className="font-bold text-slate-800 font-mono">₹{(activePayslip.record.professionalTax || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>Income Tax (TDS)</span>
+                    <span className="font-bold text-slate-800 font-mono">₹{(activePayslip.record.tds || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  {activePayslip.record.advanceDeduction > 0 && (
+                    <div className="flex justify-between font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                      <span>Advance Repayment 💸</span>
+                      <span className="font-mono">-₹{activePayslip.record.advanceDeduction.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-medium border-t border-dashed border-slate-200 pt-2 font-bold text-rose-600">
+                    <span>Total Deductions</span>
+                    <span className="font-mono">₹{activePayslip.record.deductions.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Total Row with outstanding high-fidelity gradients */}
+            <div className="bg-slate-900 text-white p-5 rounded-lg flex items-center justify-between shadow-md relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#03623c]/20 rounded-full blur-2xl"></div>
+              <div className="space-y-0.5 relative z-10">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t.netPayable}</span>
+                <p className="text-xxs text-emerald-400 font-bold font-mono uppercase tracking-wider">Computed & Secured Digital Receipt</p>
+              </div>
+              <span className="text-2xl font-extrabold font-mono text-white relative z-10">₹{(activePayslip.record.netSalary !== undefined ? activePayslip.record.netSalary : activePayslip.record.totalSalary).toLocaleString('en-IN')}</span>
+            </div>
+
+            {/* Signature Block with neat typography */}
+            <div className="grid grid-cols-2 pt-8 text-xs text-center text-slate-500">
+              <div>
+                <div className="w-36 mx-auto border-b border-slate-300 pb-1 font-bold text-slate-800">Rajeev Verma</div>
+                <p className="mt-1.5 font-bold text-[10px] text-slate-400 uppercase tracking-widest">{t.authorizedSign}</p>
+              </div>
+              <div>
+                <div className="w-36 mx-auto border-b border-slate-300 pb-1 min-h-[16px]"></div>
+                <p className="mt-1.5 font-bold text-[10px] text-slate-400 uppercase tracking-widest">{t.receiptSign}</p>
+              </div>
+            </div>
+
+            {/* Control panel buttons for modal */}
+            <div className="border-t border-slate-100 pt-5 flex justify-end gap-2.5 no-print">
+              <button
+                onClick={() => downloadPayslipPDF(activePayslip.record, activePayslip.employee)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97"
+                title="Download Professional PDF slip"
+              >
+                <FileText className="w-3.5 h-3.5 text-white" />
+                <span>Download PDF (पीडीएफ डाउनलोड)</span>
+              </button>
+              <button
+                onClick={handlePrint}
+                className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-500" />
+                <span>{t.printSlip}</span>
+              </button>
+              <button
+                onClick={() => setActivePayslip(null)}
+                className="bg-slate-900 hover:bg-slate-850 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-3xs cursor-pointer active:scale-97"
+              >
+                <span>{t.closeSlip}</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 2026 Live Manual Salary Adjustment Modal */}
+      {isAdjustModalOpen && editingRecord && (
+        <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-[0_24px_70px_rgba(0,0,0,0.18)] max-w-2xl w-full p-6 space-y-5 relative">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
+                <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-widest">
+                  {language === 'en' ? 'Adjust Salary Structure' : 'वेतन संरचना समायोजन'}
+                </h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsAdjustModalOpen(false);
+                  setEditingRecord(null);
+                }} 
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200/60 flex justify-between items-center text-xs">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Employee</span>
+                <span className="font-extrabold text-slate-900 text-sm">
+                  {employees.find(e => e.id === editingRecord.employeeId)?.name || editingRecord.employeeId}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Payroll Month</span>
+                <span className="font-bold text-slate-700 font-mono">{editingRecord.monthYear}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveAdjustment} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                
+                {/* Allowances block */}
+                <div className="space-y-3 bg-emerald-50/20 p-3 rounded-lg border border-emerald-100/40">
+                  <h4 className="font-bold text-emerald-800 uppercase tracking-wider text-[10px] flex items-center gap-1 border-b border-emerald-100/40 pb-1.5">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Allowances & Earnings (अर्जित भत्ते)</span>
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Basic Pay (अर्जित मूल वेतन)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.basicSalary} 
+                        onChange={(e) => handleAdjustmentChange('basicSalary', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Overtime Pay (ओवरटाइम)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.overtimePay} 
+                        onChange={(e) => handleAdjustmentChange('overtimePay', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">HRA (मकान किराया)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.hra !== undefined ? editingRecord.hra : Math.round(editingRecord.basicSalary * 0.40)} 
+                        onChange={(e) => handleAdjustmentChange('hra', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Dearness (DA भत्त्ता)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.da || 0} 
+                        onChange={(e) => handleAdjustmentChange('da', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Conveyance (यातायात)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.conveyanceAllowance || 0} 
+                        onChange={(e) => handleAdjustmentChange('conveyanceAllowance', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Festival Bonus (बोनस)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.festivalBonus || 0} 
+                        onChange={(e) => handleAdjustmentChange('festivalBonus', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Incentive (प्रोत्साहन)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.performanceIncentive || 0} 
+                        onChange={(e) => handleAdjustmentChange('performanceIncentive', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Paid Leave Credit</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.leaveAdjustment || 0} 
+                        onChange={(e) => handleAdjustmentChange('leaveAdjustment', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deductions block */}
+                <div className="space-y-3 bg-rose-50/20 p-3 rounded-lg border border-rose-100/40">
+                  <h4 className="font-bold text-rose-800 uppercase tracking-wider text-[10px] flex items-center gap-1 border-b border-rose-100/40 pb-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Statutory & Personal Deductions (कटौतियां)</span>
+                  </h4>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Provident Fund (PF)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.providentFund || 0} 
+                        onChange={(e) => handleAdjustmentChange('providentFund', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">State Insurance (ESIC)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.esic || 0} 
+                        onChange={(e) => handleAdjustmentChange('esic', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Professional Tax (PT)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.professionalTax || 0} 
+                        onChange={(e) => handleAdjustmentChange('professionalTax', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Income Tax (TDS)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.tds || 0} 
+                        onChange={(e) => handleAdjustmentChange('tds', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Advance EMI Repayment (एडवांस सैलरी किस्त)</label>
+                      <input 
+                        type="number" 
+                        value={editingRecord.advanceDeduction || 0} 
+                        onChange={(e) => handleAdjustmentChange('advanceDeduction', Number(e.target.value))}
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Dynamic Live Net Recalculator Ledger bar */}
+              <div className="bg-slate-900 text-white rounded-lg p-4 grid grid-cols-3 text-center divide-x divide-slate-800">
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Gross Salary</span>
+                  <span className="font-mono text-sm font-extrabold text-slate-200">₹{editingRecord.totalSalary.toLocaleString('en-IN')}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Total Deducts</span>
+                  <span className="font-mono text-sm font-extrabold text-rose-400">₹{editingRecord.deductions.toLocaleString('en-IN')}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Net Take-Home Salary</span>
+                  <span className="font-mono text-sm font-extrabold text-emerald-400">
+                    ₹{(editingRecord.netSalary !== undefined ? editingRecord.netSalary : (editingRecord.totalSalary - editingRecord.deductions)).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer controls */}
+              <div className="border-t border-slate-100 pt-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdjustModalOpen(false);
+                    setEditingRecord(null);
+                  }}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                >
+                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                </button>
+                <button
+                  type="submit"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-3xs hover:shadow-[0_4px_12px_rgba(79,70,229,0.2)]"
+                >
+                  {language === 'en' ? 'Apply Adjustments' : 'समायोजन लागू करें'}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
