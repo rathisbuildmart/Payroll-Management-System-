@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Award, Sparkles, MapPin, Briefcase, FileSpreadsheet, Search, CheckCircle, 
-  Info, AlertCircle, Plus, CalendarDays, Clock, User, Download, Palmtree
+  Info, AlertCircle, Plus, CalendarDays, Clock, User, Download, Palmtree,
+  Edit2, Trash2, X, Save
 } from 'lucide-react';
-import { Employee, Attendance } from '../types';
+import { Employee, Attendance, AdminSettings, Holiday } from '../types';
 
 interface LeavesHolidaysProps {
   employees: Employee[];
@@ -11,16 +12,21 @@ interface LeavesHolidaysProps {
   language: 'en' | 'hi';
   isEmployeeView?: boolean;
   employeeId?: string;
+  adminSettings?: AdminSettings;
+  onUpdateSettings?: (updated: AdminSettings) => Promise<void> | void;
 }
 
-// 2026 Holidays list from Rathi's Build Mart Official Calendar
+// Current year helper
+const CURRENT_YEAR = new Date().getFullYear();
+
+// Holidays list from Rathi's Build Mart Official Calendar
 export const HOLIDAYS_2026 = [
   {
     occasion: "Republic Day",
     hindiOccasion: "गणतंत्र दिवस",
     type: "National Holiday",
     hindiType: "राष्ट्रीय अवकाश",
-    date: "January 26, 2026",
+    date: `January 26, ${CURRENT_YEAR}`,
     duration: "1 Day",
     hindiDuration: "1 दिन",
     imgUrl: "🇮🇳"
@@ -30,7 +36,7 @@ export const HOLIDAYS_2026 = [
     hindiOccasion: "होली",
     type: "Festival Leave",
     hindiType: "त्योहार अवकाश",
-    date: "March 4, 2026",
+    date: `March 4, ${CURRENT_YEAR}`,
     duration: "1 Day",
     hindiDuration: "1 दिन",
     imgUrl: "🎨"
@@ -40,7 +46,7 @@ export const HOLIDAYS_2026 = [
     hindiOccasion: "ईद-उल-फितर",
     type: "Religious Leave (Muslim Community)",
     hindiType: "धार्मिक अवकाश (मुस्लिम समाज)",
-    date: "March 20, 2026",
+    date: `March 20, ${CURRENT_YEAR}`,
     duration: "1 Day",
     hindiDuration: "1 दिन",
     imgUrl: "🌙"
@@ -50,7 +56,7 @@ export const HOLIDAYS_2026 = [
     hindiOccasion: "स्वतंत्रता दिवस",
     type: "National Holiday",
     hindiType: "राष्ट्रीय अवकाश",
-    date: "August 15, 2026",
+    date: `August 15, ${CURRENT_YEAR}`,
     duration: "1 Day",
     hindiDuration: "1 दिन",
     imgUrl: "🇮🇳"
@@ -60,7 +66,7 @@ export const HOLIDAYS_2026 = [
     hindiOccasion: "दशहरा",
     type: "Festival Leave",
     hindiType: "त्योहार अवकाश",
-    date: "October 20, 2026",
+    date: `October 20, ${CURRENT_YEAR}`,
     duration: "Half Day",
     hindiDuration: "आधा दिन",
     imgUrl: "🏹"
@@ -70,7 +76,7 @@ export const HOLIDAYS_2026 = [
     hindiOccasion: "दीपावली",
     type: "Festival Leave",
     hindiType: "त्योहार अवकाश",
-    date: "November 7, November 8, November 9",
+    date: `November 7, November 8, November 9, ${CURRENT_YEAR}`,
     duration: "3 Days",
     hindiDuration: "3 दिन",
     imgUrl: "🪔"
@@ -80,23 +86,148 @@ export const HOLIDAYS_2026 = [
     hindiOccasion: "क्रिसमस",
     type: "Religious Leave (Christian Community)",
     hindiType: "धार्मिक अवकाश (ईसाई समाज)",
-    date: "December 25, 2026",
+    date: `December 25, ${CURRENT_YEAR}`,
     duration: "1 Day",
     hindiDuration: "1 दिन",
     imgUrl: "🎄"
   }
 ];
 
+const HOLIDAY_TYPES_MAP: Record<string, string> = {
+  "National Holiday": "राष्ट्रीय अवकाश",
+  "Festival Leave": "त्योहार अवकाश",
+  "Religious Leave (Muslim Community)": "धार्मिक अवकाश (मुस्लिम समाज)",
+  "Religious Leave (Christian Community)": "धार्मिक अवकाश (ईसाई समाज)",
+  "Religious Leave (Hindu Community)": "धार्मिक अवकाश (हिंदू समाज)",
+  "Religious Leave": "धार्मिक अवकाश",
+  "Other": "अन्य अवकाश"
+};
+
+const DURATIONS_MAP: Record<string, string> = {
+  "1 Day": "1 दिन",
+  "Half Day": "आधा दिन",
+  "2 Days": "2 दिन",
+  "3 Days": "3 दिन",
+  "4 Days": "4 दिन",
+  "5 Days": "5 दिन"
+};
+
 export default function LeavesHolidays({ 
   employees, 
   attendance, 
   language, 
   isEmployeeView = false, 
-  employeeId 
+  employeeId,
+  adminSettings,
+  onUpdateSettings
 }: LeavesHolidaysProps) {
   const [subTab, setSubTab] = useState<'balance' | 'calendar'>('balance');
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All');
+
+  // Custom Holidays list state synced with Admin Settings / Google Sheets / localStorage
+  const [holidays, setHolidays] = useState<Holiday[]>(() => {
+    if (adminSettings?.holidays && adminSettings.holidays.length > 0) {
+      return adminSettings.holidays;
+    }
+    const saved = localStorage.getItem('payroll_custom_holidays');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return HOLIDAYS_2026;
+  });
+
+  // Keep holidays list in sync when adminSettings updates
+  useEffect(() => {
+    if (adminSettings?.holidays && adminSettings.holidays.length > 0) {
+      setHolidays(adminSettings.holidays);
+    }
+  }, [adminSettings?.holidays]);
+
+  // Holiday Editor Modal States
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [editingHolidayIndex, setEditingHolidayIndex] = useState<number | null>(null);
+
+  // Form states for adding/editing holiday
+  const [holidayOccasion, setHolidayOccasion] = useState('');
+  const [holidayHindiOccasion, setHolidayHindiOccasion] = useState('');
+  const [holidayType, setHolidayType] = useState('Festival Leave');
+  const [holidayHindiType, setHolidayHindiType] = useState('त्योहार अवकाश');
+  const [holidayDate, setHolidayDate] = useState('');
+  const [holidayDuration, setHolidayDuration] = useState('1 Day');
+  const [holidayHindiDuration, setHolidayHindiDuration] = useState('1 दिन');
+  const [holidayImgUrl, setHolidayImgUrl] = useState('📅');
+
+  // Save changes handler
+  const handleSaveHolidaysList = (updatedHolidays: Holiday[]) => {
+    setHolidays(updatedHolidays);
+    localStorage.setItem('payroll_custom_holidays', JSON.stringify(updatedHolidays));
+    if (onUpdateSettings && adminSettings) {
+      onUpdateSettings({
+        ...adminSettings,
+        holidays: updatedHolidays
+      });
+    }
+  };
+
+  const handleOpenAddHolidayModal = () => {
+    setEditingHolidayIndex(null);
+    setHolidayOccasion('');
+    setHolidayHindiOccasion('');
+    setHolidayType('Festival Leave');
+    setHolidayHindiType('त्योहार अवकाश');
+    setHolidayDate('');
+    setHolidayDuration('1 Day');
+    setHolidayHindiDuration('1 दिन');
+    setHolidayImgUrl('📅');
+    setIsHolidayModalOpen(true);
+  };
+
+  const handleOpenEditHolidayModal = (h: Holiday, index: number) => {
+    setEditingHolidayIndex(index);
+    setHolidayOccasion(h.occasion);
+    setHolidayHindiOccasion(h.hindiOccasion);
+    setHolidayType(h.type);
+    setHolidayHindiType(h.hindiType);
+    setHolidayDate(h.date);
+    setHolidayDuration(h.duration);
+    setHolidayHindiDuration(h.hindiDuration);
+    setHolidayImgUrl(h.imgUrl || '📅');
+    setIsHolidayModalOpen(true);
+  };
+
+  const handleSaveHolidayForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newHoliday: Holiday = {
+      occasion: holidayOccasion,
+      hindiOccasion: holidayHindiOccasion || holidayOccasion,
+      type: holidayType,
+      hindiType: holidayHindiType || HOLIDAY_TYPES_MAP[holidayType] || holidayType,
+      date: holidayDate,
+      duration: holidayDuration,
+      hindiDuration: holidayHindiDuration || DURATIONS_MAP[holidayDuration] || holidayDuration,
+      imgUrl: holidayImgUrl
+    };
+
+    let updatedList: Holiday[];
+    if (editingHolidayIndex !== null) {
+      updatedList = holidays.map((h, idx) => idx === editingHolidayIndex ? newHoliday : h);
+    } else {
+      updatedList = [...holidays, newHoliday];
+    }
+
+    handleSaveHolidaysList(updatedList);
+    setIsHolidayModalOpen(false);
+  };
+
+  const handleDeleteHoliday = (indexToDelete: number) => {
+    if (window.confirm(language === 'en' ? 'Are you sure you want to delete this holiday?' : 'क्या आप वाकई इस छुट्टी को हटाना चाहते हैं?')) {
+      const updatedList = holidays.filter((_, idx) => idx !== indexToDelete);
+      handleSaveHolidaysList(updatedList);
+    }
+  };
 
   // Helper to calculate accumulated months since joining
   const calculateTenureMonths = (joiningDateStr: string): number => {
@@ -157,7 +288,7 @@ export default function LeavesHolidays({
   const t = {
     en: {
       leaveBalanceReport: "Paid Leaves & Balance Report",
-      holidayCalendar: "Holiday Calendar 2026",
+      holidayCalendar: `Holiday Calendar ${CURRENT_YEAR}`,
       leavesBalance: "Leaves Balance",
       officialCalendar: "Official Holiday Calendar",
       searchEmp: "Search employee name or ID...",
@@ -190,7 +321,7 @@ export default function LeavesHolidays({
     },
     hi: {
       leaveBalanceReport: "अर्जित अवकाश एवं शेष रिपोर्ट",
-      holidayCalendar: "त्योहारों का कैलेंडर 2026",
+      holidayCalendar: `त्योहारों का कैलेंडर ${CURRENT_YEAR}`,
       leavesBalance: "छुट्टियों का रिकॉर्ड (बैलेंस)",
       officialCalendar: "आधिकारिक अवकाश तालिका",
       searchEmp: "कर्मचारी का नाम या आईडी खोजें...",
@@ -466,11 +597,22 @@ export default function LeavesHolidays({
 
               {/* Calendar Title */}
               <h1 className="text-3xl font-black text-white tracking-wider mt-1 uppercase font-display">
-                {language === 'en' ? 'HOLIDAY CALENDAR' : 'अवकाश कैलेंडर'} <span className="text-amber-500 font-mono">2026</span>
+                {language === 'en' ? 'HOLIDAY CALENDAR' : 'अवकाश कैलेंडर'} <span className="text-amber-500 font-mono">{CURRENT_YEAR}</span>
               </h1>
               <p className="text-[10px] text-slate-300 tracking-widest uppercase font-black mt-1">
                 {t.trust}
               </p>
+
+              {/* Add Holiday Button for Admins */}
+              {!isEmployeeView && (
+                <button
+                  onClick={handleOpenAddHolidayModal}
+                  className="mt-5 flex items-center gap-1.5 px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl shadow-md border border-amber-400 transition-all cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] tracking-wider font-mono uppercase"
+                >
+                  <Plus className="w-4 h-4 text-slate-950 stroke-[3]" />
+                  {language === 'en' ? 'Add Holiday' : 'नया अवकाश जोड़ें'}
+                </button>
+              )}
             </div>
 
             {/* List Table directly matching Image layout */}
@@ -483,10 +625,13 @@ export default function LeavesHolidays({
                     <th className="py-3 px-4">{language === 'en' ? 'TYPE' : 'प्रकार'}</th>
                     <th className="py-3 px-4">{language === 'en' ? 'DATE' : 'दिनांक'}</th>
                     <th className="py-3 px-4 text-center">{language === 'en' ? 'DURATION' : 'अवधि'}</th>
+                    {!isEmployeeView && (
+                      <th className="py-3 px-4 text-center w-24">{language === 'en' ? 'ACTIONS' : 'कार्रवाई'}</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-150 font-bold text-slate-700">
-                  {HOLIDAYS_2026.map((h, idx) => (
+                  {holidays.map((h, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                       <td className="py-4 px-4 text-center text-lg">{h.imgUrl}</td>
                       <td className="py-4 px-4 text-slate-900 font-extrabold text-sm">
@@ -509,6 +654,26 @@ export default function LeavesHolidays({
                       <td className="py-4 px-4 text-center font-extrabold text-slate-900">
                         {language === 'en' ? h.duration : h.hindiDuration}
                       </td>
+                      {!isEmployeeView && (
+                        <td className="py-4 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenEditHolidayModal(h, idx)}
+                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                              title={language === 'en' ? 'Edit Holiday' : 'अवकाश संपादित करें'}
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteHoliday(idx)}
+                              className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                              title={language === 'en' ? 'Delete Holiday' : 'अवकाश हटाएं'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -547,6 +712,206 @@ export default function LeavesHolidays({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Holiday Modal */}
+      {isHolidayModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in duration-200">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-amber-500" />
+                <h3 className="text-sm font-black uppercase tracking-wider font-mono">
+                  {editingHolidayIndex !== null 
+                    ? (language === 'en' ? 'Edit Holiday' : 'अवकाश संपादित करें')
+                    : (language === 'en' ? 'Add New Holiday' : 'नया अवकाश जोड़ें')}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setIsHolidayModalOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveHolidayForm} className="p-6 space-y-4 font-sans text-xs">
+              {/* Occasion / Leave Name */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    Occasion (English) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={holidayOccasion}
+                    onChange={(e) => setHolidayOccasion(e.target.value)}
+                    placeholder="e.g. Holi"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    अवसर / अवकाश (हिंदी)
+                  </label>
+                  <input
+                    type="text"
+                    value={holidayHindiOccasion}
+                    onChange={(e) => setHolidayHindiOccasion(e.target.value)}
+                    placeholder="जैसे: होली"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Date & Icon */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    Date Description *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={holidayDate}
+                    onChange={(e) => setHolidayDate(e.target.value)}
+                    placeholder={`e.g. March 4, ${CURRENT_YEAR}`}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    Icon / Emoji
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={holidayImgUrl}
+                      onChange={(e) => setHolidayImgUrl(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600"
+                    >
+                      <option value="📅">📅 Calendar</option>
+                      <option value="🇮🇳">🇮🇳 National</option>
+                      <option value="🎨">🎨 Festival/Color</option>
+                      <option value="🌙">🌙 Moon/Muslim</option>
+                      <option value="🪔">🪔 Diwali/Lamp</option>
+                      <option value="🏹">🏹 Dussehra/Bow</option>
+                      <option value="🎄">🎄 Christmas</option>
+                      <option value="🎉">🎉 Party</option>
+                      <option value="☀️">☀️ Sun</option>
+                      <option value="🍂">🍂 Autumn/Leave</option>
+                    </select>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={holidayImgUrl}
+                      onChange={(e) => setHolidayImgUrl(e.target.value)}
+                      placeholder="Custom Emoji"
+                      className="w-16 bg-slate-50 border border-slate-200 rounded-lg text-center py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Type and Hindi Type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    Holiday Type *
+                  </label>
+                  <select
+                    value={holidayType}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setHolidayType(val);
+                      if (HOLIDAY_TYPES_MAP[val]) {
+                        setHolidayHindiType(HOLIDAY_TYPES_MAP[val]);
+                      }
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600"
+                  >
+                    <option value="National Holiday">National Holiday</option>
+                    <option value="Festival Leave">Festival Leave</option>
+                    <option value="Religious Leave (Muslim Community)">Religious (Muslim)</option>
+                    <option value="Religious Leave (Christian Community)">Religious (Christian)</option>
+                    <option value="Religious Leave (Hindu Community)">Religious (Hindu)</option>
+                    <option value="Religious Leave">Religious Leave</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    अवकाश प्रकार (हिंदी)
+                  </label>
+                  <input
+                    type="text"
+                    value={holidayHindiType}
+                    onChange={(e) => setHolidayHindiType(e.target.value)}
+                    placeholder="जैसे: त्योहार अवकाश"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Duration and Hindi Duration */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    Duration *
+                  </label>
+                  <select
+                    value={holidayDuration}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setHolidayDuration(val);
+                      if (DURATIONS_MAP[val]) {
+                        setHolidayHindiDuration(DURATIONS_MAP[val]);
+                      }
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600"
+                  >
+                    <option value="1 Day">1 Day</option>
+                    <option value="Half Day">Half Day</option>
+                    <option value="2 Days">2 Days</option>
+                    <option value="3 Days">3 Days</option>
+                    <option value="4 Days">4 Days</option>
+                    <option value="5 Days">5 Days</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    अवधि (हिंदी)
+                  </label>
+                  <input
+                    type="text"
+                    value={holidayHindiDuration}
+                    onChange={(e) => setHolidayHindiDuration(e.target.value)}
+                    placeholder="जैसे: 1 दिन"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsHolidayModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-lg shadow-sm transition-all cursor-pointer"
+                >
+                  <Save className="w-4 h-4 text-amber-500" />
+                  {language === 'en' ? 'Save Holiday' : 'अवकाश सुरक्षित करें'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, Check, Save, UserCheck, UserX, AlertTriangle, Clock, RefreshCw, 
-  ListCollapse, ThumbsUp, ThumbsDown, CheckCircle, XCircle, AlertCircle, FileSpreadsheet, List
+  ListCollapse, ThumbsUp, ThumbsDown, CheckCircle, XCircle, AlertCircle, FileSpreadsheet, List,
+  Filter, Building, Users, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Employee, Attendance } from '../types';
 
@@ -29,7 +30,54 @@ export default function AttendanceTracker({
   const [pendingChanges, setPendingChanges] = useState<Attendance[]>([]);
   const [isSavingApprovals, setIsSavingApprovals] = useState(false);
 
-  const activeEmployees = employees.filter(e => e.isActive);
+  // Filters state
+  const [selectedBranch, setSelectedBranch] = useState('All');
+  const [selectedDept, setSelectedDept] = useState('All');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('All');
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const branchOptions = useMemo(() => {
+    const branches = new Set<string>();
+    employees.forEach(emp => {
+      if (emp.branch) branches.add(emp.branch);
+    });
+    return ['All', ...Array.from(branches)];
+  }, [employees]);
+
+  const departmentOptions = useMemo(() => {
+    const depts = new Set<string>();
+    employees.forEach(emp => {
+      if (emp.department) depts.add(emp.department);
+    });
+    return ['All', ...Array.from(depts)];
+  }, [employees]);
+
+  const employeeOptions = useMemo(() => {
+    return employees.map(emp => ({
+      id: emp.id,
+      name: `${emp.name} (${emp.id})`
+    }));
+  }, [employees]);
+
+  const filteredActiveEmployees = useMemo(() => {
+    return employees.filter(emp => {
+      if (!emp.isActive) return false;
+      const matchesBranch = selectedBranch === 'All' || emp.branch === selectedBranch;
+      const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
+      const matchesEmployee = selectedEmployeeId === 'All' || emp.id === selectedEmployeeId;
+      return matchesBranch && matchesDept && matchesEmployee;
+    });
+  }, [employees, selectedBranch, selectedDept, selectedEmployeeId]);
+
+  const paginatedActiveEmployees = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredActiveEmployees.slice(start, start + pageSize);
+  }, [filteredActiveEmployees, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredActiveEmployees.length / pageSize) || 1;
+
+  const activeEmployees = filteredActiveEmployees;
 
   const t = {
     en: {
@@ -412,9 +460,61 @@ export default function AttendanceTracker({
             </div>
           </div>
 
+          {/* Robust Filters segment */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-4 h-4 text-[#03623c]" />
+              <span className="text-xs font-bold text-gray-800 uppercase tracking-wider font-mono">Filters:</span>
+            </div>
+
+            {/* Department Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-extrabold text-gray-500 uppercase font-mono">Dept:</span>
+              <select
+                value={selectedDept}
+                onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
+                className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer"
+              >
+                {departmentOptions.map(dept => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Branch Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-extrabold text-gray-500 uppercase font-mono">Branch:</span>
+              <select
+                value={selectedBranch}
+                onChange={(e) => { setSelectedBranch(e.target.value); setCurrentPage(1); }}
+                className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer"
+              >
+                {branchOptions.map(branch => (
+                  <option key={branch} value={branch}>{branch}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Employee ID Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-extrabold text-gray-500 uppercase font-mono">Employee:</span>
+              <select
+                value={selectedEmployeeId}
+                onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
+                className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer max-w-[150px]"
+              >
+                <option value="All">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+                {employeeOptions.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-            {activeEmployees.length > 0 ? (
-              <div className="overflow-x-auto">
+            {filteredActiveEmployees.length > 0 ? (
+              <>
+                <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -426,7 +526,7 @@ export default function AttendanceTracker({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm">
-                    {activeEmployees.map((emp) => {
+                    {paginatedActiveEmployees.map((emp) => {
                       const record = localRecords[emp.id] || {
                         date: selectedDate,
                         employeeId: emp.id,
@@ -589,6 +689,50 @@ export default function AttendanceTracker({
                   </tbody>
                 </table>
               </div>
+
+              {/* Entries control & Pagination */}
+              <div className="bg-gray-50 border-t border-gray-100 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-700">Show Entries:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                    className="bg-white border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+
+                <div className="text-xs text-gray-500 font-medium">
+                  Showing <span className="font-bold text-slate-800">{filteredActiveEmployees.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, filteredActiveEmployees.length)}</span> of <span className="font-bold text-slate-800">{filteredActiveEmployees.length}</span> entries
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </button>
+                  <span className="text-xs font-bold text-gray-800 font-mono">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              </>
             ) : (
               <div className="text-center py-16 text-gray-400 bg-gray-50/50">
                 <AlertTriangle className="w-12 h-12 mx-auto text-gray-300 mb-3" />
@@ -596,7 +740,7 @@ export default function AttendanceTracker({
               </div>
             )}
 
-            {activeEmployees.length > 0 && (
+            {filteredActiveEmployees.length > 0 && (
               <div className="bg-gray-50 border-t border-gray-100 p-4 flex justify-between items-center">
                 <span className="text-xs text-gray-400 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" />

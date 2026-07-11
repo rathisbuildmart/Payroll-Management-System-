@@ -24,6 +24,8 @@ export default function Dashboard({ employees, attendance, payroll, language, on
   // Real-time Dashboard Filters State
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
   const [selectedDept, setSelectedDept] = useState<string>('All');
+  const [selectedBranch, setSelectedBranch] = useState<string>('All');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('All');
 
   // List of unique months available in system
   const monthOptions = useMemo(() => {
@@ -52,13 +54,32 @@ export default function Dashboard({ employees, attendance, payroll, language, on
     return ['All', ...Array.from(depts)];
   }, [employees]);
 
-  // Dynamic filtered datasets based on Month + Department filters
+  // List of unique branches
+  const branchOptions = useMemo(() => {
+    const branches = new Set<string>();
+    employees.forEach(emp => {
+      if (emp.branch) branches.add(emp.branch);
+    });
+    return ['All', ...Array.from(branches)];
+  }, [employees]);
+
+  // List of employees for selection
+  const employeeOptions = useMemo(() => {
+    return employees.map(emp => ({
+      id: emp.id,
+      name: `${emp.name} (${emp.id})`
+    }));
+  }, [employees]);
+
+  // Dynamic filtered datasets based on Month + Department + Branch + Employee filters
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
-      return matchesDept;
+      const matchesBranch = selectedBranch === 'All' || emp.branch === selectedBranch;
+      const matchesEmployee = selectedEmployeeId === 'All' || emp.id === selectedEmployeeId;
+      return matchesDept && matchesBranch && matchesEmployee;
     });
-  }, [employees, selectedDept]);
+  }, [employees, selectedDept, selectedBranch, selectedEmployeeId]);
 
   const activeEmployees = useMemo(() => {
     return filteredEmployees.filter(e => e.isActive);
@@ -70,18 +91,22 @@ export default function Dashboard({ employees, attendance, payroll, language, on
       const matchesMonth = a.date.startsWith(selectedMonth);
       const emp = employees.find(e => e.id === a.employeeId);
       const matchesDept = selectedDept === 'All' || (emp && emp.department === selectedDept);
-      return matchesMonth && matchesDept;
+      const matchesBranch = selectedBranch === 'All' || (emp && emp.branch === selectedBranch);
+      const matchesEmployee = selectedEmployeeId === 'All' || a.employeeId === selectedEmployeeId;
+      return matchesMonth && matchesDept && matchesBranch && matchesEmployee;
     });
-  }, [attendance, selectedMonth, selectedDept, employees]);
+  }, [attendance, selectedMonth, selectedDept, selectedBranch, selectedEmployeeId, employees]);
 
   const todayAttendance = useMemo(() => {
     return attendance.filter(a => {
       const matchesDay = a.date === todayStr;
       const emp = employees.find(e => e.id === a.employeeId);
       const matchesDept = selectedDept === 'All' || (emp && emp.department === selectedDept);
-      return matchesDay && matchesDept;
+      const matchesBranch = selectedBranch === 'All' || (emp && emp.branch === selectedBranch);
+      const matchesEmployee = selectedEmployeeId === 'All' || a.employeeId === selectedEmployeeId;
+      return matchesDay && matchesDept && matchesBranch && matchesEmployee;
     });
-  }, [attendance, todayStr, selectedDept, employees]);
+  }, [attendance, todayStr, selectedDept, selectedBranch, selectedEmployeeId, employees]);
 
   const presentTodayCount = useMemo(() => {
     return todayAttendance.filter(a => a.status === 'Present' || a.status === 'Half Day').length;
@@ -99,15 +124,17 @@ export default function Dashboard({ employees, attendance, payroll, language, on
     return 100;
   }, [todayAttendance, monthlyAttendance, presentTodayCount]);
 
-  // Payroll calculations based on filtered month & department
+  // Payroll calculations based on filtered month, department, branch, and employee
   const filteredPayroll = useMemo(() => {
     return payroll.filter(p => {
       const matchesMonth = p.monthYear === selectedMonth;
       const emp = employees.find(e => e.id === p.employeeId);
       const matchesDept = selectedDept === 'All' || (emp && emp.department === selectedDept);
-      return matchesMonth && matchesDept;
+      const matchesBranch = selectedBranch === 'All' || (emp && emp.branch === selectedBranch);
+      const matchesEmployee = selectedEmployeeId === 'All' || p.employeeId === selectedEmployeeId;
+      return matchesMonth && matchesDept && matchesBranch && matchesEmployee;
     });
-  }, [payroll, selectedMonth, selectedDept, employees]);
+  }, [payroll, selectedMonth, selectedDept, selectedBranch, selectedEmployeeId, employees]);
 
   const totalPayrollExpense = useMemo(() => {
     return filteredPayroll.reduce((acc, curr) => acc + curr.totalSalary, 0);
@@ -327,6 +354,39 @@ export default function Dashboard({ employees, attendance, payroll, language, on
             >
               {departmentOptions.map(dept => (
                 <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Branch Picker */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-extrabold text-gray-800 uppercase font-mono">
+              {language === 'en' ? 'Branch' : 'शाखा'}:
+            </span>
+            <select
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer"
+            >
+              {branchOptions.map(branch => (
+                <option key={branch} value={branch}>{branch}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Employee Picker */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-extrabold text-gray-800 uppercase font-mono">
+              {language === 'en' ? 'Employee' : 'कर्मचारी'}:
+            </span>
+            <select
+              value={selectedEmployeeId}
+              onChange={(e) => setSelectedEmployeeId(e.target.value)}
+              className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer max-w-[150px]"
+            >
+              <option value="All">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+              {employeeOptions.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.name}</option>
               ))}
             </select>
           </div>

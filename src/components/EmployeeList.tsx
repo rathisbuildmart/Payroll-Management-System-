@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock } from 'lucide-react';
+import React, { useState, useRef, useMemo } from 'react';
+import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { Employee, AdminSettings } from '../types';
 
 interface EmployeeListProps {
@@ -17,6 +17,10 @@ const PAYMENT_METHODS: Employee['paymentMethod'][] = ['Bank Transfer', 'Cash', '
 export default function EmployeeList({ employees, onAddEmployee, onUpdateEmployee, onBulkAddEmployees, language, adminSettings }: EmployeeListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
+  const [selectedBranch, setSelectedBranch] = useState('All');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('All');
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -221,13 +225,41 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     }
   }[language];
 
+  // Unique Branches and Employees for dropdowns
+  const branchOptions = useMemo(() => {
+    const branches = new Set<string>();
+    employees.forEach(emp => {
+      if (emp.branch) branches.add(emp.branch);
+    });
+    return ['All', ...Array.from(branches)];
+  }, [employees]);
+
+  const employeeOptions = useMemo(() => {
+    return employees.map(emp => ({
+      id: emp.id,
+      name: `${emp.name} (${emp.id})`
+    }));
+  }, [employees]);
+
   // Filter & Search logic
-  const filteredEmployees = employees.filter(emp => {
-    const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          emp.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
-    return matchesSearch && matchesDept;
-  });
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(emp => {
+      const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            emp.id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
+      const matchesBranch = selectedBranch === 'All' || emp.branch === selectedBranch;
+      const matchesEmployee = selectedEmployeeId === 'All' || emp.id === selectedEmployeeId;
+      return matchesSearch && matchesDept && matchesBranch && matchesEmployee;
+    });
+  }, [employees, searchTerm, selectedDept, selectedBranch, selectedEmployeeId]);
+
+  // Paginated Sliced list
+  const paginatedEmployees = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredEmployees.slice(start, start + pageSize);
+  }, [filteredEmployees, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredEmployees.length / pageSize) || 1;
 
   // CSV Utility functions
   const parseCSV = (text: string) => {
@@ -687,9 +719,6 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   };
 
   const toggleActiveStatus = async (emp: Employee) => {
-    const confirmation = window.confirm(emp.isActive ? t.confirmDeactivate : t.confirmActivate);
-    if (!confirmation) return;
-
     try {
       await onUpdateEmployee({
         ...emp,
@@ -697,7 +726,6 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       });
     } catch (err) {
       console.error(err);
-      alert('Failed to update status in Google Sheets.');
     }
   };
 
@@ -846,19 +874,55 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
           </div>
 
           {/* Department Filter */}
-          <div className="relative min-w-[200px]">
+          <div className="relative flex-1 min-w-[150px]">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
               <Filter className="w-4 h-4" />
             </span>
             <select
               value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white"
+              onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
               id="dept-filter"
             >
               <option value="All">{t.filterDept}</option>
               {(adminSettings?.departments || DEPARTMENTS).map(dept => (
                 <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Branch Filter */}
+          <div className="relative flex-1 min-w-[150px]">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+              <Building className="w-4 h-4" />
+            </span>
+            <select
+              value={selectedBranch}
+              onChange={(e) => { setSelectedBranch(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
+              id="branch-filter"
+            >
+              <option value="All">{language === 'en' ? 'All Branches' : 'सभी शाखाएं'}</option>
+              {branchOptions.filter(b => b !== 'All').map(b => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Employee ID Filter */}
+          <div className="relative flex-1 min-w-[150px]">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+              <Users className="w-4 h-4" />
+            </span>
+            <select
+              value={selectedEmployeeId}
+              onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
+              id="emp-filter"
+            >
+              <option value="All">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+              {employeeOptions.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.name}</option>
               ))}
             </select>
           </div>
@@ -906,7 +970,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-sm">
-                {filteredEmployees.map((emp) => (
+                {paginatedEmployees.map((emp) => (
                   <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-6 font-mono text-xs text-gray-500 font-semibold">{emp.id}</td>
                     <td className="py-4 px-6 font-semibold text-gray-900">
@@ -986,6 +1050,49 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                 ))}
               </tbody>
             </table>
+
+            {/* Entries control & Pagination */}
+            <div className="bg-gray-50 border-t border-gray-100 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-700">Show Entries:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                  className="bg-white border border-gray-250 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <div className="text-xs text-gray-500 font-medium">
+                Showing <span className="font-bold text-slate-800">{filteredEmployees.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, filteredEmployees.length)}</span> of <span className="font-bold text-slate-800">{filteredEmployees.length}</span> entries
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </button>
+                <span className="text-xs font-bold text-gray-800 font-mono">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="text-center py-16 text-gray-400 bg-gray-50/50">
@@ -1525,7 +1632,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium">
-                    {filteredEmployees.map((emp) => {
+                    {paginatedEmployees.map((emp) => {
                       const increments = emp.increments || [];
                       const lastInc = increments.length > 0 ? increments[increments.length - 1] : null;
                       return (
@@ -1586,6 +1693,49 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     })}
                   </tbody>
                 </table>
+
+                {/* Entries control & Pagination */}
+                <div className="bg-gray-50 border-t border-gray-100 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-700">Show Entries:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                      className="bg-white border border-gray-250 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] cursor-pointer"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+
+                  <div className="text-xs text-gray-500 font-medium">
+                    Showing <span className="font-bold text-slate-800">{filteredEmployees.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, filteredEmployees.length)}</span> of <span className="font-bold text-slate-800">{filteredEmployees.length}</span> entries
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Previous
+                    </button>
+                    <span className="text-xs font-bold text-gray-800 font-mono">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center py-16 text-gray-400">

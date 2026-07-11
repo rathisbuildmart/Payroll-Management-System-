@@ -109,7 +109,6 @@ export default function EmployeePortal({
       pending: "Pending",
       noPayslips: "No payroll slips generated for you yet. Contact human resources for salary run computations.",
       noAttendance: "No attendance logs found for this period.",
-      exceptions: "My exceptions",
       noExceptions: "No missed punch or half-day logs found. You are all caught up!",
       exceptionType: "Log Type",
       approvalStatus: "Approval Status",
@@ -924,6 +923,19 @@ export default function EmployeePortal({
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* LEAVES & HOLIDAYS TAB */}
+        {activeTab === 'leaves' && (
+          <div className="bg-white rounded-2xl border border-slate-200/85 p-5 md:p-6 shadow-md">
+            <LeavesHolidays
+              employees={[employee]}
+              attendance={attendanceRecords}
+              language={language}
+              isEmployeeView={true}
+              employeeId={employee.id}
+            />
           </div>
         )}
 

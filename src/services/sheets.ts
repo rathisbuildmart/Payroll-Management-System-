@@ -116,7 +116,10 @@ export const PAYROLL_COLUMNS: { key: keyof PayrollRecord; header: string }[] = [
   { key: 'professionalTax', header: 'Professional Tax' },
   { key: 'providentFund', header: 'Provident Fund' },
   { key: 'esic', header: 'ESIC' },
-  { key: 'netSalary', header: 'Net Salary' }
+  { key: 'netSalary', header: 'Net Salary' },
+  { key: 'oneTimeRefundAmount', header: 'One Time Refund Amount' },
+  { key: 'lateEarlyDays', header: 'Late Early Days' },
+  { key: 'attendanceFine', header: 'Attendance Fine' }
 ];
 
 // Helper to check response
@@ -741,6 +744,7 @@ export async function saveAdminSettings(spreadsheetId: string, settings: AdminSe
     ['weeklyOffProfiles', JSON.stringify(settings.weeklyOffProfiles || [])],
     ['leaveTypes', JSON.stringify(settings.leaveTypes || [])],
     ['fields', JSON.stringify(settings.fields || [])],
+    ['holidays', JSON.stringify(settings.holidays || [])],
     ['adminUsername', settings.adminUsername || ''],
     ['adminPassword', settings.adminPassword || '']
   ];
@@ -810,11 +814,11 @@ export async function fetchAdminSettings(spreadsheetId: string, token: string): 
       } catch (e) {
         settings[key] = val.split(',').map(s => s.trim()).filter(Boolean);
       }
-    } else if (key === 'fields') {
+    } else if (key === 'fields' || key === 'holidays') {
       try {
         settings[key] = JSON.parse(val);
       } catch (e) {
-        console.error('Failed to parse fields configuration:', e);
+        console.error(`Failed to parse ${key} configuration:`, e);
       }
     } else {
       settings[key] = val;

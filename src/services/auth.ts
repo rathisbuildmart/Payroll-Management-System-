@@ -25,7 +25,7 @@ const isTokenExpired = (): boolean => {
 // Initialize auth listener
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
-  onAuthFailure?: () => void
+  onAuthFailure?: (user: User | null) => void
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
@@ -35,7 +35,7 @@ export const initAuth = (
           cachedAccessToken = null;
           localStorage.removeItem('google_access_token');
           localStorage.removeItem('google_access_token_expires_at');
-          if (onAuthFailure) onAuthFailure();
+          if (onAuthFailure) onAuthFailure(user);
           return;
         }
         cachedAccessToken = localStorage.getItem('google_access_token');
@@ -44,13 +44,13 @@ export const initAuth = (
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
-        if (onAuthFailure) onAuthFailure();
+        if (onAuthFailure) onAuthFailure(user);
       }
     } else {
       // NOTE: Do NOT clear the google_access_token from localStorage here, 
       // as onAuthStateChanged can fire null briefly on page reload before restoring the session.
       // This is the key fix that prevents users from being forced to authorize repeatedly.
-      if (onAuthFailure) onAuthFailure();
+      if (onAuthFailure) onAuthFailure(null);
     }
   });
 };

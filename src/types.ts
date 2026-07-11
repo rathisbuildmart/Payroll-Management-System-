@@ -99,6 +99,17 @@ export interface FieldSetting {
   isMandatory: boolean;
 }
 
+export interface Holiday {
+  occasion: string;
+  hindiOccasion: string;
+  type: string;
+  hindiType: string;
+  date: string;
+  duration: string;
+  hindiDuration: string;
+  imgUrl?: string;
+}
+
 export interface AdminSettings {
   companyName: string;
   companyAddress: string;
@@ -119,6 +130,7 @@ export interface AdminSettings {
   fields: FieldSetting[];
   adminUsername?: string;
   adminPassword?: string;
+  holidays?: Holiday[];
 }
 
 export interface Attendance {
@@ -156,4 +168,27 @@ export interface PayrollRecord {
   providentFund?: number; // PF deduction
   esic?: number; // ESIC deduction
   netSalary?: number; // Net payable salary (Gross - Deductions - Advance - TDS - PT - PF - ESIC)
+  oneTimeRefundAmount?: number; // Month-wise installment refund amount (e.g. for Uniform/Tour)
+  lateEarlyDays?: number; // Total days with late arrival or early going
+  attendanceFine?: number; // Fine calculated for late/early going above free 3 days
+}
+
+export interface OneTimeDeduction {
+  id: string;
+  employeeId: string;
+  type: 'Uniform' | 'Tour' | 'Other';
+  totalAmount: number;
+  monthlyRefundInstallment: number;
+  refundedAmount: number; // Sum of what has been paid back so far
+  description?: string;
+  createdAt: string; // YYYY-MM-DD
+  status: 'Pending' | 'Partially Refunded' | 'Fully Refunded';
+}
+
+export interface SyncLog {
+  id: string;
+  timestamp: string;
+  operation: string;
+  status: 'success' | 'error' | 'syncing';
+  details: string;
 }

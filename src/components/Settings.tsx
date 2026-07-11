@@ -111,6 +111,7 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
   const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'>>('departments');
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
+  const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
   const t = {
     en: {
@@ -277,12 +278,16 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
   };
 
   const handleResetToDefault = () => {
-    if (window.confirm("Are you sure you want to reset all admin settings to standard default values? This will overwrite your current configuration.")) {
-      setLocalSettings(INITIAL_ADMIN_SETTINGS);
-      onSaveSettings(INITIAL_ADMIN_SETTINGS);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 4000);
+    if (!confirmReset) {
+      setConfirmReset(true);
+      setTimeout(() => setConfirmReset(false), 5000);
+      return;
     }
+    setLocalSettings(INITIAL_ADMIN_SETTINGS);
+    onSaveSettings(INITIAL_ADMIN_SETTINGS);
+    setSaveSuccess(true);
+    setConfirmReset(false);
+    setTimeout(() => setSaveSuccess(false), 4000);
   };
 
   const filteredFields = localSettings.fields.filter(f => {
@@ -318,59 +323,63 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
         <aside className="w-full md:w-56 border-r border-gray-100 bg-slate-50/60 p-4 shrink-0 flex flex-row md:flex-col gap-1.5 overflow-x-auto">
           <button
             onClick={() => setActiveSubTab('company')}
-            className={`flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap cursor-pointer ${
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer ${
               activeSubTab === 'company'
                 ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
                 : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <Building className="w-3.5 h-3.5" />
-            {t.tabCompany}
+            <Building className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
+            <span>{t.tabCompany}</span>
           </button>
           
           <button
             onClick={() => setActiveSubTab('fields')}
-            className={`flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap cursor-pointer ${
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer ${
               activeSubTab === 'fields'
                 ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
                 : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <ToggleLeft className="w-3.5 h-3.5" />
-            {t.tabFields}
+            <ToggleLeft className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
+            <span>{t.tabFields}</span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('masters')}
-            className={`flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap cursor-pointer ${
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer ${
               activeSubTab === 'masters'
                 ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
                 : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <List className="w-3.5 h-3.5" />
-            {t.tabMasters}
+            <List className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
+            <span>{t.tabMasters}</span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('policy')}
-            className={`flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap cursor-pointer ${
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer ${
               activeSubTab === 'policy'
                 ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
                 : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <SettingsIcon className="w-3.5 h-3.5" />
-            {t.tabPolicy}
+            <SettingsIcon className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
+            <span>{t.tabPolicy}</span>
           </button>
 
           <div className="hidden md:block pt-6 mt-6 border-t border-gray-200/60">
             <button
               onClick={handleResetToDefault}
-              className="flex items-center gap-1.5 w-full text-left px-3 py-1.5 text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 border border-red-200/50 rounded transition-all cursor-pointer"
+              className={`flex items-center gap-1.5 w-full text-left px-3 py-1.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                confirmReset 
+                  ? 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
+                  : 'text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 border border-red-200/50'
+              }`}
             >
               <Undo className="w-3 h-3" />
-              {t.resetDefault}
+              {confirmReset ? (language === 'en' ? "Confirm Reset!" : "पुष्टि करें!") : t.resetDefault}
             </button>
           </div>
         </aside>

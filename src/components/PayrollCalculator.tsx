@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, CreditCard, Check, Printer, FileText, DollarSign, Calculator, AlertCircle, Save, TrendingUp, Users, ArrowUpRight, ShieldCheck, ArrowDownRight, Landmark, Building, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Calendar, CreditCard, Check, Printer, FileText, DollarSign, Calculator, AlertCircle, Save, TrendingUp, Users, ArrowUpRight, ShieldCheck, ArrowDownRight, Landmark, Building, Sparkles, Filter, ChevronLeft, ChevronRight, RefreshCcw, FileDown, PlusCircle, Trash2, HelpCircle, Info } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { Employee, Attendance, PayrollRecord } from '../types';
+import { Employee, Attendance, PayrollRecord, OneTimeDeduction, AdminSettings } from '../types';
 
 interface PayrollCalculatorProps {
   employees: Employee[];
@@ -10,6 +10,7 @@ interface PayrollCalculatorProps {
   onSavePayroll: (records: PayrollRecord[]) => Promise<void>;
   onUpdateEmployees?: (updatedEmployees: Employee[]) => Promise<void>;
   language: 'en' | 'hi';
+  adminSettings?: AdminSettings;
 }
 
 const MONTHS = [
@@ -27,18 +28,204 @@ const MONTHS = [
   { name: 'December', hindi: 'दिसंबर', value: '12' },
 ];
 
-export default function PayrollCalculator({ employees, attendanceRecords, payrollRecords, onSavePayroll, onUpdateEmployees, language }: PayrollCalculatorProps) {
+const parseTime = (timeStr?: string): { hour: number; minute: number } | null => {
+  if (!timeStr) return null;
+  const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  return { hour: parseInt(match[1], 10), minute: parseInt(match[2], 10) };
+};
+
+const parseShiftStart = (workTiming?: string, fallback: string = "09:00"): { hour: number; minute: number } => {
+  if (!workTiming) {
+    const p = parseTime(fallback);
+    return p || { hour: 9, minute: 0 };
+  }
+  const match = workTiming.match(/(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?/i);
+  if (match) {
+    let hour = parseInt(match[1], 10);
+    const minute = parseInt(match[2], 10);
+    const ampm = match[3];
+    if (ampm) {
+      const isPm = ampm.toUpperCase() === 'PM';
+      if (isPm && hour < 12) hour += 12;
+      if (!isPm && hour === 12) hour = 0;
+    }
+    return { hour, minute };
+  }
+  const p = parseTime(fallback);
+  return p || { hour: 9, minute: 0 };
+};
+
+const parseShiftEnd = (workTiming?: string, fallback: string = "18:00"): { hour: number; minute: number } => {
+  if (!workTiming) {
+    const p = parseTime(fallback);
+    return p || { hour: 18, minute: 0 };
+  }
+  const matches = [...workTiming.matchAll(/(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?/gi)];
+  if (matches.length >= 2) {
+    const match = matches[1];
+    let hour = parseInt(match[1], 10);
+    const minute = parseInt(match[2], 10);
+    const ampm = match[3];
+    if (ampm) {
+      const isPm = ampm.toUpperCase() === 'PM';
+      if (isPm && hour < 12) hour += 12;
+      if (!isPm && hour === 12) hour = 0;
+    }
+    return { hour, minute };
+  }
+  const p = parseTime(fallback);
+  return p || { hour: 18, minute: 0 };
+};
+
+const isAttendanceLate = (record: Attendance, workTiming?: string, defaultCheckIn: string = "09:00"): boolean => {
+  if (!record.checkIn || record.checkIn === '--:--' || record.checkIn === '') return false;
+  const checkInTime = parseTime(record.checkIn);
+  if (!checkInTime) return false;
+  const shiftStart = parseShiftStart(workTiming, defaultCheckIn);
+  
+  const checkInMin = checkInTime.hour * 60 + checkInTime.minute;
+  const shiftStartMin = shiftStart.hour * 60 + shiftStart.minute;
+  
+  return checkInMin > (shiftStartMin + 5);
+};
+
+const isAttendanceEarlyGoing = (record: Attendance, workTiming?: string, defaultCheckOut: string = "18:00"): boolean => {
+  if (!record.checkOut || record.checkOut === '--:--' || record.checkOut === '') return false;
+  const checkOutTime = parseTime(record.checkOut);
+  if (!checkOutTime) return false;
+  const shiftEnd = parseShiftEnd(workTiming, defaultCheckOut);
+  
+  const checkOutMin = checkOutTime.hour * 60 + checkOutTime.minute;
+  const shiftEndMin = shiftEnd.hour * 60 + shiftEnd.minute;
+  
+  return checkOutMin < shiftEndMin;
+};
+
+export default function PayrollCalculator({ employees, attendanceRecords, payrollRecords, onSavePayroll, onUpdateEmployees, language, adminSettings }: PayrollCalculatorProps) {
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [workingDays, setWorkingDays] = useState<number>(26);
   const [localPayroll, setLocalPayroll] = useState<PayrollRecord[]>([]);
   const [activePayslip, setActivePayslip] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmPayEmpId, setConfirmPayEmpId] = useState<string | null>(null);
+  const [confirmPayAll, setConfirmPayAll] = useState<boolean>(false);
 
   // States for manual payroll adjustments modal
   const [editingRecord, setEditingRecord] = useState<PayrollRecord | null>(null);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'ledger' | 'refunds'>('ledger');
+
+  // One-time deductions list and their monthly refund tracking
+  const [oneTimeDeductions, setOneTimeDeductions] = useState<OneTimeDeduction[]>(() => {
+    try {
+      const saved = localStorage.getItem('payroll_one_time_deductions');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    // Pre-populate with beautiful standard demo data so the report lists items by default
+    const defaultDeductions: OneTimeDeduction[] = [
+      {
+        id: 'REF001',
+        employeeId: 'EMP001',
+        type: 'Uniform',
+        totalAmount: 3000,
+        monthlyRefundInstallment: 500,
+        refundedAmount: 1000,
+        createdAt: '2026-04-10',
+        status: 'Partially Refunded',
+        description: 'Standard uniform deduction (Refunded in 6 parts)'
+      },
+      {
+        id: 'REF002',
+        employeeId: 'EMP002',
+        type: 'Tour',
+        totalAmount: 5000,
+        monthlyRefundInstallment: 1000,
+        refundedAmount: 5000,
+        createdAt: '2026-02-15',
+        status: 'Fully Refunded',
+        description: 'Tour allowance initial one-time charge (Refunded in 5 parts)'
+      },
+      {
+        id: 'REF003',
+        employeeId: 'EMP003',
+        type: 'Uniform',
+        totalAmount: 3000,
+        monthlyRefundInstallment: 600,
+        refundedAmount: 0,
+        createdAt: '2026-07-01',
+        status: 'Pending',
+        description: 'Factory protective gear charge'
+      }
+    ];
+    localStorage.setItem('payroll_one_time_deductions', JSON.stringify(defaultDeductions));
+    return defaultDeductions;
+  });
+
+  // Track the deductions in localStorage on updates
+  useEffect(() => {
+    localStorage.setItem('payroll_one_time_deductions', JSON.stringify(oneTimeDeductions));
+  }, [oneTimeDeductions]);
+
+  // Form states for creating new one-time deduction & refund plans
+  const [newDeductEmpId, setNewDeductEmpId] = useState('');
+  const [newDeductType, setNewDeductType] = useState<'Uniform' | 'Tour' | 'Other'>('Uniform');
+  const [newDeductTotal, setNewDeductTotal] = useState<number>(3000);
+  const [newDeductInstallment, setNewDeductInstallment] = useState<number>(500);
+  const [newDeductDesc, setNewDeductDesc] = useState('');
+
+  // Filters state
+  const [selectedBranch, setSelectedBranch] = useState('All');
+  const [selectedDept, setSelectedDept] = useState('All');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('All');
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const branchOptions = useMemo(() => {
+    const branches = new Set<string>();
+    employees.forEach(emp => {
+      if (emp.branch) branches.add(emp.branch);
+    });
+    return ['All', ...Array.from(branches)];
+  }, [employees]);
+
+  const departmentOptions = useMemo(() => {
+    const depts = new Set<string>();
+    employees.forEach(emp => {
+      if (emp.department) depts.add(emp.department);
+    });
+    return ['All', ...Array.from(depts)];
+  }, [employees]);
+
+  const employeeOptions = useMemo(() => {
+    return employees.map(emp => ({
+      id: emp.id,
+      name: `${emp.name} (${emp.id})`
+    }));
+  }, [employees]);
+
+  // Compute filtered payroll list
+  const filteredPayroll = useMemo(() => {
+    return localPayroll.filter(record => {
+      const emp = employees.find(e => e.id === record.employeeId);
+      if (!emp) return false;
+      const matchesBranch = selectedBranch === 'All' || emp.branch === selectedBranch;
+      const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
+      const matchesEmployee = selectedEmployeeId === 'All' || emp.id === selectedEmployeeId;
+      return matchesBranch && matchesDept && matchesEmployee;
+    });
+  }, [localPayroll, employees, selectedBranch, selectedDept, selectedEmployeeId]);
+
+  const paginatedPayroll = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredPayroll.slice(start, start + pageSize);
+  }, [filteredPayroll, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredPayroll.length / pageSize) || 1;
 
   const activeEmployees = employees.filter(e => e.isActive);
   const selectedMonthYear = `${selectedYear}-${selectedMonth}`;
@@ -67,6 +254,23 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     const defaultConveyance = emp.conveyanceAllowance !== undefined && emp.conveyanceAllowance > 0 ? emp.conveyanceAllowance : (emp.basicSalary > 25000 ? 1600 : 800);
     const defaultAdvanceDeduction = emp.advanceSalaryDeduction !== undefined && emp.advanceSalaryDeduction > 0 ? Math.min(emp.advanceSalaryBalance || 0, emp.advanceSalaryDeduction) : 0;
 
+    // Compute late coming and early going fine: 5 min grace, 3 free days, ₹100/day after
+    let lateEarlyDaysCount = 0;
+    const activeAtt = empAtt.filter(r => r.status === 'Present' || r.status === 'Half Day');
+    activeAtt.forEach(r => {
+      const isLate = isAttendanceLate(r, emp.workTiming, adminSettings?.defaultCheckIn || "09:00");
+      const isEarly = isAttendanceEarlyGoing(r, emp.workTiming, adminSettings?.defaultCheckOut || "18:00");
+      if (isLate || isEarly) {
+        lateEarlyDaysCount++;
+      }
+    });
+    const attendanceFine = Math.max(0, lateEarlyDaysCount - 3) * 100;
+
+    // Compute monthly wise part-part refund of one-time deductions (e.g. Uniform / Tour)
+    const activeRefunds = oneTimeDeductions.filter(d => d.employeeId === emp.id && d.status !== 'Fully Refunded');
+    const computedRefundAmount = activeRefunds.reduce((sum, d) => sum + Math.min(d.monthlyRefundInstallment, d.totalAmount - d.refundedAmount), 0);
+    const oneTimeRefundAmount = overrideRecord?.oneTimeRefundAmount !== undefined ? overrideRecord.oneTimeRefundAmount : computedRefundAmount;
+
     // Use current overrides or default values
     const hra = overrideRecord?.hra !== undefined ? overrideRecord.hra : defaultHra;
     const da = overrideRecord?.da !== undefined ? overrideRecord.da : defaultDa;
@@ -80,7 +284,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     // Let's keep HRA/DA/Conveyance fixed/monthly full, but pro-rate Basic (very common to prevent penalizing allowances, or we can proration, let's keep them fully paid as configured)
     const standardAllowancesTotal = emp.allowances;
     const customAllowancesTotal = hra + da + conveyanceAllowance;
-    const grossSalary = earnedBasic + standardAllowancesTotal + customAllowancesTotal + overtimePay + festivalBonus + performanceIncentive + leaveAdjustment;
+    const grossSalary = earnedBasic + standardAllowancesTotal + customAllowancesTotal + overtimePay + festivalBonus + performanceIncentive + leaveAdjustment + oneTimeRefundAmount;
 
     // PF contribution: 12% of pro-rated basic salary
     const providentFund = Math.round(earnedBasic * 0.12);
@@ -112,8 +316,8 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     // Statutory deductions total
     const statutoryDeductionsTotal = finalPf + finalEsic + finalPt + finalTds;
     
-    // Total standard and custom deductions
-    const totalDeductions = emp.deductions + statutoryDeductionsTotal;
+    // Total standard and custom deductions including attendance fine
+    const totalDeductions = emp.deductions + statutoryDeductionsTotal + attendanceFine;
 
     // Net Payable = Gross - Deductions - Advance repaid
     const netSalary = Math.max(0, grossSalary - totalDeductions - advanceDeduction);
@@ -122,7 +326,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       monthYear: selectedMonthYear,
       employeeId: emp.id,
       basicSalary: emp.basicSalary,
-      allowances: standardAllowancesTotal + customAllowancesTotal + festivalBonus + performanceIncentive + leaveAdjustment,
+      allowances: standardAllowancesTotal + customAllowancesTotal + festivalBonus + performanceIncentive + leaveAdjustment + oneTimeRefundAmount,
       deductions: totalDeductions,
       overtimePay,
       totalSalary: grossSalary, // Gross Salary
@@ -142,6 +346,9 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       providentFund: finalPf,
       esic: finalEsic,
       netSalary,
+      oneTimeRefundAmount,
+      lateEarlyDays: lateEarlyDaysCount,
+      attendanceFine,
     };
   };
 
@@ -563,6 +770,132 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     }
   }, [selectedMonthYear, attendanceRecords, payrollRecords, employees, workingDays]);
 
+  const handleAddDeductionPlan = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeductEmpId) {
+      alert('Please select an employee!');
+      return;
+    }
+    const newPlan: OneTimeDeduction = {
+      id: `REF_${Date.now()}`,
+      employeeId: newDeductEmpId,
+      type: newDeductType,
+      totalAmount: Number(newDeductTotal),
+      monthlyRefundInstallment: Number(newDeductInstallment),
+      refundedAmount: 0,
+      createdAt: new Date().toISOString().split('T')[0],
+      status: 'Pending',
+      description: newDeductDesc || `${newDeductType} deduction plan`
+    };
+
+    setOneTimeDeductions(prev => [newPlan, ...prev]);
+    setNewDeductDesc('');
+    alert('Deduction & Refund Plan added successfully! It will now be processed automatically month-by-month inside active payroll sheets.');
+    
+    // Automatically recalculate current sheet to immediately reflect refund additions!
+    setTimeout(() => {
+      handleRecalculate();
+    }, 200);
+  };
+
+  const handleDeleteDeductionPlan = (id: string) => {
+    if (confirm('Are you sure you want to delete this deduction & refund plan?')) {
+      setOneTimeDeductions(prev => prev.filter(d => d.id !== id));
+      setTimeout(() => {
+        handleRecalculate();
+      }, 200);
+    }
+  };
+
+  const downloadRefundReportPDF = () => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Outer frame / header styling - elegant deep green theme
+    doc.setFillColor(3, 98, 60); 
+    doc.rect(0, 0, 210, 28, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('ONE-TIME DEDUCTIONS & MONTHLY REFUNDS REPORT', 15, 11);
+    doc.setFontSize(9);
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Deduction tracking, month-wise refunds progress & outstanding balances', 15, 17);
+    doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 15, 23);
+
+    // Summary statistics boxes
+    const totalDeductedVal = oneTimeDeductions.reduce((sum, d) => sum + d.totalAmount, 0);
+    const totalRefundedVal = oneTimeDeductions.reduce((sum, d) => sum + d.refundedAmount, 0);
+    const totalPendingVal = totalDeductedVal - totalRefundedVal;
+
+    doc.setFillColor(245, 247, 246);
+    doc.rect(15, 34, 180, 16, 'F');
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text('TOTAL DEDUCTED', 20, 39);
+    doc.text('TOTAL REFUNDED', 80, 39);
+    doc.text('OUTSTANDING TO REFUND', 140, 39);
+
+    doc.setFontSize(11);
+    doc.setTextColor(3, 98, 60);
+    doc.text(`Rs. ${totalDeductedVal.toLocaleString('en-IN')}`, 20, 45);
+    doc.text(`Rs. ${totalRefundedVal.toLocaleString('en-IN')}`, 80, 45);
+    doc.text(`Rs. ${totalPendingVal.toLocaleString('en-IN')}`, 140, 45);
+
+    // Table setup
+    doc.setFillColor(235, 235, 235);
+    doc.rect(15, 56, 180, 8, 'F');
+    doc.setFontSize(8.5);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont('Helvetica', 'bold');
+    doc.text('Employee', 17, 61);
+    doc.text('Type', 65, 61);
+    doc.text('Total Amt', 92, 61);
+    doc.text('Installment', 115, 61);
+    doc.text('Refunded', 140, 61);
+    doc.text('Outstanding', 162, 61);
+    doc.text('Status', 183, 61);
+
+    let y = 70;
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    
+    oneTimeDeductions.forEach(d => {
+      const emp = employees.find(e => e.id === d.employeeId);
+      const name = emp ? `${emp.name} (${d.employeeId})` : d.employeeId;
+      const remaining = d.totalAmount - d.refundedAmount;
+
+      doc.text(name.slice(0, 22), 17, y);
+      doc.text(d.type, 65, y);
+      doc.text(`Rs. ${d.totalAmount}`, 92, y);
+      doc.text(`Rs. ${d.monthlyRefundInstallment}`, 115, y);
+      doc.text(`Rs. ${d.refundedAmount}`, 140, y);
+      doc.text(`Rs. ${remaining}`, 162, y);
+      doc.text(d.status, 183, y);
+
+      doc.setDrawColor(230, 230, 230);
+      doc.line(15, y + 2, 195, y + 2);
+      y += 8;
+
+      if (y > 275) {
+        doc.addPage();
+        y = 20;
+      }
+    });
+
+    // Add a professional footer
+    doc.setFontSize(7.5);
+    doc.setTextColor(150, 150, 150);
+    doc.text('Confidential - Generated by Payroll Management System', 15, 288);
+    
+    doc.save(`OneTime_Deductions_Refund_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   const handleRecalculate = () => {
     const computed: PayrollRecord[] = activeEmployees.map(emp => {
       return calculateSingleEmployeePayroll(emp);
@@ -572,8 +905,12 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   };
 
   const handleMarkPaid = async (empId: string) => {
-    const confirmation = window.confirm(t.confirmPay);
-    if (!confirmation) return;
+    if (confirmPayEmpId !== empId) {
+      setConfirmPayEmpId(empId);
+      setTimeout(() => setConfirmPayEmpId(null), 5000);
+      return;
+    }
+    setConfirmPayEmpId(null);
 
     let advanceDeductionAmt = 0;
     const updated = localPayroll.map(p => {
@@ -589,6 +926,29 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     });
 
     setLocalPayroll(updated);
+
+    // Process one-time deduction refunds for this employee
+    const employeeRecord = localPayroll.find(p => p.employeeId === empId);
+    if (employeeRecord && employeeRecord.oneTimeRefundAmount && employeeRecord.oneTimeRefundAmount > 0) {
+      setOneTimeDeductions(prev => {
+        let remainingRefundToApply = employeeRecord.oneTimeRefundAmount || 0;
+        return prev.map(d => {
+          if (d.employeeId === empId && d.status !== 'Fully Refunded' && remainingRefundToApply > 0) {
+            const maxRefundable = d.totalAmount - d.refundedAmount;
+            const refundApplied = Math.min(remainingRefundToApply, maxRefundable);
+            remainingRefundToApply -= refundApplied;
+            const newRefunded = d.refundedAmount + refundApplied;
+            const newStatus = newRefunded >= d.totalAmount ? 'Fully Refunded' as const : 'Partially Refunded' as const;
+            return {
+              ...d,
+              refundedAmount: newRefunded,
+              status: newStatus
+            };
+          }
+          return d;
+        });
+      });
+    }
     
     // Save to Google sheets directly
     setIsSaving(true);
@@ -612,15 +972,18 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       await onSavePayroll(combined);
     } catch (err) {
       console.error(err);
-      alert('Failed to save to Google Sheets.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleMarkAllPaid = async () => {
-    const confirmation = window.confirm(t.confirmAllPay);
-    if (!confirmation) return;
+    if (!confirmPayAll) {
+      setConfirmPayAll(true);
+      setTimeout(() => setConfirmPayAll(false), 5000);
+      return;
+    }
+    setConfirmPayAll(false);
 
     const updated = localPayroll.map(p => ({
       ...p,
@@ -629,6 +992,32 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     }));
 
     setLocalPayroll(updated);
+
+    // Process one-time deduction refunds for all paid employees in bulk
+    setOneTimeDeductions(prev => {
+      let currentDeductions = [...prev];
+      localPayroll.forEach(p => {
+        if (p.oneTimeRefundAmount && p.oneTimeRefundAmount > 0) {
+          let remainingRefundToApply = p.oneTimeRefundAmount;
+          currentDeductions = currentDeductions.map(d => {
+            if (d.employeeId === p.employeeId && d.status !== 'Fully Refunded' && remainingRefundToApply > 0) {
+              const maxRefundable = d.totalAmount - d.refundedAmount;
+              const refundApplied = Math.min(remainingRefundToApply, maxRefundable);
+              remainingRefundToApply -= refundApplied;
+              const newRefunded = d.refundedAmount + refundApplied;
+              const newStatus = newRefunded >= d.totalAmount ? 'Fully Refunded' as const : 'Partially Refunded' as const;
+              return {
+                ...d,
+                refundedAmount: newRefunded,
+                status: newStatus
+              };
+            }
+            return d;
+          });
+        }
+      });
+      return currentDeductions;
+    });
     
     setIsSaving(true);
     try {
@@ -882,7 +1271,35 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
       </div>
 
-      {/* Dynamic Annual Analytics Dashboard Panel */}
+      {/* Premium sub-tab switcher */}
+      <div className="flex border-b border-slate-200 bg-white rounded-t-xl overflow-hidden mt-6 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
+        <button
+          onClick={() => setActiveSubTab('ledger')}
+          className={`flex-1 py-3.5 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            activeSubTab === 'ledger'
+              ? 'border-[#03623c] text-[#03623c] bg-slate-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50/20'
+          }`}
+        >
+          <Check className="w-4 h-4 text-[#03623c]" />
+          <span>Monthly Payroll Ledger (मासिक पेरोल सूची)</span>
+        </button>
+        <button
+          onClick={() => setActiveSubTab('refunds')}
+          className={`flex-1 py-3.5 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            activeSubTab === 'refunds'
+              ? 'border-[#03623c] text-[#03623c] bg-slate-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50/20'
+          }`}
+        >
+          <RefreshCcw className="w-4 h-4 text-indigo-600" />
+          <span>One-Time Deductions & Refunds Report (कटौती एवं रिफंड)</span>
+        </button>
+      </div>
+
+      {activeSubTab === 'ledger' && (
+        <>
+          {/* Dynamic Annual Analytics Dashboard Panel */}
       {showAnalytics && (
         <div className="bg-slate-900 text-slate-100 p-6 rounded-xl border border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-300">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-4 mb-6">
@@ -1098,18 +1515,73 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           
           <button
             onClick={handleMarkAllPaid}
-            className="px-4 py-2.5 border border-emerald-200/80 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-800 text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all hover:shadow-2xs active:scale-98"
+            className={`px-4 py-2.5 border text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all hover:shadow-2xs active:scale-98 ${
+              confirmPayAll 
+                ? 'border-amber-300 bg-amber-50 text-amber-800 animate-pulse'
+                : 'border-emerald-200/80 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-800'
+            }`}
             id="mark-all-paid"
           >
             <Check className="w-4 h-4 text-emerald-600" />
-            <span>{t.markAllPaid}</span>
+            <span>{confirmPayAll ? (language === 'en' ? 'Click to Confirm All' : 'सभी की पुष्टि करें') : t.markAllPaid}</span>
           </button>
+        </div>
+      </div>
+
+      {/* Dynamic Filters Row */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-1.5">
+          <Filter className="w-4 h-4 text-indigo-600" />
+          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">Filters:</span>
+        </div>
+
+        {/* Department Filter */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-extrabold text-slate-500 uppercase font-mono">Dept:</span>
+          <select
+            value={selectedDept}
+            onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
+            className="bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer"
+          >
+            {departmentOptions.map(dept => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Branch Filter */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-extrabold text-slate-500 uppercase font-mono">Branch:</span>
+          <select
+            value={selectedBranch}
+            onChange={(e) => { setSelectedBranch(e.target.value); setCurrentPage(1); }}
+            className="bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer"
+          >
+            {branchOptions.map(branch => (
+              <option key={branch} value={branch}>{branch}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Employee ID Filter */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-extrabold text-slate-500 uppercase font-mono">Employee:</span>
+          <select
+            value={selectedEmployeeId}
+            onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
+            className="bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer max-w-[150px]"
+          >
+            <option value="All">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+            {employeeOptions.map(emp => (
+              <option key={emp.id} value={emp.id}>{emp.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
       {/* Main List Box with exquisite, clean modern table design */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.015)] overflow-hidden">
-        {localPayroll.length > 0 ? (
+        {filteredPayroll.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -1124,7 +1596,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {localPayroll.map((rec) => {
+                {paginatedPayroll.map((rec) => {
                   const emp = employees.find(e => e.id === rec.employeeId);
                   const empAtt = attendanceRecords.filter(r => r.employeeId === rec.employeeId && r.date.startsWith(selectedMonthYear));
                   
@@ -1256,11 +1728,15 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                           {rec.paymentStatus === 'Pending' && (
                             <button
                               onClick={() => handleMarkPaid(rec.employeeId)}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-3xs active:scale-97 hover:shadow-[0_4px_12px_rgba(79,70,229,0.2)]"
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-3xs active:scale-97 ${
+                                confirmPayEmpId === rec.employeeId
+                                  ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
+                                  : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:shadow-[0_4px_12px_rgba(79,70,229,0.2)]'
+                              }`}
                               id={`pay-${rec.employeeId}`}
                             >
                               <CreditCard className="w-3.5 h-3.5" />
-                              <span>{t.markPaidBtn}</span>
+                              <span>{confirmPayEmpId === rec.employeeId ? (language === 'en' ? 'Click to Confirm' : 'पुष्टि करें') : t.markPaidBtn}</span>
                             </button>
                           )}
                         </div>
@@ -1270,6 +1746,49 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 })}
               </tbody>
             </table>
+
+            {/* Entries control & Pagination */}
+            <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700">Show Entries:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                  className="bg-white border border-slate-250 text-xs font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <div className="text-xs text-slate-500 font-medium">
+                Showing <span className="font-bold text-slate-800">{filteredPayroll.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, filteredPayroll.length)}</span> of <span className="font-bold text-slate-800">{filteredPayroll.length}</span> entries
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </button>
+                <span className="text-xs font-bold text-slate-800 font-mono">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="text-center py-16 text-slate-400 bg-slate-50/50">
@@ -1279,7 +1798,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
         )}
 
         {/* Sync panel footer with glass reflection */}
-        {localPayroll.length > 0 && (
+        {filteredPayroll.length > 0 && (
           <div className="bg-slate-50/80 border-t border-slate-150 p-5 flex justify-end">
             <button
               onClick={handleSavePayroll}
@@ -1302,6 +1821,205 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {/* 2. One-Time Deductions & Refunds Subtab content */}
+      {activeSubTab === 'refunds' && (
+        <div className="space-y-6">
+          {/* Quick Help Box */}
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex gap-3 text-indigo-900 mt-6">
+            <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1 font-medium">
+              <p className="font-bold">एक-बारगी कटौती एवं मासिक रिफंड प्रणाली (Deduction & Refund System Rulebook):</p>
+              <p>1. Uniform या Tour जैसी एक-बारगी लगने वाली कटौतियों को दर्ज करें।</p>
+              <p>2. प्रत्येक माह की पेरोल गणना में इस राशि का एक निश्चित भाग (मासिक किस्त) कर्मचारी के वेतन में जोड़कर वापस (Refund) कर दिया जाता है।</p>
+              <p>3. जैसे ही पेरोल शीट 'Paid' मार्क होती है, शेष रिफंड राशि को घटा दिया जाता है और स्थिति अपडेट हो जाती है।</p>
+            </div>
+          </div>
+
+          {/* Form and Stats Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* New deduction creation form card */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
+                <PlusCircle className="w-4 h-4 text-[#03623c]" />
+                <span>नयी कटौती और रिफंड योजना जोड़ें</span>
+              </h3>
+
+              <form onSubmit={handleAddDeductionPlan} className="space-y-4 font-sans">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">कर्मचारी का चयन करें (Select Employee)</label>
+                  <select
+                    value={newDeductEmpId}
+                    onChange={(e) => setNewDeductEmpId(e.target.value)}
+                    required
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white cursor-pointer"
+                  >
+                    <option value="">-- चुनें (Choose Employee) --</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.id}) - {emp.designation}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">कटौती का प्रकार (Deduction Type)</label>
+                  <select
+                    value={newDeductType}
+                    onChange={(e) => setNewDeductType(e.target.value as any)}
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white cursor-pointer"
+                  >
+                    <option value="Uniform">Uniform (यूनिफॉर्म चार्ज)</option>
+                    <option value="Tour">Tour (दौरा / टूर व्यय)</option>
+                    <option value="Other">Other (अन्य कटौती)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">कुल राशि (Total Amount)</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={newDeductTotal}
+                      onChange={(e) => setNewDeductTotal(Number(e.target.value))}
+                      className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold font-mono focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">मासिक किस्त (Monthly Part)</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={newDeductInstallment}
+                      onChange={(e) => setNewDeductInstallment(Number(e.target.value))}
+                      className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold font-mono focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">विवरण / नोट (Description)</label>
+                  <textarea
+                    rows={2}
+                    value={newDeductDesc}
+                    onChange={(e) => setNewDeductDesc(e.target.value)}
+                    placeholder="जैसे: Winter uniform kit 2026..."
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-[#03623c] hover:bg-[#024d2e] text-white p-3 rounded-lg text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs active:scale-98"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>योजना लागू करें (Save Plan)</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Refund list and live progress panel */}
+            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">
+                    कटौती वापसी एवं शेष विवरण रिपोर्ट (Active Plans & Outstanding Balances)
+                  </h3>
+                  <button
+                    onClick={downloadRefundReportPDF}
+                    className="text-xs font-bold bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 text-indigo-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-98"
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span>Download Report (PDF)</span>
+                  </button>
+                </div>
+
+                {oneTimeDeductions.length === 0 ? (
+                  <div className="p-12 text-center text-slate-400 text-xs font-medium flex flex-col items-center gap-2.5">
+                    <RefreshCcw className="w-8 h-8 text-slate-300 animate-spin" />
+                    <span>कोई भी सक्रिय योजना नहीं मिली। ऊपर फॉर्म का उपयोग करके एक नई योजना जोड़ें।</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse font-sans">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 text-[10px] uppercase tracking-wider">
+                          <th className="py-3 px-4">कर्मचारी (Employee)</th>
+                          <th className="py-3 px-4">प्रकार (Type)</th>
+                          <th className="py-3 px-4">कुल कटौती</th>
+                          <th className="py-3 px-4">किस्त (Monthly)</th>
+                          <th className="py-3 px-4">वापस मिला (Refunded)</th>
+                          <th className="py-3 px-4">बचा हुआ (Outstanding)</th>
+                          <th className="py-3 px-4">स्थिति (Status)</th>
+                          <th className="py-3 px-4 text-center">क्रिया</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {oneTimeDeductions.map(d => {
+                          const emp = employees.find(e => e.id === d.employeeId);
+                          const outstanding = d.totalAmount - d.refundedAmount;
+                          const progressPercent = Math.min(100, Math.round((d.refundedAmount / d.totalAmount) * 100));
+
+                          return (
+                            <tr key={d.id} className="hover:bg-slate-50/50 transition-colors font-medium">
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-slate-900">{emp?.name || d.employeeId}</div>
+                                <div className="text-[10px] text-slate-400 font-mono font-bold">ID: {d.employeeId}</div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  d.type === 'Uniform' ? 'bg-amber-50 text-amber-800 border border-amber-100' :
+                                  d.type === 'Tour' ? 'bg-indigo-50 text-indigo-800 border border-indigo-100' :
+                                  'bg-slate-100 text-slate-800 border border-slate-200'
+                                }`}>
+                                  {d.type}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 font-bold font-mono text-slate-800">₹{d.totalAmount}</td>
+                              <td className="py-3 px-4 font-bold font-mono text-slate-700">₹{d.monthlyRefundInstallment}</td>
+                              <td className="py-3 px-4">
+                                <div className="font-bold font-mono text-emerald-700">₹{d.refundedAmount}</div>
+                                <div className="w-16 bg-slate-100 h-1 rounded-full overflow-hidden mt-1 p-[0.5px]">
+                                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${progressPercent}%` }} />
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 font-black font-mono text-rose-600 bg-rose-50/10">₹{outstanding}</td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                  d.status === 'Fully Refunded' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' :
+                                  d.status === 'Partially Refunded' ? 'bg-indigo-50 text-indigo-800 border border-indigo-100' :
+                                  'bg-amber-50 text-amber-800 border border-amber-100 animate-pulse'
+                                }`}>
+                                  {d.status === 'Fully Refunded' ? 'पूर्ण भुगतान' : d.status === 'Partially Refunded' ? 'आंशिक' : 'लंबित'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <button
+                                  onClick={() => handleDeleteDeductionPlan(d.id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-all cursor-pointer"
+                                  title="Delete plan"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2026 Ultra-Premium Payslip Modal - Beautifully frosted glass effect with double border & invoice aesthetics */}
       {activePayslip && (
