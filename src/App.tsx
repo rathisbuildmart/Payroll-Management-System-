@@ -16,7 +16,9 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   User as LucideUser,
-  CalendarDays
+  CalendarDays,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { initAuth, googleSignIn, logout } from './services/auth';
 import { 
@@ -34,6 +36,7 @@ import {
   saveAdminSettings
 } from './services/sheets';
 import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog } from './types';
+import { saveToFirestore, loadFromFirestore } from './services/firestore';
 
 // Importing Tab Components
 import Dashboard from './components/Dashboard';
@@ -111,6 +114,7 @@ export default function App() {
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
   const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [hasLoadedFromCloud, setHasLoadedFromCloud] = useState<boolean>(false);
 
   // Sheets Metadata
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
@@ -164,12 +168,118 @@ export default function App() {
 
   // Application Data States (with local cache fallbacks for instant offline load)
   const [employees, setEmployees] = useState<Employee[]>(() => {
+    // Default demo/fallback employees so that employees can log in out-of-the-box
+    const defaultEmployees: Employee[] = [
+      {
+        id: 'EMP001',
+        name: 'Rajesh Kumar',
+        department: 'Management',
+        designation: 'Senior Supervisor',
+        joiningDate: '2025-01-10',
+        basicSalary: 38000,
+        allowances: 3500,
+        deductions: 1500,
+        hourlyRate: 150,
+        paymentMethod: 'Bank Transfer',
+        isActive: true,
+      },
+      {
+        id: 'EMP002',
+        name: 'Sunita Sharma',
+        department: 'Finance',
+        designation: 'Accounts Executive',
+        joiningDate: '2025-06-15',
+        basicSalary: 28000,
+        allowances: 2000,
+        deductions: 1000,
+        hourlyRate: 120,
+        paymentMethod: 'Bank Transfer',
+        isActive: true,
+      },
+      {
+        id: 'EMP003',
+        name: 'Amit Patel',
+        department: 'Operations',
+        designation: 'Dispatch Officer',
+        joiningDate: '2026-02-01',
+        basicSalary: 18000,
+        allowances: 1500,
+        deductions: 800,
+        hourlyRate: 100,
+        paymentMethod: 'Cash',
+        isActive: true,
+      },
+      {
+        id: 'EMP004',
+        name: 'Suresh Kumar',
+        department: 'Sales',
+        designation: 'Sales Executive',
+        joiningDate: '2026-04-01',
+        basicSalary: 19000,
+        allowances: 1600,
+        deductions: 900,
+        hourlyRate: 105,
+        paymentMethod: 'Bank Transfer',
+        isActive: true,
+        password: '123456'
+      }
+    ];
+
     const saved = localStorage.getItem('cached_employees');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as Employee[];
+        if (parsed.length > 0) {
+          // If EMP003 or EMP004 is missing, merge/add the defaults so they are always available
+          const hasEmp3 = parsed.some(e => e.id.toUpperCase() === 'EMP003');
+          const hasEmp4 = parsed.some(e => e.id.toUpperCase() === 'EMP004');
+          if (!hasEmp3 || !hasEmp4) {
+            const merged = [...parsed];
+            defaultEmployees.forEach(defEmp => {
+              if (!merged.some(e => e.id.toLowerCase() === defEmp.id.toLowerCase())) {
+                merged.push(defEmp);
+              }
+            });
+            localStorage.setItem('cached_employees', JSON.stringify(merged));
+            return merged;
+          }
+          return parsed;
+        }
+      } catch (err) {
+        console.error("Error parsing cached employees", err);
+      }
+    }
+    
+    localStorage.setItem('cached_employees', JSON.stringify(defaultEmployees));
+    return defaultEmployees;
   });
   const [attendance, setAttendance] = useState<Attendance[]>(() => {
     const saved = localStorage.getItem('cached_attendance');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) return JSON.parse(saved);
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const sampleAttendance: Attendance[] = [];
+    const empIds = ['EMP001', 'EMP002', 'EMP003'];
+    
+    for (let day = 1; day <= 15; day++) {
+      const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
+      empIds.forEach((id, index) => {
+        const isAbsent = day === 3 && index === 2;
+        const isHalfDay = day === 4 && index === 1;
+
+        sampleAttendance.push({
+          date: dateStr,
+          employeeId: id,
+          status: isAbsent ? 'Absent' : isHalfDay ? 'Half Day' : 'Present',
+          checkIn: isAbsent ? '' : '09:00',
+          checkOut: isAbsent ? '' : isHalfDay ? '13:30' : '18:30',
+          overtimeHours: (!isAbsent && !isHalfDay && index === 0) ? 0.5 : 0,
+          remarks: isAbsent ? 'Sick leave' : isHalfDay ? 'Personal chore' : 'On-time'
+        });
+      });
+    }
+    localStorage.setItem('cached_attendance', JSON.stringify(sampleAttendance));
+    return sampleAttendance;
   });
   const [payroll, setPayroll] = useState<PayrollRecord[]>(() => {
     const saved = localStorage.getItem('cached_payroll');
@@ -180,6 +290,7 @@ export default function App() {
   const [loginId, setLoginId] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginErr, setLoginErr] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Sync state changes to local storage caches automatically
   useEffect(() => {
@@ -217,6 +328,61 @@ export default function App() {
     }
     return INITIAL_ADMIN_SETTINGS;
   });
+
+  // Load global data from Firestore on startup to allow any device/browser to log in with up-to-date credentials
+  useEffect(() => {
+    const fetchGlobalData = async () => {
+      try {
+        const globalData = await loadFromFirestore();
+        if (globalData) {
+          if (globalData.employees && globalData.employees.length > 0) {
+            setEmployees(globalData.employees);
+          }
+          if (globalData.attendance && globalData.attendance.length > 0) {
+            setAttendance(globalData.attendance);
+          }
+          if (globalData.payroll && globalData.payroll.length > 0) {
+            setPayroll(globalData.payroll);
+          }
+          if (globalData.adminSettings) {
+            setAdminSettings(globalData.adminSettings);
+            localStorage.setItem('payroll_admin_settings', JSON.stringify(globalData.adminSettings));
+          }
+          console.log('Successfully loaded synced credentials from cloud Firestore');
+        }
+      } catch (err) {
+        console.warn('Failed to load global data from Firestore on startup:', err);
+      } finally {
+        setHasLoadedFromCloud(true);
+      }
+    };
+    fetchGlobalData();
+  }, []);
+
+  // Synchronize state changes to Firestore when we have finished loading from the cloud
+  useEffect(() => {
+    if (!hasLoadedFromCloud) return;
+
+    const syncToCloud = async () => {
+      try {
+        await saveToFirestore({
+          employees,
+          attendance,
+          payroll,
+          adminSettings
+        });
+      } catch (err) {
+        console.warn('Auto-syncing to Firestore failed:', err);
+      }
+    };
+
+    // Debounce cloud writes by 1 second to avoid rapid write limits
+    const timer = setTimeout(() => {
+      syncToCloud();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [employees, attendance, payroll, adminSettings, hasLoadedFromCloud]);
 
   const handleSaveSettings = async (updated: AdminSettings) => {
     setAdminSettings(updated);
@@ -356,7 +522,7 @@ export default function App() {
 
       // Sync portalUser with fresh details from Google Sheets
       if (portalUser && portalUser.role === 'employee') {
-        const freshEmp = fetchedEmployees.find(e => e.id.toLowerCase() === portalUser.id.toLowerCase());
+        const freshEmp = fetchedEmployees.find(e => e.id.trim().toLowerCase() === portalUser.id.trim().toLowerCase());
         if (freshEmp) {
           const updatedUser: PortalUser = { ...portalUser, name: freshEmp.name, employee: freshEmp };
           setPortalUser(updatedUser);
@@ -916,12 +1082,14 @@ export default function App() {
                 setLoginPass('');
                 setLoginErr(null);
               } else {
-                const emp = employees.find(e => e.id.toLowerCase() === inputID.toLowerCase());
+                const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
                 if (emp) {
-                  const targetPass = emp.password || emp.id;
-                  const isDefaultPass = !emp.password && inputPass === '123456';
-                  const isEmpIdPass = !emp.password && inputPass === emp.id;
-                  const isCorrectPass = inputPass === targetPass || isDefaultPass || isEmpIdPass;
+                  const targetPass = (emp.password || '').trim();
+                  // A password is correct if it exactly matches the saved password, OR
+                  // if there is no saved password, it can be '123456' or the employee ID itself
+                  const isCorrectPass = targetPass 
+                    ? (inputPass.trim() === targetPass) 
+                    : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
 
                   if (isCorrectPass) {
                     const empUser: PortalUser = {
@@ -964,14 +1132,23 @@ export default function App() {
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   Password
                 </label>
-                <input
-                  type="password"
-                  required
-                  value={loginPass}
-                  onChange={(e) => setLoginPass(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={loginPass}
+                    onChange={(e) => setLoginPass(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full border border-slate-200 rounded-xl pl-3.5 pr-10 py-2.5 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-md transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {/* Submit Button */}
