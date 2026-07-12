@@ -20,7 +20,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { initAuth, googleSignIn, logout } from './services/auth';
+import { initAuth, googleSignIn, googleSignInRedirect, logout } from './services/auth';
 import { 
   findSpreadsheet, 
   createSpreadsheet, 
@@ -292,6 +292,23 @@ export default function App() {
   const [loginErr, setLoginErr] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Attempt automatic Google Sheets authorization if running in top-level window (not in iframe)
+  useEffect(() => {
+    const isIframe = typeof window !== 'undefined' && window.self !== window.top;
+    if (portalUser?.role === 'admin' && needsAuth && !isLoadingAuth && !isLoggingIn && !isIframe) {
+      const triggerAutoRedirect = async () => {
+        setIsLoggingIn(true);
+        try {
+          await googleSignInRedirect();
+        } catch (err) {
+          console.error('Auto redirect authorization failed:', err);
+          setIsLoggingIn(false);
+        }
+      };
+      triggerAutoRedirect();
+    }
+  }, [portalUser, needsAuth, isLoadingAuth, isLoggingIn]);
+
   // Sync state changes to local storage caches automatically
   useEffect(() => {
     localStorage.setItem('cached_employees', JSON.stringify(employees));
@@ -306,6 +323,20 @@ export default function App() {
   }, [payroll]);
 
   // UI States
+  const [isOnline, setIsOnline] = useState<boolean>(typeof window !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger'>('dashboard');
   const [language, setLanguage] = useState<'en' | 'hi'>('en'); // Set default to English as bilingual toggle is disabled
   const [showSeedDialog, setShowSeedDialog] = useState<boolean>(false);
@@ -1205,6 +1236,14 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Connection Status Indicator */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-slate-800">
+              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
+              <span className={isOnline ? 'text-green-400' : 'text-amber-400 font-sans'}>
+                {isOnline ? (language === 'en' ? 'Cloud Connected' : 'क्लाउड कनेक्टेड') : (language === 'en' ? 'Offline Mode' : 'ऑफ़लाइन मोड')}
+              </span>
+            </div>
+
             {/* Logout Button */}
             <button
               onClick={handlePortalLogout}
@@ -1423,6 +1462,16 @@ export default function App() {
             </span>
             <span className="bg-emerald-50 text-emerald-800 border border-emerald-100 text-[10px] font-mono px-2 py-0.5 rounded font-bold max-w-[200px] truncate">
               {spreadsheetId || 'None'}
+            </span>
+
+            {/* Real-time Connection Badge */}
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${
+              isOnline 
+                ? 'bg-emerald-50/50 text-emerald-700 border-emerald-200/50' 
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              <span className={`w-1 h-1 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+              {isOnline ? (language === 'en' ? 'Online' : 'ऑनलाइन') : (language === 'en' ? 'Offline' : 'ऑफ़लाइन')}
             </span>
           </div>
 

@@ -1,5 +1,13 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
+import { 
+  getAuth, 
+  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult, 
+  GoogleAuthProvider, 
+  onAuthStateChanged, 
+  User 
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -29,6 +37,27 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: (user: User | null) => void
 ) => {
+  // Check for redirect result when initializing
+  getRedirectResult(auth)
+    .then((result) => {
+      if (result) {
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential?.accessToken) {
+          cachedAccessToken = credential.accessToken;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('google_access_token', cachedAccessToken);
+            localStorage.setItem('google_access_token_expires_at', String(Date.now() + 55 * 60 * 1000));
+          }
+          if (auth.currentUser && onAuthSuccess) {
+            onAuthSuccess(auth.currentUser, cachedAccessToken);
+          }
+        }
+      }
+    })
+    .catch((error) => {
+      console.error('Redirect result error:', error);
+    });
+
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       if (typeof window !== 'undefined') {
@@ -79,6 +108,18 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     throw error;
   } finally {
     isSigningIn = false;
+  }
+};
+
+// Sign in with redirect (prevents popup blocked issue)
+export const googleSignInRedirect = async (): Promise<void> => {
+  try {
+    isSigningIn = true;
+    await signInWithRedirect(auth, provider);
+  } catch (error: any) {
+    console.error('Redirect sign in error:', error);
+    isSigningIn = false;
+    throw error;
   }
 };
 

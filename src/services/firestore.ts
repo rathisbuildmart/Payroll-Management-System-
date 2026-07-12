@@ -24,8 +24,12 @@ export async function saveToFirestore(data: SharedData): Promise<void> {
       lastUpdated: new Date().toISOString()
     });
     console.log('Successfully synced data to Firestore');
-  } catch (error) {
-    console.warn('Firestore sync skipped (offline or not provisioned):', error);
+  } catch (error: any) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.log('Firestore sync skipped: System is working offline. Local changes saved in browser.');
+    } else {
+      console.log('Firestore sync skipped (offline or sandbox):', error?.message || error);
+    }
   }
 }
 
@@ -40,8 +44,12 @@ export async function loadFromFirestore(): Promise<SharedData | null> {
       return docSnap.data() as SharedData;
     }
     return null;
-  } catch (error) {
-    console.warn('Firestore load skipped (using offline cache):', error);
+  } catch (error: any) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.log('Firestore loading skipped: System is working offline. Loading local cache.');
+    } else {
+      console.log('Firestore loading skipped (offline or sandbox):', error?.message || error);
+    }
     return null;
   }
 }
