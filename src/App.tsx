@@ -1284,9 +1284,12 @@ export default function App() {
           
           {/* Top Brand Logo header */}
           <div className="flex items-center gap-3 relative z-10">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-black text-white text-base shadow-lg shadow-emerald-500/20 ring-1 ring-emerald-400/25">
-              R
-            </div>
+            <img 
+              src="/src/assets/images/rathi_favicon_1783945713829.jpg" 
+              alt="Rathi Buildmart" 
+              className="w-10 h-10 rounded-2xl object-cover shadow-lg shadow-emerald-500/20 ring-1 ring-emerald-400/25"
+              referrerPolicy="no-referrer"
+            />
             <div>
               <h1 className="text-sm font-black uppercase tracking-widest text-slate-100 font-display">
                 {adminSettings.companyName || 'Rathi Build Mart'}
@@ -1944,7 +1947,12 @@ export default function App() {
         {/* Portal Header */}
         <header className="bg-slate-950 text-white border-b border-slate-900 py-4 px-6 md:px-8 flex items-center justify-between shadow-md relative no-print shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-extrabold text-xs font-display">R</div>
+            <img 
+              src="/src/assets/images/rathi_favicon_1783945713829.jpg" 
+              alt="Rathi Logo" 
+              className="w-8 h-8 rounded-lg object-cover" 
+              referrerPolicy="no-referrer"
+            />
             <div>
               <h1 className="text-sm font-black uppercase tracking-widest">{adminSettings.companyName || 'Rathi Build Mart'}</h1>
               <p className="text-[9px] font-mono font-bold text-emerald-400 tracking-wider">Employee Workspace Portal</p>
@@ -2033,12 +2041,13 @@ export default function App() {
         {/* Brand Logo inside a perfect white squircle */}
         <div className={`flex flex-col ${isSidebarHovered ? 'items-start w-full' : 'items-center'}`}>
           <div className="flex items-center gap-3 mb-8 w-full">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 hover:rotate-3 transition-all duration-300 cursor-pointer relative group border border-emerald-500/20 shadow-emerald-950/20 shrink-0">
-              <svg viewBox="0 0 40 40" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 8C12 8 16 12 20 12C24 12 28 8 28 8" stroke="#03623c" strokeWidth="4" strokeLinecap="round" />
-                <path d="M12 20C12 20 18 16 22 22C26 28 28 32 28 32" stroke="#024d2e" strokeWidth="4" strokeLinecap="round" />
-                <circle cx="20" cy="20" r="14" stroke="#10b981" strokeWidth="2.5" strokeDasharray="4 4" />
-              </svg>
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 hover:rotate-3 transition-all duration-300 cursor-pointer relative group border border-emerald-500/20 shadow-emerald-950/20 shrink-0 overflow-hidden">
+              <img 
+                src="/src/assets/images/rathi_favicon_1783945713829.jpg" 
+                alt="Rathi Buildmart" 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer"
+              />
               {/* Logo Tooltip */}
               {!isSidebarHovered && (
                 <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-2 rounded-xl shadow-xl pointer-events-none z-50 text-[11px] font-bold whitespace-nowrap">

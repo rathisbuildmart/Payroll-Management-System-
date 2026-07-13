@@ -17,9 +17,21 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ employees, attendance, payroll, language, onNavigate }: DashboardProps) {
-  // Format current month string (YYYY-MM)
-  const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), []);
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  // Format current month string (YYYY-MM) in local timezone to avoid offset issues
+  const currentMonthStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }, []);
+
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
 
   // Real-time Dashboard Filters State
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
@@ -137,15 +149,15 @@ export default function Dashboard({ employees, attendance, payroll, language, on
   }, [payroll, selectedMonth, selectedDept, selectedBranch, selectedEmployeeId, employees]);
 
   const totalPayrollExpense = useMemo(() => {
-    return filteredPayroll.reduce((acc, curr) => acc + curr.totalSalary, 0);
+    return filteredPayroll.reduce((acc, curr) => acc + (Number(curr.totalSalary) || 0), 0);
   }, [filteredPayroll]);
 
   const paidPayrollExpense = useMemo(() => {
-    return filteredPayroll.filter(p => p.paymentStatus === 'Paid').reduce((acc, curr) => acc + curr.totalSalary, 0);
+    return filteredPayroll.filter(p => p.paymentStatus === 'Paid').reduce((acc, curr) => acc + (Number(curr.totalSalary) || 0), 0);
   }, [filteredPayroll]);
 
   const pendingPayrollExpense = useMemo(() => {
-    return filteredPayroll.filter(p => p.paymentStatus === 'Pending').reduce((acc, curr) => acc + curr.totalSalary, 0);
+    return filteredPayroll.filter(p => p.paymentStatus === 'Pending').reduce((acc, curr) => acc + (Number(curr.totalSalary) || 0), 0);
   }, [filteredPayroll]);
 
   const payrollComplianceRate = useMemo(() => {
@@ -154,16 +166,17 @@ export default function Dashboard({ employees, attendance, payroll, language, on
     return Math.round((paidCount / filteredPayroll.length) * 100);
   }, [filteredPayroll]);
 
-  // Department-wise breakdown statistics
+  // Department-wise breakdown statistics (using filteredEmployees to respect search & filter settings)
   const deptChartData = useMemo(() => {
     const deptMap: { [key: string]: { count: number; salary: number; active: number } } = {};
-    employees.forEach(emp => {
-      const dept = emp.department || 'Other';
+    filteredEmployees.forEach(emp => {
+      const dept = (emp.department || 'Other').trim();
       if (!deptMap[dept]) {
         deptMap[dept] = { count: 0, salary: 0, active: 0 };
       }
       deptMap[dept].count += 1;
-      deptMap[dept].salary += emp.basicSalary;
+      const basicSal = Number(emp.basicSalary);
+      deptMap[dept].salary += isNaN(basicSal) ? 0 : basicSal;
       if (emp.isActive) {
         deptMap[dept].active += 1;
       }
@@ -175,14 +188,17 @@ export default function Dashboard({ employees, attendance, payroll, language, on
       active: deptMap[key].active,
       salary: deptMap[key].salary,
     }));
-  }, [employees]);
+  }, [filteredEmployees]);
 
-  // Attendance trends for last 7 calendar days
+  // Attendance trends for last 7 calendar days in local timezone
   const last7DaysData = useMemo(() => {
     const days = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      return d.toISOString().split('T')[0];
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }).reverse();
 
     return days.map(date => {
@@ -190,12 +206,14 @@ export default function Dashboard({ employees, attendance, payroll, language, on
         const matchesDay = a.date === date;
         const emp = employees.find(e => e.id === a.employeeId);
         const matchesDept = selectedDept === 'All' || (emp && emp.department === selectedDept);
-        return matchesDay && matchesDept;
+        const matchesBranch = selectedBranch === 'All' || (emp && emp.branch === selectedBranch);
+        const matchesEmployee = selectedEmployeeId === 'All' || a.employeeId === selectedEmployeeId;
+        return matchesDay && matchesDept && matchesBranch && matchesEmployee;
       });
       
       const total = dayAttendance.length;
       const present = dayAttendance.filter(a => a.status === 'Present' || a.status === 'Half Day').length;
-      const rate = total > 0 ? Math.round((present / total) * 100) : 100;
+      const rate = total > 0 ? Math.round((present / total) * 100) : 0; // Default to 0 instead of 100 so empty days have visual differentiation
       
       const parts = date.split('-');
       const label = `${parts[2]}/${parts[1]}`;
@@ -206,7 +224,7 @@ export default function Dashboard({ employees, attendance, payroll, language, on
         total,
       };
     });
-  }, [attendance, selectedDept, employees]);
+  }, [attendance, selectedDept, selectedBranch, selectedEmployeeId, employees]);
 
   // Payroll status pie dataset
   const pieData = useMemo(() => {
@@ -586,16 +604,26 @@ export default function Dashboard({ employees, attendance, payroll, language, on
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
+                      const hasRecords = data.total > 0;
                       return (
                         <div className="bg-white/95 backdrop-blur-md p-2.5 rounded-lg border border-gray-200 shadow-lg text-[11px] font-sans">
                           <p className="font-bold text-gray-800 mb-1">Date: {data.date}</p>
-                          <p className="text-[#03623c] font-semibold flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-[#03623c] rounded-full"></span>
-                            Attendance: {data.rate}%
-                          </p>
-                          <p className="text-gray-500 font-medium">
-                            Present: {data.present} / {data.total}
-                          </p>
+                          {hasRecords ? (
+                            <>
+                              <p className="text-[#03623c] font-semibold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-[#03623c] rounded-full"></span>
+                                Attendance: {data.rate}%
+                              </p>
+                              <p className="text-gray-500 font-medium">
+                                Present: {data.present} / {data.total}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-amber-600 font-semibold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                              {language === 'en' ? 'No Records Marked' : 'कोई रिकॉर्ड दर्ज नहीं'}
+                            </p>
+                          )}
                         </div>
                       );
                     }
@@ -710,7 +738,7 @@ export default function Dashboard({ employees, attendance, payroll, language, on
           <div className="h-64 w-full">
             {deptChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deptChartData} margin={{ top: 10, right: -15, left: -25, bottom: 0 }}>
+                <BarChart data={deptChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorSalary" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.9}/>
