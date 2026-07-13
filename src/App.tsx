@@ -313,22 +313,13 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Attempt automatic Google Sheets authorization if running in top-level window (not in iframe)
+  // We disable the automatic Google Sheets redirect on page load because it causes infinite redirect loops 
+  // on custom/Render domains if the Authorized Domains list is not fully configured yet.
+  // Instead, the administrator can stably click the "Authorize Google Sheets" button manually in the dashboard.
   useEffect(() => {
-    const isIframe = typeof window !== 'undefined' && window.self !== window.top;
-    if (portalUser?.role === 'admin' && needsAuth && !isLoadingAuth && !isLoggingIn && !isIframe) {
-      const triggerAutoRedirect = async () => {
-        setIsLoggingIn(true);
-        try {
-          await googleSignInRedirect();
-        } catch (err) {
-          console.error('Auto redirect authorization failed:', err);
-          setIsLoggingIn(false);
-        }
-      };
-      triggerAutoRedirect();
-    }
-  }, [portalUser, needsAuth, isLoadingAuth, isLoggingIn]);
+    // Automatic redirect is disabled to ensure maximum stability and offline-first usage.
+    // The admin can manually click "Authorize Google Sheets" when ready.
+  }, []);
 
   // Sync state changes to local storage caches automatically
   useEffect(() => {
