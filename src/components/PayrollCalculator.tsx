@@ -240,7 +240,22 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     const daysMissPunch = empAtt.filter(r => r.status === 'Miss Punch').length;
     
     // Compute pro-rated earned basic (Miss punches or pending aren't fully counted unless approved, keeping simple)
-    const workedDaysVal = daysPresent + (0.5 * daysHalfDay) + daysLeave;
+    // Check if Paid Leave is applicable for this employee based on Policy & service tenure at payroll month
+    const joinDate = emp.joiningDate ? new Date(emp.joiningDate) : null;
+    let isEligibleForPaidLeave = adminSettings?.enablePaidLeaveCalculation !== false && emp.isPaidLeaveApplicable !== false;
+    
+    if (isEligibleForPaidLeave && joinDate) {
+      const payYear = Number(selectedYear);
+      const payMonth = Number(selectedMonth) - 1; // 0-indexed
+      const diffMonths = (payYear - joinDate.getFullYear()) * 12 + (payMonth - joinDate.getMonth());
+      const probationMonths = adminSettings?.paidLeaveStartAfterMonths || 0;
+      if (diffMonths < probationMonths) {
+        isEligibleForPaidLeave = false;
+      }
+    }
+
+    const actualPaidLeaves = isEligibleForPaidLeave ? daysLeave : 0;
+    const workedDaysVal = daysPresent + (0.5 * daysHalfDay) + actualPaidLeaves;
     const earnedRatio = Math.min(1, workedDaysVal / workingDays);
     const earnedBasic = Math.round(emp.basicSalary * (workedDaysVal === 0 ? 0 : earnedRatio));
 
@@ -248,10 +263,16 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     const overtimeHoursTotal = empAtt.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
     const overtimePay = Math.round(overtimeHoursTotal * (emp.hourlyRate || 150));
 
-    // Base default structures from employee profile or Indian standards
-    const defaultHra = emp.hra !== undefined && emp.hra > 0 ? emp.hra : Math.round(emp.basicSalary * 0.40);
-    const defaultDa = emp.da !== undefined && emp.da > 0 ? emp.da : Math.round(emp.basicSalary * 0.10);
-    const defaultConveyance = emp.conveyanceAllowance !== undefined && emp.conveyanceAllowance > 0 ? emp.conveyanceAllowance : (emp.basicSalary > 25000 ? 1600 : 800);
+    // Base default structures from employee profile or Indian standards (conditional on adminSettings and employee-specific toggles)
+    const defaultHra = (adminSettings?.enableHra !== false && emp.isHraApplicable !== false)
+      ? (emp.hra !== undefined && emp.hra > 0 ? emp.hra : Math.round(emp.basicSalary * 0.40))
+      : 0;
+    const defaultDa = (adminSettings?.enableDa !== false && emp.isDaApplicable !== false)
+      ? (emp.da !== undefined && emp.da > 0 ? emp.da : Math.round(emp.basicSalary * 0.10))
+      : 0;
+    const defaultConveyance = (adminSettings?.enableConveyance !== false && emp.isConveyanceApplicable !== false)
+      ? (emp.conveyanceAllowance !== undefined && emp.conveyanceAllowance > 0 ? emp.conveyanceAllowance : (emp.basicSalary > 25000 ? 1600 : 800))
+      : 0;
     const defaultAdvanceDeduction = emp.advanceSalaryDeduction !== undefined && emp.advanceSalaryDeduction > 0 ? Math.min(emp.advanceSalaryBalance || 0, emp.advanceSalaryDeduction) : 0;
 
     // Compute late coming and early going fine: 5 min grace, 3 free days, ₹100/day after
@@ -286,14 +307,16 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     const customAllowancesTotal = hra + da + conveyanceAllowance;
     const grossSalary = earnedBasic + standardAllowancesTotal + customAllowancesTotal + overtimePay + festivalBonus + performanceIncentive + leaveAdjustment + oneTimeRefundAmount;
 
-    // PF contribution: 12% of pro-rated basic salary
-    const providentFund = Math.round(earnedBasic * 0.12);
+    // PF contribution: 12% of pro-rated basic salary (conditional on employee-specific toggle)
+    const providentFund = emp.isPfApplicable !== false ? Math.round(earnedBasic * 0.12) : 0;
 
-    // ESIC contribution: 0.75% of Gross Salary if gross is <= 21,000 INR
-    const esic = grossSalary <= 21000 ? Math.round(grossSalary * 0.0075) : 0;
+    // ESIC contribution: 0.75% of Gross Salary if gross is <= 21,000 INR (conditional on employee-specific toggle)
+    const esic = emp.isEsicApplicable !== false ? (grossSalary <= 21000 ? Math.round(grossSalary * 0.0075) : 0) : 0;
 
-    // Professional Tax (PT): ₹200 if Gross >= 10000 INR
-    const professionalTax = grossSalary >= 10000 ? 200 : 0;
+    // Professional Tax (PT): ₹200 if Gross >= 10000 INR (conditional on adminSettings and employee-specific toggle)
+    const professionalTax = (emp.isPtApplicable !== false && adminSettings?.enableProfessionalTax !== false) 
+      ? (grossSalary >= 10000 ? 200 : 0)
+      : 0;
 
     // Indian Income Tax TDS (Estimated Bracket based on annual projected Gross)
     const annualEstGross = grossSalary * 12;

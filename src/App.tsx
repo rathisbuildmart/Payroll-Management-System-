@@ -18,7 +18,12 @@ import {
   User as LucideUser,
   CalendarDays,
   Eye,
-  EyeOff
+  EyeOff,
+  Lock,
+  Building2,
+  Sparkles,
+  Globe,
+  HelpCircle
 } from 'lucide-react';
 import { initAuth, googleSignIn, googleSignInRedirect, logout } from './services/auth';
 import { 
@@ -35,7 +40,7 @@ import {
   fetchAdminSettings,
   saveAdminSettings
 } from './services/sheets';
-import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog } from './types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt } from './types';
 import { saveToFirestore, loadFromFirestore } from './services/firestore';
 
 // Importing Tab Components
@@ -286,11 +291,27 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Unsuccessful login attempts state
+  const [failedLogins, setFailedLogins] = useState<FailedLoginAttempt[]>(() => {
+    const saved = localStorage.getItem('cached_failed_logins');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   // Portal login states
   const [loginId, setLoginId] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [loginErr, setLoginErr] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showLoginHelp, setShowLoginHelp] = useState(false);
+
+  // Live time for login clock
+  const [liveTime, setLiveTime] = useState<Date>(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Attempt automatic Google Sheets authorization if running in top-level window (not in iframe)
   useEffect(() => {
@@ -321,6 +342,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('cached_payroll', JSON.stringify(payroll));
   }, [payroll]);
+
+  useEffect(() => {
+    localStorage.setItem('cached_failed_logins', JSON.stringify(failedLogins));
+  }, [failedLogins]);
 
   // UI States
   const [isOnline, setIsOnline] = useState<boolean>(typeof window !== 'undefined' ? navigator.onLine : true);
@@ -379,6 +404,9 @@ export default function App() {
             setAdminSettings(globalData.adminSettings);
             localStorage.setItem('payroll_admin_settings', JSON.stringify(globalData.adminSettings));
           }
+          if (globalData.failedLogins) {
+            setFailedLogins(globalData.failedLogins);
+          }
           console.log('Successfully loaded synced credentials from cloud Firestore');
         }
       } catch (err) {
@@ -400,7 +428,8 @@ export default function App() {
           employees,
           attendance,
           payroll,
-          adminSettings
+          adminSettings,
+          failedLogins
         });
       } catch (err) {
         console.warn('Auto-syncing to Firestore failed:', err);
@@ -413,7 +442,7 @@ export default function App() {
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [employees, attendance, payroll, adminSettings, hasLoadedFromCloud]);
+  }, [employees, attendance, payroll, adminSettings, failedLogins, hasLoadedFromCloud]);
 
   const handleSaveSettings = async (updated: AdminSettings) => {
     setAdminSettings(updated);
@@ -627,6 +656,21 @@ export default function App() {
         setConfirmDialog(null);
       }
     });
+  };
+
+  const recordUnsuccessfulLogin = (enteredId: string, reason: 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password') => {
+    const newAttempt: FailedLoginAttempt = {
+      id: `fail-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      enteredId,
+      timestamp: new Date().toISOString(),
+      reason,
+      browserInfo: typeof navigator !== 'undefined' ? navigator.userAgent : undefined
+    };
+    setFailedLogins(prev => [newAttempt, ...(prev || [])]);
+  };
+
+  const handleClearFailedLogins = () => {
+    setFailedLogins([]);
   };
 
   const handleLogout = () => {
@@ -1053,170 +1097,305 @@ export default function App() {
 
   // 2. Render Custom Login Screen if not authenticated via Portal
   if (!portalUser) {
+    const formattedTime = liveTime.toLocaleTimeString(undefined, { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit',
+      hour12: true 
+    });
+    const formattedDate = liveTime.toLocaleDateString(undefined, { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:grid lg:grid-cols-12 font-sans relative overflow-hidden selection:bg-emerald-500/30 selection:text-emerald-100">
         
-        {/* Subtle Decorative Background Gradients */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
-
-
-
-        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-          <div className="inline-flex bg-white text-emerald-700 p-4 rounded-3xl mb-4 border border-emerald-500/10 shadow-lg shadow-emerald-500/5">
-            <CreditCard className="w-10 h-10" />
-          </div>
-          <h2 className="text-3xl font-black text-slate-900 font-display tracking-tight leading-none">
-            {language === 'en' ? 'PaySmart Portal' : 'पे-स्मार्ट पोर्टल'}
-          </h2>
-          <p className="mt-2 text-xs text-slate-500 max-w-sm mx-auto font-bold uppercase tracking-widest font-mono">
-            {adminSettings.companyName || 'Rathi Build Mart'}
-          </p>
+        {/* Top-Right Language Switcher (Visible on all screens) */}
+        <div className="absolute top-4 right-4 z-50">
+          <button
+            onClick={toggleLanguage}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-slate-900/80 backdrop-blur-md hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-all duration-150 cursor-pointer shadow-md active:scale-95"
+          >
+            <Globe className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{language === 'en' ? 'हिन्दी (Hindi)' : 'English (अंग्रेजी)'}</span>
+          </button>
         </div>
 
-        {/* Floating login Card */}
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md font-sans">
-          <div className="bg-white py-8 px-6 border border-slate-200 shadow-xl rounded-2xl space-y-6">
-            
-            <h3 className="text-center text-xs font-black text-slate-400 uppercase tracking-widest pb-2 border-b border-slate-100">
-              Credential Access
-            </h3>
+        {/* LEFT PANEL - Beautiful Brand Showcase (5 Columns) */}
+        <div className="lg:col-span-5 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-8 md:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-800/80 shrink-0 min-h-[340px] lg:min-h-screen">
+          {/* Subtle Glowing Background Accents */}
+          <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+          <div className="absolute top-1/2 -right-40 w-80 h-80 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
+          
+          {/* Top Brand Logo header */}
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-black text-white text-base shadow-lg shadow-emerald-500/20 ring-1 ring-emerald-400/25">
+              R
+            </div>
+            <div>
+              <h1 className="text-sm font-black uppercase tracking-widest text-slate-100 font-display">
+                {adminSettings.companyName || 'Rathi Build Mart'}
+              </h1>
+              <p className="text-[9px] font-black tracking-widest uppercase text-emerald-400 font-mono mt-0.5">
+                {language === 'en' ? 'Secure Payroll Portal' : 'सुरक्षित वेतन पोर्टल'}
+              </p>
+            </div>
+          </div>
 
-            {loginErr && (
-              <div className="bg-rose-50 text-rose-700 border border-rose-200/50 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
-                <span>{loginErr}</span>
+          {/* Middle Content - Display Header / Stats */}
+          <div className="my-auto py-8 lg:py-0 relative z-10 max-w-sm">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-4 uppercase tracking-wider">
+              <Sparkles className="w-3 h-3 animate-pulse" />
+              {language === 'en' ? 'SaaS Level Security' : 'SaaS स्तर की सुरक्षा'}
+            </span>
+            <h2 className="text-3xl lg:text-4xl font-black text-white font-display tracking-tight leading-tight">
+              {language === 'en' 
+                ? 'Modern payroll & attendance workspace.' 
+                : 'आधुनिक वेतन और उपस्थिति कार्यक्षेत्र।'}
+            </h2>
+            <p className="mt-3 text-xs text-slate-400 leading-relaxed font-semibold">
+              {language === 'en'
+                ? 'Empowering employees with self-service receipt printing, real-time leaves requests, and secure administrator portal ledger reviews.'
+                : 'कर्मचारियों को वेतन पर्ची मुद्रण, वास्तविक समय छुट्टी अनुरोधों और सुरक्षित प्रशासनिक पोर्टल बहीखाता समीक्षाओं के साथ सशक्त बनाना।'}
+            </p>
+
+            {/* Quick Live stats cards */}
+            <div className="grid grid-cols-2 gap-3 mt-8">
+              <div className="bg-slate-900/60 backdrop-blur-xs border border-slate-800/80 p-3.5 rounded-xl">
+                <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">
+                  {language === 'en' ? 'Active Roster' : 'सक्रिय कर्मचारी'}
+                </span>
+                <span className="text-sm font-black text-white font-mono block mt-1">
+                  {employees.length} {language === 'en' ? 'Staff' : 'कर्मचारी'}
+                </span>
               </div>
-            )}
+              <div className="bg-slate-900/60 backdrop-blur-xs border border-slate-800/80 p-3.5 rounded-xl">
+                <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">
+                  {language === 'en' ? 'System Status' : 'सिस्टम की स्थिति'}
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs font-black text-emerald-400 mt-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  {language === 'en' ? 'Operational' : 'सक्रिय है'}
+                </span>
+              </div>
+            </div>
+          </div>
 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const inputID = loginId.trim();
-              const inputPass = loginPass;
-              if (!inputID || !inputPass) {
-                setLoginErr('Please fill in all fields.');
-                return;
-              }
+          {/* Bottom Live Workspace Clock */}
+          <div className="relative z-10 border-t border-slate-800/60 pt-6 mt-6 lg:mt-0">
+            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">
+              {language === 'en' ? 'System Reference Time' : 'सिस्टम संदर्भ समय'}
+            </span>
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-900 border border-slate-800 px-3.5 py-2 rounded-xl font-mono text-xs font-bold text-emerald-400 tracking-wider shadow-sm flex items-center justify-center min-w-[110px]">
+                {formattedTime}
+              </div>
+              <div className="text-[10px] text-slate-400 font-bold leading-normal">
+                <span className="block">{formattedDate}</span>
+                <span className="text-slate-500 text-[9px] font-semibold">UTC-07:00 • {language === 'en' ? 'Secure Connection' : 'सुरक्षित कनेक्शन'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-              const adminUsername = adminSettings.adminUsername || 'admin';
-              const adminPassword = adminSettings.adminPassword || 'admin123';
+        {/* RIGHT PANEL - Secure Sign In Card (7 Columns) */}
+        <div className="lg:col-span-7 bg-slate-900 p-6 md:p-12 lg:p-16 flex flex-col justify-center items-center relative min-h-[500px]">
+          {/* Abstract background grids */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
+          
+          <div className="w-full max-w-md relative z-10">
+            
+            {/* Main Login Card */}
+            <div className="bg-slate-950/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500" />
+              
+              {/* Header */}
+              <div className="space-y-1.5 text-center sm:text-left">
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest bg-emerald-950/50 text-emerald-400 border border-emerald-900/30">
+                  <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                  {language === 'en' ? 'Secure Gateway' : 'सुरक्षित गेटवे'}
+                </div>
+                <h3 className="text-2xl font-black text-white font-display tracking-tight mt-2 leading-none">
+                  {language === 'en' ? 'Sign In to Portal' : 'पोर्टल में लॉगिन करें'}
+                </h3>
+                <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
+                  {language === 'en' 
+                    ? 'Enter your unique Employee ID or administrator credentials to enter the workspace.' 
+                    : 'कार्यक्षेत्र में प्रवेश करने के लिए अपनी कर्मचारी आईडी या एडमिनिस्ट्रेटर क्रेडेंशियल दर्ज करें।'}
+                </p>
+              </div>
 
-              if (inputID.toLowerCase() === adminUsername.toLowerCase() && inputPass === adminPassword) {
-                const adminUser: PortalUser = {
-                  id: 'admin',
-                  name: 'Administrator',
-                  role: 'admin'
-                };
-                setPortalUser(adminUser);
-                localStorage.setItem('payroll_portal_user', JSON.stringify(adminUser));
-                setLoginId('');
-                setLoginPass('');
-                setLoginErr(null);
-              } else {
-                const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
-                if (emp) {
-                  const targetPass = (emp.password || '').trim();
-                  // A password is correct if it exactly matches the saved password, OR
-                  // if there is no saved password, it can be '123456' or the employee ID itself
-                  const isCorrectPass = targetPass 
-                    ? (inputPass.trim() === targetPass) 
-                    : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
+              {/* Error Alert Box */}
+              {loginErr && (
+                <div className="bg-rose-500/10 text-rose-300 border border-rose-500/20 p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 mt-5">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5 animate-bounce" />
+                  <span className="leading-normal">{loginErr}</span>
+                </div>
+              )}
 
-                  if (isCorrectPass) {
-                    const empUser: PortalUser = {
-                      id: emp.id,
-                      name: emp.name,
-                      role: 'employee',
-                      employee: emp
+              {/* Main Credentials Form */}
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const inputID = loginId.trim();
+                const inputPass = loginPass;
+                if (!inputID || !inputPass) {
+                  setLoginErr(language === 'en' ? 'Please fill in all fields.' : 'कृपया सभी फ़ील्ड भरें।');
+                  return;
+                }
+
+                const adminUsername = adminSettings.adminUsername || 'admin';
+                const adminPassword = adminSettings.adminPassword || 'admin123';
+
+                if (inputID.toLowerCase() === adminUsername.toLowerCase()) {
+                  if (inputPass === adminPassword) {
+                    const adminUser: PortalUser = {
+                      id: 'admin',
+                      name: 'Administrator',
+                      role: 'admin'
                     };
-                    setPortalUser(empUser);
-                    localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                    setPortalUser(adminUser);
+                    localStorage.setItem('payroll_portal_user', JSON.stringify(adminUser));
                     setLoginId('');
                     setLoginPass('');
                     setLoginErr(null);
                   } else {
-                    setLoginErr("Incorrect Password! Standard password is your Employee ID or '123456'.");
+                    recordUnsuccessfulLogin(inputID, 'Admin Incorrect Password');
+                    setLoginErr(language === 'en' ? 'Incorrect Administrator password.' : 'अमान्य एडमिनिस्ट्रेटर पासवर्ड।');
                   }
                 } else {
-                  setLoginErr("User ID / Employee ID not found. Contact administration.");
+                  const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
+                  if (emp) {
+                    const targetPass = (emp.password || '').trim();
+                    const isCorrectPass = targetPass 
+                      ? (inputPass.trim() === targetPass) 
+                      : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
+
+                    if (isCorrectPass) {
+                      const empUser: PortalUser = {
+                        id: emp.id,
+                        name: emp.name,
+                        role: 'employee',
+                        employee: emp
+                      };
+                      setPortalUser(empUser);
+                      localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                      setLoginId('');
+                      setLoginPass('');
+                      setLoginErr(null);
+                    } else {
+                      recordUnsuccessfulLogin(inputID, 'Incorrect Password');
+                      setLoginErr(language === 'en' ? "Incorrect Password! Standard password is your Employee ID or '123456'." : "गलत पासवर्ड! मानक पासवर्ड आपकी कर्मचारी आईडी या '123456' है।");
+                    }
+                  } else {
+                    recordUnsuccessfulLogin(inputID, 'User ID not found');
+                    setLoginErr(language === 'en' ? "User ID / Employee ID not found. Contact administration." : "उपयोगकर्ता आईडी / कर्मचारी आईडी नहीं मिली। प्रशासन से संपर्क करें।");
+                  }
                 }
-              }
-            }} className="space-y-4">
-              
-              {/* User ID Field */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  User ID / Employee ID
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={loginId}
-                  onChange={(e) => setLoginId(e.target.value)}
-                  placeholder="e.g., admin or EMP001"
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
-                />
+              }} className="space-y-4 mt-6">
+                
+                {/* User ID Field */}
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                    {language === 'en' ? 'User ID / Employee ID' : 'उपयोगकर्ता आईडी / कर्मचारी आईडी'}
+                  </label>
+                  <div className="relative">
+                    <LucideUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      value={loginId}
+                      onChange={(e) => setLoginId(e.target.value)}
+                      placeholder={language === 'en' ? 'e.g., admin or EMP001' : 'उदा., admin या EMP001'}
+                      className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Password Field */}
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                    {language === 'en' ? 'Password' : 'पासवर्ड'}
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={loginPass}
+                      onChange={(e) => setLoginPass(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-sans"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 focus:outline-none p-1 rounded-md transition-colors cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg shadow-emerald-950/40 hover:shadow-emerald-500/10 transition-all duration-200 text-center uppercase tracking-wider active:scale-98 mt-2"
+                >
+                  {language === 'en' ? 'Sign In to Workspace' : 'कार्यक्षेत्र में साइन इन करें'}
+                </button>
+
+              </form>
+
+              {/* Help & FAQ Accordion Section */}
+              <div className="mt-6 pt-5 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => setShowLoginHelp(!showLoginHelp)}
+                  className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    {language === 'en' ? 'Struggling with Sign In?' : 'लॉगिन करने में समस्या?'}
+                  </span>
+                  <span className="text-[12px] font-bold text-slate-500">{showLoginHelp ? '−' : '+'}</span>
+                </button>
+
+                {showLoginHelp && (
+                  <div className="mt-3 p-3 bg-slate-900/80 rounded-xl border border-slate-800/60 text-[10px] text-slate-400 font-semibold space-y-2 leading-relaxed animate-fadeIn">
+                    <p>
+                      💡 <strong className="text-slate-200">{language === 'en' ? 'Standard Employees:' : 'मानक कर्मचारी:'}</strong>{' '}
+                      {language === 'en' 
+                        ? "Your standard default password is your unique Employee ID (e.g., EMP001) or '123456' unless modified by admin."
+                        : "आपका मानक डिफ़ॉल्ट पासवर्ड आपकी विशिष्ट कर्मचारी आईडी (जैसे, EMP001) या '123456' है जब तक कि एडमिन द्वारा बदला न गया हो।"}
+                    </p>
+                    <p>
+                      ⚙️ <strong className="text-slate-200">{language === 'en' ? 'System Administrator:' : 'सिस्टम एडमिनिस्ट्रेटर:'}</strong>{' '}
+                      {language === 'en'
+                        ? "Login with username 'admin' and standard password to enter admin workspace."
+                        : "प्रशासनिक कार्यक्षेत्र में प्रवेश करने के लिए उपयोगकर्ता नाम 'admin' और मानक पासवर्ड के साथ लॉगिन करें।"}
+                    </p>
+                    <p className="text-slate-500 text-[9px] italic border-t border-slate-800/40 pt-1.5 font-mono">
+                      {language === 'en' 
+                        ? 'All unsuccessful sign-in attempts are logged securely in our Firestore security audit database.' 
+                        : 'सभी असफल लॉगिन प्रयास हमारे फ़ायरस्टोर सुरक्षा ऑडिट डेटाबेस में सुरक्षित रूप से दर्ज किए जाते हैं।'}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* Password Field */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={loginPass}
-                    onChange={(e) => setLoginPass(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full border border-slate-200 rounded-xl pl-3.5 pr-10 py-2.5 text-xs font-bold bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-md transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-3 px-4 rounded-xl cursor-pointer shadow-md hover:shadow-lg hover:shadow-emerald-600/10 transition-all duration-150 text-center uppercase tracking-wider active:scale-98"
-              >
-                Sign In to Portal
-              </button>
-
-            </form>
-
-            <p className="text-[10px] text-center text-slate-400 font-bold leading-normal">
-              Standard employee password is their Employee ID or "123456".
-            </p>
-
-            <hr className="border-slate-100" />
-
-            {/* Feature benefits list */}
-            <div className="space-y-4">
-              <div className="flex gap-3 text-xs font-bold text-slate-800">
-                <div className="bg-emerald-50 text-emerald-600 p-2 rounded-xl h-fit">
-                  <Database className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    Cloud Sync & Storage
-                  </h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5 leading-normal font-semibold font-sans">
-                    Admins can sync all payroll records safely to secure Google Sheets.
-                  </p>
-                </div>
-              </div>
             </div>
+
+            {/* Subtle Footer branding info */}
+            <p className="text-center text-[10px] text-slate-500 font-semibold mt-6 uppercase tracking-wider">
+              © {new Date().getFullYear()} {adminSettings.companyName || 'Rathi Build Mart'} • {language === 'en' ? 'All Rights Reserved' : 'सर्वाधिकार सुरक्षित'}
+            </p>
 
           </div>
         </div>
+
       </div>
     );
   }
@@ -1782,6 +1961,8 @@ export default function App() {
                   settings={adminSettings}
                   onSaveSettings={handleSaveSettings}
                   language={language}
+                  failedLogins={failedLogins}
+                  onClearFailedLogins={handleClearFailedLogins}
                 />
               )}
             </div>

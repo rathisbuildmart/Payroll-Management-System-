@@ -80,6 +80,15 @@ export interface Employee {
   photoUrl?: string; // base64 or link
   increments?: SalaryIncrement[];
   nextIncrementDate?: string;
+
+  // Employee-specific payroll rule applicability toggles
+  isPfApplicable?: boolean;
+  isEsicApplicable?: boolean;
+  isPtApplicable?: boolean;
+  isHraApplicable?: boolean;
+  isDaApplicable?: boolean;
+  isConveyanceApplicable?: boolean;
+  isPaidLeaveApplicable?: boolean;
 }
 
 export interface SalaryIncrement {
@@ -131,6 +140,12 @@ export interface AdminSettings {
   adminUsername?: string;
   adminPassword?: string;
   holidays?: Holiday[];
+  enableHra?: boolean;
+  enableDa?: boolean;
+  enableConveyance?: boolean;
+  enableProfessionalTax?: boolean;
+  enablePaidLeaveCalculation?: boolean;
+  paidLeaveStartAfterMonths?: number;
 }
 
 export interface Attendance {
@@ -191,4 +206,13 @@ export interface SyncLog {
   operation: string;
   status: 'success' | 'error' | 'syncing';
   details: string;
+}
+
+export interface FailedLoginAttempt {
+  id: string;
+  enteredId: string;
+  timestamp: string; // ISO string
+  reason: 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password';
+  browserInfo?: string;
+  ipAddress?: string;
 }

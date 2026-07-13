@@ -246,6 +246,24 @@ export default function LeavesHolidays({
     return attendance.filter(r => r.employeeId === empId && r.status === 'Leave').length;
   };
 
+  const getPaidLeaveNote = (): string => {
+    const isEnabled = adminSettings?.enablePaidLeaveCalculation !== false;
+    const probationMonths = adminSettings?.paidLeaveStartAfterMonths || 0;
+    if (!isEnabled) {
+      return language === 'en' 
+        ? "Paid Leave (EL) calculation is currently disabled in company policy."
+        : "सवैतनिक अवकाश (EL) गणना वर्तमान में कंपनी की नीति में बंद है।";
+    }
+    if (probationMonths > 0) {
+      return language === 'en'
+        ? `One Paid Leave day is provided each month after completing a waiting period of ${probationMonths} month(s) of service.`
+        : `${probationMonths} महीने की सेवा की प्रतीक्षा अवधि पूरी करने के बाद हर महीने एक दिन का सवेतन अवकाश (Paid Leave) दिया जाता है।`;
+    }
+    return language === 'en'
+      ? "One Paid Leave day is provided in each month as Earned Leave (EL) starting immediately upon joining."
+      : "शामिल होने के तुरंत बाद प्रत्येक माह में एक दिन का सवेतन अवकाश (Paid Leave) अर्जित अवकाश (EL) के रूप में प्रदान किया जाता है।";
+  };
+
   // Extract unique departments for filtering
   const departments = ['All', ...Array.from(new Set(employees.map(e => e.department).filter(Boolean)))];
 
@@ -254,7 +272,12 @@ export default function LeavesHolidays({
     const openingEL = emp.elBalance || 0;
     const openingCL = emp.clBalance || 0;
     const tenureMonths = calculateTenureMonths(emp.joiningDate);
-    const accumulatedEL = tenureMonths; // 1 EL per month
+    
+    // Calculate accumulated EL taking into account policy settings
+    const isPaidLeaveEnabled = adminSettings?.enablePaidLeaveCalculation !== false && emp.isPaidLeaveApplicable !== false;
+    const probationMonths = adminSettings?.paidLeaveStartAfterMonths || 0;
+    const accumulatedEL = isPaidLeaveEnabled ? Math.max(0, tenureMonths - probationMonths) : 0;
+    
     const totalGrantedEL = openingEL + accumulatedEL;
     const usedEL = getUsedLeavesCount(emp.id);
     const remainingEL = totalGrantedEL - usedEL;
@@ -556,7 +579,7 @@ export default function LeavesHolidays({
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="text-[#10b981] mt-0.5">•</span>
-                <span>{t.note2}</span>
+                <span>{getPaidLeaveNote()}</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="text-[#10b981] mt-0.5">•</span>
@@ -693,7 +716,7 @@ export default function LeavesHolidays({
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="text-amber-500">•</span>
-                    <span>{t.note2}</span>
+                    <span>{getPaidLeaveNote()}</span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <span className="text-amber-500">•</span>

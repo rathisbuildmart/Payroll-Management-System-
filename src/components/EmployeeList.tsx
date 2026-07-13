@@ -551,6 +551,14 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       clBalance: 12,
       elBalance: 15,
 
+      isPfApplicable: true,
+      isEsicApplicable: true,
+      isPtApplicable: true,
+      isHraApplicable: true,
+      isDaApplicable: true,
+      isConveyanceApplicable: true,
+      isPaidLeaveApplicable: true,
+
       firstName: '',
       lastName: '',
       email: '',
@@ -628,6 +636,14 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       advanceSalaryDeduction: emp.advanceSalaryDeduction || 0,
       clBalance: emp.clBalance || 0,
       elBalance: emp.elBalance || 0,
+
+      isPfApplicable: emp.isPfApplicable !== false,
+      isEsicApplicable: emp.isEsicApplicable !== false,
+      isPtApplicable: emp.isPtApplicable !== false,
+      isHraApplicable: emp.isHraApplicable !== false,
+      isDaApplicable: emp.isDaApplicable !== false,
+      isConveyanceApplicable: emp.isConveyanceApplicable !== false,
+      isPaidLeaveApplicable: emp.isPaidLeaveApplicable !== false,
 
       firstName: emp.firstName || '',
       lastName: emp.lastName || '',
@@ -1308,6 +1324,109 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       <div className="grid grid-cols-2 gap-2">
                         {renderFormInput('clBalance', 'CL Balance (Casual)', 'number')}
                         {renderFormInput('elBalance', 'EL Balance (Earned)', 'number')}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
+                      <h5 className="text-[10px] font-extrabold text-[#7c3aed] uppercase tracking-wide mb-2">Rule Customization (इस कर्मचारी के नियम व कटौतियां)</h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-semibold text-gray-700">
+                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="isPfApplicable"
+                            checked={formData.isPfApplicable !== false}
+                            onChange={handleInputChange}
+                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-gray-800 font-bold">Deduct PF (PF कटौती)</span>
+                            <span className="text-[9px] text-gray-400 font-medium">Provident Fund (12%)</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="isEsicApplicable"
+                            checked={formData.isEsicApplicable !== false}
+                            onChange={handleInputChange}
+                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-gray-800 font-bold">Deduct ESIC (ESIC कटौती)</span>
+                            <span className="text-[9px] text-gray-400 font-medium">State Insurance (0.75%)</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="isPtApplicable"
+                            checked={formData.isPtApplicable !== false}
+                            onChange={handleInputChange}
+                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-gray-800 font-bold">Deduct PT (PT कटौती)</span>
+                            <span className="text-[9px] text-gray-400 font-medium">Professional Tax (₹200)</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="isHraApplicable"
+                            checked={formData.isHraApplicable !== false}
+                            onChange={handleInputChange}
+                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-gray-800 font-bold">Enable HRA (HRA चालू)</span>
+                            <span className="text-[9px] text-gray-400 font-medium">House Rent Allowance</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="isDaApplicable"
+                            checked={formData.isDaApplicable !== false}
+                            onChange={handleInputChange}
+                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-gray-800 font-bold">Enable DA (DA चालू)</span>
+                            <span className="text-[9px] text-gray-400 font-medium">Dearness Allowance</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="isConveyanceApplicable"
+                            checked={formData.isConveyanceApplicable !== false}
+                            onChange={handleInputChange}
+                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-gray-800 font-bold">Enable Conveyance (Conveyance चालू)</span>
+                            <span className="text-[9px] text-gray-400 font-medium">Conveyance Allowance</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="isPaidLeaveApplicable"
+                            checked={formData.isPaidLeaveApplicable !== false}
+                            onChange={handleInputChange}
+                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-gray-800 font-bold">Paid Leave Policy (सवैतनिक अवकाश नियम)</span>
+                            <span className="text-[9px] text-gray-400 font-medium">Earned Leave Credit & Status</span>
+                          </div>
+                        </label>
                       </div>
                     </div>
 

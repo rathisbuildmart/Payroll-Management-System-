@@ -746,7 +746,13 @@ export async function saveAdminSettings(spreadsheetId: string, settings: AdminSe
     ['fields', JSON.stringify(settings.fields || [])],
     ['holidays', JSON.stringify(settings.holidays || [])],
     ['adminUsername', settings.adminUsername || ''],
-    ['adminPassword', settings.adminPassword || '']
+    ['adminPassword', settings.adminPassword || ''],
+    ['enableHra', settings.enableHra !== false ? 'TRUE' : 'FALSE'],
+    ['enableDa', settings.enableDa !== false ? 'TRUE' : 'FALSE'],
+    ['enableConveyance', settings.enableConveyance !== false ? 'TRUE' : 'FALSE'],
+    ['enableProfessionalTax', settings.enableProfessionalTax !== false ? 'TRUE' : 'FALSE'],
+    ['enablePaidLeaveCalculation', settings.enablePaidLeaveCalculation !== false ? 'TRUE' : 'FALSE'],
+    ['paidLeaveStartAfterMonths', settings.paidLeaveStartAfterMonths || 0]
   ];
 
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Settings!A1:B${values.length}?valueInputOption=USER_ENTERED`;
@@ -795,7 +801,8 @@ export async function fetchAdminSettings(spreadsheetId: string, token: string): 
 
     if (!key) return;
 
-    const numericFields = ['defaultOvertimeRate', 'pfContributionRate', 'esicContributionRate'];
+    const numericFields = ['defaultOvertimeRate', 'pfContributionRate', 'esicContributionRate', 'paidLeaveStartAfterMonths'];
+    const booleanFields = ['enableHra', 'enableDa', 'enableConveyance', 'enableProfessionalTax', 'enablePaidLeaveCalculation'];
     const arrayFields = [
       'departments', 'branches', 'costCenters', 'employeeGroups',
       'workTimings', 'weeklyOffProfiles', 'leaveTypes'
@@ -803,6 +810,8 @@ export async function fetchAdminSettings(spreadsheetId: string, token: string): 
 
     if (numericFields.includes(key)) {
       settings[key] = Number(val) || 0;
+    } else if (booleanFields.includes(key)) {
+      settings[key] = val === 'TRUE' || val === 'true' || val === '1';
     } else if (arrayFields.includes(key)) {
       try {
         if (val.startsWith('[') && val.endsWith(']')) {

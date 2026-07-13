@@ -12,14 +12,19 @@ import {
   EyeOff, 
   Lock, 
   HelpCircle,
-  Undo
+  Undo,
+  ShieldAlert,
+  Search,
+  Filter
 } from 'lucide-react';
-import { AdminSettings, FieldSetting } from '../types';
+import { AdminSettings, FieldSetting, FailedLoginAttempt } from '../types';
 
 interface SettingsProps {
   settings: AdminSettings;
   onSaveSettings: (settings: AdminSettings) => void;
   language: 'en' | 'hi';
+  failedLogins?: FailedLoginAttempt[];
+  onClearFailedLogins?: () => void;
 }
 
 export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
@@ -102,16 +107,26 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   fields: DEFAULT_FIELDS_CONFIG,
   adminUsername: 'admin',
   adminPassword: 'admin123',
+  enableHra: true,
+  enableDa: true,
+  enableConveyance: true,
+  enableProfessionalTax: true,
+  enablePaidLeaveCalculation: true,
+  paidLeaveStartAfterMonths: 0,
 };
 
-export default function Settings({ settings, onSaveSettings, language }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy'>('company');
+export default function Settings({ settings, onSaveSettings, language, failedLogins = [], onClearFailedLogins }: SettingsProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
   const [newMasterVal, setNewMasterVal] = useState<string>('');
   const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'>>('departments');
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
+
+  // Security Log Search/Filter States
+  const [securitySearch, setSecuritySearch] = useState('');
+  const [securityReasonFilter, setSecurityReasonFilter] = useState<'all' | 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password'>('all');
 
   const t = {
     en: {
@@ -122,6 +137,7 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
       tabFields: "Field Settings (Mandatory/Hide)",
       tabMasters: "Dropdown Masters",
       tabPolicy: "Policy & Payroll Rules",
+      tabSecurity: "Login Security Audit",
       
       // Company
       compName: "Company Name",
@@ -172,6 +188,15 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
       overtimeRate: "Overtime Hourly Rate (₹)",
       pfRate: "PF Employee Contribution (%)",
       esicRate: "ESIC Contribution (%)",
+      allowancesCalcTitle: "Allowances & Deductions Active Toggles",
+      enableHraLabel: "Enable House Rent Allowance (HRA) Calculation",
+      enableDaLabel: "Enable Dearness Allowance (DA) Calculation",
+      enableConveyanceLabel: "Enable Conveyance Allowance Calculation",
+      enableProfessionalTaxLabel: "Enable Professional Tax (PT) Deduction",
+      enablePaidLeaveLabel: "Enable Paid Leave (PL) & Earned Leave Calculation",
+      paidLeaveStartAfterLabel: "Paid Leave Starts After (Months of Service required)",
+      paidLeaveStartImmediately: "Start Immediately Upon Joining",
+      toggleCalcSub: "Toggle which salary components are dynamically processed in payroll generation.",
     },
     hi: {
       adminTitle: "एडमिन पैनल और सिस्टम सेटिंग्स",
@@ -181,6 +206,7 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
       tabFields: "फ़ील्ड सेटिंग्स (अनिवार्य/छिपाएं)",
       tabMasters: "ड्रॉपडाउन मास्टर सूचियाँ",
       tabPolicy: "नीति और पेरोल नियम",
+      tabSecurity: "लॉगिन सुरक्षा ऑडिट",
       
       // Company
       compName: "कंपनी का नाम",
@@ -231,6 +257,15 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
       overtimeRate: "ओवरटाइम प्रति घंटा दर (₹)",
       pfRate: "PF कर्मचारी योगदान (%)",
       esicRate: "ESIC कर्मचारी योगदान (%)",
+      allowancesCalcTitle: "भत्ते और कटौतियां सक्रिय टॉगल",
+      enableHraLabel: "मकान किराया (HRA) गणना चालू करें",
+      enableDaLabel: "महंगाई भत्ता (DA) गणना चालू करें",
+      enableConveyanceLabel: "यातायात भत्ता (Conveyance) गणना चालू करें",
+      enableProfessionalTaxLabel: "व्यावसायिक कर (PT) कटौती चालू करें",
+      enablePaidLeaveLabel: "सवैतनिक अवकाश (Paid Leave / EL) गणना चालू करें",
+      paidLeaveStartAfterLabel: "सवैतनिक अवकाश कितने महीने बाद शुरू हो (सेवा अवधि)",
+      paidLeaveStartImmediately: "शामिल होने के तुरंत बाद शुरू करें",
+      toggleCalcSub: "चुनें कि पेरोल गणना के दौरान कौन से वेतन घटक सक्रिय रूप से संसाधित किए जाते हैं।",
     }
   }[language];
 
@@ -367,6 +402,23 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
           >
             <SettingsIcon className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
             <span>{t.tabPolicy}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('security')}
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
+              activeSubTab === 'security'
+                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
+                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <ShieldAlert className={`w-3.5 h-3.5 shrink-0 md:mt-0.5 ${failedLogins.length > 0 ? 'text-amber-500 animate-pulse' : ''}`} />
+            <span>{t.tabSecurity}</span>
+            {failedLogins.length > 0 && (
+              <span className="absolute top-1.5 right-1.5 md:relative md:top-0 md:right-0 md:ml-auto bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                {failedLogins.length}
+              </span>
+            )}
           </button>
 
           <div className="hidden md:block pt-6 mt-6 border-t border-gray-200/60">
@@ -692,6 +744,375 @@ export default function Settings({ settings, onSaveSettings, language }: Setting
                   />
                 </div>
               </div>
+
+              {/* Allowance & Deduction Toggles */}
+              <div className="border-t border-gray-100 pt-4 mt-4">
+                <h4 className="text-xs font-bold text-gray-800 mb-1">{t.allowancesCalcTitle}</h4>
+                <p className="text-[10px] text-gray-500 mb-3">{t.toggleCalcSub}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-3 p-3 bg-gray-50/40 hover:bg-gray-55/60 rounded-lg border border-gray-100 cursor-pointer transition-colors">
+                    <input 
+                      type="checkbox"
+                      checked={localSettings.enableHra !== false}
+                      onChange={(e) => setLocalSettings({...localSettings, enableHra: e.target.checked})}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                    />
+                    <div>
+                      <span className="block text-xs font-bold text-gray-800">{t.enableHraLabel}</span>
+                      <span className="text-[10px] text-gray-400 font-medium">HRA (मकान किराया)</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 bg-gray-50/40 hover:bg-gray-55/60 rounded-lg border border-gray-100 cursor-pointer transition-colors">
+                    <input 
+                      type="checkbox"
+                      checked={localSettings.enableDa !== false}
+                      onChange={(e) => setLocalSettings({...localSettings, enableDa: e.target.checked})}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                    />
+                    <div>
+                      <span className="block text-xs font-bold text-gray-800">{t.enableDaLabel}</span>
+                      <span className="text-[10px] text-gray-400 font-medium">Dearness (DA भत्ता)</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 bg-gray-50/40 hover:bg-gray-55/60 rounded-lg border border-gray-100 cursor-pointer transition-colors">
+                    <input 
+                      type="checkbox"
+                      checked={localSettings.enableConveyance !== false}
+                      onChange={(e) => setLocalSettings({...localSettings, enableConveyance: e.target.checked})}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                    />
+                    <div>
+                      <span className="block text-xs font-bold text-gray-800">{t.enableConveyanceLabel}</span>
+                      <span className="text-[10px] text-gray-400 font-medium">Conveyance (यातायात)</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 bg-gray-50/40 hover:bg-gray-55/60 rounded-lg border border-gray-100 cursor-pointer transition-colors">
+                    <input 
+                      type="checkbox"
+                      checked={localSettings.enableProfessionalTax !== false}
+                      onChange={(e) => setLocalSettings({...localSettings, enableProfessionalTax: e.target.checked})}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                    />
+                    <div>
+                      <span className="block text-xs font-bold text-gray-800">{t.enableProfessionalTaxLabel}</span>
+                      <span className="text-[10px] text-gray-400 font-medium">Professional Tax (PT)</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 bg-gray-50/40 hover:bg-gray-55/60 rounded-lg border border-gray-100 cursor-pointer transition-colors">
+                    <input 
+                      type="checkbox"
+                      checked={localSettings.enablePaidLeaveCalculation !== false}
+                      onChange={(e) => setLocalSettings({...localSettings, enablePaidLeaveCalculation: e.target.checked})}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                    />
+                    <div>
+                      <span className="block text-xs font-bold text-gray-800">{t.enablePaidLeaveLabel}</span>
+                      <span className="text-[10px] text-gray-400 font-medium">Paid Leave (PL)</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {localSettings.enablePaidLeaveCalculation !== false && (
+                <div className="border-t border-gray-100 pt-4 mt-4 bg-emerald-50/20 p-3 rounded-lg border border-emerald-100/50">
+                  <h4 className="text-xs font-bold text-emerald-900 mb-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block"></span>
+                    {language === 'en' ? "Paid Leave Policy Settings" : "सवैतनिक अवकाश नीति सेटिंग्स"}
+                  </h4>
+                  <div className="mt-3 max-w-md">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">{t.paidLeaveStartAfterLabel}</label>
+                    <select
+                      value={localSettings.paidLeaveStartAfterMonths || 0}
+                      onChange={(e) => setLocalSettings({...localSettings, paidLeaveStartAfterMonths: Number(e.target.value) || 0})}
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none bg-white"
+                    >
+                      <option value={0}>{t.paidLeaveStartImmediately}</option>
+                      <option value={1}>{language === 'en' ? "After 1 Month of Service" : "1 महीने की सेवा के बाद"}</option>
+                      <option value={2}>{language === 'en' ? "After 2 Months of Service" : "2 महीने की सेवा के बाद"}</option>
+                      <option value={3}>{language === 'en' ? "After 3 Months (Standard Probation)" : "3 महीने बाद (मानक परिवीक्षा)"}</option>
+                      <option value={6}>{language === 'en' ? "After 6 Months of Service" : "6 महीने की सेवा के बाद"}</option>
+                      <option value={12}>{language === 'en' ? "After 1 Year of Service" : "1 वर्ष की सेवा के बाद"}</option>
+                    </select>
+                    <p className="text-[10px] text-gray-400 font-medium mt-1">
+                      {language === 'en' 
+                        ? "Paid Leave (Earned Leave) will only be credited/applicable if employee's tenure (joining date) meets this waiting period."
+                        : "सवैतनिक अवकाश (अर्जित अवकाश) केवल तभी लागू/जमा होगा जब कर्मचारी का कार्यकाल (शामिल होने की तिथि) इस प्रतीक्षा अवधि को पूरा करता है।"}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSubTab === 'security' && (
+            <div className="space-y-6">
+              <div className="border-b border-gray-150 pb-4">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-rose-500" />
+                  {language === 'en' ? 'Portal Security Audit Log' : 'पोर्टल सुरक्षा ऑडिट लॉग'}
+                </h3>
+                <p className="text-[11px] text-gray-500 font-medium mt-1">
+                  {language === 'en' 
+                    ? 'Monitor failed login attempts to recognize potential security breaches, unauthorized entry attempts, or employees struggling with forgotten passwords.'
+                    : 'भूले हुए पासवर्ड या संभावित अनधिकृत पहुंच का पता लगाने के लिए असफल लॉगिन प्रयासों की निगरानी करें।'}
+                </p>
+              </div>
+
+              {/* Stats Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl border border-rose-100 bg-rose-50/50 flex flex-col justify-between shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                    {language === 'en' ? 'Total Unsuccessful Attempts' : 'कुल असफल प्रयास'}
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-2xl font-black text-rose-950 font-mono">
+                      {failedLogins.length}
+                    </span>
+                    <span className="text-[10px] text-rose-600 font-semibold font-mono">
+                      {language === 'en' ? 'logs' : 'लॉग'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/50 flex flex-col justify-between shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                    {language === 'en' ? 'Unique IDs Targeted' : 'लक्षित विशिष्ट आईडी'}
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-2xl font-black text-amber-950 font-mono">
+                      {new Set(failedLogins.map(l => l.enteredId.toLowerCase())).size}
+                    </span>
+                    <span className="text-[10px] text-amber-600 font-semibold font-mono">
+                      {language === 'en' ? 'user IDs' : 'उपयोगकर्ता आईडी'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/50 flex flex-col justify-between shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                    {language === 'en' ? 'System Audit Status' : 'सिस्टम ऑडिट स्थिति'}
+                  </span>
+                  <div className="flex items-center gap-2 mt-2">
+                    {failedLogins.length >= 8 ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-black text-rose-700 bg-rose-100 px-2.5 py-1 rounded-full animate-pulse">
+                        ⚠️ {language === 'en' ? 'High Fail Rate' : 'उच्च विफलता दर'}
+                      </span>
+                    ) : failedLogins.length > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
+                        ℹ️ {language === 'en' ? 'Minor Incidents' : 'मामूली घटनाएं'}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
+                        ✓ {language === 'en' ? 'Secure & Stable' : 'सुरक्षित और स्थिर'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Alert Insights Box */}
+              {(() => {
+                const idCounts: { [key: string]: number } = {};
+                failedLogins.forEach(log => {
+                  const k = log.enteredId.toUpperCase();
+                  idCounts[k] = (idCounts[k] || 0) + 1;
+                });
+                const flaggedIds = Object.entries(idCounts).filter(([_, count]) => count >= 3);
+
+                if (flaggedIds.length > 0) {
+                  return (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <h4 className="text-xs font-black text-amber-900 uppercase tracking-wide">
+                          {language === 'en' ? 'Security Action Warning Required' : 'सुरक्षा चेतावनी - ध्यान दें'}
+                        </h4>
+                        <p className="text-[10px] text-amber-800 font-semibold leading-relaxed">
+                          {language === 'en' 
+                            ? 'The following User/Employee IDs have 3 or more unsuccessful login attempts. This could suggest forgotten passwords or unauthorized brute-forcing attempts:' 
+                            : 'निम्नलिखित उपयोगकर्ता/कर्मचारी आईडी पर 3 या अधिक असफल प्रयास दर्ज किए गए हैं:'}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {flaggedIds.map(([id, count]) => (
+                            <span key={id} className="inline-flex items-center bg-amber-200 text-amber-950 text-[10px] font-black px-2.5 py-1 rounded-md font-mono border border-amber-300 shadow-xs">
+                              {id} ({count} {language === 'en' ? 'fails' : 'प्रयास'})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Filter controls bar */}
+              <div className="bg-slate-50 border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+                  {/* Search input */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input 
+                      type="text"
+                      placeholder={language === 'en' ? 'Search Employee ID...' : 'कर्मचारी आईडी खोजें...'}
+                      value={securitySearch}
+                      onChange={(e) => setSecuritySearch(e.target.value)}
+                      className="pl-9 pr-4 py-1.5 border border-gray-200 bg-white rounded-lg text-xs font-bold w-full sm:w-48 focus:outline-none focus:ring-1 focus:ring-[#03623c] font-mono shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Filter Reason dropdown */}
+                  <div className="flex items-center gap-1.5 bg-white border border-gray-200 px-2.5 py-1 rounded-lg shadow-2xs">
+                    <Filter className="w-3 h-3 text-gray-400" />
+                    <select
+                      value={securityReasonFilter}
+                      onChange={(e: any) => setSecurityReasonFilter(e.target.value)}
+                      className="text-xs font-bold text-gray-700 bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer"
+                    >
+                      <option value="all">{language === 'en' ? 'All Reasons' : 'सभी कारण'}</option>
+                      <option value="Incorrect Password">{language === 'en' ? 'Incorrect Password' : 'गलत पासवर्ड'}</option>
+                      <option value="User ID not found">{language === 'en' ? 'ID Not Found' : 'आईडी नहीं मिली'}</option>
+                      <option value="Admin Incorrect Password">{language === 'en' ? 'Admin Bad Password' : 'एडमिन गलत पासवर्ड'}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Clear Audit log button */}
+                {failedLogins.length > 0 && onClearFailedLogins && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm(language === 'en' ? 'Are you sure you want to permanently clear all unsuccessful login attempts logs?' : 'क्या आप स्थायी रूप से सभी असफल लॉगिन लॉग साफ़ करना चाहते हैं?')) {
+                        onClearFailedLogins();
+                      }
+                    }}
+                    className="text-xs font-black text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200/50 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-97"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {language === 'en' ? 'Clear Security Log' : 'सुरक्षा लॉग साफ़ करें'}
+                  </button>
+                )}
+              </div>
+
+              {/* Log Table / List */}
+              {(() => {
+                const filteredLogs = failedLogins.filter(log => {
+                  const matchesSearch = log.enteredId.toLowerCase().includes(securitySearch.toLowerCase());
+                  const matchesReason = securityReasonFilter === 'all' || log.reason === securityReasonFilter;
+                  return matchesSearch && matchesReason;
+                });
+
+                if (filteredLogs.length === 0) {
+                  return (
+                    <div className="border border-dashed border-gray-250 rounded-2xl p-10 text-center space-y-2 bg-slate-25/40">
+                      <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+                        <CheckCircle className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest pt-2">
+                        {language === 'en' ? 'System Audit Clear' : 'सिस्टम ऑडिट साफ़'}
+                      </h4>
+                      <p className="text-[10px] text-gray-500 font-medium max-w-sm mx-auto">
+                        {language === 'en' 
+                          ? 'No unsuccessful attempts match your current search/filters, or the login security log is entirely clear. Excellent!' 
+                          : 'सक्रिय फ़िल्टर या खोज के अनुसार कोई असफल प्रयास नहीं मिला, या सुरक्षा लॉग पूरी तरह से खाली है। बहुत बढ़िया!'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-gray-200 font-mono">
+                            <th className="py-2.5 px-4">{language === 'en' ? 'Status' : 'स्थिति'}</th>
+                            <th className="py-2.5 px-4">{language === 'en' ? 'Entered User ID' : 'दर्ज उपयोगकर्ता आईडी'}</th>
+                            <th className="py-2.5 px-4">{language === 'en' ? 'Timestamp' : 'समय और दिनांक'}</th>
+                            <th className="py-2.5 px-4">{language === 'en' ? 'Reason' : 'विफलता का कारण'}</th>
+                            <th className="py-2.5 px-4 hidden md:table-cell">{language === 'en' ? 'Device/Browser' : 'ब्राउज़र विवरण'}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {filteredLogs.map((log) => {
+                            let dateStr = '';
+                            try {
+                              dateStr = new Date(log.timestamp).toLocaleString(undefined, {
+                                dateStyle: 'medium',
+                                timeStyle: 'short'
+                              });
+                            } catch (_) {
+                              dateStr = log.timestamp;
+                            }
+
+                            let badgeStyle = '';
+                            let badgeText = '';
+                            let statusDot = '';
+
+                            if (log.reason === 'Admin Incorrect Password') {
+                              badgeStyle = 'bg-slate-100 text-slate-800 border-slate-200';
+                              badgeText = language === 'en' ? 'System Administrator' : 'सिस्टम व्यवस्थापक';
+                              statusDot = 'bg-slate-900 ring-slate-100 animate-pulse';
+                            } else if (log.reason === 'Incorrect Password') {
+                              badgeStyle = 'bg-amber-100 text-amber-800 border-amber-200';
+                              badgeText = language === 'en' ? 'Registered Employee' : 'पंजीकृत कर्मचारी';
+                              statusDot = 'bg-amber-500 ring-amber-100';
+                            } else {
+                              badgeStyle = 'bg-rose-100 text-rose-800 border-rose-200';
+                              badgeText = language === 'en' ? 'Unknown/Invalid User' : 'अज्ञात उपयोगकर्ता';
+                              statusDot = 'bg-rose-500 ring-rose-100';
+                            }
+
+                            return (
+                              <tr key={log.id} className="hover:bg-slate-50/50 transition-colors text-xs font-semibold text-slate-700">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`w-2 h-2 rounded-full ring-4 ${statusDot}`} />
+                                    {log.reason === 'User ID not found' ? (
+                                      <span className="text-[10px] text-rose-600 font-extrabold uppercase font-mono">{language === 'en' ? 'UNREGISTERED' : 'अपंजीकृत'}</span>
+                                    ) : (
+                                      <span className="text-[10px] text-amber-600 font-extrabold uppercase font-mono">{language === 'en' ? 'REGISTERED' : 'पंजीकृत'}</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 font-mono text-slate-900 font-bold">
+                                  <div className="flex flex-col gap-0.5">
+                                    <span>{log.enteredId}</span>
+                                    <span className={`inline-self-start text-[9px] font-bold px-1.5 py-0.25 rounded-md border ${badgeStyle} mt-0.5`}>
+                                      {badgeText}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-gray-500 font-mono">
+                                  {dateStr}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <span className="inline-flex items-center gap-1 text-gray-800">
+                                    <Lock className="w-3 h-3 text-gray-400 shrink-0" />
+                                    {log.reason === 'Admin Incorrect Password' ? (
+                                      <span className="text-rose-700 font-extrabold">{log.reason}</span>
+                                    ) : log.reason === 'Incorrect Password' ? (
+                                      <span className="text-amber-700 font-bold">{log.reason}</span>
+                                    ) : (
+                                      <span className="text-slate-500 italic">{log.reason}</span>
+                                    )}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 hidden md:table-cell text-[10px] text-gray-400 font-mono max-w-xs truncate" title={log.browserInfo}>
+                                  {log.browserInfo || 'N/A'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
