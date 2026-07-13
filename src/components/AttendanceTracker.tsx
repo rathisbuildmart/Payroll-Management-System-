@@ -12,6 +12,8 @@ import {
   isAttendanceLate, 
   isAttendanceEarlyGoing 
 } from '../utils/shift';
+import PunchImportModal from './PunchImportModal';
+import MonthlyCalendarReport from './MonthlyCalendarReport';
 
 interface AttendanceTrackerProps {
   employees: Employee[];
@@ -30,14 +32,36 @@ export default function AttendanceTracker({
   language,
   adminSettings
 }: AttendanceTrackerProps) {
-  const [activeTab, setActiveTab] = useState<'daily' | 'misspunch' | 'halfday'>('daily');
+  const [activeTab, setActiveTab] = useState<'daily' | 'misspunch' | 'halfday' | 'calendar'>('daily');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [localRecords, setLocalRecords] = useState<{ [empId: string]: Attendance }>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   
   // States for approvals
   const [pendingChanges, setPendingChanges] = useState<Attendance[]>([]);
   const [isSavingApprovals, setIsSavingApprovals] = useState(false);
+
+  const handlePunchImportComplete = async (importedRecords: Attendance[]) => {
+    if (onUpdateAttendanceRecords) {
+      await onUpdateAttendanceRecords(importedRecords);
+      
+      // Update local state immediately if any match the currently selected date
+      const recordsForDate = importedRecords.filter(r => r.date === selectedDate);
+      if (recordsForDate.length > 0) {
+        setLocalRecords(prev => {
+          const copy = { ...prev };
+          recordsForDate.forEach(r => {
+            copy[r.employeeId] = r;
+          });
+          return copy;
+        });
+      }
+      alert(language === 'en' ? 'Biometric records imported successfully!' : 'बायोमेट्रिक पंच लॉग सफलतापूर्वक आयात किए गए!');
+    } else {
+      alert('Import service not registered on parent.');
+    }
+  };
 
   // Filters state
   const [selectedBranch, setSelectedBranch] = useState('All');
@@ -115,6 +139,7 @@ export default function AttendanceTracker({
       subTabDaily: "Daily Attendance Register",
       subTabMissPunch: "Miss Punch Approvals",
       subTabHalfDay: "Half Day Register",
+      subTabCalendar: "Monthly Calendar Report",
       approvalStatus: "Approval Status",
       action: "Action",
       approved: "Approved",
@@ -152,6 +177,7 @@ export default function AttendanceTracker({
       subTabDaily: "दैनिक उपस्थिति रजिस्टर",
       subTabMissPunch: "मिस पंच मंजूरी",
       subTabHalfDay: "हाफ डे रजिस्टर",
+      subTabCalendar: "मासिक कैलेंडर रिपोर्ट",
       approvalStatus: "मंजूरी की स्थिति",
       action: "कार्रवाई",
       approved: "मंजूर किया",
@@ -442,6 +468,16 @@ export default function AttendanceTracker({
               </span>
             )}
           </button>
+          <button
+            onClick={() => { setActiveTab('calendar'); setPendingChanges([]); }}
+            className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+              activeTab === 'calendar' 
+                ? 'bg-white text-gray-800 shadow-xs border border-gray-200/20' 
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {t.subTabCalendar}
+          </button>
         </div>
       </div>
 
@@ -463,7 +499,15 @@ export default function AttendanceTracker({
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="px-4 py-2 border border-[#03623c]/20 bg-[#03623c]/5 text-[#03623c] hover:bg-[#03623c]/10 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer hover:shadow-3xs"
+                id="bulk-import-punch"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                {language === 'en' ? 'Upload Punch Machine Data' : 'पंच मशीन डाटा अपलोड करें'}
+              </button>
               <button
                 onClick={() => markBulkStatus('Present')}
                 className="px-4 py-2 border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -1133,6 +1177,27 @@ export default function AttendanceTracker({
           </div>
         </div>
       )}
+
+      {/* CALENDAR VIEW */}
+      {activeTab === 'calendar' && (
+        <MonthlyCalendarReport
+          isAdmin={true}
+          employeeList={employees}
+          attendanceRecords={attendanceRecords}
+          adminSettings={adminSettings || { defaultCheckIn: '09:00', defaultCheckOut: '18:00' } as any}
+          language={language}
+        />
+      )}
+
+      {/* Biometric Punch Import Modal */}
+      <PunchImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        employees={employees}
+        onImportComplete={handlePunchImportComplete}
+        language={language}
+        adminSettings={adminSettings}
+      />
 
     </div>
   );

@@ -8,6 +8,7 @@ import { jsPDF } from 'jspdf';
 import { Employee, Attendance, PayrollRecord, AdminSettings } from '../types';
 import LeavesHolidays from './LeavesHolidays';
 import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
+import MonthlyCalendarReport from './MonthlyCalendarReport';
 
 interface EmployeePortalProps {
   employee: Employee;
@@ -24,7 +25,7 @@ export default function EmployeePortal({
   language, 
   adminSettings 
 }: EmployeePortalProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'attendance' | 'payslips' | 'exceptions' | 'leaves'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'attendance' | 'payslips' | 'exceptions' | 'leaves' | 'calendar'>('profile');
   const [attendanceYear, setAttendanceYear] = useState<string>(new Date().getFullYear().toString());
   const [attendanceMonth, setAttendanceMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [activePayslip, setActivePayslip] = useState<any | null>(null);
@@ -36,6 +37,7 @@ export default function EmployeePortal({
       payslips: language === 'en' ? "My Salary Slips" : "मेरी सैलरी स्लिप",
       exceptions: language === 'en' ? "My Exceptions" : "मेरी विसंगतियां",
       leaves: language === 'en' ? "Leaves & Holidays" : "अवकाश और छुट्टियां",
+      calendar: language === 'en' ? "Calendar Report" : "कैलेंडर रिपोर्ट",
       personalInfo: "Personal & Contact Information",
       bankingInfo: "Bank Account Details",
       statutoryInfo: "Statutory Registry & IDs",
@@ -437,6 +439,17 @@ export default function EmployeePortal({
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>{t.attendance}</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('calendar')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'calendar' 
+                ? 'bg-emerald-600 text-white shadow-md' 
+                : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
+            }`}
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>{t.calendar}</span>
           </button>
           <button
             onClick={() => setActiveTab('exceptions')}
@@ -963,6 +976,17 @@ export default function EmployeePortal({
               employeeId={employee.id}
             />
           </div>
+        )}
+
+        {/* CALENDAR REPORT TAB */}
+        {activeTab === 'calendar' && (
+          <MonthlyCalendarReport
+            isAdmin={false}
+            attendanceRecords={attendanceRecords}
+            adminSettings={adminSettings}
+            language={language}
+            currentEmployee={employee}
+          />
         )}
 
       </div>

@@ -23,7 +23,13 @@ import {
   Building2,
   Sparkles,
   Globe,
-  HelpCircle
+  HelpCircle,
+  Megaphone,
+  Send,
+  LifeBuoy,
+  KeyRound,
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { initAuth, googleSignIn, googleSignInRedirect, logout } from './services/auth';
 import { 
@@ -304,6 +310,112 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [showLoginHelp, setShowLoginHelp] = useState(false);
 
+  // Corporate notices & support gateway states
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [supportSubmitted, setSupportSubmitted] = useState(false);
+  const [forgotSubmitted, setForgotSubmitted] = useState(false);
+  
+  const [supportName, setSupportName] = useState('');
+  const [supportEmpId, setSupportEmpId] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
+  const [supportMsg, setSupportMsg] = useState('');
+  const [supportCategory, setSupportCategory] = useState('sign_in_issue');
+  const [forgotEmpId, setForgotEmpId] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotMobile, setForgotMobile] = useState('');
+  const [forgotError, setForgotError] = useState<string | null>(null);
+
+  const [announcements, setAnnouncements] = useState<any[]>(() => {
+    const saved = localStorage.getItem('payroll_announcements');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'ann-1',
+        title: 'Implementation of Biometric Punch System',
+        titleHi: 'बायोमेट्रिक पंच प्रणाली का कार्यान्वयन',
+        date: '2026-07-12',
+        content: 'All departments must ensure staff punches via the integrated biometric portal. Late punches after standard 15-min grace period will record automatic late penalty checks.',
+        contentHi: 'सभी विभागों को एकीकृत बायोमेट्रिक पोर्टल के माध्यम से कर्मचारियों का पंच सुनिश्चित करना होगा। 15 मिनट की छूट अवधि के बाद देर से पंच करने पर स्वचालित विलंब पेनल्टी दर्ज होगी।',
+        badge: 'Critical',
+        badgeHi: 'महत्वपूर्ण'
+      },
+      {
+        id: 'ann-2',
+        title: 'Upcoming Public Holiday Notice',
+        titleHi: 'आगामी सार्वजनिक अवकाश सूचना',
+        date: '2026-07-20',
+        content: 'The workspace will remain closed on July 25th in observation of the regional festival. Off-duty profiles are auto-applied.',
+        contentHi: 'क्षेत्रीय त्योहार के अवसर पर 25 जुलाई को कार्यक्षेत्र बंद रहेगा। ऑफ-ड्यूटी प्रोफाइल स्वचालित रूप से लागू हो गई हैं।',
+        badge: 'Holiday',
+        badgeHi: 'छुट्टी'
+      },
+      {
+        id: 'ann-3',
+        title: 'Revised Provident Fund Policies',
+        titleHi: 'संशोधित भविष्य निधि (PF) नीतियां',
+        date: '2026-07-08',
+        content: 'Effective from this payroll cycle, PF calculations adhere to the updated 12% statutory caps. Review your salary slips structure under settings.',
+        contentHi: 'इस पेरोल चक्र से प्रभावी, पीएफ गणना अपडेटेड 12% वैधानिक सीमा के अनुरूप है। सेटिंग्स के तहत अपनी सैलरी स्लिप संरचना की समीक्षा करें।',
+        badge: 'Policy',
+        badgeHi: 'नीति'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('payroll_announcements', JSON.stringify(announcements));
+  }, [announcements]);
+
+  const [hrTickets, setHrTickets] = useState<any[]>(() => {
+    const saved = localStorage.getItem('payroll_hr_tickets');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'TKT-8274',
+        name: 'Rohan Sharma',
+        empId: 'EMP001',
+        email: 'rohan@rathibuildmart.com',
+        category: 'Attendance Adjustment',
+        categoryHi: 'उपस्थिति समायोजन',
+        message: 'Forgot to punch out yesterday due to emergency on-site meeting. Please approve my miss punch adjustment request.',
+        date: '2026-07-12T14:30:00Z',
+        status: 'Pending'
+      },
+      {
+        id: 'TKT-3921',
+        name: 'Sunita Verma',
+        empId: 'EMP003',
+        email: 'sunita@rathibuildmart.com',
+        category: 'Salary Discrepancy',
+        categoryHi: 'वेतन विसंगति',
+        message: 'My PF contribution seems to have a mismatch of 200 INR. Kindly assist.',
+        date: '2026-07-10T11:15:00Z',
+        status: 'Resolved'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('payroll_hr_tickets', JSON.stringify(hrTickets));
+  }, [hrTickets]);
+
+  const [passwordRequests, setPasswordRequests] = useState<any[]>(() => {
+    const saved = localStorage.getItem('payroll_password_requests');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'REQ-4819',
+        empId: 'EMP002',
+        email: 'amit@rathibuildmart.com',
+        mobile: '9876543210',
+        date: '2026-07-13T09:12:00Z',
+        status: 'Pending'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('payroll_password_requests', JSON.stringify(passwordRequests));
+  }, [passwordRequests]);
+
   // Live time for login clock
   const [liveTime, setLiveTime] = useState<Date>(new Date());
   useEffect(() => {
@@ -354,6 +466,7 @@ export default function App() {
   }, []);
 
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger'>('dashboard');
+  const [isSidebarHovered, setIsSidebarHovered] = useState<boolean>(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en'); // Set default to English as bilingual toggle is disabled
   const [showSeedDialog, setShowSeedDialog] = useState<boolean>(false);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -1173,6 +1286,54 @@ export default function App() {
                 </span>
               </div>
             </div>
+
+            {/* Notice & Announcement Board */}
+            <div className="mt-6 border-t border-slate-800/60 pt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  <Megaphone className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  {language === 'en' ? 'Notice Board & Circulars' : 'सूचना पट्ट और परिपत्र'}
+                </span>
+                <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
+                  {announcements.length} {language === 'en' ? 'Active' : 'सक्रिय'}
+                </span>
+              </div>
+
+              <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1 select-none custom-scrollbar">
+                {announcements.length === 0 ? (
+                  <p className="text-[10px] text-slate-500 italic">
+                    {language === 'en' ? 'No recent company announcements.' : 'कोई हालिया कंपनी घोषणाएं नहीं हैं।'}
+                  </p>
+                ) : (
+                  announcements.map((ann) => {
+                    let badgeBg = 'bg-slate-900 border-slate-800 text-slate-400';
+                    if (ann.badge === 'Critical') badgeBg = 'bg-rose-950/40 border-rose-900/30 text-rose-400';
+                    if (ann.badge === 'Holiday') badgeBg = 'bg-amber-950/40 border-amber-900/30 text-amber-400';
+                    if (ann.badge === 'Policy') badgeBg = 'bg-sky-950/40 border-sky-900/30 text-sky-400';
+                    
+                    return (
+                      <div key={ann.id} className="bg-slate-900/40 hover:bg-slate-900/70 border border-slate-800/80 p-3 rounded-xl transition-all">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-xs font-bold text-slate-200 line-clamp-1">
+                            {language === 'en' ? ann.title : ann.titleHi}
+                          </h4>
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${badgeBg} shrink-0`}>
+                            {language === 'en' ? ann.badge : ann.badgeHi}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
+                          {language === 'en' ? ann.content : ann.contentHi}
+                        </p>
+                        <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-800/40">
+                          <span className="text-[9px] font-mono text-slate-500">{ann.date}</span>
+                          <span className="text-[8px] text-slate-500 italic">HR Department</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Bottom Live Workspace Clock */}
@@ -1307,9 +1468,25 @@ export default function App() {
 
                 {/* Password Field */}
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                    {language === 'en' ? 'Password' : 'पासवर्ड'}
-                  </label>
+                  <div className="flex justify-between items-center">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                      {language === 'en' ? 'Password' : 'पासवर्ड'}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotModal(true);
+                        setForgotSubmitted(false);
+                        setForgotEmpId('');
+                        setForgotEmail('');
+                        setForgotMobile('');
+                        setForgotError(null);
+                      }}
+                      className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                    >
+                      {language === 'en' ? 'Forgot Password?' : 'पासवर्ड भूल गए?'}
+                    </button>
+                  </div>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <input
@@ -1373,6 +1550,24 @@ export default function App() {
                         ? 'All unsuccessful sign-in attempts are logged securely in our Firestore security audit database.' 
                         : 'सभी असफल लॉगिन प्रयास हमारे फ़ायरस्टोर सुरक्षा ऑडिट डेटाबेस में सुरक्षित रूप से दर्ज किए जाते हैं।'}
                     </p>
+                    <div className="border-t border-slate-800/40 pt-2.5 mt-1.5 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSupportModal(true);
+                          setSupportSubmitted(false);
+                          setSupportName('');
+                          setSupportEmpId('');
+                          setSupportEmail('');
+                          setSupportMsg('');
+                          setSupportCategory('sign_in_issue');
+                        }}
+                        className="w-full bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 hover:text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <LifeBuoy className="w-3.5 h-3.5 shrink-0" />
+                        {language === 'en' ? 'Contact HR Helpdesk Support' : 'एचआर हेल्पडेस्क से संपर्क करें'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1386,6 +1581,309 @@ export default function App() {
 
           </div>
         </div>
+
+        {/* ============================================== */}
+        {/* FORGOT PASSWORD? REQUEST GATEWAY MODAL */}
+        {/* ============================================== */}
+        {showForgotModal && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 relative overflow-hidden shadow-2xl">
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-teal-500 to-emerald-500" />
+              
+              <button 
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {!forgotSubmitted ? (
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const targetEmp = employees.find(emp => emp.id.trim().toLowerCase() === forgotEmpId.trim().toLowerCase());
+                  if (!targetEmp) {
+                    setForgotError(language === 'en' 
+                      ? "Employee ID not found in Rathi Build Mart roster." 
+                      : "राठी बिल्डमार्ट रजिस्टर में कर्मचारी आईडी नहीं मिली।");
+                    return;
+                  }
+
+                  const newReq = {
+                    id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
+                    empId: forgotEmpId.trim().toUpperCase(),
+                    email: forgotEmail.trim(),
+                    mobile: forgotMobile.trim(),
+                    date: new Date().toISOString(),
+                    status: 'Pending'
+                  };
+                  setPasswordRequests(prev => [newReq, ...prev]);
+                  setForgotSubmitted(true);
+                  setForgotError(null);
+                }} className="space-y-4">
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest bg-emerald-950/50 text-emerald-400 border border-emerald-900/30">
+                      <KeyRound className="w-3 h-3 text-emerald-400" />
+                      {language === 'en' ? 'Reset Gateway' : 'रीसेट गेटवे'}
+                    </div>
+                    <h3 className="text-lg font-black text-white font-display tracking-tight mt-1.5">
+                      {language === 'en' ? 'Forgot Your Password?' : 'पासवर्ड भूल गए?'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-semibold leading-normal">
+                      {language === 'en' 
+                        ? 'Submit your registered employee details. A password reset request will be dispatched to the HR Administrator instantly.'
+                        : 'अपने पंजीकृत कर्मचारी विवरण सबमिट करें। एक पासवर्ड रीसेट अनुरोध तुरंत एचआर एडमिनिस्ट्रेटर को भेजा जाएगा।'}
+                    </p>
+                  </div>
+
+                  {forgotError && (
+                    <div className="bg-rose-500/10 text-rose-300 border border-rose-500/20 p-3 rounded-xl text-[11px] font-semibold flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <span>{forgotError}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 mt-4">
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? 'Employee ID (Required)' : 'कर्मचारी आईडी (आवश्यक)'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={forgotEmpId}
+                        onChange={(e) => setForgotEmpId(e.target.value)}
+                        placeholder="e.g. EMP001"
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono uppercase"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? 'Registered Email' : 'पंजीकृत ईमेल'}
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="e.g. staff@rathibuildmart.com"
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? 'Mobile Number' : 'मोबाइल नंबर'}
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={forgotMobile}
+                        onChange={(e) => setForgotMobile(e.target.value)}
+                        placeholder="e.g. 9876543210"
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
+                  >
+                    {language === 'en' ? 'Submit Reset Request' : 'रीसेट अनुरोध सबमिट करें'}
+                  </button>
+                </form>
+              ) : (
+                <div className="text-center py-6 space-y-4 animate-fadeIn">
+                  <div className="w-12 h-12 rounded-full bg-emerald-950/50 text-emerald-400 border border-emerald-900/50 flex items-center justify-center mx-auto animate-pulse">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-base font-black text-white">
+                      {language === 'en' ? 'Request Registered!' : 'अनुरोध पंजीकृत!'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-semibold leading-relaxed max-w-xs mx-auto">
+                      {language === 'en' 
+                        ? 'Your request has been securely registered. Your shift manager or payroll admin has been notified and will reset your password shortly.'
+                        : 'आपका अनुरोध सफलतापूर्वक पंजीकृत हो गया है। आपके शिफ्ट मैनेजर या पेरोल एडमिन को सूचित कर दिया गया है और वे जल्द ही आपका पासवर्ड रीसेट करेंगे।'}
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/80 text-[10px] font-mono text-slate-500">
+                    ID: REQ-{Math.floor(10000 + Math.random() * 90000)} • Status: PENDING_HR
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotModal(false)}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2 px-4 rounded-xl transition-all cursor-pointer"
+                  >
+                    {language === 'en' ? 'Return to Login' : 'लॉगिन पर लौटें'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ============================================== */}
+        {/* HR HELPDESK SUPPORT MODAL */}
+        {/* ============================================== */}
+        {showSupportModal && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 relative overflow-hidden shadow-2xl">
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-blue-500 via-emerald-500 to-teal-500" />
+              
+              <button 
+                type="button"
+                onClick={() => setShowSupportModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {!supportSubmitted ? (
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const newTicket = {
+                    id: `TKT-${Math.floor(1000 + Math.random() * 9000)}`,
+                    name: supportName.trim(),
+                    empId: supportEmpId.trim().toUpperCase() || 'N/A',
+                    email: supportEmail.trim(),
+                    category: supportCategory,
+                    message: supportMsg.trim(),
+                    date: new Date().toISOString(),
+                    status: 'Pending'
+                  };
+                  setHrTickets(prev => [newTicket, ...prev]);
+                  setSupportSubmitted(true);
+                }} className="space-y-4 font-sans">
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest bg-emerald-950/50 text-emerald-400 border border-emerald-900/30">
+                      <LifeBuoy className="w-3 h-3 text-emerald-400" />
+                      {language === 'en' ? 'HR Helpdesk' : 'एचआर हेल्पडेस्क'}
+                    </div>
+                    <h3 className="text-lg font-black text-white font-display tracking-tight mt-1.5 font-sans">
+                      {language === 'en' ? 'Contact HR Helpdesk' : 'एचआर हेल्पडेस्क से संपर्क करें'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-semibold leading-normal">
+                      {language === 'en' 
+                        ? 'Having issues with attendance logs, salary slips, or profile registrations? Leave a message for Rathi HR.'
+                        : 'उपस्थिति लॉग, वेतन पर्ची या प्रोफ़ाइल पंजीकरण में समस्या आ रही है? राठी एचआर के लिए एक संदेश छोड़ें।'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 mt-4 overflow-y-auto max-h-[300px] pr-1">
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? 'Full Name' : 'पूरा नाम'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={supportName}
+                        onChange={(e) => setSupportName(e.target.value)}
+                        placeholder="e.g. Amit Kumar"
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? 'Employee ID (Optional)' : 'कर्मचारी आईडी (वैकल्पिक)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={supportEmpId}
+                        onChange={(e) => setSupportEmpId(e.target.value)}
+                        placeholder="e.g. EMP001"
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono uppercase"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? 'Contact Email' : 'संपर्क ईमेल'}
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={supportEmail}
+                        onChange={(e) => setSupportEmail(e.target.value)}
+                        placeholder="e.g. amit@rathibuildmart.com"
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? 'Issue Category' : 'समस्या की श्रेणी'}
+                      </label>
+                      <select
+                        value={supportCategory}
+                        onChange={(e) => setSupportCategory(e.target.value)}
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
+                      >
+                        <option value="Attendance / Punch Issue">{language === 'en' ? 'Attendance / Punch Issue' : 'उपस्थिति / पंच समस्या'}</option>
+                        <option value="Salary Slip Discrepancy">{language === 'en' ? 'Salary Slip Discrepancy' : 'वेतन पर्ची विसंगति'}</option>
+                        <option value="Login / Password Problem">{language === 'en' ? 'Login / Password Problem' : 'लॉगिन / पासवर्ड समस्या'}</option>
+                        <option value="Profile Registration Error">{language === 'en' ? 'Profile Registration Error' : 'प्रोफ़ाइल पंजीकरण त्रुटि'}</option>
+                        <option value="Other HR General Query">{language === 'en' ? 'Other HR General Query' : 'अन्य एचआर सामान्य प्रश्न'}</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? 'Message / Support Description' : 'संदेश / विवरण'}
+                      </label>
+                      <textarea
+                        required
+                        rows={3}
+                        value={supportMsg}
+                        onChange={(e) => setSupportMsg(e.target.value)}
+                        placeholder={language === 'en' ? "Describe your issue in detail..." : "अपनी समस्या का विस्तार से वर्णन करें..."}
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider flex items-center justify-center gap-1.5"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    {language === 'en' ? 'Send Support Ticket' : 'सपोर्ट टिकट भेजें'}
+                  </button>
+                </form>
+              ) : (
+                <div className="text-center py-6 space-y-4 animate-fadeIn">
+                  <div className="w-12 h-12 rounded-full bg-emerald-950/50 text-emerald-400 border border-emerald-900/50 flex items-center justify-center mx-auto animate-pulse">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-base font-black text-white">
+                      {language === 'en' ? 'Support Ticket Dispatched!' : 'सपोर्ट टिकट भेजा गया!'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-semibold leading-relaxed max-w-xs mx-auto">
+                      {language === 'en' 
+                        ? 'Your support inquiry has been submitted. The HR helpdesk team will review your ticket and reach out to you via your registered contact coordinates shortly.'
+                        : 'आपकी सहायता पूछताछ सबमिट कर दी गई है। एचआर हेल्पडेस्क टीम आपके टिकट की समीक्षा करेगी और जल्द ही आपके पंजीकृत संपर्क विवरणों के माध्यम से आपसे संपर्क करेगी।'}
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/80 text-[10px] font-mono text-slate-500">
+                    TICKET: TKT-{Math.floor(1000 + Math.random() * 9000)} • Status: QUEUED
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSupportModal(false)}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2 px-4 rounded-xl transition-all cursor-pointer"
+                  >
+                    {language === 'en' ? 'Return to Login' : 'लॉगिन पर लौटें'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       </div>
     );
@@ -1477,23 +1975,43 @@ export default function App() {
     <div className="h-screen w-screen bg-[#f1f5f9] text-[#1e293b] flex overflow-hidden font-sans">
       
       {/* Left Sidebar navigation */}
-      <aside className="my-4 ml-4 mr-2 h-[calc(100vh-2rem)] w-[78px] bg-gradient-to-b from-[#031c12] via-[#02110c] to-[#010906] text-[#cbd5e1] flex flex-col justify-between rounded-[2.25rem] border border-emerald-500/15 shadow-[0_20px_50px_-12px_rgba(2,17,12,0.8)] shrink-0 no-print items-center py-6 px-3 relative z-40">
+      <aside 
+        onMouseEnter={() => setIsSidebarHovered(true)}
+        onMouseLeave={() => setIsSidebarHovered(false)}
+        className={`my-4 ml-4 mr-2 h-[calc(100vh-2rem)] bg-gradient-to-b from-[#031c12] via-[#02110c] to-[#010906] text-[#cbd5e1] flex flex-col justify-between rounded-[2.25rem] border border-emerald-500/15 shadow-[0_20px_50px_-12px_rgba(2,17,12,0.8)] shrink-0 no-print py-6 transition-all duration-300 ease-in-out relative z-40 ${
+          isSidebarHovered ? 'w-[240px] px-5 items-start' : 'w-[78px] px-3 items-center'
+        }`}
+      >
         {/* Brand Logo inside a perfect white squircle */}
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-8 transform hover:scale-105 active:scale-95 hover:rotate-3 transition-all duration-300 cursor-pointer relative group border border-emerald-500/20 shadow-emerald-950/20">
-            <svg viewBox="0 0 40 40" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 8C12 8 16 12 20 12C24 12 28 8 28 8" stroke="#03623c" strokeWidth="4" strokeLinecap="round" />
-              <path d="M12 20C12 20 18 16 22 22C26 28 28 32 28 32" stroke="#024d2e" strokeWidth="4" strokeLinecap="round" />
-              <circle cx="20" cy="20" r="14" stroke="#10b981" strokeWidth="2.5" strokeDasharray="4 4" />
-            </svg>
-            {/* Logo Tooltip */}
-            <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-2 rounded-xl shadow-xl pointer-events-none z-50 text-[11px] font-bold whitespace-nowrap">
-              {uiTexts.appName}
+        <div className={`flex flex-col ${isSidebarHovered ? 'items-start w-full' : 'items-center'}`}>
+          <div className="flex items-center gap-3 mb-8 w-full">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 hover:rotate-3 transition-all duration-300 cursor-pointer relative group border border-emerald-500/20 shadow-emerald-950/20 shrink-0">
+              <svg viewBox="0 0 40 40" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 8C12 8 16 12 20 12C24 12 28 8 28 8" stroke="#03623c" strokeWidth="4" strokeLinecap="round" />
+                <path d="M12 20C12 20 18 16 22 22C26 28 28 32 28 32" stroke="#024d2e" strokeWidth="4" strokeLinecap="round" />
+                <circle cx="20" cy="20" r="14" stroke="#10b981" strokeWidth="2.5" strokeDasharray="4 4" />
+              </svg>
+              {/* Logo Tooltip */}
+              {!isSidebarHovered && (
+                <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-2 rounded-xl shadow-xl pointer-events-none z-50 text-[11px] font-bold whitespace-nowrap">
+                  {uiTexts.appName}
+                </div>
+              )}
             </div>
+            {isSidebarHovered && (
+              <div className="flex flex-col min-w-0 animate-fadeIn">
+                <span className="text-[12px] font-black tracking-wider text-white uppercase font-sans truncate">
+                  {adminSettings.companyName || 'RATHI MART'}
+                </span>
+                <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest font-mono truncate">
+                  {uiTexts.appName}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex flex-col items-center gap-4">
+          <nav className={`flex flex-col ${isSidebarHovered ? 'items-start w-full gap-2' : 'items-center gap-4'}`}>
             {[
               { id: 'dashboard' as const, label: uiTexts.dashboard, icon: TrendingUp },
               { id: 'employees' as const, label: uiTexts.employees, icon: Users },
@@ -1506,10 +2024,12 @@ export default function App() {
               const IconComponent = item.icon;
               const isActive = currentTab === item.id;
               return (
-                <div key={item.id} className="relative group flex items-center justify-center">
+                <div key={item.id} className="relative group flex items-center justify-start w-full">
                   <button
                     onClick={() => setCurrentTab(item.id)}
-                    className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all duration-300 cursor-pointer relative ${
+                    className={`flex items-center rounded-2xl transition-all duration-300 cursor-pointer relative ${
+                      isSidebarHovered ? 'w-full h-11 px-3 justify-start gap-3' : 'w-12 h-12 justify-center'
+                    } ${
                       isActive
                         ? 'bg-emerald-500/15 text-[#10b981] shadow-[0_0_15px_rgba(16,185,129,0.12)] border border-emerald-500/30'
                         : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
@@ -1517,14 +2037,23 @@ export default function App() {
                     id={`tab-${item.id}`}
                   >
                     {isActive && (
-                      <span className="absolute left-0 w-1 h-5 bg-[#10b981] rounded-r-full shadow-[0_0_8px_#10b981]" />
+                      <span className={`absolute left-0 w-1 bg-[#10b981] rounded-r-full shadow-[0_0_8px_#10b981] ${
+                        isSidebarHovered ? 'h-4' : 'h-5'
+                      }`} />
                     )}
-                    <IconComponent className="w-5 h-5" />
+                    <IconComponent className="w-5 h-5 shrink-0" />
+                    {isSidebarHovered && (
+                      <span className="text-[11px] font-bold tracking-wide whitespace-nowrap animate-fadeIn">
+                        {item.label}
+                      </span>
+                    )}
                   </button>
                   {/* Tooltip */}
-                  <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
-                    {item.label}
-                  </div>
+                  {!isSidebarHovered && (
+                    <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+                      {item.label}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1532,32 +2061,39 @@ export default function App() {
         </div>
 
         {/* Sidebar Footer */}
-        <div className="flex flex-col items-center gap-3 w-full">
+        <div className={`flex flex-col ${isSidebarHovered ? 'items-start w-full' : 'items-center'} gap-3 w-full`}>
           {/* Divider */}
-          <div className="w-8 h-[1px] bg-emerald-950/60" />
+          <div className={`${isSidebarHovered ? 'w-full' : 'w-8'} h-[1px] bg-emerald-950/60 transition-all`} />
 
           {/* Spreadsheet Link Badge */}
           {spreadsheetLink && (
-            <div className="relative group flex items-center justify-center">
+            <div className="relative group flex items-center justify-start w-full">
               <a
                 href={spreadsheetLink}
                 target="_blank"
                 rel="noreferrer"
-                className="w-11 h-11 flex items-center justify-center rounded-xl text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-all"
+                className={`flex items-center rounded-xl text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-all ${
+                  isSidebarHovered ? 'w-full h-11 px-3.5 justify-start gap-3.5' : 'w-11 h-11 justify-center'
+                }`}
               >
-                <FileSpreadsheet className="w-5 h-5" />
+                <FileSpreadsheet className="w-5 h-5 shrink-0" />
+                {isSidebarHovered && (
+                  <span className="text-[11px] font-bold whitespace-nowrap animate-fadeIn text-[#cbd5e1]">
+                    {uiTexts.viewSheets}
+                  </span>
+                )}
               </a>
-              <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
-                {uiTexts.viewSheets}
-              </div>
+              {!isSidebarHovered && (
+                <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+                  {uiTexts.viewSheets}
+                </div>
+              )}
             </div>
           )}
 
-
-
           {/* Light/Dark Toggle Mock representing premium dashboard details */}
-          <div className="flex flex-col items-center gap-1.5 py-1">
-            <div className="relative group flex items-center justify-center">
+          <div className={`flex ${isSidebarHovered ? 'flex-row items-center justify-between w-full px-3.5 py-1.5 rounded-xl hover:bg-emerald-500/5' : 'flex-col items-center gap-1.5 py-1'}`}>
+            <div className="relative group flex items-center">
               <span className="text-slate-400">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sun w-4 h-4">
                   <circle cx="12" cy="12" r="4"/>
@@ -1571,52 +2107,80 @@ export default function App() {
                   <path d="m19.07 4.93-1.41 1.41"/>
                 </svg>
               </span>
-              <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
-                Premium Light Mode Active
-              </div>
+              {isSidebarHovered && (
+                <span className="text-[11px] font-bold text-slate-300 ml-3.5 whitespace-nowrap animate-fadeIn">
+                  Premium Light Mode
+                </span>
+              )}
+              {!isSidebarHovered && (
+                <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+                  Premium Light Mode Active
+                </div>
+              )}
             </div>
             {/* Custom Toggle Switch Capsule */}
-            <div className="w-7 h-4 bg-emerald-950 border border-emerald-900 rounded-full p-[2px] cursor-pointer flex items-center justify-start relative shadow-inner">
+            <div className="w-7 h-4 bg-emerald-950 border border-emerald-900 rounded-full p-[2px] cursor-pointer flex items-center justify-start relative shadow-inner shrink-0">
               <div className="w-3.5 h-3.5 bg-white rounded-full shadow-sm transform translate-x-2.5 transition-transform"></div>
             </div>
           </div>
 
           {/* Sign Out Button */}
-          <div className="relative group flex items-center justify-center">
+          <div className="relative group flex items-center justify-start w-full">
             <button
               onClick={handleLogout}
-              className="w-11 h-11 flex items-center justify-center rounded-xl text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+              className={`flex items-center rounded-xl text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer ${
+                isSidebarHovered ? 'w-full h-11 px-3.5 justify-start gap-3.5' : 'w-11 h-11 justify-center'
+              }`}
               id="btn-signout"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-5 h-5 shrink-0" />
+              {isSidebarHovered && (
+                <span className="text-[11px] font-bold whitespace-nowrap animate-fadeIn">
+                  {uiTexts.signout}
+                </span>
+              )}
             </button>
-            <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-red-950 text-red-200 border border-red-900/30 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
-              {uiTexts.signout}
-            </div>
+            {!isSidebarHovered && (
+              <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-red-950 text-red-200 border border-red-900/30 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+                {uiTexts.signout}
+              </div>
+            )}
           </div>
 
           {/* User Account with Slide out detail card */}
-          <div className="relative group mt-1">
+          <div className={`relative group mt-1 flex items-center justify-start ${isSidebarHovered ? 'w-full px-1.5 gap-3' : ''}`}>
             {user?.photoURL ? (
               <img
                 src={user.photoURL}
                 alt="Profile"
-                className="w-10 h-10 rounded-2xl border-2 border-emerald-500/30 object-cover shadow-md hover:border-emerald-400 cursor-pointer transition-all duration-300"
+                className="w-10 h-10 rounded-2xl border-2 border-emerald-500/30 object-cover shadow-md hover:border-emerald-400 cursor-pointer transition-all duration-300 shrink-0"
                 referrerPolicy="no-referrer"
               />
             ) : (
               <img
                 src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=150&q=80"
                 alt="Premium User"
-                className="w-10 h-10 rounded-2xl border-2 border-emerald-500/30 object-cover shadow-md transition-all duration-300 hover:border-emerald-400 cursor-pointer"
+                className="w-10 h-10 rounded-2xl border-2 border-emerald-500/30 object-cover shadow-md transition-all duration-300 hover:border-emerald-400 cursor-pointer shrink-0"
                 referrerPolicy="no-referrer"
               />
             )}
-            <div className="absolute left-16 bottom-0 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-3 rounded-2xl shadow-2xl pointer-events-none z-50 min-w-[180px]">
-              <p className="font-black text-[9px] text-emerald-400 tracking-wider uppercase mb-1">Active Portal Admin</p>
-              <p className="text-xs font-bold text-slate-200 truncate">{user?.displayName || 'Rathi Build Mart'}</p>
-              <p className="text-[10px] text-slate-400 truncate mt-0.5">{user?.email}</p>
-            </div>
+            {isSidebarHovered && (
+              <div className="flex flex-col min-w-0 animate-fadeIn">
+                <p className="text-[11px] font-black text-slate-100 truncate">
+                  {user?.displayName || 'Admin'}
+                </p>
+                <p className="text-[9px] font-medium text-emerald-400 truncate">
+                  {user?.email || 'rathi@buildmart.com'}
+                </p>
+              </div>
+            )}
+            {!isSidebarHovered && (
+              <div className="absolute left-16 bottom-0 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-3 rounded-2xl shadow-2xl pointer-events-none z-50 min-w-[180px]">
+                <p className="font-black text-[9px] text-emerald-400 tracking-wider uppercase mb-1">Active Portal Admin</p>
+                <p className="text-xs font-bold text-slate-200 truncate">{user?.displayName || 'Rathi Build Mart'}</p>
+                <p className="text-[10px] text-slate-400 truncate mt-0.5">{user?.email}</p>
+              </div>
+            )}
           </div>
         </div>
       </aside>
@@ -1955,6 +2519,12 @@ export default function App() {
                   language={language}
                   failedLogins={failedLogins}
                   onClearFailedLogins={handleClearFailedLogins}
+                  announcements={announcements}
+                  setAnnouncements={setAnnouncements}
+                  hrTickets={hrTickets}
+                  setHrTickets={setHrTickets}
+                  passwordRequests={passwordRequests}
+                  setPasswordRequests={setPasswordRequests}
                 />
               )}
             </div>

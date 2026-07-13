@@ -15,7 +15,11 @@ import {
   Undo,
   ShieldAlert,
   Search,
-  Filter
+  Filter,
+  Megaphone,
+  LifeBuoy,
+  KeyRound,
+  CheckCircle2
 } from 'lucide-react';
 import { AdminSettings, FieldSetting, FailedLoginAttempt } from '../types';
 
@@ -25,6 +29,13 @@ interface SettingsProps {
   language: 'en' | 'hi';
   failedLogins?: FailedLoginAttempt[];
   onClearFailedLogins?: () => void;
+
+  announcements?: any[];
+  setAnnouncements?: React.Dispatch<React.SetStateAction<any[]>>;
+  hrTickets?: any[];
+  setHrTickets?: React.Dispatch<React.SetStateAction<any[]>>;
+  passwordRequests?: any[];
+  setPasswordRequests?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
@@ -115,8 +126,20 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   paidLeaveStartAfterMonths: 0,
 };
 
-export default function Settings({ settings, onSaveSettings, language, failedLogins = [], onClearFailedLogins }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security'>('company');
+export default function Settings({ 
+  settings, 
+  onSaveSettings, 
+  language, 
+  failedLogins = [], 
+  onClearFailedLogins,
+  announcements = [],
+  setAnnouncements,
+  hrTickets = [],
+  setHrTickets,
+  passwordRequests = [],
+  setPasswordRequests
+}: SettingsProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'notices_support'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
   const [newMasterVal, setNewMasterVal] = useState<string>('');
   const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'>>('departments');
@@ -124,9 +147,21 @@ export default function Settings({ settings, onSaveSettings, language, failedLog
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
+  // Corporate notices & HR Helpdesk management states
+  const [newNoticeTitle, setNewNoticeTitle] = useState('');
+  const [newNoticeTitleHi, setNewNoticeTitleHi] = useState('');
+  const [newNoticeContent, setNewNoticeContent] = useState('');
+  const [newNoticeContentHi, setNewNoticeContentHi] = useState('');
+  const [newNoticeBadge, setNewNoticeBadge] = useState<'Critical' | 'Holiday' | 'General' | 'Policy'>('General');
+
   // Security Log Search/Filter States
   const [securitySearch, setSecuritySearch] = useState('');
   const [securityReasonFilter, setSecurityReasonFilter] = useState<'all' | 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password'>('all');
+
+  // Work Timing Specific Builder States
+  const [shiftName, setShiftName] = useState<string>('');
+  const [shiftStart, setShiftStart] = useState<string>('09:00');
+  const [shiftEnd, setShiftEnd] = useState<string>('18:00');
 
   const t = {
     en: {
@@ -138,6 +173,7 @@ export default function Settings({ settings, onSaveSettings, language, failedLog
       tabMasters: "Dropdown Masters",
       tabPolicy: "Policy & Payroll Rules",
       tabSecurity: "Login Security Audit",
+      tabNoticesSupport: "Notices & HR Helpdesk",
       
       // Company
       compName: "Company Name",
@@ -207,6 +243,7 @@ export default function Settings({ settings, onSaveSettings, language, failedLog
       tabMasters: "ड्रॉपडाउन मास्टर सूचियाँ",
       tabPolicy: "नीति और पेरोल नियम",
       tabSecurity: "लॉगिन सुरक्षा ऑडिट",
+      tabNoticesSupport: "कंपनी नोटिस और हेल्पडेस्क",
       
       // Company
       compName: "कंपनी का नाम",
@@ -282,19 +319,50 @@ export default function Settings({ settings, onSaveSettings, language, failedLog
     setLocalSettings({ ...localSettings, fields: updatedFields });
   };
 
+  const formatTo12Hour = (time24: string): string => {
+    if (!time24) return '09:00 AM';
+    const parts = time24.split(':');
+    let hour = parseInt(parts[0], 10);
+    const minute = (parts[1] || '00').padStart(2, '0');
+    if (isNaN(hour)) hour = 9;
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    if (hour === 0) hour = 12;
+    return `${String(hour).padStart(2, '0')}:${minute} ${ampm}`;
+  };
+
   const handleAddMasterItem = () => {
-    if (!newMasterVal.trim()) return;
+    let valToAdd = '';
+    
+    if (activeMasterList === 'workTimings') {
+      if (!shiftName.trim()) {
+        alert(language === 'en' ? "Please enter a shift name!" : "कृपया शिफ्ट का नाम दर्ज करें!");
+        return;
+      }
+      const startFormatted = formatTo12Hour(shiftStart);
+      const endFormatted = formatTo12Hour(shiftEnd);
+      valToAdd = `${shiftName.trim()} (${startFormatted} - ${endFormatted})`;
+    } else {
+      if (!newMasterVal.trim()) return;
+      valToAdd = newMasterVal.trim();
+    }
+
     const currentList = localSettings[activeMasterList] as string[];
-    if (currentList.includes(newMasterVal.trim())) {
-      alert("Option already exists!");
+    if (currentList.includes(valToAdd)) {
+      alert(language === 'en' ? "Option already exists!" : "यह विकल्प पहले से मौजूद है!");
       return;
     }
-    const updatedList = [...currentList, newMasterVal.trim()];
+    const updatedList = [...currentList, valToAdd];
     setLocalSettings({
       ...localSettings,
       [activeMasterList]: updatedList
     });
-    setNewMasterVal('');
+    
+    if (activeMasterList === 'workTimings') {
+      setShiftName('');
+    } else {
+      setNewMasterVal('');
+    }
   };
 
   const handleRemoveMasterItem = (itemToRemove: string) => {
@@ -417,6 +485,23 @@ export default function Settings({ settings, onSaveSettings, language, failedLog
             {failedLogins.length > 0 && (
               <span className="absolute top-1.5 right-1.5 md:relative md:top-0 md:right-0 md:ml-auto bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
                 {failedLogins.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('notices_support')}
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
+              activeSubTab === 'notices_support'
+                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
+                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Megaphone className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
+            <span>{t.tabNoticesSupport}</span>
+            {(hrTickets.filter(tk => tk.status === 'Pending').length + passwordRequests.filter(pr => pr.status === 'Pending').length) > 0 && (
+              <span className="absolute top-1.5 right-1.5 md:relative md:top-0 md:right-0 md:ml-auto bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none animate-pulse">
+                {hrTickets.filter(tk => tk.status === 'Pending').length + passwordRequests.filter(pr => pr.status === 'Pending').length}
               </span>
             )}
           </button>
@@ -644,23 +729,83 @@ export default function Settings({ settings, onSaveSettings, language, failedLog
 
               {/* Master options listing */}
               <div className="border border-gray-200 rounded-lg p-4 bg-slate-50/50 space-y-3.5 shadow-2xs">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newMasterVal}
-                    placeholder={t.masterPlaceholder}
-                    onChange={(e) => setNewMasterVal(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddMasterItem()}
-                    className="flex-1 border border-gray-200 px-3 py-1.5 rounded text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                  />
-                  <button
-                    onClick={handleAddMasterItem}
-                    className="bg-[#03623c] hover:bg-[#024d2e] text-white px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    {t.masterAdd}
-                  </button>
-                </div>
+                {activeMasterList === 'workTimings' ? (
+                  <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-3 shadow-3xs">
+                    <div className="font-extrabold text-[11px] text-[#03623c] uppercase tracking-wider">
+                      {language === 'en' ? 'Shift Timing Builder' : 'शिफ्ट समय निर्माता'}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                          {language === 'en' ? 'Shift Name' : 'शिफ्ट का नाम'}
+                        </label>
+                        <input
+                          type="text"
+                          value={shiftName}
+                          placeholder={language === 'en' ? "e.g. General Shift, Night Shift" : "जैसे सामान्य शिफ्ट"}
+                          onChange={(e) => setShiftName(e.target.value)}
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                          {language === 'en' ? 'Check-In Time' : 'आगमन समय'}
+                        </label>
+                        <input
+                          type="time"
+                          value={shiftStart}
+                          onChange={(e) => setShiftStart(e.target.value)}
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                          {language === 'en' ? 'Check-Out Time' : 'प्रस्थान समय'}
+                        </label>
+                        <input
+                          type="time"
+                          value={shiftEnd}
+                          onChange={(e) => setShiftEnd(e.target.value)}
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-gray-100">
+                      <div className="text-[11px] text-gray-500 font-semibold">
+                        <span>{language === 'en' ? 'Compiled Preview:' : 'संकलित पूर्वावलोकन:'} </span>
+                        <code className="bg-[#03623c]/5 px-2 py-0.5 rounded font-mono font-bold text-[#03623c] text-xs">
+                          {shiftName.trim() || 'Shift'} ({formatTo12Hour(shiftStart)} - {formatTo12Hour(shiftEnd)})
+                        </code>
+                      </div>
+                      <button
+                        onClick={handleAddMasterItem}
+                        className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-3xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {language === 'en' ? 'Add Shift' : 'शिफ्ट जोड़ें'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newMasterVal}
+                      placeholder={t.masterPlaceholder}
+                      onChange={(e) => setNewMasterVal(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddMasterItem()}
+                      className="flex-1 border border-gray-200 px-3 py-1.5 rounded text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    />
+                    <button
+                      onClick={handleAddMasterItem}
+                      className="bg-[#03623c] hover:bg-[#024d2e] text-white px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {t.masterAdd}
+                    </button>
+                  </div>
+                )}
 
                 <div className="bg-white rounded border border-gray-100 max-h-[250px] overflow-y-auto divide-y divide-gray-100">
                   {((localSettings[activeMasterList] as string[]) || []).length === 0 ? (
@@ -1113,6 +1258,331 @@ export default function Settings({ settings, onSaveSettings, language, failedLog
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {activeSubTab === 'notices_support' && (
+            <div className="space-y-6 animate-fadeIn font-sans">
+              
+              {/* Header Info */}
+              <div className="border-b border-gray-150 pb-4">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest font-mono flex items-center gap-2">
+                  <Megaphone className="w-4 h-4 text-emerald-600" />
+                  {language === 'en' ? 'Notices & HR Support Helpdesk' : 'कंपनी नोटिस और एचआर सहायता हेल्पडेस्क'}
+                </h3>
+                <p className="text-[10px] text-gray-500 font-bold mt-1">
+                  {language === 'en' 
+                    ? 'Publish general announcements to the login screen, review forgot password requests, and answer employee helpdesk tickets.'
+                    : 'लॉगिन स्क्रीन पर सामान्य कंपनी घोषणाएं प्रकाशित करें, पासवर्ड रीसेट अनुरोधों की समीक्षा करें और कर्मचारियों के हेल्पडेस्क टिकटों का समाधान करें।'}
+                </p>
+              </div>
+
+              {/* Grid 2 Columns: (1) Notices Publisher, (2) Password reset gateway queue */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Notice Board Manager */}
+                <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-xl space-y-4">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between font-sans">
+                    <span>📢 {language === 'en' ? 'Manage Announcements' : 'घोषणाओं का प्रबंधन'}</span>
+                    <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-100 font-mono">
+                      {announcements.length} {language === 'en' ? 'Total' : 'कुल'}
+                    </span>
+                  </h4>
+
+                  {/* Create New Announcement Form */}
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newNoticeTitle.trim() || !newNoticeContent.trim()) return;
+                    
+                    const newAnn = {
+                      id: `ann-${Date.now()}`,
+                      title: newNoticeTitle.trim(),
+                      titleHi: newNoticeTitleHi.trim() || newNoticeTitle.trim(),
+                      date: new Date().toISOString().split('T')[0],
+                      content: newNoticeContent.trim(),
+                      contentHi: newNoticeContentHi.trim() || newNoticeContent.trim(),
+                      badge: newNoticeBadge,
+                      badgeHi: newNoticeBadge === 'Critical' ? 'महत्वपूर्ण' : newNoticeBadge === 'Holiday' ? 'छुट्टी' : newNoticeBadge === 'Policy' ? 'नीति' : 'सामान्य'
+                    };
+
+                    if (setAnnouncements) {
+                      setAnnouncements(prev => [newAnn, ...prev]);
+                    }
+                    
+                    // Reset fields
+                    setNewNoticeTitle('');
+                    setNewNoticeTitleHi('');
+                    setNewNoticeContent('');
+                    setNewNoticeContentHi('');
+                    setNewNoticeBadge('General');
+                  }} className="bg-white border border-slate-200 p-3 rounded-lg space-y-3 shadow-xs">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block border-b border-slate-100 pb-1 font-sans">
+                      ➕ {language === 'en' ? 'Publish Circular / Notice' : 'नया परिपत्र / सूचना प्रकाशित करें'}
+                    </span>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-gray-500 block font-sans">{language === 'en' ? 'Title (English)' : 'शीर्षक (अंग्रेजी)'}</label>
+                        <input
+                          type="text"
+                          required
+                          value={newNoticeTitle}
+                          onChange={(e) => setNewNoticeTitle(e.target.value)}
+                          placeholder="e.g. Office Closed on Independence Day"
+                          className="w-full border border-gray-250 rounded-md px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-slate-50/40 text-slate-800 font-sans"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-gray-500 block font-sans">{language === 'en' ? 'Title (Hindi)' : 'शीर्षक (हिंदी)'}</label>
+                        <input
+                          type="text"
+                          value={newNoticeTitleHi}
+                          onChange={(e) => setNewNoticeTitleHi(e.target.value)}
+                          placeholder="उदा., स्वतंत्रता दिवस पर कार्यालय बंद"
+                          className="w-full border border-gray-250 rounded-md px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-slate-50/40 text-slate-800 font-sans"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-gray-500 block font-sans">{language === 'en' ? 'Content (English)' : 'विवरण (अंग्रेजी)'}</label>
+                        <textarea
+                          required
+                          rows={2}
+                          value={newNoticeContent}
+                          onChange={(e) => setNewNoticeContent(e.target.value)}
+                          placeholder="Write English circular detail..."
+                          className="w-full border border-gray-250 rounded-md p-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-slate-50/40 text-slate-800 resize-none font-sans"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-gray-500 block font-sans">{language === 'en' ? 'Content (Hindi)' : 'विवरण (हिंदी)'}</label>
+                        <textarea
+                          rows={2}
+                          value={newNoticeContentHi}
+                          onChange={(e) => setNewNoticeContentHi(e.target.value)}
+                          placeholder="हिंदी परिपत्र विवरण लिखें..."
+                          className="w-full border border-gray-250 rounded-md p-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-slate-50/40 text-slate-800 resize-none font-sans"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold text-gray-500 font-sans">{language === 'en' ? 'Badge Type:' : 'वर्ग टाइप:'}</span>
+                        <select
+                          value={newNoticeBadge}
+                          onChange={(e: any) => setNewNoticeBadge(e.target.value)}
+                          className="border border-gray-250 rounded px-2 py-0.5 text-[10px] font-bold bg-white text-slate-700 cursor-pointer font-sans"
+                        >
+                          <option value="General">General</option>
+                          <option value="Critical">Critical</option>
+                          <option value="Holiday">Holiday</option>
+                          <option value="Policy">Policy</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-3.5 py-1 rounded-md transition-colors uppercase tracking-wider cursor-pointer font-sans"
+                      >
+                        {language === 'en' ? 'Publish Notice' : 'सूचना प्रकाशित करें'}
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Active Notices List */}
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {announcements.length === 0 ? (
+                      <p className="text-[11px] text-gray-500 italic text-center py-4 bg-white border border-dashed border-gray-200 rounded-lg font-sans">
+                        {language === 'en' ? 'No active notice board items.' : 'कोई सक्रिय नोटिस बोर्ड आइटम नहीं है।'}
+                      </p>
+                    ) : (
+                      announcements.map((ann) => {
+                        let badgeCol = 'bg-slate-100 text-slate-700 border-slate-200';
+                        if (ann.badge === 'Critical') badgeCol = 'bg-red-50 text-red-700 border-red-200';
+                        if (ann.badge === 'Holiday') badgeCol = 'bg-amber-50 text-amber-700 border-amber-200';
+                        if (ann.badge === 'Policy') badgeCol = 'bg-blue-50 text-blue-700 border-blue-200';
+
+                        return (
+                          <div key={ann.id} className="bg-white border border-slate-150 p-3 rounded-lg shadow-2xs flex justify-between items-start gap-3 font-sans">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.25 rounded border ${badgeCol} font-mono`}>
+                                  {language === 'en' ? ann.badge : ann.badgeHi}
+                                </span>
+                                <h5 className="text-xs font-black text-slate-800 font-sans">
+                                  {language === 'en' ? ann.title : ann.titleHi}
+                                </h5>
+                              </div>
+                              <p className="text-[10px] text-slate-600 leading-relaxed font-semibold">
+                                {language === 'en' ? ann.content : ann.contentHi}
+                              </p>
+                              <span className="text-[9px] text-gray-400 font-mono block pt-0.5">{ann.date} • Published by Admin</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (setAnnouncements) {
+                                  setAnnouncements(prev => prev.filter(a => a.id !== ann.id));
+                                }
+                              }}
+                              className="text-gray-400 hover:text-red-600 p-1 rounded-md hover:bg-slate-50 transition-all shrink-0 cursor-pointer"
+                              title={language === 'en' ? 'Remove Notice' : 'सूचना हटाएँ'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Password reset gateway request queue */}
+                <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-xl space-y-4">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between font-sans">
+                    <span className="flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
+                      {language === 'en' ? 'Forgot Password Gateways' : 'पासवर्ड रीसेट गेटवे अनुरोध'}
+                    </span>
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-100 font-mono">
+                      {passwordRequests.filter(r => r.status === 'Pending').length} Pending
+                    </span>
+                  </h4>
+
+                  <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                    {passwordRequests.length === 0 ? (
+                      <p className="text-[11px] text-gray-500 italic text-center py-8 bg-white border border-dashed border-gray-200 rounded-lg font-sans">
+                        {language === 'en' ? 'No password reset requests logged.' : 'कोई पासवर्ड रीसेट अनुरोध दर्ज नहीं है।'}
+                      </p>
+                    ) : (
+                      passwordRequests.map((req) => (
+                        <div key={req.id} className="bg-white border border-slate-150 p-3 rounded-lg shadow-2xs space-y-2 font-sans">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-black text-slate-800 font-mono uppercase bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                  {req.empId}
+                                </span>
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full font-sans ${
+                                  req.status === 'Pending' ? 'bg-amber-100 text-amber-700 border border-amber-200/50' : 'bg-emerald-100 text-emerald-700 border border-emerald-200/50'
+                                }`}>
+                                  {req.status}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-600 font-semibold mt-1">
+                                {language === 'en' ? 'Email:' : 'ईमेल:'} <span className="font-mono font-bold text-slate-900">{req.email}</span>
+                              </p>
+                              <p className="text-[10px] text-slate-600 font-semibold font-sans">
+                                {language === 'en' ? 'Mobile:' : 'मोबाइल:'} <span className="font-mono font-bold text-slate-900">{req.mobile}</span>
+                              </p>
+                            </div>
+                            <span className="text-[8px] font-mono text-gray-400 shrink-0">
+                              {new Date(req.date).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          {req.status === 'Pending' && (
+                            <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (setPasswordRequests) {
+                                    setPasswordRequests(prev => prev.map(p => p.id === req.id ? { ...p, status: 'Resolved' } : p));
+                                  }
+                                }}
+                                className="bg-emerald-50 hover:bg-emerald-600 border border-emerald-200 hover:border-emerald-600 text-emerald-700 hover:text-white font-bold text-[9px] px-2.5 py-1 rounded transition-all flex items-center gap-1 cursor-pointer uppercase font-sans"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                {language === 'en' ? 'Mark Resolved (Reset)' : 'रीसेट करें (समाधान)'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* HR Helpdesk Tickets Queue Block */}
+              <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-xl space-y-4">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between font-sans">
+                  <span className="flex items-center gap-1.5">
+                    <LifeBuoy className="w-4 h-4 text-emerald-600" />
+                    {language === 'en' ? 'HR Helpdesk Support Tickets' : 'कर्मचारी सहायता हेल्पडेस्क टिकट'}
+                  </span>
+                  <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-100 font-mono">
+                    {hrTickets.filter(tk => tk.status === 'Pending').length} Pending
+                  </span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto max-h-[300px] pr-1">
+                  {hrTickets.length === 0 ? (
+                    <div className="col-span-full py-8 text-center text-gray-500 italic bg-white border border-dashed border-gray-200 rounded-lg font-sans">
+                      {language === 'en' ? 'No support tickets logged.' : 'कोई सहायता टिकट दर्ज नहीं है।'}
+                    </div>
+                  ) : (
+                    hrTickets.map((ticket) => (
+                      <div key={ticket.id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-3xs flex flex-col justify-between space-y-3 relative hover:border-slate-350 transition-all font-sans">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[9px] font-black font-mono text-indigo-600 bg-indigo-50 border border-indigo-150 px-2 py-0.5 rounded">
+                              {ticket.id}
+                            </span>
+                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                              ticket.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            }`}>
+                              {ticket.status}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1">
+                            <h5 className="text-xs font-black text-slate-800 font-sans leading-snug">
+                              {ticket.name} <span className="text-[10px] font-bold text-slate-400 font-mono ml-1">({ticket.empId})</span>
+                            </h5>
+                            <p className="text-[9px] font-mono text-gray-400 font-bold">{ticket.email}</p>
+                          </div>
+
+                          <div className="p-2.5 bg-slate-50 border border-slate-150 rounded-lg">
+                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block mb-0.5 font-sans">
+                              Category: <span className="text-slate-800 font-extrabold font-sans">{ticket.category}</span>
+                            </span>
+                            <p className="text-[10px] text-slate-600 font-semibold leading-relaxed line-clamp-3 font-sans" title={ticket.message}>
+                              "{ticket.message}"
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
+                          <span className="text-[8px] font-mono text-gray-400">
+                            {new Date(ticket.date).toLocaleString()}
+                          </span>
+                          
+                          {ticket.status === 'Pending' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (setHrTickets) {
+                                  setHrTickets(prev => prev.map(t => t.id === ticket.id ? { ...t, status: 'Resolved' } : t));
+                                }
+                              }}
+                              className="bg-emerald-50 hover:bg-emerald-600 border border-emerald-200 hover:border-emerald-600 text-emerald-700 hover:text-white font-bold text-[9px] px-2.5 py-1 rounded transition-all flex items-center gap-1 cursor-pointer uppercase font-mono"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              {language === 'en' ? 'Resolve' : 'समाधान'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
             </div>
           )}
 
