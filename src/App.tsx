@@ -67,25 +67,46 @@ export interface PortalUser {
 }
 
 // Merge utility functions to handle offline modifications merging back with Google Sheets
+const isDefaultDemoEmployee = (emp: Employee): boolean => {
+  const defaults = [
+    { id: 'emp001', name: 'rajesh kumar' },
+    { id: 'emp002', name: 'sunita sharma' },
+    { id: 'emp003', name: 'amit patel' },
+    { id: 'emp004', name: 'suresh kumar' }
+  ];
+  const targetId = emp.id.trim().toLowerCase();
+  const targetName = emp.name.trim().toLowerCase();
+  return defaults.some(d => d.id === targetId || d.name === targetName);
+};
+
 const mergeEmployees = (local: Employee[], remote: Employee[]): Employee[] => {
+  if (remote.length === 0) return local;
+
   const merged = [...remote];
   local.forEach(localEmp => {
     const idx = merged.findIndex(e => e.id.trim().toLowerCase() === localEmp.id.trim().toLowerCase());
     if (idx > -1) {
-      merged[idx] = { ...merged[idx], ...localEmp };
+      // Remote (Google Sheets) is the absolute source of truth.
+      // Remote properties must override local stale default properties (e.g. Suresh Kumar vs Aashish Sahu)
+      merged[idx] = { ...localEmp, ...merged[idx] };
     } else {
-      merged.push(localEmp);
+      // If employee exists in local but not remote, only merge if they are NOT a default demo employee
+      if (!isDefaultDemoEmployee(localEmp)) {
+        merged.push(localEmp);
+      }
     }
   });
   return merged;
 };
 
 const mergeAttendance = (local: Attendance[], remote: Attendance[]): Attendance[] => {
+  if (remote.length === 0) return local;
+
   const merged = [...remote];
   local.forEach(localRec => {
     const idx = merged.findIndex(r => r.employeeId.trim().toLowerCase() === localRec.employeeId.trim().toLowerCase() && r.date === localRec.date);
     if (idx > -1) {
-      merged[idx] = { ...merged[idx], ...localRec };
+      merged[idx] = { ...localRec, ...merged[idx] };
     } else {
       merged.push(localRec);
     }
@@ -94,11 +115,13 @@ const mergeAttendance = (local: Attendance[], remote: Attendance[]): Attendance[
 };
 
 const mergePayroll = (local: PayrollRecord[], remote: PayrollRecord[]): PayrollRecord[] => {
+  if (remote.length === 0) return local;
+
   const merged = [...remote];
   local.forEach(localRec => {
     const idx = merged.findIndex(r => r.employeeId.trim().toLowerCase() === localRec.employeeId.trim().toLowerCase() && r.monthYear === localRec.monthYear);
     if (idx > -1) {
-      merged[idx] = { ...merged[idx], ...localRec };
+      merged[idx] = { ...localRec, ...merged[idx] };
     } else {
       merged.push(localRec);
     }
@@ -437,6 +460,31 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('cached_employees', JSON.stringify(employees));
   }, [employees]);
+
+  // Keep portalUser (employee profile) updated with latest employee details from employees state
+  useEffect(() => {
+    if (portalUser && portalUser.role === 'employee' && portalUser.id) {
+      const currentEmp = employees.find(e => e.id.trim().toLowerCase() === portalUser.id.trim().toLowerCase());
+      if (currentEmp) {
+        const hasDiff = !portalUser.employee || 
+                        portalUser.name !== currentEmp.name || 
+                        portalUser.employee.department !== currentEmp.department ||
+                        portalUser.employee.designation !== currentEmp.designation ||
+                        portalUser.employee.basicSalary !== currentEmp.basicSalary ||
+                        portalUser.employee.photoUrl !== currentEmp.photoUrl ||
+                        JSON.stringify(portalUser.employee) !== JSON.stringify(currentEmp);
+        if (hasDiff) {
+          const updatedUser: PortalUser = {
+            ...portalUser,
+            name: currentEmp.name,
+            employee: currentEmp
+          };
+          setPortalUser(updatedUser);
+          localStorage.setItem('payroll_portal_user', JSON.stringify(updatedUser));
+        }
+      }
+    }
+  }, [employees, portalUser?.id, portalUser?.name, portalUser?.employee?.id]);
 
   useEffect(() => {
     localStorage.setItem('cached_attendance', JSON.stringify(attendance));
