@@ -7,6 +7,7 @@ import {
 import { jsPDF } from 'jspdf';
 import { Employee, Attendance, PayrollRecord, AdminSettings } from '../types';
 import LeavesHolidays from './LeavesHolidays';
+import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
 
 interface EmployeePortalProps {
   employee: Employee;
@@ -746,30 +747,55 @@ export default function EmployeePortal({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
-                      {empAttendanceList.map((rec) => (
-                        <tr key={rec.date} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="py-3 px-6 font-mono font-bold text-slate-900">{rec.date}</td>
-                          <td className="py-3 px-6">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                              rec.status === 'Present' 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                : rec.status === 'Half Day' 
-                                  ? 'bg-amber-50 text-amber-700 border-amber-100'
-                                  : rec.status === 'Leave' 
-                                    ? 'bg-blue-50 text-blue-700 border-blue-100'
-                                    : 'bg-rose-50 text-rose-700 border-rose-100'
-                            }`}>
-                              {rec.status}
-                            </span>
-                          </td>
-                          <td className="py-3 px-6 font-mono text-slate-700">{rec.checkIn || '--:--'}</td>
-                          <td className="py-3 px-6 font-mono text-slate-700">{rec.checkOut || '--:--'}</td>
-                          <td className="py-3 px-6 font-mono text-slate-700">
-                            {rec.overtimeHours ? `${rec.overtimeHours} hrs` : '--'}
-                          </td>
-                          <td className="py-3 px-6 text-slate-500 italic max-w-xs truncate">{rec.remarks || '--'}</td>
-                        </tr>
-                      ))}
+                      {empAttendanceList.map((rec) => {
+                        const isLate = isAttendanceLate(rec, employee.workTiming, adminSettings?.defaultCheckIn || '09:00');
+                        const isEarly = isAttendanceEarlyGoing(rec, employee.workTiming, adminSettings?.defaultCheckOut || '18:00');
+
+                        return (
+                          <tr key={rec.date} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-6 font-mono font-bold text-slate-900">{rec.date}</td>
+                            <td className="py-3 px-6">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                rec.status === 'Present' 
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                  : rec.status === 'Half Day' 
+                                    ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                    : rec.status === 'Leave' 
+                                      ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                      : 'bg-rose-50 text-rose-700 border-rose-100'
+                              }`}>
+                                {rec.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-6 font-mono text-slate-700">
+                              <div className="flex flex-col">
+                                <span>{rec.checkIn || '--:--'}</span>
+                                {isLate && (
+                                  <span className="text-[9px] text-rose-500 font-extrabold flex items-center gap-0.5 mt-0.5">
+                                    <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></span>
+                                    <span>{language === 'en' ? 'Late' : 'देरी'}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-6 font-mono text-slate-700">
+                              <div className="flex flex-col">
+                                <span>{rec.checkOut || '--:--'}</span>
+                                {isEarly && (
+                                  <span className="text-[9px] text-amber-500 font-extrabold flex items-center gap-0.5 mt-0.5">
+                                    <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>
+                                    <span>{language === 'en' ? 'Early' : 'जल्दी'}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-6 font-mono text-slate-700">
+                              {rec.overtimeHours ? `${rec.overtimeHours} hrs` : '--'}
+                            </td>
+                            <td className="py-3 px-6 text-slate-500 italic max-w-xs truncate">{rec.remarks || '--'}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

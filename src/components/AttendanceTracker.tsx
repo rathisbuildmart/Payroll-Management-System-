@@ -4,7 +4,14 @@ import {
   ListCollapse, ThumbsUp, ThumbsDown, CheckCircle, XCircle, AlertCircle, FileSpreadsheet, List,
   Filter, Building, Users, ChevronLeft, ChevronRight
 } from 'lucide-react';
-import { Employee, Attendance } from '../types';
+import { Employee, Attendance, AdminSettings } from '../types';
+import { 
+  getShiftTimings, 
+  getHalfDayCheckOut, 
+  getShiftDurationHours, 
+  isAttendanceLate, 
+  isAttendanceEarlyGoing 
+} from '../utils/shift';
 
 interface AttendanceTrackerProps {
   employees: Employee[];
@@ -12,6 +19,7 @@ interface AttendanceTrackerProps {
   onSaveAttendance: (date: string, records: Attendance[]) => Promise<void>;
   onUpdateAttendanceRecords?: (records: Attendance[]) => Promise<void>;
   language: 'en' | 'hi';
+  adminSettings?: AdminSettings;
 }
 
 export default function AttendanceTracker({ 
@@ -19,7 +27,8 @@ export default function AttendanceTracker({
   attendanceRecords, 
   onSaveAttendance, 
   onUpdateAttendanceRecords,
-  language 
+  language,
+  adminSettings
 }: AttendanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<'daily' | 'misspunch' | 'halfday'>('daily');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -166,12 +175,13 @@ export default function AttendanceTracker({
       if (existing) {
         newLocalRecords[emp.id] = { ...existing };
       } else {
+        const timings = getShiftTimings(emp.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
         newLocalRecords[emp.id] = {
           date: selectedDate,
           employeeId: emp.id,
           status: 'Present',
-          checkIn: '09:00',
-          checkOut: '18:00',
+          checkIn: timings.checkIn,
+          checkOut: timings.checkOut,
           overtimeHours: 0,
           remarks: '',
           approvalStatus: 'Pending'
@@ -183,6 +193,9 @@ export default function AttendanceTracker({
   }, [selectedDate, attendanceRecords, employees]);
 
   const handleStatusChange = (empId: string, status: Attendance['status']) => {
+    const emp = employees.find(e => e.id === empId);
+    const timings = getShiftTimings(emp?.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
+
     setLocalRecords(prev => {
       const rec = prev[empId];
       let checkIn = rec.checkIn;
@@ -195,14 +208,14 @@ export default function AttendanceTracker({
         checkOut = '';
         overtimeHours = 0;
       } else if (status === 'Present' && (rec.status === 'Miss Punch' || !checkIn || checkIn === '' || !checkOut || checkOut === '')) {
-        checkIn = '09:00';
-        checkOut = '18:00';
-      } else if (status === 'Half Day' && (!checkIn || checkIn === '09:00')) {
-        checkIn = '09:00';
-        checkOut = '13:30';
+        checkIn = timings.checkIn;
+        checkOut = timings.checkOut;
+      } else if (status === 'Half Day' && (!checkIn || checkIn === timings.checkIn)) {
+        checkIn = timings.checkIn;
+        checkOut = getHalfDayCheckOut(timings.checkIn);
         overtimeHours = 0;
       } else if (status === 'Miss Punch') {
-        checkIn = rec.checkIn || '09:00';
+        checkIn = rec.checkIn || timings.checkIn;
         checkOut = '';
         overtimeHours = 0;
         approvalStatus = 'Pending';
@@ -228,12 +241,17 @@ export default function AttendanceTracker({
       const updated = { ...rec, [field]: value };
 
       if (field === 'checkOut' && rec.checkIn && value) {
+        const emp = employees.find(e => e.id === empId);
+        const timings = getShiftTimings(emp?.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
+        const regularHours = getShiftDurationHours(timings.checkIn, timings.checkOut);
+
         const [inH, inM] = rec.checkIn.split(':').map(Number);
         const [outH, outM] = value.split(':').map(Number);
-        
+
         if (!isNaN(inH) && !isNaN(outH)) {
-          const totalHours = (outH + outM / 60) - (inH + inM / 60);
-          const regularHours = 9;
+          let totalHours = (outH + outM / 60) - (inH + inM / 60);
+          if (totalHours < 0) totalHours += 24; // overnight shift
+
           if (totalHours > regularHours) {
             const calculatedOvertime = Math.round((totalHours - regularHours) * 10) / 10;
             updated.overtimeHours = Math.max(0, calculatedOvertime);
@@ -265,11 +283,14 @@ export default function AttendanceTracker({
     setLocalRecords(prev => {
       const bulk = { ...prev };
       Object.keys(bulk).forEach(empId => {
+        const emp = employees.find(e => e.id === empId);
+        const timings = getShiftTimings(emp?.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
+
         bulk[empId] = {
           ...bulk[empId],
           status,
-          checkIn: (status === 'Present' ? '09:00' : status === 'Half Day' ? '09:00' : ''),
-          checkOut: (status === 'Present' ? '18:00' : status === 'Half Day' ? '13:30' : ''),
+          checkIn: (status === 'Present' ? timings.checkIn : status === 'Half Day' ? timings.checkIn : ''),
+          checkOut: (status === 'Present' ? timings.checkOut : status === 'Half Day' ? getHalfDayCheckOut(timings.checkIn) : ''),
           overtimeHours: 0,
         };
       });
@@ -310,8 +331,10 @@ export default function AttendanceTracker({
       // If approved, let's automatically add default times if they are empty
       if (field === 'approvalStatus' && value === 'Approved') {
         if (updatedRecord.status === 'Miss Punch') {
-          if (!updatedRecord.checkIn || updatedRecord.checkIn === '') updatedRecord.checkIn = '09:00';
-          if (!updatedRecord.checkOut || updatedRecord.checkOut === '') updatedRecord.checkOut = '18:00';
+          const emp = employees.find(e => e.id === record.employeeId);
+          const timings = getShiftTimings(emp?.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
+          if (!updatedRecord.checkIn || updatedRecord.checkIn === '') updatedRecord.checkIn = timings.checkIn;
+          if (!updatedRecord.checkOut || updatedRecord.checkOut === '') updatedRecord.checkOut = timings.checkOut;
           // Toggling to Present once approved is standard, or keeping it Miss Punch but marked approved
         }
       }
@@ -527,15 +550,19 @@ export default function AttendanceTracker({
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm">
                     {paginatedActiveEmployees.map((emp) => {
+                      const timings = getShiftTimings(emp.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
                       const record = localRecords[emp.id] || {
                         date: selectedDate,
                         employeeId: emp.id,
                         status: 'Present',
-                        checkIn: '09:00',
-                        checkOut: '18:00',
+                        checkIn: timings.checkIn,
+                        checkOut: timings.checkOut,
                         overtimeHours: 0,
                         remarks: '',
                       };
+
+                      const isLate = isAttendanceLate(record, emp.workTiming, adminSettings?.defaultCheckIn || '09:00');
+                      const isEarly = isAttendanceEarlyGoing(record, emp.workTiming, adminSettings?.defaultCheckOut || '18:00');
 
                       return (
                         <tr key={emp.id} className="hover:bg-gray-50/30 transition-colors">
@@ -630,24 +657,49 @@ export default function AttendanceTracker({
 
                           <td className="py-4 px-6 text-center">
                             {record.status === 'Present' || record.status === 'Half Day' || record.status === 'Miss Punch' ? (
-                              <div className="flex items-center justify-center gap-2">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xxs text-gray-400 font-bold uppercase">{t.checkIn}</span>
-                                  <input
-                                    type="time"
-                                    value={record.checkIn}
-                                    onChange={(e) => handleTimeChange(emp.id, 'checkIn', e.target.value)}
-                                    className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none"
-                                  />
+                              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                                <div className="flex flex-col items-start gap-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xxs text-gray-400 font-bold uppercase">{t.checkIn}</span>
+                                    <input
+                                      type="time"
+                                      value={record.checkIn}
+                                      onChange={(e) => handleTimeChange(emp.id, 'checkIn', e.target.value)}
+                                      className={`border rounded-lg px-1.5 py-1 text-xs font-semibold text-gray-700 bg-white focus:outline-none focus:ring-1 ${
+                                        isLate 
+                                          ? 'border-rose-300 focus:ring-rose-500 bg-rose-50/20' 
+                                          : 'border-gray-200 focus:ring-[#03623c]'
+                                      }`}
+                                    />
+                                  </div>
+                                  {isLate && (
+                                    <span className="text-[10px] text-rose-600 font-black flex items-center gap-1 pl-10" title="Late Arrival">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                      <span>{language === 'en' ? 'Late' : 'देरी'}</span>
+                                    </span>
+                                  )}
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xxs text-gray-400 font-bold uppercase">{t.checkOut}</span>
-                                  <input
-                                    type="time"
-                                    value={record.checkOut}
-                                    onChange={(e) => handleTimeChange(emp.id, 'checkOut', e.target.value)}
-                                    className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none"
-                                  />
+
+                                <div className="flex flex-col items-start gap-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xxs text-gray-400 font-bold uppercase">{t.checkOut}</span>
+                                    <input
+                                      type="time"
+                                      value={record.checkOut}
+                                      onChange={(e) => handleTimeChange(emp.id, 'checkOut', e.target.value)}
+                                      className={`border rounded-lg px-1.5 py-1 text-xs font-semibold text-gray-700 bg-white focus:outline-none focus:ring-1 ${
+                                        isEarly 
+                                          ? 'border-amber-300 focus:ring-amber-500 bg-amber-50/20' 
+                                          : 'border-gray-200 focus:ring-[#03623c]'
+                                      }`}
+                                    />
+                                  </div>
+                                  {isEarly && (
+                                    <span className="text-[10px] text-amber-600 font-black flex items-center gap-1 pl-11" title="Early Departure">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                      <span>{language === 'en' ? 'Early' : 'जल्दी'}</span>
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             ) : (

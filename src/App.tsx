@@ -1926,6 +1926,7 @@ export default function App() {
                   onSaveAttendance={handleSaveAttendance} 
                   onUpdateAttendanceRecords={handleUpdateAttendanceRecords}
                   language={language} 
+                  adminSettings={adminSettings}
                 />
               )}
               {currentTab === 'payroll' && (
