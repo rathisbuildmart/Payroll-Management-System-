@@ -223,16 +223,78 @@ export default function App() {
 
   // Application Data States (with local cache fallbacks for instant offline load)
   const [employees, setEmployees] = useState<Employee[]>(() => {
+    const defaultEmployees: Employee[] = [
+      {
+        id: 'EMP001',
+        name: 'Rajesh Kumar',
+        department: 'Management',
+        designation: 'Senior Supervisor',
+        joiningDate: '2025-01-10',
+        basicSalary: 38000,
+        allowances: 3500,
+        deductions: 1500,
+        hourlyRate: 150,
+        paymentMethod: 'Bank Transfer',
+        isActive: true,
+      },
+      {
+        id: 'EMP002',
+        name: 'Sunita Sharma',
+        department: 'Finance',
+        designation: 'Accounts Executive',
+        joiningDate: '2025-06-15',
+        basicSalary: 28000,
+        allowances: 2000,
+        deductions: 1000,
+        hourlyRate: 120,
+        paymentMethod: 'Bank Transfer',
+        isActive: true,
+      },
+      {
+        id: 'EMP003',
+        name: 'Amit Patel',
+        department: 'Operations',
+        designation: 'Dispatch Officer',
+        joiningDate: '2026-02-01',
+        basicSalary: 18000,
+        allowances: 1500,
+        deductions: 800,
+        hourlyRate: 100,
+        paymentMethod: 'Cash',
+        isActive: true,
+      },
+      {
+        id: 'EMP004',
+        name: 'Suresh Kumar',
+        department: 'Sales',
+        designation: 'Sales Executive',
+        joiningDate: '2026-04-01',
+        basicSalary: 19000,
+        allowances: 1600,
+        deductions: 900,
+        hourlyRate: 105,
+        paymentMethod: 'Bank Transfer',
+        isActive: true,
+        password: '123456'
+      }
+    ];
+
     const saved = localStorage.getItem('cached_employees');
     if (saved) {
       try {
-        return JSON.parse(saved) as Employee[];
+        const parsed = JSON.parse(saved) as Employee[];
+        if (parsed.length > 0) {
+          return parsed;
+        }
       } catch (err) {
         console.error("Error parsing cached employees", err);
       }
     }
-    return [];
+    
+    localStorage.setItem('cached_employees', JSON.stringify(defaultEmployees));
+    return defaultEmployees;
   });
+
   const [attendance, setAttendance] = useState<Attendance[]>(() => {
     const saved = localStorage.getItem('cached_attendance');
     if (saved) {
@@ -242,8 +304,32 @@ export default function App() {
         console.error("Error parsing cached attendance", err);
       }
     }
-    return [];
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const sampleAttendance: Attendance[] = [];
+    const empIds = ['EMP001', 'EMP002', 'EMP003'];
+    
+    for (let day = 1; day <= 15; day++) {
+      const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
+      empIds.forEach((id, index) => {
+        const isAbsent = day === 3 && index === 2;
+        const isHalfDay = day === 4 && index === 1;
+
+        sampleAttendance.push({
+          date: dateStr,
+          employeeId: id,
+          status: isAbsent ? 'Absent' : isHalfDay ? 'Half Day' : 'Present',
+          checkIn: isAbsent ? '' : '09:00',
+          checkOut: isAbsent ? '' : isHalfDay ? '13:30' : '18:30',
+          overtimeHours: (!isAbsent && !isHalfDay && index === 0) ? 0.5 : 0,
+          remarks: isAbsent ? 'Sick leave' : isHalfDay ? 'Personal chore' : 'On-time'
+        });
+      });
+    }
+    localStorage.setItem('cached_attendance', JSON.stringify(sampleAttendance));
+    return sampleAttendance;
   });
+
   const [payroll, setPayroll] = useState<PayrollRecord[]>(() => {
     const saved = localStorage.getItem('cached_payroll');
     if (saved) {
@@ -453,6 +539,10 @@ export default function App() {
   const [isSidebarHovered, setIsSidebarHovered] = useState<boolean>(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en'); // Set default to English as bilingual toggle is disabled
   const [showSeedDialog, setShowSeedDialog] = useState<boolean>(false);
+  const [showSheetsNotice, setShowSheetsNotice] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('dismiss_sheets_notice') !== 'true';
+  });
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -503,12 +593,18 @@ export default function App() {
             setSpreadsheetLink(globalData.spreadsheetLink);
           }
           console.log('Successfully loaded synced credentials from cloud Firestore');
+        } else if (result && result.success && !result.data) {
+          // Cloud Firestore is empty. Trigger a save so the baseline default employees/attendance
+          // are automatically registered in the cloud database.
+          setIsDataModified(true);
+          console.log('Cloud Firestore is empty. Automatically syncing baseline default data to Firestore...');
         }
       } catch (err) {
         console.warn('Failed to load global data from Firestore on startup:', err);
       } finally {
         setHasLoadedFromCloud(true);
-        setIsDataModified(false); // Reset modification flag after initial load
+        // If we didn't trigger an automatic baseline sync, clear modified status
+        // otherwise let the auto-save effect handle it and reset it.
       }
     };
     fetchGlobalData();
@@ -529,6 +625,7 @@ export default function App() {
           spreadsheetId,
           spreadsheetLink
         });
+        setIsDataModified(false);
         console.log('Central Firestore database synchronized successfully.');
       } catch (err) {
         console.warn('Auto-syncing to Firestore failed:', err);
@@ -803,7 +900,6 @@ export default function App() {
 
   // Seeding sample data
   const handleSeedDemoData = async () => {
-    if (!spreadsheetId || !token) return;
     setIsLoadingData(true);
     setSyncStatus('syncing');
 
@@ -873,14 +969,16 @@ export default function App() {
         });
       }
 
-      // Save Employees and Attendance to sheets
-      addSyncLog(
-        language === 'en' ? 'Seed Database' : 'डेटाबेस सीड करें',
-        'syncing',
-        language === 'en' ? 'Writing sample employees and attendance history...' : 'नमूना कर्मचारी और उपस्थिति इतिहास लिखा जा रहा है...'
-      );
-      await saveEmployees(spreadsheetId, sampleEmployees, token);
-      await saveAttendance(spreadsheetId, sampleAttendance, token);
+      // Save Employees and Attendance to sheets if connected
+      if (spreadsheetId && token) {
+        addSyncLog(
+          language === 'en' ? 'Seed Database' : 'डेटाबेस सीड करें',
+          'syncing',
+          language === 'en' ? 'Writing sample employees and attendance history...' : 'नमूना कर्मचारी और उपस्थिति इतिहास लिखा जा रहा है...'
+        );
+        await saveEmployees(spreadsheetId, sampleEmployees, token);
+        await saveAttendance(spreadsheetId, sampleAttendance, token);
+      }
 
       // Reload
       setEmployees(sampleEmployees);
@@ -900,7 +998,11 @@ export default function App() {
         'error',
         language === 'en' ? `Failed to seed: ${err?.message || err}` : `सीड करने में विफल: ${err?.message || err}`
       );
-      alert('Failed to seed demo data to Sheets.');
+      if (spreadsheetId && token) {
+        alert('Failed to seed demo data to Sheets.');
+      } else {
+        alert('Failed to seed demo data.');
+      }
     } finally {
       setIsLoadingData(false);
     }
@@ -2210,7 +2312,7 @@ export default function App() {
               {language === 'en' ? 'Database:' : 'डेटाबेस:'}
             </span>
             <span className="bg-emerald-50 text-emerald-800 border border-emerald-100 text-[10px] font-mono px-2 py-0.5 rounded font-bold max-w-[200px] truncate">
-              {spreadsheetId || 'None'}
+              {spreadsheetId ? 'Google Sheet & Firestore' : 'Cloud Firestore (Active)'}
             </span>
 
             {/* Real-time Connection Badge */}
@@ -2344,11 +2446,28 @@ export default function App() {
                   {/* Actions inside panel */}
                   <div className="flex gap-2">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (token) {
                           loadApplicationData(token);
                         } else {
-                          alert(language === 'en' ? 'Database is offline. Sign in to sync.' : 'डेटाबेस ऑफ़लाइन है। सिंक करने के लिए साइन इन करें।');
+                          setIsLoadingData(true);
+                          try {
+                            const result = await loadFromFirestore();
+                            if (result && result.success && result.data) {
+                              const globalData = result.data;
+                              if (globalData.employees) setEmployees(globalData.employees);
+                              if (globalData.attendance) setAttendance(globalData.attendance);
+                              if (globalData.payroll) setPayroll(globalData.payroll);
+                              if (globalData.adminSettings) setAdminSettings(globalData.adminSettings);
+                              alert(language === 'en' ? 'Cloud Firestore database loaded successfully!' : 'क्लाउड फ़ायरस्टोर डेटाबेस सफलतापूर्वक लोड किया गया!');
+                            } else {
+                              alert(language === 'en' ? 'Failed to load from Cloud Firestore. Working with local cache.' : 'क्लाउड फ़ायरस्टोर से लोड करने में विफल। स्थानीय कैश के साथ काम किया जा रहा है।');
+                            }
+                          } catch (err) {
+                            alert(language === 'en' ? 'Cloud Firestore connection error. Working with local cache.' : 'क्लाउड फ़ायरस्टोर कनेक्शन त्रुटि। स्थानीय कैश के साथ काम किया जा रहा है।');
+                          } finally {
+                            setIsLoadingData(false);
+                          }
                         }
                       }}
                       disabled={isLoadingData}
@@ -2435,31 +2554,42 @@ export default function App() {
 
         {/* Scrollable Workspace Wrapper */}
         <main className="flex-1 overflow-y-auto p-4 space-y-4">
-          {portalUser?.role === 'admin' && needsAuth && !isLoadingAuth && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm bg-amber-50 text-amber-900 mb-2 font-sans">
+          {portalUser?.role === 'admin' && needsAuth && !isLoadingAuth && showSheetsNotice && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm bg-emerald-50/50 text-emerald-900 mb-2 font-sans relative">
               <div className="flex items-center gap-3">
-                <div className="bg-amber-100 text-amber-850 p-2.5 rounded-xl shrink-0">
-                  <Database className="w-5 h-5 text-amber-800" />
+                <div className="bg-emerald-100 text-emerald-800 p-2.5 rounded-xl shrink-0">
+                  <Database className="w-5 h-5 text-emerald-800" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-extrabold tracking-tight">Google Sheets Database Disconnected</h4>
+                  <h4 className="text-sm font-extrabold tracking-tight">Cloud Firestore Database Active</h4>
                   <p className="text-[11px] text-slate-700 font-medium mt-0.5 leading-normal font-semibold">
-                    Sign in with your administrator Google account to automatically sync and save all payroll data to Google Sheets.
+                    Your database is securely connected and active on Cloud Firestore. Google Sheets integration is optional. Connect your Google Account if you wish to also sync and backup all payroll records to a live Google Sheet.
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleLogin}
-                disabled={isLoggingIn}
-                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shrink-0 cursor-pointer transition-all flex items-center gap-2 shadow-sm"
-              >
-                {isLoggingIn ? (
-                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                ) : (
-                  <Database className="w-3.5 h-3.5" />
-                )}
-                <span>Authorize Google Sheets</span>
-              </button>
+              <div className="flex items-center gap-2.5 self-end md:self-auto">
+                <button
+                  onClick={() => {
+                    setShowSheetsNotice(false);
+                    localStorage.setItem('dismiss_sheets_notice', 'true');
+                  }}
+                  className="bg-transparent hover:bg-slate-100 text-slate-500 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all border border-slate-200"
+                >
+                  Hide Notice
+                </button>
+                <button
+                  onClick={handleLogin}
+                  disabled={isLoggingIn}
+                  className="bg-emerald-750 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shrink-0 cursor-pointer transition-all flex items-center gap-2 shadow-sm"
+                >
+                  {isLoggingIn ? (
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  ) : (
+                    <Database className="w-3.5 h-3.5" />
+                  )}
+                  <span>Connect Google Sheets</span>
+                </button>
+              </div>
             </div>
           )}
 
