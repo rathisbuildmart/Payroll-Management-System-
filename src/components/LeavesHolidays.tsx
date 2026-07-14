@@ -429,32 +429,32 @@ export default function LeavesHolidays({
               </div>
 
               {/* Bento Grid Leaves Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 shadow-xxs">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{t.startingBal}</p>
-                  <p className="text-xl font-black text-slate-700 mt-1 font-mono">{employeeLeaveData.openingEL} Days</p>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-2 sm:gap-4">
+                <div className="bg-slate-50 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-slate-150 shadow-xxs">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider block truncate">{t.startingBal}</p>
+                  <p className="text-sm sm:text-xl font-bold sm:font-black text-slate-700 mt-1 font-mono">{employeeLeaveData.openingEL} Days</p>
                 </div>
                 
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 shadow-xxs">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{t.monthlyEarned}</p>
-                  <p className="text-xl font-black text-slate-700 mt-1 font-mono">+{employeeLeaveData.accumulatedEL} Days</p>
-                  <p className="text-[9px] text-slate-400 mt-0.5 font-bold">1 Day per month since joining</p>
+                <div className="bg-slate-50 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-slate-150 shadow-xxs">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider block truncate">{t.monthlyEarned}</p>
+                  <p className="text-sm sm:text-xl font-bold sm:font-black text-slate-700 mt-1 font-mono">+{employeeLeaveData.accumulatedEL} Days</p>
+                  <p className="text-[7.5px] sm:text-[9px] text-slate-400 mt-0.5 font-bold block truncate">1 Day/month</p>
                 </div>
 
-                <div className="bg-blue-50/55 p-4 rounded-xl border border-blue-100 shadow-xxs">
-                  <p className="text-[9px] font-black text-blue-500 uppercase tracking-wider">{t.totalAccumulated}</p>
-                  <p className="text-xl font-black text-blue-700 mt-1 font-mono">{employeeLeaveData.totalGrantedEL} Days</p>
+                <div className="bg-blue-50/55 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-blue-100 shadow-xxs">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-blue-500 uppercase tracking-wider block truncate">{t.totalAccumulated}</p>
+                  <p className="text-sm sm:text-xl font-bold sm:font-black text-blue-700 mt-1 font-mono">{employeeLeaveData.totalGrantedEL} Days</p>
                 </div>
 
-                <div className="bg-rose-50/50 p-4 rounded-xl border border-rose-100 shadow-xxs">
-                  <p className="text-[9px] font-black text-rose-500 uppercase tracking-wider">{t.totalUsed}</p>
-                  <p className="text-xl font-black text-rose-700 mt-1 font-mono">{employeeLeaveData.usedEL} Days</p>
-                  <p className="text-[9px] text-slate-400 mt-0.5 font-bold">Days marked 'Leave' in Logs</p>
+                <div className="bg-rose-50/50 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-rose-100 shadow-xxs">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-rose-500 uppercase tracking-wider block truncate">{t.totalUsed}</p>
+                  <p className="text-sm sm:text-xl font-bold sm:font-black text-rose-700 mt-1 font-mono">{employeeLeaveData.usedEL} Days</p>
+                  <p className="text-[7.5px] sm:text-[9px] text-slate-400 mt-0.5 font-bold block truncate">From Logs</p>
                 </div>
 
-                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-150 shadow-xxs sm:col-span-2 md:col-span-1">
-                  <p className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">{t.availableBal}</p>
-                  <p className="text-2xl font-black text-emerald-700 mt-1 font-mono">{employeeLeaveData.remainingEL} Days</p>
+                <div className="bg-emerald-50 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-emerald-150 shadow-xxs col-span-2 md:col-span-1">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-emerald-600 uppercase tracking-wider block truncate">{t.availableBal}</p>
+                  <p className="text-base sm:text-2xl font-bold sm:font-black text-emerald-700 mt-1 font-mono">{employeeLeaveData.remainingEL} Days</p>
                 </div>
               </div>
 
@@ -639,68 +639,129 @@ export default function LeavesHolidays({
             </div>
 
             {/* List Table directly matching Image layout */}
-            <div className="overflow-x-auto p-4 md:p-6 bg-slate-50/50">
-              <table className="w-full text-left border-collapse text-xs bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-                <thead>
-                  <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider">
-                    <th className="py-3 px-4 text-center w-16">#</th>
-                    <th className="py-3 px-4">{language === 'en' ? 'OCCASION / LEAVE' : 'अवकाश / अवसर'}</th>
-                    <th className="py-3 px-4">{language === 'en' ? 'TYPE' : 'प्रकार'}</th>
-                    <th className="py-3 px-4">{language === 'en' ? 'DATE' : 'दिनांक'}</th>
-                    <th className="py-3 px-4 text-center">{language === 'en' ? 'DURATION' : 'अवधि'}</th>
-                    {!isEmployeeView && (
-                      <th className="py-3 px-4 text-center w-24">{language === 'en' ? 'ACTIONS' : 'कार्रवाई'}</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-150 font-bold text-slate-700">
-                  {holidays.map((h, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 px-4 text-center text-lg">{h.imgUrl}</td>
-                      <td className="py-4 px-4 text-slate-900 font-extrabold text-sm">
-                        {language === 'en' ? h.occasion : h.hindiOccasion}
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${
-                          h.type.includes('National') 
-                            ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                            : h.type.includes('Religious') 
-                              ? 'bg-purple-100 text-purple-800 border border-purple-200' 
-                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        }`}>
-                          {language === 'en' ? h.type : h.hindiType}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4 text-slate-800 font-semibold font-mono text-xs">
-                        {h.date}
-                      </td>
-                      <td className="py-4 px-4 text-center font-extrabold text-slate-900">
-                        {language === 'en' ? h.duration : h.hindiDuration}
-                      </td>
+            <div className="p-4 md:p-6 bg-slate-50/50">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+                  <thead>
+                    <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider">
+                      <th className="py-3 px-4 text-center w-16">#</th>
+                      <th className="py-3 px-4">{language === 'en' ? 'OCCASION / LEAVE' : 'अवकाश / अवसर'}</th>
+                      <th className="py-3 px-4">{language === 'en' ? 'TYPE' : 'प्रकार'}</th>
+                      <th className="py-3 px-4">{language === 'en' ? 'DATE' : 'दिनांक'}</th>
+                      <th className="py-3 px-4 text-center">{language === 'en' ? 'DURATION' : 'अवधि'}</th>
                       {!isEmployeeView && (
-                        <td className="py-4 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => handleOpenEditHolidayModal(h, idx)}
-                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
-                              title={language === 'en' ? 'Edit Holiday' : 'अवकाश संपादित करें'}
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteHoliday(idx)}
-                              className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                              title={language === 'en' ? 'Delete Holiday' : 'अवकाश हटाएं'}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
+                        <th className="py-3 px-4 text-center w-24">{language === 'en' ? 'ACTIONS' : 'कार्रवाई'}</th>
                       )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-150 font-bold text-slate-700">
+                    {holidays.map((h, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-4 px-4 text-center text-lg">{h.imgUrl}</td>
+                        <td className="py-4 px-4 text-slate-900 font-extrabold text-sm">
+                          {language === 'en' ? h.occasion : h.hindiOccasion}
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${
+                            h.type.includes('National') 
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                              : h.type.includes('Religious') 
+                                ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}>
+                            {language === 'en' ? h.type : h.hindiType}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-slate-800 font-semibold font-mono text-xs">
+                          {h.date}
+                        </td>
+                        <td className="py-4 px-4 text-center font-extrabold text-slate-900">
+                          {language === 'en' ? h.duration : h.hindiDuration}
+                        </td>
+                        {!isEmployeeView && (
+                          <td className="py-4 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenEditHolidayModal(h, idx)}
+                                className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                                title={language === 'en' ? 'Edit Holiday' : 'अवकाश संपादित करें'}
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteHoliday(idx)}
+                                className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                title={language === 'en' ? 'Delete Holiday' : 'अवकाश हटाएं'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="block md:hidden space-y-3">
+                {holidays.map((h, idx) => (
+                  <div key={idx} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xxs flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="text-2xl shrink-0 w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center">
+                        {h.imgUrl}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-extrabold text-slate-900 text-sm truncate">
+                          {language === 'en' ? h.occasion : h.hindiOccasion}
+                        </h4>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="font-mono text-[10px] font-bold text-slate-500">
+                            {h.date}
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-[9px] font-extrabold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded">
+                            {language === 'en' ? h.duration : h.hindiDuration}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide ${
+                        h.type.includes('National') 
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                          : h.type.includes('Religious') 
+                            ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                            : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}>
+                        {language === 'en' ? h.type.split(' ')[0] : h.hindiType.split(' ')[0]}
+                      </span>
+                      
+                      {!isEmployeeView && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEditHolidayModal(h, idx)}
+                            className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md transition-all cursor-pointer"
+                            title={language === 'en' ? 'Edit' : 'संपादित करें'}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteHoliday(idx)}
+                            className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
+                            title={language === 'en' ? 'Delete' : 'हटाएं'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Poster Policy Footer (Matches bottom notes in uploaded image) */}

@@ -417,75 +417,75 @@ export default function EmployeePortal({
         </div>
 
         {/* Portal Quick Action Navigation */}
-        <div className="flex flex-wrap gap-2 relative z-10 w-full md:w-auto justify-center md:justify-end">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 relative z-10 w-full md:w-auto justify-center md:justify-end">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
               activeTab === 'profile' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
             }`}
           >
-            <User className="w-3.5 h-3.5" />
-            <span>{t.profile}</span>
+            <User className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{t.profile}</span>
           </button>
           <button
             onClick={() => setActiveTab('attendance')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
               activeTab === 'attendance' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
             }`}
           >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>{t.attendance}</span>
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{t.attendance}</span>
           </button>
           <button
             onClick={() => setActiveTab('calendar')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
               activeTab === 'calendar' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
             }`}
           >
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span>{t.calendar}</span>
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{t.calendar}</span>
           </button>
           <button
             onClick={() => setActiveTab('exceptions')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer w-full sm:w-auto ${
               activeTab === 'exceptions' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
             }`}
           >
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>{t.exceptions}</span>
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{t.exceptions}</span>
             {attendanceRecords.filter(r => r.employeeId === employee.id && (r.status === 'Miss Punch' || r.status === 'Half Day') && (r.approvalStatus || 'Pending') === 'Pending').length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping shrink-0"></span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('payslips')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
               activeTab === 'payslips' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
             }`}
           >
-            <CreditCard className="w-3.5 h-3.5" />
-            <span>{t.payslips}</span>
+            <CreditCard className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{t.payslips}</span>
           </button>
           <button
             onClick={() => setActiveTab('leaves')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
               activeTab === 'leaves' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
             }`}
           >
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span>{t.leaves}</span>
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{t.leaves}</span>
           </button>
         </div>
       </div>
@@ -747,70 +747,141 @@ export default function EmployeePortal({
             {/* Daily log table */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
               {empAttendanceList.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        <th className="py-3 px-6">{t.date}</th>
-                        <th className="py-3 px-6">{t.status}</th>
-                        <th className="py-3 px-6">{t.checkIn}</th>
-                        <th className="py-3 px-6">{t.checkOut}</th>
-                        <th className="py-3 px-6">{t.overtime}</th>
-                        <th className="py-3 px-6">{t.remarks}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium">
-                      {empAttendanceList.map((rec) => {
-                        const isLate = isAttendanceLate(rec, employee.workTiming, adminSettings?.defaultCheckIn || '09:00');
-                        const isEarly = isAttendanceEarlyGoing(rec, employee.workTiming, adminSettings?.defaultCheckOut || '18:00');
+                <div>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          <th className="py-3 px-6">{t.date}</th>
+                          <th className="py-3 px-6">{t.status}</th>
+                          <th className="py-3 px-6">{t.checkIn}</th>
+                          <th className="py-3 px-6">{t.checkOut}</th>
+                          <th className="py-3 px-6">{t.overtime}</th>
+                          <th className="py-3 px-6">{t.remarks}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {empAttendanceList.map((rec) => {
+                          const isLate = isAttendanceLate(rec, employee.workTiming, adminSettings?.defaultCheckIn || '09:00');
+                          const isEarly = isAttendanceEarlyGoing(rec, employee.workTiming, adminSettings?.defaultCheckOut || '18:00');
 
-                        return (
-                          <tr key={rec.date} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="py-3 px-6 font-mono font-bold text-slate-900">{rec.date}</td>
-                            <td className="py-3 px-6">
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                                rec.status === 'Present' 
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                  : rec.status === 'Half Day' 
-                                    ? 'bg-amber-50 text-amber-700 border-amber-100'
-                                    : rec.status === 'Leave' 
-                                      ? 'bg-blue-50 text-blue-700 border-blue-100'
-                                      : 'bg-rose-50 text-rose-700 border-rose-100'
-                              }`}>
-                                {rec.status}
-                              </span>
-                            </td>
-                            <td className="py-3 px-6 font-mono text-slate-700">
-                              <div className="flex flex-col">
+                          return (
+                            <tr key={rec.date} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="py-3 px-6 font-mono font-bold text-slate-900">{rec.date}</td>
+                              <td className="py-3 px-6">
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                  rec.status === 'Present' 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                    : rec.status === 'Half Day' 
+                                      ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                      : rec.status === 'Leave' 
+                                        ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                        : 'bg-rose-50 text-rose-700 border-rose-100'
+                                }`}>
+                                  {rec.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-6 font-mono text-slate-700">
+                                <div className="flex flex-col">
+                                  <span>{rec.checkIn || '--:--'}</span>
+                                  {isLate && (
+                                    <span className="text-[9px] text-rose-500 font-extrabold flex items-center gap-0.5 mt-0.5">
+                                      <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></span>
+                                      <span>{language === 'en' ? 'Late' : 'देरी'}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-6 font-mono text-slate-700">
+                                <div className="flex flex-col">
+                                  <span>{rec.checkOut || '--:--'}</span>
+                                  {isEarly && (
+                                    <span className="text-[9px] text-amber-500 font-extrabold flex items-center gap-0.5 mt-0.5">
+                                      <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>
+                                      <span>{language === 'en' ? 'Early' : 'जल्दी'}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-6 font-mono text-slate-700">
+                                {rec.overtimeHours ? `${rec.overtimeHours} hrs` : '--'}
+                              </td>
+                              <td className="py-3 px-6 text-slate-500 italic max-w-xs truncate">{rec.remarks || '--'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="block md:hidden divide-y divide-slate-100">
+                    {empAttendanceList.map((rec) => {
+                      const isLate = isAttendanceLate(rec, employee.workTiming, adminSettings?.defaultCheckIn || '09:00');
+                      const isEarly = isAttendanceEarlyGoing(rec, employee.workTiming, adminSettings?.defaultCheckOut || '18:00');
+
+                      return (
+                        <div key={rec.date} className="p-4 hover:bg-slate-50/50 transition-colors space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-black text-slate-900 text-sm">{rec.date}</span>
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              rec.status === 'Present' 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                : rec.status === 'Half Day' 
+                                  ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                  : rec.status === 'Leave' 
+                                    ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                    : 'bg-rose-50 text-rose-700 border-rose-100'
+                            }`}>
+                              {rec.status}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 text-xs">
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">In Time</span>
+                              <div className="font-mono text-slate-700 font-bold mt-0.5 flex items-center gap-1.5">
                                 <span>{rec.checkIn || '--:--'}</span>
                                 {isLate && (
-                                  <span className="text-[9px] text-rose-500 font-extrabold flex items-center gap-0.5 mt-0.5">
-                                    <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></span>
-                                    <span>{language === 'en' ? 'Late' : 'देरी'}</span>
+                                  <span className="text-[9px] bg-rose-50 text-rose-500 border border-rose-100 px-1 py-0.2 rounded font-extrabold">
+                                    {language === 'en' ? 'Late' : 'देरी'}
                                   </span>
                                 )}
                               </div>
-                            </td>
-                            <td className="py-3 px-6 font-mono text-slate-700">
-                              <div className="flex flex-col">
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Out Time</span>
+                              <div className="font-mono text-slate-700 font-bold mt-0.5 flex items-center gap-1.5">
                                 <span>{rec.checkOut || '--:--'}</span>
                                 {isEarly && (
-                                  <span className="text-[9px] text-amber-500 font-extrabold flex items-center gap-0.5 mt-0.5">
-                                    <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>
-                                    <span>{language === 'en' ? 'Early' : 'जल्दी'}</span>
+                                  <span className="text-[9px] bg-amber-50 text-amber-500 border border-amber-100 px-1 py-0.2 rounded font-extrabold">
+                                    {language === 'en' ? 'Early' : 'जल्दी'}
                                   </span>
                                 )}
                               </div>
-                            </td>
-                            <td className="py-3 px-6 font-mono text-slate-700">
-                              {rec.overtimeHours ? `${rec.overtimeHours} hrs` : '--'}
-                            </td>
-                            <td className="py-3 px-6 text-slate-500 italic max-w-xs truncate">{rec.remarks || '--'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                            </div>
+                          </div>
+
+                          {(rec.overtimeHours || rec.remarks) && (
+                            <div className="bg-slate-50 p-2.5 rounded-lg text-[11px] space-y-1">
+                              {rec.overtimeHours ? (
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500 font-semibold">Overtime:</span>
+                                  <span className="font-mono font-bold text-slate-700">{rec.overtimeHours} hrs</span>
+                                </div>
+                              ) : null}
+                              {rec.remarks ? (
+                                <div className="text-slate-500 italic">
+                                  <span className="font-semibold not-italic text-slate-600">Notes: </span>{rec.remarks}
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12 text-slate-400">
@@ -827,52 +898,98 @@ export default function EmployeePortal({
         {activeTab === 'payslips' && (
           <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
             {empPayslips.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      <th className="py-4 px-6">{t.monthYear}</th>
-                      <th className="py-4 px-6">{t.basicSalary}</th>
-                      <th className="py-4 px-6">{t.grossSalary}</th>
-                      <th className="py-4 px-6">{t.slipDeductions}</th>
-                      <th className="py-4 px-6 font-bold text-slate-800">{t.netSalary}</th>
-                      <th className="py-4 px-6 text-center">{t.paymentStatus}</th>
-                      <th className="py-4 px-6 text-right">{t.actions}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {empPayslips.map((rec) => (
-                      <tr key={rec.monthYear} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-4 px-6 font-mono font-bold text-slate-950 text-sm">{rec.monthYear}</td>
-                        <td className="py-4 px-6 font-mono text-slate-700">₹{rec.basicSalary.toLocaleString('en-IN')}</td>
-                        <td className="py-4 px-6 font-mono text-slate-700">₹{rec.totalSalary.toLocaleString('en-IN')}</td>
-                        <td className="py-4 px-6 font-mono text-rose-600">-₹{rec.deductions.toLocaleString('en-IN')}</td>
-                        <td className="py-4 px-6 font-mono text-slate-900 font-extrabold text-sm">
-                          ₹{(rec.netSalary !== undefined ? rec.netSalary : rec.totalSalary).toLocaleString('en-IN')}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border ${
-                            rec.paymentStatus === 'Paid' 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                              : 'bg-amber-50 text-amber-700 border-amber-100'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${rec.paymentStatus === 'Paid' ? 'bg-emerald-500' : 'bg-amber-400'}`}></span>
-                            <span>{rec.paymentStatus === 'Paid' ? t.paid : t.pending}</span>
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-right">
+              <div>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <th className="py-4 px-6">{t.monthYear}</th>
+                        <th className="py-4 px-6">{t.basicSalary}</th>
+                        <th className="py-4 px-6">{t.grossSalary}</th>
+                        <th className="py-4 px-6">{t.slipDeductions}</th>
+                        <th className="py-4 px-6 font-bold text-slate-800">{t.netSalary}</th>
+                        <th className="py-4 px-6 text-center">{t.paymentStatus}</th>
+                        <th className="py-4 px-6 text-right">{t.actions}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {empPayslips.map((rec) => (
+                        <tr key={rec.monthYear} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="py-4 px-6 font-mono font-bold text-slate-950 text-sm">{rec.monthYear}</td>
+                          <td className="py-4 px-6 font-mono text-slate-700">₹{rec.basicSalary.toLocaleString('en-IN')}</td>
+                          <td className="py-4 px-6 font-mono text-slate-700">₹{rec.totalSalary.toLocaleString('en-IN')}</td>
+                          <td className="py-4 px-6 font-mono text-rose-600">-₹{rec.deductions.toLocaleString('en-IN')}</td>
+                          <td className="py-4 px-6 font-mono text-slate-900 font-extrabold text-sm">
+                            ₹{(rec.netSalary !== undefined ? rec.netSalary : rec.totalSalary).toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-6 text-center">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border ${
+                              rec.paymentStatus === 'Paid' 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                : 'bg-amber-50 text-amber-700 border-amber-100'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${rec.paymentStatus === 'Paid' ? 'bg-emerald-500' : 'bg-amber-400'}`}></span>
+                              <span>{rec.paymentStatus === 'Paid' ? t.paid : t.pending}</span>
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 text-right">
+                            <button
+                              onClick={() => handleOpenPayslip(rec)}
+                              className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-all active:scale-97"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-slate-400" />
+                              <span>View Slip</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="block md:hidden divide-y divide-slate-100">
+                  {empPayslips.map((rec) => (
+                    <div key={rec.monthYear} className="p-4 hover:bg-slate-50/50 transition-colors space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-black text-slate-950 text-sm">{rec.monthYear}</span>
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                          rec.paymentStatus === 'Paid' 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                            : 'bg-amber-50 text-amber-700 border-amber-100'
+                        }`}>
+                          <span className={`w-1 h-1 rounded-full ${rec.paymentStatus === 'Paid' ? 'bg-emerald-500' : 'bg-amber-400'}`}></span>
+                          <span>{rec.paymentStatus === 'Paid' ? t.paid : t.pending}</span>
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gross Pay</span>
+                          <p className="font-mono text-slate-700 font-semibold mt-0.5">₹{rec.totalSalary.toLocaleString('en-IN')}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Deductions</span>
+                          <p className="font-mono text-rose-600 font-semibold mt-0.5">-₹{rec.deductions.toLocaleString('en-IN')}</p>
+                        </div>
+                        <div className="col-span-2 border-t border-slate-100 pt-2 flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Net Payout</span>
+                            <p className="font-mono text-slate-950 font-black text-sm">₹{(rec.netSalary !== undefined ? rec.netSalary : rec.totalSalary).toLocaleString('en-IN')}</p>
+                          </div>
                           <button
                             onClick={() => handleOpenPayslip(rec)}
-                            className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-all active:scale-97"
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-all active:scale-97"
                           >
-                            <FileText className="w-3.5 h-3.5 text-slate-400" />
+                            <FileText className="w-3.5 h-3.5 text-slate-500" />
                             <span>View Slip</span>
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="text-center py-16 text-slate-400">
@@ -898,62 +1015,125 @@ export default function EmployeePortal({
 
             <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
               {attendanceRecords.filter(r => r.employeeId === employee.id && (r.status === 'Miss Punch' || r.status === 'Half Day')).length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        <th className="py-4 px-6">{t.date}</th>
-                        <th className="py-4 px-6">{t.exceptionType}</th>
-                        <th className="py-4 px-6">{t.checkIn} / {t.checkOut}</th>
-                        <th className="py-4 px-6 text-center">{t.approvalStatus}</th>
-                        <th className="py-4 px-6">{t.adminRemarks}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium">
-                      {attendanceRecords
-                        .filter(r => r.employeeId === employee.id && (r.status === 'Miss Punch' || r.status === 'Half Day'))
-                        .sort((a, b) => b.date.localeCompare(a.date))
-                        .map((rec) => {
-                          const status = rec.approvalStatus || 'Pending';
-                          return (
-                            <tr key={rec.date} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="py-4 px-6 font-mono font-bold text-slate-950 text-sm">{rec.date}</td>
-                              <td className="py-4 px-6">
-                                <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase ${
-                                  rec.status === 'Miss Punch' 
-                                    ? 'bg-amber-50 text-amber-700 border border-amber-100' 
-                                    : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                                }`}>
-                                  {rec.status}
-                                </span>
-                              </td>
-                              <td className="py-4 px-6 font-mono text-slate-700">
-                                {rec.checkIn || '--:--'} &rarr; {rec.checkOut || '--:--'}
-                              </td>
-                              <td className="py-4 px-6 text-center">
-                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border ${
-                                  status === 'Approved' 
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                    : status === 'Rejected' 
-                                      ? 'bg-red-50 text-red-700 border-red-100' 
-                                      : 'bg-amber-50 text-amber-700 border-amber-100'
-                                }`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                <div>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          <th className="py-4 px-6">{t.date}</th>
+                          <th className="py-4 px-6">{t.exceptionType}</th>
+                          <th className="py-4 px-6">{t.checkIn} / {t.checkOut}</th>
+                          <th className="py-4 px-6 text-center">{t.approvalStatus}</th>
+                          <th className="py-4 px-6">{t.adminRemarks}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {attendanceRecords
+                          .filter(r => r.employeeId === employee.id && (r.status === 'Miss Punch' || r.status === 'Half Day'))
+                          .sort((a, b) => b.date.localeCompare(a.date))
+                          .map((rec) => {
+                            const status = rec.approvalStatus || 'Pending';
+                            return (
+                              <tr key={rec.date} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="py-4 px-6 font-mono font-bold text-slate-950 text-sm">{rec.date}</td>
+                                <td className="py-4 px-6">
+                                  <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase ${
+                                    rec.status === 'Miss Punch' 
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-100' 
+                                      : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                                  }`}>
+                                    {rec.status}
+                                  </span>
+                                </td>
+                                <td className="py-4 px-6 font-mono text-slate-700">
+                                  {rec.checkIn || '--:--'} &rarr; {rec.checkOut || '--:--'}
+                                </td>
+                                <td className="py-4 px-6 text-center">
+                                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border ${
                                     status === 'Approved' 
-                                      ? 'bg-emerald-500' 
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
                                       : status === 'Rejected' 
-                                        ? 'bg-red-500' 
-                                        : 'bg-amber-400 animate-pulse'
-                                  }`}></span>
-                                  <span>{status === 'Approved' ? 'Approved' : status === 'Rejected' ? 'Rejected' : 'Pending'}</span>
-                                </span>
-                              </td>
-                              <td className="py-4 px-6 text-slate-500 italic font-semibold">{rec.remarks || '—'}</td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
+                                        ? 'bg-red-50 text-red-700 border-red-100' 
+                                        : 'bg-amber-50 text-amber-700 border-amber-100'
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                      status === 'Approved' 
+                                        ? 'bg-emerald-500' 
+                                        : status === 'Rejected' 
+                                          ? 'bg-red-500' 
+                                          : 'bg-amber-400 animate-pulse'
+                                    }`}></span>
+                                    <span>{status === 'Approved' ? 'Approved' : status === 'Rejected' ? 'Rejected' : 'Pending'}</span>
+                                  </span>
+                                </td>
+                                <td className="py-4 px-6 text-slate-500 italic font-semibold">{rec.remarks || '—'}</td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="block md:hidden divide-y divide-slate-100">
+                    {attendanceRecords
+                      .filter(r => r.employeeId === employee.id && (r.status === 'Miss Punch' || r.status === 'Half Day'))
+                      .sort((a, b) => b.date.localeCompare(a.date))
+                      .map((rec) => {
+                        const status = rec.approvalStatus || 'Pending';
+                        return (
+                          <div key={rec.date} className="p-4 hover:bg-slate-50/50 transition-colors space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono font-black text-slate-950 text-sm">{rec.date}</span>
+                              <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase ${
+                                rec.status === 'Miss Punch' 
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-100' 
+                                  : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                              }`}>
+                                {rec.status}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Punch Log</span>
+                                <p className="font-mono text-slate-700 font-semibold mt-0.5">
+                                  {rec.checkIn || '--:--'} &rarr; {rec.checkOut || '--:--'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Approval Status</span>
+                                <div className="mt-0.5">
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${
+                                    status === 'Approved' 
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                      : status === 'Rejected' 
+                                        ? 'bg-red-50 text-red-700 border-red-100' 
+                                        : 'bg-amber-50 text-amber-700 border-amber-100'
+                                  }`}>
+                                    <span className={`w-1 h-1 rounded-full ${
+                                      status === 'Approved' 
+                                        ? 'bg-emerald-500' 
+                                        : status === 'Rejected' 
+                                          ? 'bg-red-500' 
+                                          : 'bg-amber-400 animate-pulse'
+                                    }`}></span>
+                                    <span>{status === 'Approved' ? 'Approved' : status === 'Rejected' ? 'Rejected' : 'Pending'}</span>
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {rec.remarks && (
+                              <div className="bg-slate-50 p-2.5 rounded-lg text-[11px] text-slate-500 italic">
+                                <span className="font-semibold not-italic text-slate-600">Remarks: </span>{rec.remarks}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-16 text-slate-400">
@@ -993,35 +1173,35 @@ export default function EmployeePortal({
 
       {/* DETAILED PAYSLIP MODAL (Matches Administrator layout exactly) */}
       {activePayslip && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.15)] max-w-2xl w-full p-8 space-y-6 relative" id="printable-payslip">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.15)] max-w-2xl w-full p-4 sm:p-8 space-y-4 sm:space-y-6 relative" id="printable-payslip">
             
             <div className="absolute inset-0 pointer-events-none overflow-hidden select-none opacity-[0.015] flex items-center justify-center">
               <Sparkles className="w-96 h-96 text-indigo-900" />
             </div>
 
             {/* Header info */}
-            <div className="border-b border-slate-200 pb-5 text-center relative">
+            <div className="border-b border-slate-200 pb-4 sm:pb-5 text-center relative">
               <div className="flex items-center justify-center gap-2 mb-1.5">
                 <div className="w-6 h-6 rounded bg-indigo-600 text-white flex items-center justify-center font-extrabold text-[10px] font-display">P</div>
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-widest font-display">{t.payslipTitle}</h2>
+                <h2 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-widest font-display">{t.payslipTitle}</h2>
               </div>
-              <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest leading-none font-bold">Verified Employee Cloud Records System</p>
+              <p className="text-[8px] sm:text-[9px] font-mono text-slate-400 uppercase tracking-widest leading-none font-bold">Verified Employee Cloud Records System</p>
               
-              <div className="mt-4 inline-block">
-                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/60 px-4 py-1.5 rounded-full uppercase tracking-wider">{t.payslipHeader}</span>
+              <div className="mt-3 sm:mt-4 inline-block">
+                <span className="text-[10px] sm:text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/60 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full uppercase tracking-wider">{t.payslipHeader}</span>
               </div>
-              <p className="text-xs text-slate-500 font-mono font-bold mt-3 bg-slate-50 inline-block px-3 py-1 rounded-md border border-slate-150">{t.payslipMonth}: {activePayslip.record.monthYear}</p>
+              <p className="text-[11px] sm:text-xs text-slate-500 font-mono font-bold mt-2.5 sm:mt-3 bg-slate-50 inline-block px-3 py-1 rounded-md border border-slate-150">{t.payslipMonth}: {activePayslip.record.monthYear}</p>
             </div>
 
             {/* Employee metadata */}
-            <div className="bg-slate-50/80 p-5 rounded-lg border border-slate-200/60 relative">
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3.5 flex items-center gap-1">
+            <div className="bg-slate-50/80 p-4 sm:p-5 rounded-lg border border-slate-200/60 relative">
+              <h4 className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 sm:mb-3.5 flex items-center gap-1">
                 <Users className="w-3 h-3 text-indigo-500" />
                 <span>{t.payslipEmpDetails}</span>
               </h4>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs">
-                <div className="space-y-1.5 font-semibold">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                <div className="space-y-1 sm:space-y-1.5 font-semibold">
                   <p className="text-slate-500 flex justify-between border-b border-slate-100 pb-1">
                     <span>{t.id}:</span> 
                     <span className="font-mono font-bold text-slate-900">{activePayslip.record.employeeId}</span>
@@ -1035,7 +1215,7 @@ export default function EmployeePortal({
                     <span className="font-bold text-slate-900">{activePayslip.employee?.department}</span>
                   </p>
                 </div>
-                <div className="space-y-1.5 font-semibold">
+                <div className="space-y-1 sm:space-y-1.5 font-semibold">
                   <p className="text-slate-500 flex justify-between border-b border-slate-100 pb-1">
                     <span>{t.designation}:</span> 
                     <span className="font-bold text-slate-900">{activePayslip.employee?.designation}</span>
@@ -1058,7 +1238,7 @@ export default function EmployeePortal({
                 <Calendar className="w-3 h-3" />
                 <span>{t.attendanceBreakdown}</span>
               </h4>
-              <div className="grid grid-cols-5 text-center text-xs divide-x divide-indigo-100/30 font-semibold">
+              <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 text-center text-xs gap-y-3 sm:gap-y-0 sm:divide-x divide-indigo-100/30 font-semibold">
                 <div className="px-1">
                   <p className="text-slate-400 text-[10px] mb-1 font-bold">{t.presentDays}</p>
                   <p className="font-extrabold text-slate-800 text-sm font-mono">{activePayslip.attendance.present}</p>
@@ -1075,7 +1255,7 @@ export default function EmployeePortal({
                   <p className="text-slate-400 text-[10px] mb-1 font-bold">{t.absentDays}</p>
                   <p className="font-extrabold text-rose-600 text-sm font-mono">{activePayslip.attendance.absent}</p>
                 </div>
-                <div className="px-1">
+                <div className="px-1 col-span-2 xs:col-span-1">
                   <p className="text-slate-400 text-[10px] mb-1 font-bold">Overtime</p>
                   <p className="font-extrabold text-emerald-700 text-sm font-mono">{activePayslip.attendance.overtimeHrs} hr</p>
                 </div>
@@ -1176,17 +1356,17 @@ export default function EmployeePortal({
             </div>
 
             {/* Net Total block */}
-            <div className="bg-slate-900 text-white p-5 rounded-lg flex items-center justify-between shadow-md relative overflow-hidden">
+            <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-lg flex items-center justify-between shadow-md relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#03623c]/20 rounded-full blur-2xl"></div>
               <div className="space-y-0.5 relative z-10 font-bold">
                 <span className="text-[10px] uppercase tracking-widest text-slate-400">{t.netPayable}</span>
-                <p className="text-xxs text-emerald-400 font-mono uppercase tracking-wider">Computed & Secured Digital Receipt</p>
+                <p className="text-[9px] text-emerald-400 font-mono uppercase tracking-wider">Computed & Secured Digital Receipt</p>
               </div>
-              <span className="text-2xl font-extrabold font-mono text-white relative z-10">₹{(activePayslip.record.netSalary !== undefined ? activePayslip.record.netSalary : activePayslip.record.totalSalary).toLocaleString('en-IN')}</span>
+              <span className="text-xl sm:text-2xl font-extrabold font-mono text-white relative z-10">₹{(activePayslip.record.netSalary !== undefined ? activePayslip.record.netSalary : activePayslip.record.totalSalary).toLocaleString('en-IN')}</span>
             </div>
 
             {/* Signature Block */}
-            <div className="grid grid-cols-2 pt-8 text-xs text-center text-slate-500 font-bold">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 sm:gap-y-0 pt-6 sm:pt-8 text-xs text-center text-slate-500 font-bold">
               <div>
                 <div className="w-36 mx-auto border-b border-slate-300 pb-1 text-slate-800">Rajeev Verma</div>
                 <p className="mt-1.5 text-[10px] text-slate-400 uppercase tracking-widest">{t.authorizedSign}</p>
@@ -1198,24 +1378,24 @@ export default function EmployeePortal({
             </div>
 
             {/* Controls */}
-            <div className="border-t border-slate-100 pt-5 flex justify-end gap-2.5 no-print">
+            <div className="border-t border-slate-100 pt-4 sm:pt-5 flex flex-col sm:flex-row justify-end gap-2 no-print">
               <button
                 onClick={() => downloadPayslipPDF(activePayslip.record, activePayslip.employee)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97 w-full sm:w-auto"
               >
                 <FileText className="w-3.5 h-3.5 text-white" />
                 <span>{t.downloadPDF}</span>
               </button>
               <button
                 onClick={handlePrint}
-                className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97"
+                className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97 w-full sm:w-auto"
               >
                 <Printer className="w-3.5 h-3.5 text-slate-500" />
                 <span>{t.printSlip}</span>
               </button>
               <button
                 onClick={() => setActivePayslip(null)}
-                className="bg-slate-900 hover:bg-slate-850 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-3xs cursor-pointer active:scale-97"
+                className="bg-slate-900 hover:bg-slate-850 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-3xs cursor-pointer active:scale-97 w-full sm:w-auto text-center"
               >
                 <span>{t.closeSlip}</span>
               </button>

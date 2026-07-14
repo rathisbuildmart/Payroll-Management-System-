@@ -2105,33 +2105,35 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans">
         {/* Portal Header */}
-        <header className="bg-slate-950 text-white border-b border-slate-900 py-4 px-6 md:px-8 flex items-center justify-between shadow-md relative no-print shrink-0">
-          <div className="flex items-center gap-2.5">
-            <img 
-              src={getDirectImageUrl(adminSettings.companyLogo)} 
-              alt="Logo" 
-              className="w-8 h-8 rounded-lg object-cover" 
-              referrerPolicy="no-referrer"
-            />
-            <div>
-              <h1 className="text-sm font-black uppercase tracking-widest">{adminSettings.companyName || 'Rathi Build Mart'}</h1>
-              <p className="text-[9px] font-mono font-bold text-emerald-400 tracking-wider">Employee Workspace Portal</p>
+        <header className="bg-slate-950 text-white border-b border-slate-900 py-3 px-4 md:py-4 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md relative no-print shrink-0">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-start">
+            <div className="flex items-center gap-2.5">
+              <img 
+                src={getDirectImageUrl(adminSettings.companyLogo)} 
+                alt="Logo" 
+                className="w-8 h-8 rounded-lg object-cover" 
+                referrerPolicy="no-referrer"
+              />
+              <div className="max-w-[180px] sm:max-w-none">
+                <h1 className="text-xs sm:text-sm font-black uppercase tracking-widest truncate">{adminSettings.companyName || 'Rathi Build Mart'}</h1>
+                <p className="text-[8px] sm:text-[9px] font-mono font-bold text-emerald-400 tracking-wider">Employee Workspace Portal</p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t border-slate-900/50 sm:border-t-0 pt-2 sm:pt-0">
             {/* Connection Status Indicator */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-slate-800">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-slate-800">
               <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
-              <span className={isOnline ? 'text-green-400' : 'text-amber-400 font-sans'}>
-                {isOnline ? (language === 'en' ? 'Cloud Connected' : 'क्लाउड कनेक्टेड') : (language === 'en' ? 'Offline Mode' : 'ऑफ़लाइन मोड')}
+              <span className={isOnline ? 'text-green-400 font-sans' : 'text-amber-400 font-sans'}>
+                {isOnline ? (language === 'en' ? 'Connected' : 'कनेक्टेड') : (language === 'en' ? 'Offline' : 'ऑफ़लाइन')}
               </span>
             </div>
 
             {/* Logout Button */}
             <button
               onClick={handlePortalLogout}
-              className="bg-rose-600/10 hover:bg-rose-600 hover:text-white border border-rose-600/20 text-rose-400 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 transition-all"
+              className="bg-rose-600/10 hover:bg-rose-600 hover:text-white border border-rose-600/20 text-rose-400 text-xs font-bold px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 transition-all"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>{language === 'en' ? 'Sign Out' : 'लॉग आउट'}</span>
