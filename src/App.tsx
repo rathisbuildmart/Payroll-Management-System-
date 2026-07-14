@@ -130,6 +130,26 @@ const mergePayroll = (local: PayrollRecord[], remote: PayrollRecord[]): PayrollR
 };
 
 export default function App() {
+  // Synchronously and dynamically force document title and favicon to update on app load
+  useEffect(() => {
+    document.title = "Rathi Buildmart - Payroll & Attendance Portal";
+    
+    const updateFavicon = () => {
+      // Remove any existing favicons to avoid conflicts
+      const linkElements = document.querySelectorAll("link[rel*='icon']");
+      linkElements.forEach(el => el.parentNode?.removeChild(el));
+      
+      // Create and append the new custom favicon
+      const newLink = document.createElement('link');
+      newLink.type = 'image/jpeg';
+      newLink.rel = 'shortcut icon';
+      newLink.href = '/src/assets/images/rathi_favicon_1783945713829.jpg';
+      document.getElementsByTagName('head')[0].appendChild(newLink);
+    };
+    
+    updateFavicon();
+  }, []);
+
   const [portalUser, setPortalUser] = useState<PortalUser | null>(() => {
     const saved = localStorage.getItem('payroll_portal_user');
     if (saved) {
