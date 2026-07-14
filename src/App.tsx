@@ -765,10 +765,12 @@ export default function App() {
       }
 
       // Load Settings from Google Sheets
+      let activeSettings = adminSettings;
       try {
         const fetchedSettings = await fetchAdminSettings(sheetId, accessToken);
         if (fetchedSettings) {
           setAdminSettings(fetchedSettings);
+          activeSettings = fetchedSettings;
           localStorage.setItem('payroll_admin_settings', JSON.stringify(fetchedSettings));
         } else {
           // If the sheet doesn't have settings yet, write current local settings to Google Sheets
@@ -791,6 +793,24 @@ export default function App() {
       // If existing employees are found, hide seed dialog
       if (fetchedEmployees.length > 0) {
         setShowSeedDialog(false);
+      }
+
+      // Force direct, immediate synchronization of loaded real data to central Firestore database
+      // so other devices, browsers, and employee portals can access the real data immediately.
+      try {
+        await saveToFirestore({
+          employees: mergedEmployees,
+          attendance: mergedAttendance,
+          payroll: mergedPayroll,
+          adminSettings: activeSettings,
+          failedLogins,
+          spreadsheetId: sheetId,
+          spreadsheetLink: webLink
+        });
+        setIsDataModified(false); // Directly saved, clear modified state
+        console.log('Central Firestore database successfully synchronized with fresh Google Sheets data.');
+      } catch (fErr) {
+        console.warn('Failed to save fresh Google Sheets data directly to Firestore:', fErr);
       }
 
       setSyncStatus('synced');
@@ -871,6 +891,51 @@ export default function App() {
   const handleClearFailedLogins = () => {
     setFailedLogins([]);
     setIsDataModified(true);
+  };
+
+  const handleImportDatabase = async (importedData: any) => {
+    try {
+      const { employees: importedEmps, attendance: importedAtt, payroll: importedPay, adminSettings: importedSettings } = importedData;
+
+      const newEmps = Array.isArray(importedEmps) ? importedEmps : employees;
+      const newAtt = Array.isArray(importedAtt) ? importedAtt : attendance;
+      const newPay = Array.isArray(importedPay) ? importedPay : payroll;
+      const newSettings = importedSettings && typeof importedSettings === 'object' ? importedSettings : adminSettings;
+
+      setEmployees(newEmps);
+      setAttendance(newAtt);
+      setPayroll(newPay);
+      setAdminSettings(newSettings);
+      
+      setIsDataModified(true);
+      
+      await saveToFirestore({
+        employees: newEmps,
+        attendance: newAtt,
+        payroll: newPay,
+        adminSettings: newSettings,
+        failedLogins
+      });
+
+      localStorage.removeItem('dismiss_sheets_notice');
+      setShowSheetsNotice(true);
+    } catch (err: any) {
+      console.error("Import failed in App", err);
+      alert("Failed to import database: " + (err?.message || err));
+    }
+  };
+
+  const handleClearSheetsSession = () => {
+    try {
+      logout();
+      localStorage.removeItem('google_access_token');
+      localStorage.removeItem('google_access_token_expires_at');
+      setToken(null);
+      setNeedsAuth(true);
+      setSyncStatus('idle');
+    } catch (err) {
+      console.error("Clear sheets session failed", err);
+    }
   };
 
   const handleLogout = () => {
@@ -2670,6 +2735,11 @@ export default function App() {
                   setHrTickets={setHrTickets}
                   passwordRequests={passwordRequests}
                   setPasswordRequests={setPasswordRequests}
+                  employees={employees}
+                  attendance={attendance}
+                  payroll={payroll}
+                  onImportData={handleImportDatabase}
+                  onClearSheetsSession={handleClearSheetsSession}
                 />
               )}
             </div>

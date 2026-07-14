@@ -22,8 +22,11 @@ export interface SharedData {
 export async function saveToFirestore(data: SharedData): Promise<void> {
   try {
     const docRef = doc(db, COLLECTION_NAME, DOCUMENT_ID);
+    // Deeply serialize and deserialize to strip undefined values which crash Firestore setDoc
+    const sanitizedData = JSON.parse(JSON.stringify(data));
+    
     await setDoc(docRef, {
-      ...data,
+      ...sanitizedData,
       lastUpdated: new Date().toISOString()
     });
     console.log('Successfully synced data to Firestore');
@@ -31,7 +34,7 @@ export async function saveToFirestore(data: SharedData): Promise<void> {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       console.log('Firestore sync skipped: System is working offline. Local changes saved in browser.');
     } else {
-      console.log('Firestore sync skipped (offline or sandbox):', error?.message || error);
+      console.error('Firestore sync failed:', error?.message || error);
     }
   }
 }

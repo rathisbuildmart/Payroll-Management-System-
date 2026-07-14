@@ -19,7 +19,12 @@ import {
   Megaphone,
   LifeBuoy,
   KeyRound,
-  CheckCircle2
+  CheckCircle2,
+  Database,
+  Upload,
+  Download,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import { AdminSettings, FieldSetting, FailedLoginAttempt } from '../types';
 
@@ -36,6 +41,12 @@ interface SettingsProps {
   setHrTickets?: React.Dispatch<React.SetStateAction<any[]>>;
   passwordRequests?: any[];
   setPasswordRequests?: React.Dispatch<React.SetStateAction<any[]>>;
+
+  employees?: any[];
+  attendance?: any[];
+  payroll?: any[];
+  onImportData?: (data: { employees?: any[]; attendance?: any[]; payroll?: any[]; adminSettings?: AdminSettings }) => void;
+  onClearSheetsSession?: () => void;
 }
 
 export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
@@ -137,9 +148,14 @@ export default function Settings({
   hrTickets = [],
   setHrTickets,
   passwordRequests = [],
-  setPasswordRequests
+  setPasswordRequests,
+  employees = [],
+  attendance = [],
+  payroll = [],
+  onImportData,
+  onClearSheetsSession
 }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'notices_support'>('company');
+  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'notices_support' | 'database'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
   const [newMasterVal, setNewMasterVal] = useState<string>('');
   const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'>>('departments');
@@ -158,6 +174,78 @@ export default function Settings({
   const [securitySearch, setSecuritySearch] = useState('');
   const [securityReasonFilter, setSecurityReasonFilter] = useState<'all' | 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password'>('all');
 
+  // Database Backup, Sync, and Troubleshoot States
+  const [importData, setImportData] = useState<any>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+
+  const handleExport = () => {
+    try {
+      const exportPayload = {
+        employees,
+        attendance,
+        payroll,
+        adminSettings: settings,
+        exportedAt: new Date().toISOString(),
+        source: window.location.href
+      };
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `payroll_db_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert("Export failed: " + (e?.message || e));
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImportError(null);
+    setImportSummary(null);
+    setImportData(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (!parsed || (typeof parsed !== 'object')) {
+          throw new Error(language === 'en' ? "Invalid JSON format." : "अमान्य JSON प्रारूप।");
+        }
+        
+        const empsCount = Array.isArray(parsed.employees) ? parsed.employees.length : 0;
+        const attCount = Array.isArray(parsed.attendance) ? parsed.attendance.length : 0;
+        const payCount = Array.isArray(parsed.payroll) ? parsed.payroll.length : 0;
+        
+        if (empsCount === 0 && attCount === 0 && payCount === 0) {
+          throw new Error(language === 'en' ? "Backup file is empty." : "बैकअप फ़ाइल खाली है।");
+        }
+
+        setImportData(parsed);
+        setImportSummary(
+          language === 'en'
+            ? `Backup file verified. It contains: ${empsCount} employees, ${attCount} attendance entries, and ${payCount} payroll records.`
+            : `बैकअप फ़ाइल सत्यापित की गई। इसमें: ${empsCount} कर्मचारी, ${attCount} उपस्थिति रिकॉर्ड, और ${payCount} पेरोल रिकॉर्ड शामिल हैं।`
+        );
+      } catch (err: any) {
+        setImportError(err?.message || String(err));
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleConfirmImport = () => {
+    if (!importData || !onImportData) return;
+    onImportData(importData);
+    setImportSummary(null);
+    setImportData(null);
+  };
+
   // Work Timing Specific Builder States
   const [shiftName, setShiftName] = useState<string>('');
   const [shiftStart, setShiftStart] = useState<string>('09:00');
@@ -174,6 +262,7 @@ export default function Settings({
       tabPolicy: "Policy & Payroll Rules",
       tabSecurity: "Login Security Audit",
       tabNoticesSupport: "Notices & HR Helpdesk",
+      tabDatabase: "Database & Backups",
       
       // Company
       compName: "Company Name",
@@ -244,6 +333,7 @@ export default function Settings({
       tabPolicy: "नीति और पेरोल नियम",
       tabSecurity: "लॉगिन सुरक्षा ऑडिट",
       tabNoticesSupport: "कंपनी नोटिस और हेल्पडेस्क",
+      tabDatabase: "डेटाबेस और बैकअप",
       
       // Company
       compName: "कंपनी का नाम",
@@ -504,6 +594,18 @@ export default function Settings({
                 {hrTickets.filter(tk => tk.status === 'Pending').length + passwordRequests.filter(pr => pr.status === 'Pending').length}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('database')}
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
+              activeSubTab === 'database'
+                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
+                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
+            <span>{t.tabDatabase}</span>
           </button>
 
           <div className="hidden md:block pt-6 mt-6 border-t border-gray-200/60">
@@ -1583,6 +1685,148 @@ export default function Settings({
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {activeSubTab === 'database' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xs font-bold text-gray-800 border-b border-gray-100 pb-2 flex items-center gap-1.5">
+                  <Database className="w-4 h-4 text-slate-600" />
+                  {language === 'en' ? 'Database Synchronization & Session Management' : 'डेटाबेस सिंक्रनाइज़ेशन और सत्र प्रबंधन'}
+                </h3>
+                <p className="text-[10px] text-gray-500 mt-1 leading-normal font-sans">
+                  {language === 'en' 
+                    ? 'Manage your cloud storage connections, troubleshoot Google Sheets sync errors, or backup and restore your complete HRMS database.' 
+                    : 'अपने क्लाउड स्टोरेज कनेक्शन प्रबंधित करें, Google Sheets सिंक त्रुटियों को दूर करें, या अपने संपूर्ण HRMS डेटाबेस का बैकअप लें और उसे पुनर्स्थापित करें।'}
+                </p>
+              </div>
+
+              {/* Troubleshooting Card */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs font-sans">
+                <div className="flex items-start gap-3">
+                  <div className="bg-amber-100 p-2 rounded-xl text-amber-700 shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-slate-800">
+                      {language === 'en' ? 'Troubleshoot "Failed to Fetch" Sync Errors' : '"Failed to Fetch" सिंक त्रुटियों का समाधान करें'}
+                    </h4>
+                    <p className="text-[10px] text-slate-500 leading-normal font-semibold">
+                      {language === 'en'
+                        ? 'If you are seeing a persistent Google Sheets sync error or "Failed to Fetch", it is typically caused by cookie tracking protection, local ad-blockers, or an expired/invalid Google OAuth token. Clearing your Google Sheets credentials cache allows you to log back in cleanly and recreate the connection.'
+                        : 'यदि आप लगातार Google Sheets सिंक त्रुटि या "Failed to Fetch" देख रहे हैं, तो यह आमतौर पर कुकी ट्रैकिंग सुरक्षा, स्थानीय विज्ञापन-अवरोधकों (ad-blockers), या एक समाप्त/अमान्य Google OAuth टोकन के कारण होता है। अपने Google Sheets क्रेडेंशियल कैश को साफ़ करने से आप आसानी से दोबारा लॉग इन कर सकते हैं।'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onClearSheetsSession) {
+                        onClearSheetsSession();
+                        alert(language === 'en' 
+                          ? 'Google Sheets token cache cleared. Please refresh the page and authorize Google Sheets again.' 
+                          : 'Google Sheets टोकन कैश साफ़ कर दिया गया है। कृपया पृष्ठ को रीफ़्रेश करें और Google Sheets को फिर से अधिकृत करें।');
+                      }
+                    }}
+                    className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    {language === 'en' ? 'Clear Google Sheets Cache & Reset Session' : 'Google Sheets कैश साफ़ करें और सत्र रीसेट करें'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Import/Export Card */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs font-sans">
+                <div className="flex items-start gap-3">
+                  <div className="bg-indigo-100 p-2 rounded-xl text-indigo-700 shrink-0">
+                    <Database className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-slate-800">
+                      {language === 'en' ? 'JSON Database Backup & Direct Instance Syncing' : 'JSON डेटाबेस बैकअप और डायरेक्ट इंस्टेंस सिंकिंग'}
+                    </h4>
+                    <p className="text-[10px] text-slate-500 leading-normal font-semibold">
+                      {language === 'en'
+                        ? 'Want to transfer your live production data from https://hrmsrbm.onrender.com/ into this development workspace? You can export the whole database in 1-click as a JSON backup file from your live instance, and import it here. The data will merge cleanly and automatically synchronize to your active Cloud Firestore.'
+                        : 'क्या आप https://hrmsrbm.onrender.com/ से अपने वास्तविक लाइव डेटा को इस विकास कार्यक्षेत्र में स्थानांतरित करना चाहते हैं? आप अपने लाइव इंस्टेंस से संपूर्ण डेटाबेस को 1-क्लिक में JSON बैकअप फ़ाइल के रूप में निर्यात कर सकते हैं, और इसे यहाँ आयात कर सकते हैं। डेटा आसानी से मर्ज हो जाएगा और आपके सक्रिय क्लाउड फायरस्टोर में स्वतः सिंक्रनाइज़ हो जाएगा।'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+                  {/* Export Section */}
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between space-y-3">
+                    <div>
+                      <h5 className="text-[11px] font-bold text-slate-800 mb-1">
+                        {language === 'en' ? 'Export Database' : 'डेटाबेस निर्यात करें'}
+                      </h5>
+                      <p className="text-[9px] text-slate-500 leading-normal">
+                        {language === 'en'
+                          ? 'Download all employees, attendance archives, payroll records, and customized settings configuration as a local JSON backup.'
+                          : 'सभी कर्मचारियों, उपस्थिति अभिलेखागार, पेरोल रिकॉर्ड और अनुकूलित सेटिंग्स कॉन्फ़िगरेशन को स्थानीय JSON बैकअप के रूप में डाउनलोड करें।'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleExport}
+                      className="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 text-[10px] font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-slate-300"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      {language === 'en' ? 'Download JSON Backup' : 'JSON बैकअप डाउनलोड करें'}
+                    </button>
+                  </div>
+
+                  {/* Import Section */}
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between space-y-3">
+                    <div>
+                      <h5 className="text-[11px] font-bold text-slate-800 mb-1">
+                        {language === 'en' ? 'Import Database' : 'डेटाबेस आयात करें'}
+                      </h5>
+                      <p className="text-[9px] text-slate-500 leading-normal">
+                        {language === 'en'
+                          ? 'Upload a previously exported JSON backup file to overwrite current workspace records and sync to Cloud Firestore.'
+                          : 'वर्तमान कार्यक्षेत्र रिकॉर्ड को अधिलेखित करने और क्लाउड फायरस्टोर से सिंक करने के लिए पहले निर्यात की गई JSON बैकअप फ़ाइल अपलोड करें।'}
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block w-full cursor-pointer">
+                        <span className="sr-only">Choose backup file</span>
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleFileChange}
+                          className="block w-full text-[9px] text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[9px] file:font-black file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                        />
+                      </label>
+
+                      {importError && (
+                        <div className="text-[9px] text-red-600 font-bold bg-red-50 p-2 rounded border border-red-200">
+                          {importError}
+                        </div>
+                      )}
+
+                      {importSummary && (
+                        <div className="text-[9px] text-emerald-700 font-bold bg-emerald-50 p-2 rounded border border-emerald-150 space-y-2">
+                          <p>{importSummary}</p>
+                          <button
+                            type="button"
+                            onClick={handleConfirmImport}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black py-1.5 rounded transition-all cursor-pointer flex items-center justify-center gap-1"
+                          >
+                            <Upload className="w-3 h-3" />
+                            {language === 'en' ? 'Confirm Overwrite & Import Now' : 'अधिलेखन की पुष्टि करें और अभी आयात करें'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
