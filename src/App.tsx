@@ -129,27 +129,34 @@ const mergePayroll = (local: PayrollRecord[], remote: PayrollRecord[]): PayrollR
   return merged;
 };
 
-export default function App() {
-  // Synchronously and dynamically force document title and favicon to update on app load
-  useEffect(() => {
-    document.title = "Rathi Buildmart - Payroll & Attendance Portal";
-    
-    const updateFavicon = () => {
-      // Remove any existing favicons to avoid conflicts
-      const linkElements = document.querySelectorAll("link[rel*='icon']");
-      linkElements.forEach(el => el.parentNode?.removeChild(el));
-      
-      // Create and append the new custom favicon
-      const newLink = document.createElement('link');
-      newLink.type = 'image/jpeg';
-      newLink.rel = 'shortcut icon';
-      newLink.href = '/src/assets/images/rathi_favicon_1783945713829.jpg';
-      document.getElementsByTagName('head')[0].appendChild(newLink);
-    };
-    
-    updateFavicon();
-  }, []);
+export function getDirectImageUrl(url: string | undefined): string {
+  const fallback = '/src/assets/images/rathi_favicon_1783945713829.jpg';
+  if (!url || !url.trim()) return fallback;
+  
+  const trimmed = url.trim();
+  
+  // If it's already a local asset, data URL, or blob, return as is
+  if (trimmed.startsWith('/') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+  
+  // Google Drive URL patterns:
+  // 1. /file/d/{ID}/view or /file/d/{ID}/edit or similar
+  const fileDMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]{25,50})/);
+  if (fileDMatch && fileDMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${fileDMatch[1]}`;
+  }
+  
+  // 2. id={ID} query parameter (e.g. open?id=..., uc?id=..., uc?export=download&id=...)
+  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{25,50})/);
+  if (idMatch && idMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+  }
+  
+  return trimmed;
+}
 
+export default function App() {
   const [portalUser, setPortalUser] = useState<PortalUser | null>(() => {
     const saved = localStorage.getItem('payroll_portal_user');
     if (saved) {
@@ -562,6 +569,26 @@ export default function App() {
     }
     return INITIAL_ADMIN_SETTINGS;
   });
+
+  // Dynamically update document title and favicon when company name or logo changes
+  useEffect(() => {
+    document.title = `${adminSettings.companyName || 'Rathi Buildmart'} - Payroll & Attendance Portal`;
+    
+    const updateFavicon = () => {
+      // Remove any existing favicons to avoid conflicts
+      const linkElements = document.querySelectorAll("link[rel*='icon']");
+      linkElements.forEach(el => el.parentNode?.removeChild(el));
+      
+      // Create and append the new custom favicon
+      const newLink = document.createElement('link');
+      newLink.type = adminSettings.companyLogo ? 'image/png' : 'image/jpeg';
+      newLink.rel = 'shortcut icon';
+      newLink.href = getDirectImageUrl(adminSettings.companyLogo);
+      document.getElementsByTagName('head')[0].appendChild(newLink);
+    };
+    
+    updateFavicon();
+  }, [adminSettings.companyName, adminSettings.companyLogo]);
 
   // Load global data from Firestore on startup to allow any device/browser to log in with up-to-date credentials
   useEffect(() => {
@@ -1418,8 +1445,8 @@ export default function App() {
           {/* Top Brand Logo header */}
           <div className="flex items-center gap-3 relative z-10">
             <img 
-              src="/src/assets/images/rathi_favicon_1783945713829.jpg" 
-              alt="Rathi Buildmart" 
+              src={getDirectImageUrl(adminSettings.companyLogo)} 
+              alt={adminSettings.companyName || 'Rathi Buildmart'} 
               className="w-10 h-10 rounded-2xl object-cover shadow-lg shadow-emerald-500/20 ring-1 ring-emerald-400/25"
               referrerPolicy="no-referrer"
             />
@@ -2081,8 +2108,8 @@ export default function App() {
         <header className="bg-slate-950 text-white border-b border-slate-900 py-4 px-6 md:px-8 flex items-center justify-between shadow-md relative no-print shrink-0">
           <div className="flex items-center gap-2.5">
             <img 
-              src="/src/assets/images/rathi_favicon_1783945713829.jpg" 
-              alt="Rathi Logo" 
+              src={getDirectImageUrl(adminSettings.companyLogo)} 
+              alt="Logo" 
               className="w-8 h-8 rounded-lg object-cover" 
               referrerPolicy="no-referrer"
             />
@@ -2176,8 +2203,8 @@ export default function App() {
           <div className="flex items-center gap-3 mb-8 w-full">
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 hover:rotate-3 transition-all duration-300 cursor-pointer relative group border border-emerald-500/20 shadow-emerald-950/20 shrink-0 overflow-hidden">
               <img 
-                src="/src/assets/images/rathi_favicon_1783945713829.jpg" 
-                alt="Rathi Buildmart" 
+                src={getDirectImageUrl(adminSettings.companyLogo)} 
+                alt={adminSettings.companyName || 'Rathi Buildmart'} 
                 className="w-full h-full object-cover" 
                 referrerPolicy="no-referrer"
               />
