@@ -832,8 +832,16 @@ export default function App() {
           : `सिंक करने में विफल: ${error?.message || error}`
       );
       const errStr = String(error?.message || error);
-      if (errStr.includes('401') || errStr.includes('Unauthorized') || errStr.includes('403') || errStr.includes('invalid_grant')) {
-        // Clear expired/invalid session token
+      if (
+        errStr.includes('401') || 
+        errStr.includes('Unauthorized') || 
+        errStr.includes('403') || 
+        errStr.includes('invalid_grant') ||
+        errStr.includes('Failed to fetch') ||
+        errStr.includes('TypeError')
+      ) {
+        // Clear expired/invalid session token to prevent persistent lockout loops
+        console.warn('Stale or blocked token detected, resetting sheets session state:', errStr);
         logout();
         setUser(null);
         setToken(null);
@@ -2526,10 +2534,20 @@ export default function App() {
                               if (globalData.adminSettings) setAdminSettings(globalData.adminSettings);
                               alert(language === 'en' ? 'Cloud Firestore database loaded successfully!' : 'क्लाउड फ़ायरस्टोर डेटाबेस सफलतापूर्वक लोड किया गया!');
                             } else {
-                              alert(language === 'en' ? 'Failed to load from Cloud Firestore. Working with local cache.' : 'क्लाउड फ़ायरस्टोर से लोड करने में विफल। स्थानीय कैश के साथ काम किया जा रहा है।');
+                              const errorDetail = result?.error ? `\n\nError: ${result.error}` : '';
+                              alert(
+                                language === 'en' 
+                                  ? `Failed to load from Cloud Firestore. Working with local cache.${errorDetail}` 
+                                  : `क्लाउड फ़ायरस्टोर से लोड करने में विफल। स्थानीय कैश के साथ काम किया जा रहा है।${errorDetail}`
+                              );
                             }
-                          } catch (err) {
-                            alert(language === 'en' ? 'Cloud Firestore connection error. Working with local cache.' : 'क्लाउड फ़ायरस्टोर कनेक्शन त्रुटि। स्थानीय कैश के साथ काम किया जा रहा है।');
+                          } catch (err: any) {
+                            const errorDetail = err?.message || String(err);
+                            alert(
+                              language === 'en' 
+                                ? `Cloud Firestore connection error. Working with local cache.\n\nError: ${errorDetail}` 
+                                : `क्लाउड फ़ायरस्टोर कनेक्शन त्रुटि। स्थानीय कैश के साथ काम किया जा रहा है।\n\nत्रुटि: ${errorDetail}`
+                            );
                           } finally {
                             setIsLoadingData(false);
                           }
@@ -2565,6 +2583,30 @@ export default function App() {
                       {language === 'en' ? 'Clear Logs' : 'लॉग साफ़ करें'}
                     </button>
                   </div>
+
+                  {/* Troubleshooting Reset for Sync Errors */}
+                  {syncStatus === 'error' && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2 font-sans">
+                      <p className="text-[10px] text-amber-800 leading-normal font-semibold">
+                        {language === 'en' 
+                          ? 'Persistent "Failed to Fetch" or "Sync Error"? This is usually caused by expired credentials, browser tracking blocks, or local adblockers. Click below to clear Google session cache and re-authenticate.'
+                          : 'लगातार "Failed to Fetch" या "सिंक त्रुटि" दिख रही है? यह आमतौर पर समाप्त क्रेडेंशियल्स, ब्राउज़र ट्रैकिंग ब्लॉक या एडब्लॉकर्स के कारण होता है। Google सत्र कैश साफ़ करने और फिर से प्रमाणित करने के लिए नीचे क्लिक करें।'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleClearSheetsSession();
+                          alert(language === 'en'
+                            ? 'Google Sheets cache cleared. Please click "Connect Google Account" in the banner to log back in.'
+                            : 'Google Sheets कैश साफ़ कर दिया गया है। फिर से लॉग इन करने के लिए बैनर में "Google खाता कनेक्ट करें" पर क्लिक करें।');
+                        }}
+                        className="w-full bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 shadow-3xs"
+                      >
+                        <RefreshCw className="w-3 h-3 animate-spin" style={{ animationDuration: '3s' }} />
+                        {language === 'en' ? 'Reset Google Sheets Session & Relogin' : 'Google Sheets सत्र रीसेट करें और पुनः लॉगिन करें'}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Sync Logs list */}
                   <div className="space-y-2">

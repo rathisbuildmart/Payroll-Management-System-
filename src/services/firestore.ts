@@ -19,7 +19,7 @@ export interface SharedData {
 /**
  * Saves all application data to Firestore
  */
-export async function saveToFirestore(data: SharedData): Promise<void> {
+export async function saveToFirestore(data: SharedData): Promise<{ success: boolean; error?: string }> {
   try {
     const docRef = doc(db, COLLECTION_NAME, DOCUMENT_ID);
     // Deeply serialize and deserialize to strip undefined values which crash Firestore setDoc
@@ -30,19 +30,22 @@ export async function saveToFirestore(data: SharedData): Promise<void> {
       lastUpdated: new Date().toISOString()
     });
     console.log('Successfully synced data to Firestore');
+    return { success: true };
   } catch (error: any) {
+    const errMsg = error?.message || String(error);
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       console.log('Firestore sync skipped: System is working offline. Local changes saved in browser.');
     } else {
-      console.error('Firestore sync failed:', error?.message || error);
+      console.error('Firestore sync failed:', errMsg);
     }
+    return { success: false, error: errMsg };
   }
 }
 
 /**
  * Loads all application data from Firestore
  */
-export async function loadFromFirestore(): Promise<{ data: SharedData | null; success: boolean }> {
+export async function loadFromFirestore(): Promise<{ data: SharedData | null; success: boolean; error?: string }> {
   try {
     const docRef = doc(db, COLLECTION_NAME, DOCUMENT_ID);
     const docSnap = await getDoc(docRef);
@@ -51,11 +54,12 @@ export async function loadFromFirestore(): Promise<{ data: SharedData | null; su
     }
     return { data: null, success: true };
   } catch (error: any) {
+    const errMsg = error?.message || String(error);
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       console.log('Firestore loading skipped: System is working offline. Loading local cache.');
     } else {
-      console.log('Firestore loading skipped (offline or sandbox):', error?.message || error);
+      console.log('Firestore loading skipped (offline or sandbox):', errMsg);
     }
-    return { data: null, success: false };
+    return { data: null, success: false, error: errMsg };
   }
 }
