@@ -11,6 +11,8 @@ export interface SharedData {
   payroll: PayrollRecord[];
   adminSettings?: AdminSettings;
   failedLogins?: FailedLoginAttempt[];
+  spreadsheetId?: string | null;
+  spreadsheetLink?: string | null;
   lastUpdated?: string;
 }
 
@@ -37,20 +39,20 @@ export async function saveToFirestore(data: SharedData): Promise<void> {
 /**
  * Loads all application data from Firestore
  */
-export async function loadFromFirestore(): Promise<SharedData | null> {
+export async function loadFromFirestore(): Promise<{ data: SharedData | null; success: boolean }> {
   try {
     const docRef = doc(db, COLLECTION_NAME, DOCUMENT_ID);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return docSnap.data() as SharedData;
+      return { data: docSnap.data() as SharedData, success: true };
     }
-    return null;
+    return { data: null, success: true };
   } catch (error: any) {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       console.log('Firestore loading skipped: System is working offline. Loading local cache.');
     } else {
       console.log('Firestore loading skipped (offline or sandbox):', error?.message || error);
     }
-    return null;
+    return { data: null, success: false };
   }
 }

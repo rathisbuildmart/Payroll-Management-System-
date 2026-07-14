@@ -169,6 +169,7 @@ export default function App() {
   const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [hasLoadedFromCloud, setHasLoadedFromCloud] = useState<boolean>(false);
+  const [isDataModified, setIsDataModified] = useState<boolean>(false);
 
   // Sheets Metadata
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
@@ -222,122 +223,37 @@ export default function App() {
 
   // Application Data States (with local cache fallbacks for instant offline load)
   const [employees, setEmployees] = useState<Employee[]>(() => {
-    // Default demo/fallback employees so that employees can log in out-of-the-box
-    const defaultEmployees: Employee[] = [
-      {
-        id: 'EMP001',
-        name: 'Rajesh Kumar',
-        department: 'Management',
-        designation: 'Senior Supervisor',
-        joiningDate: '2025-01-10',
-        basicSalary: 38000,
-        allowances: 3500,
-        deductions: 1500,
-        hourlyRate: 150,
-        paymentMethod: 'Bank Transfer',
-        isActive: true,
-      },
-      {
-        id: 'EMP002',
-        name: 'Sunita Sharma',
-        department: 'Finance',
-        designation: 'Accounts Executive',
-        joiningDate: '2025-06-15',
-        basicSalary: 28000,
-        allowances: 2000,
-        deductions: 1000,
-        hourlyRate: 120,
-        paymentMethod: 'Bank Transfer',
-        isActive: true,
-      },
-      {
-        id: 'EMP003',
-        name: 'Amit Patel',
-        department: 'Operations',
-        designation: 'Dispatch Officer',
-        joiningDate: '2026-02-01',
-        basicSalary: 18000,
-        allowances: 1500,
-        deductions: 800,
-        hourlyRate: 100,
-        paymentMethod: 'Cash',
-        isActive: true,
-      },
-      {
-        id: 'EMP004',
-        name: 'Suresh Kumar',
-        department: 'Sales',
-        designation: 'Sales Executive',
-        joiningDate: '2026-04-01',
-        basicSalary: 19000,
-        allowances: 1600,
-        deductions: 900,
-        hourlyRate: 105,
-        paymentMethod: 'Bank Transfer',
-        isActive: true,
-        password: '123456'
-      }
-    ];
-
     const saved = localStorage.getItem('cached_employees');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as Employee[];
-        if (parsed.length > 0) {
-          // If EMP003 or EMP004 is missing, merge/add the defaults so they are always available
-          const hasEmp3 = parsed.some(e => e.id.toUpperCase() === 'EMP003');
-          const hasEmp4 = parsed.some(e => e.id.toUpperCase() === 'EMP004');
-          if (!hasEmp3 || !hasEmp4) {
-            const merged = [...parsed];
-            defaultEmployees.forEach(defEmp => {
-              if (!merged.some(e => e.id.toLowerCase() === defEmp.id.toLowerCase())) {
-                merged.push(defEmp);
-              }
-            });
-            localStorage.setItem('cached_employees', JSON.stringify(merged));
-            return merged;
-          }
-          return parsed;
-        }
+        return JSON.parse(saved) as Employee[];
       } catch (err) {
         console.error("Error parsing cached employees", err);
       }
     }
-    
-    localStorage.setItem('cached_employees', JSON.stringify(defaultEmployees));
-    return defaultEmployees;
+    return [];
   });
   const [attendance, setAttendance] = useState<Attendance[]>(() => {
     const saved = localStorage.getItem('cached_attendance');
-    if (saved) return JSON.parse(saved);
-
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const sampleAttendance: Attendance[] = [];
-    const empIds = ['EMP001', 'EMP002', 'EMP003'];
-    
-    for (let day = 1; day <= 15; day++) {
-      const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
-      empIds.forEach((id, index) => {
-        const isAbsent = day === 3 && index === 2;
-        const isHalfDay = day === 4 && index === 1;
-
-        sampleAttendance.push({
-          date: dateStr,
-          employeeId: id,
-          status: isAbsent ? 'Absent' : isHalfDay ? 'Half Day' : 'Present',
-          checkIn: isAbsent ? '' : '09:00',
-          checkOut: isAbsent ? '' : isHalfDay ? '13:30' : '18:30',
-          overtimeHours: (!isAbsent && !isHalfDay && index === 0) ? 0.5 : 0,
-          remarks: isAbsent ? 'Sick leave' : isHalfDay ? 'Personal chore' : 'On-time'
-        });
-      });
+    if (saved) {
+      try {
+        return JSON.parse(saved) as Attendance[];
+      } catch (err) {
+        console.error("Error parsing cached attendance", err);
+      }
     }
-    localStorage.setItem('cached_attendance', JSON.stringify(sampleAttendance));
-    return sampleAttendance;
+    return [];
   });
   const [payroll, setPayroll] = useState<PayrollRecord[]>(() => {
     const saved = localStorage.getItem('cached_payroll');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        return JSON.parse(saved) as PayrollRecord[];
+      } catch (err) {
+        console.error("Error parsing cached payroll", err);
+      }
+    }
+    return [];
   });
 
   // Unsuccessful login attempts state
@@ -561,8 +477,9 @@ export default function App() {
   useEffect(() => {
     const fetchGlobalData = async () => {
       try {
-        const globalData = await loadFromFirestore();
-        if (globalData) {
+        const result = await loadFromFirestore();
+        if (result && result.success && result.data) {
+          const globalData = result.data;
           if (globalData.employees && globalData.employees.length > 0) {
             setEmployees(globalData.employees);
           }
@@ -579,20 +496,27 @@ export default function App() {
           if (globalData.failedLogins) {
             setFailedLogins(globalData.failedLogins);
           }
+          if (globalData.spreadsheetId) {
+            setSpreadsheetId(globalData.spreadsheetId);
+          }
+          if (globalData.spreadsheetLink) {
+            setSpreadsheetLink(globalData.spreadsheetLink);
+          }
           console.log('Successfully loaded synced credentials from cloud Firestore');
         }
       } catch (err) {
         console.warn('Failed to load global data from Firestore on startup:', err);
       } finally {
         setHasLoadedFromCloud(true);
+        setIsDataModified(false); // Reset modification flag after initial load
       }
     };
     fetchGlobalData();
   }, []);
 
-  // Synchronize state changes to Firestore when we have finished loading from the cloud
+  // Synchronize state changes to Firestore when we have finished loading from the cloud and user has modified data
   useEffect(() => {
-    if (!hasLoadedFromCloud) return;
+    if (!hasLoadedFromCloud || !isDataModified) return;
 
     const syncToCloud = async () => {
       try {
@@ -601,23 +525,27 @@ export default function App() {
           attendance,
           payroll,
           adminSettings,
-          failedLogins
+          failedLogins,
+          spreadsheetId,
+          spreadsheetLink
         });
+        console.log('Central Firestore database synchronized successfully.');
       } catch (err) {
         console.warn('Auto-syncing to Firestore failed:', err);
       }
     };
 
-    // Debounce cloud writes by 1 second to avoid rapid write limits
+    // Debounce cloud writes by 1.5 seconds to avoid rapid write limits
     const timer = setTimeout(() => {
       syncToCloud();
-    }, 1000);
+    }, 1500);
 
     return () => clearTimeout(timer);
-  }, [employees, attendance, payroll, adminSettings, failedLogins, hasLoadedFromCloud]);
+  }, [employees, attendance, payroll, adminSettings, failedLogins, spreadsheetId, spreadsheetLink, hasLoadedFromCloud, isDataModified]);
 
   const handleSaveSettings = async (updated: AdminSettings) => {
     setAdminSettings(updated);
+    setIsDataModified(true);
     localStorage.setItem('payroll_admin_settings', JSON.stringify(updated));
     if (spreadsheetId && token) {
       try {
@@ -714,6 +642,7 @@ export default function App() {
       setEmployees(mergedEmployees);
       setAttendance(mergedAttendance);
       setPayroll(mergedPayroll);
+      setIsDataModified(true);
 
       // Save merged results back to Google Sheets if they contain changes not present on remote
       if (mergedEmployees.length > fetchedEmployees.length || JSON.stringify(mergedEmployees) !== JSON.stringify(fetchedEmployees)) {
@@ -839,10 +768,12 @@ export default function App() {
       browserInfo: typeof navigator !== 'undefined' ? navigator.userAgent : undefined
     };
     setFailedLogins(prev => [newAttempt, ...(prev || [])]);
+    setIsDataModified(true);
   };
 
   const handleClearFailedLogins = () => {
     setFailedLogins([]);
+    setIsDataModified(true);
   };
 
   const handleLogout = () => {
@@ -954,6 +885,7 @@ export default function App() {
       // Reload
       setEmployees(sampleEmployees);
       setAttendance(sampleAttendance);
+      setIsDataModified(true);
       setShowSeedDialog(false);
       setSyncStatus('synced');
       addSyncLog(
@@ -978,6 +910,7 @@ export default function App() {
   const handleAddEmployee = async (newEmp: Employee) => {
     const updated = [...employees, newEmp];
     setEmployees(updated);
+    setIsDataModified(true);
     if (!spreadsheetId || !token) {
       setSyncStatus('error');
       addSyncLog(
@@ -1024,6 +957,7 @@ export default function App() {
     });
 
     setEmployees(updated);
+    setIsDataModified(true);
     if (!spreadsheetId || !token) {
       setSyncStatus('error');
       addSyncLog(
@@ -1061,6 +995,7 @@ export default function App() {
   const handleUpdateEmployee = async (updatedEmp: Employee) => {
     const updated = employees.map(emp => emp.id === updatedEmp.id ? updatedEmp : emp);
     setEmployees(updated);
+    setIsDataModified(true);
     if (!spreadsheetId || !token) {
       setSyncStatus('error');
       addSyncLog(
@@ -1101,6 +1036,7 @@ export default function App() {
     const combined = [...filteredOld, ...records];
     
     setAttendance(combined);
+    setIsDataModified(true);
     if (!spreadsheetId || !token) {
       setSyncStatus('error');
       addSyncLog(
@@ -1149,6 +1085,7 @@ export default function App() {
     });
 
     setAttendance(updated);
+    setIsDataModified(true);
     if (!spreadsheetId || !token) {
       setSyncStatus('error');
       addSyncLog(
@@ -1185,6 +1122,7 @@ export default function App() {
 
   const handleSavePayroll = async (records: PayrollRecord[]) => {
     setPayroll(records);
+    setIsDataModified(true);
     if (!spreadsheetId || !token) {
       setSyncStatus('error');
       addSyncLog(

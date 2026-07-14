@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Information about an employee including credentials and salary structure",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique Employee ID" },
+        "name": { "type": "string", "description": "Full name of the employee" },
+        "department": { "type": "string", "description": "Department name" },
+        "designation": { "type": "string", "description": "Designation name" },
+        "joiningDate": { "type": "string", "format": "date", "description": "Date of joining (YYYY-MM-DD)" },
+        "basicSalary": { "type": "number", "description": "Basic monthly salary" },
+        "allowances": { "type": "number", "description": "Total recurring monthly allowances" },
+        "deductions": { "type": "number", "description": "Total recurring monthly deductions" },
+        "hourlyRate": { "type": "number", "description": "Hourly rate for overtime calculation" },
+        "paymentMethod": { "type": "string", "enum": ["Bank Transfer", "Cash", "Cheque"] },
+        "isActive": { "type": "boolean", "description": "Whether employee is currently active" },
+        "password": { "type": "string", "description": "Optional portal login password" }
+      },
+      "required": ["id", "name", "department", "designation", "joiningDate", "basicSalary", "isActive"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily attendance punch records for an employee",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date", "description": "Date of attendance (YYYY-MM-DD)" },
+        "employeeId": { "type": "string", "description": "Associated Employee ID" },
+        "status": { "type": "string", "enum": ["Present", "Absent", "Half Day", "Leave", "Miss Punch"] },
+        "checkIn": { "type": "string", "description": "Check-in time (HH:MM)" },
+        "checkOut": { "type": "string", "description": "Check-out time (HH:MM)" },
+        "overtimeHours": { "type": "number", "description": "Calculated overtime hours" },
+        "remarks": { "type": "string", "description": "Notes or remarks" },
+        "approvalStatus": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] }
+      },
+      "required": ["date", "employeeId", "status", "checkIn", "checkOut", "overtimeHours"]
+    },
+    "PayrollRecord": {
+      "title": "PayrollRecord",
+      "description": "Monthly generated salary slip and payments data",
+      "type": "object",
+      "properties": {
+        "monthYear": { "type": "string", "description": "Month and Year of payroll (YYYY-MM)" },
+        "employeeId": { "type": "string", "description": "Associated Employee ID" },
+        "basicSalary": { "type": "number", "description": "Basic salary applied" },
+        "allowances": { "type": "number", "description": "Allowances applied" },
+        "deductions": { "type": "number", "description": "Deductions applied" },
+        "overtimePay": { "type": "number", "description": "Overtime pay applied" },
+        "totalSalary": { "type": "number", "description": "Gross total salary" },
+        "paymentDate": { "type": "string", "format": "date", "description": "Date of payment (YYYY-MM-DD)" },
+        "paymentStatus": { "type": "string", "enum": ["Paid", "Pending"] },
+        "netSalary": { "type": "number", "description": "Net payable salary" }
+      },
+      "required": ["monthYear", "employeeId", "basicSalary", "totalSalary", "paymentStatus"]
+    },
+    "AdminSettings": {
+      "title": "AdminSettings",
+      "description": "Global payroll configuration and company metadata",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string", "description": "Name of the organization" },
+        "companyAddress": { "type": "string", "description": "Address of the organization" },
+        "currency": { "type": "string", "description": "Currency symbol used" },
+        "defaultCheckIn": { "type": "string" },
+        "defaultCheckOut": { "type": "string" },
+        "defaultOvertimeRate": { "type": "number" },
+        "departments": { "type": "array", "items": { "type": "string" } },
+        "branches": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["companyName", "currency", "defaultCheckIn", "defaultCheckOut", "departments", "branches"]
+    },
+    "SharedDB": {
+      "title": "SharedDB",
+      "description": "The root document container that houses all synchronized portal states",
+      "type": "object",
+      "properties": {
+        "employees": { "type": "array", "items": { "type": "object" } },
+        "attendance": { "type": "array", "items": { "type": "object" } },
+        "payroll": { "type": "array", "items": { "type": "object" } },
+        "adminSettings": { "type": "object" },
+        "lastUpdated": { "type": "string" },
+        "spreadsheetId": { "type": "string" },
+        "spreadsheetLink": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/payroll_system_data/shared_db": {
+      "schema": "SharedDB",
+      "description": "Main document holding all global sync states for the entire organization"
+    }
+  }
+}
