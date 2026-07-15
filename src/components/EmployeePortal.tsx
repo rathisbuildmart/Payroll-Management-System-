@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   User, Calendar, CreditCard, Check, Printer, FileText, AlertCircle, 
   TrendingUp, Users, ShieldCheck, Building, Sparkles, MapPin, Briefcase, Phone, Mail, FileCheck, DollarSign,
-  CalendarDays
+  CalendarDays, Plus
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Employee, Attendance, PayrollRecord, AdminSettings } from '../types';
@@ -16,6 +16,7 @@ interface EmployeePortalProps {
   payrollRecords: PayrollRecord[];
   language: 'en' | 'hi';
   adminSettings: AdminSettings;
+  onUpdateAttendanceRecords?: (records: Attendance[]) => Promise<void>;
 }
 
 export default function EmployeePortal({ 
@@ -23,12 +24,65 @@ export default function EmployeePortal({
   attendanceRecords, 
   payrollRecords, 
   language, 
-  adminSettings 
+  adminSettings,
+  onUpdateAttendanceRecords
 }: EmployeePortalProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'attendance' | 'payslips' | 'exceptions' | 'leaves' | 'calendar'>('profile');
   const [attendanceYear, setAttendanceYear] = useState<string>(new Date().getFullYear().toString());
   const [attendanceMonth, setAttendanceMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [activePayslip, setActivePayslip] = useState<any | null>(null);
+
+  // Miss punch ticket raising states
+  const [showRaiseModal, setShowRaiseModal] = useState(false);
+  const [raiseDate, setRaiseDate] = useState('');
+  const [raiseCheckIn, setRaiseCheckIn] = useState('09:00');
+  const [raiseCheckOut, setRaiseCheckOut] = useState('18:00');
+  const [raiseRemarks, setRaiseRemarks] = useState('');
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
+  const [ticketError, setTicketError] = useState('');
+  const [ticketSuccess, setTicketSuccess] = useState('');
+
+  const handleRaiseTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTicketError('');
+    setTicketSuccess('');
+
+    if (!raiseDate) {
+      setTicketError(language === 'en' ? 'Please select a date' : 'कृपया तिथि चुनें');
+      return;
+    }
+
+    setIsSubmittingTicket(true);
+    try {
+      if (onUpdateAttendanceRecords) {
+        const newRecord: Attendance = {
+          date: raiseDate,
+          employeeId: employee.id,
+          status: 'Miss Punch',
+          checkIn: raiseCheckIn,
+          checkOut: raiseCheckOut,
+          overtimeHours: 0,
+          remarks: raiseRemarks,
+          approvalStatus: 'Pending'
+        };
+
+        await onUpdateAttendanceRecords([newRecord]);
+        setTicketSuccess(language === 'en' ? 'Missed punch ticket raised successfully!' : 'मिस पंच टिकट सफलतापूर्वक दर्ज कर लिया गया है!');
+        setTimeout(() => {
+          setShowRaiseModal(false);
+          setTicketSuccess('');
+          setRaiseRemarks('');
+        }, 1800);
+      } else {
+        setTicketError('Update handler not registered on the portal.');
+      }
+    } catch (err) {
+      console.error(err);
+      setTicketError(language === 'en' ? 'Failed to raise ticket' : 'टिकट दर्ज करने में विफल');
+    } finally {
+      setIsSubmittingTicket(false);
+    }
+  };
 
   const t = {
     en: {
@@ -465,17 +519,19 @@ export default function EmployeePortal({
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping shrink-0"></span>
             )}
           </button>
-          <button
-            onClick={() => setActiveTab('payslips')}
-            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
-              activeTab === 'payslips' 
-                ? 'bg-emerald-600 text-white shadow-md' 
-                : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
-            }`}
-          >
-            <CreditCard className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">{t.payslips}</span>
-          </button>
+          {adminSettings.enableEmployeePayslips === true && (
+            <button
+              onClick={() => setActiveTab('payslips')}
+              className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
+                activeTab === 'payslips' 
+                  ? 'bg-emerald-600 text-white shadow-md' 
+                  : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{t.payslips}</span>
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('leaves')}
             className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
@@ -498,12 +554,12 @@ export default function EmployeePortal({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Column 1: Personal & Contacts */}
-            <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-xs space-y-5 lg:col-span-2">
-              <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-                  <User className="w-4 h-4" />
+            <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-4 sm:space-y-5 lg:col-span-2">
+              <div className="flex items-center gap-2 pb-2.5 sm:pb-3 border-b border-slate-100">
+                <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                  <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">{t.personalInfo}</h3>
+                <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.personalInfo}</h3>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
@@ -582,12 +638,12 @@ export default function EmployeePortal({
             <div className="space-y-6">
               
               {/* Standard Salary Structure */}
-              <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-xs space-y-4">
+              <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-                    <DollarSign className="w-4 h-4" />
+                  <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                    <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">{t.salaryStructure}</h3>
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.salaryStructure}</h3>
                 </div>
                 <div className="space-y-2.5 text-xs font-semibold text-slate-700">
                   <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
@@ -614,12 +670,12 @@ export default function EmployeePortal({
               </div>
 
               {/* Bank Account details */}
-              <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-xs space-y-4">
+              <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
-                    <Building className="w-4 h-4" />
+                  <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold shrink-0">
+                    <Building className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">{t.bankingInfo}</h3>
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.bankingInfo}</h3>
                 </div>
                 <div className="space-y-3 text-xs">
                   <div>
@@ -644,12 +700,12 @@ export default function EmployeePortal({
               </div>
 
               {/* Statutory Registry */}
-              <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-xs space-y-4">
+              <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
-                    <FileCheck className="w-4 h-4" />
+                  <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold shrink-0">
+                    <FileCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">{t.statutoryInfo}</h3>
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.statutoryInfo}</h3>
                 </div>
                 <div className="space-y-2.5 text-xs font-semibold text-slate-700">
                   <div className="flex justify-between items-center py-1 border-b border-slate-50">
@@ -895,7 +951,7 @@ export default function EmployeePortal({
         )}
 
         {/* PAYSLIPS TAB */}
-        {activeTab === 'payslips' && (
+        {adminSettings.enableEmployeePayslips === true && activeTab === 'payslips' && (
           <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
             {empPayslips.length > 0 ? (
               <div>
@@ -1011,7 +1067,126 @@ export default function EmployeePortal({
                 </h3>
                 <p className="text-xs text-slate-400 mt-1 font-medium">Verify your registered missed punches, half-day records, and their approval statuses.</p>
               </div>
+              <button
+                onClick={() => {
+                  setRaiseDate(new Date().toISOString().split('T')[0]);
+                  setRaiseCheckIn(adminSettings?.defaultCheckIn || '09:00');
+                  setRaiseCheckOut(adminSettings?.defaultCheckOut || '18:00');
+                  setRaiseRemarks('');
+                  setTicketError('');
+                  setTicketSuccess('');
+                  setShowRaiseModal(true);
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer transition-all self-start md:self-auto shadow-md"
+              >
+                <Plus className="w-4 h-4 shrink-0" />
+                <span>{language === 'en' ? 'Raise Missed Punch Ticket' : 'मिस पंच टिकट दर्ज करें'}</span>
+              </button>
             </div>
+
+            {/* Raise Missed Punch Modal */}
+            {showRaiseModal && (
+              <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_24px_70px_rgba(0,0,0,0.2)] max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-emerald-600 animate-pulse" />
+                      <span>{language === 'en' ? 'Raise Missed Punch' : 'मिस पंच अनुरोध'}</span>
+                    </h3>
+                    <button
+                      onClick={() => setShowRaiseModal(false)}
+                      className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleRaiseTicket} className="space-y-4">
+                    {ticketError && (
+                      <div className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-xs font-bold">
+                        {ticketError}
+                      </div>
+                    )}
+                    {ticketSuccess && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg text-xs font-bold animate-pulse">
+                        {ticketSuccess}
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        {language === 'en' ? 'Date of Missed Punch' : 'मिस पंच की तिथि'}
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={raiseDate}
+                        onChange={(e) => setRaiseDate(e.target.value)}
+                        className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-xs text-slate-700"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          {language === 'en' ? 'Check-In Time' : 'आगमन समय (In)'}
+                        </label>
+                        <input
+                          type="time"
+                          required
+                          value={raiseCheckIn}
+                          onChange={(e) => setRaiseCheckIn(e.target.value)}
+                          className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-xs text-slate-700"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          {language === 'en' ? 'Check-Out Time' : 'प्रस्थान समय (Out)'}
+                        </label>
+                        <input
+                          type="time"
+                          required
+                          value={raiseCheckOut}
+                          onChange={(e) => setRaiseCheckOut(e.target.value)}
+                          className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-xs text-slate-700"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        {language === 'en' ? 'Reason / Explanation' : 'मिस पंच का कारण'}
+                      </label>
+                      <textarea
+                        required
+                        rows={3}
+                        value={raiseRemarks}
+                        onChange={(e) => setRaiseRemarks(e.target.value)}
+                        placeholder={language === 'en' ? 'e.g. Card forgotten, Biometric reader error' : 'उदा. आरएफआईडी कार्ड भूल गए, मशीन खराब थी'}
+                        className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none text-xs text-slate-700"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowRaiseModal(false)}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg cursor-pointer transition-all"
+                      >
+                        {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmittingTicket}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5"
+                      >
+                        {isSubmittingTicket ? (language === 'en' ? 'Submitting...' : 'भेजा जा रहा है...') : (language === 'en' ? 'Submit Ticket' : 'टिकट भेजें')}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
 
             <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
               {attendanceRecords.filter(r => r.employeeId === employee.id && (r.status === 'Miss Punch' || r.status === 'Half Day')).length > 0 ? (

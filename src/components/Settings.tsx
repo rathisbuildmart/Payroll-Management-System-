@@ -26,7 +26,7 @@ import {
   RefreshCw,
   AlertTriangle
 } from 'lucide-react';
-import { AdminSettings, FieldSetting, FailedLoginAttempt } from '../types';
+import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount } from '../types';
 
 interface SettingsProps {
   settings: AdminSettings;
@@ -135,6 +135,41 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   enableProfessionalTax: true,
   enablePaidLeaveCalculation: true,
   paidLeaveStartAfterMonths: 0,
+  roleAccounts: [
+    {
+      id: 'acc-1',
+      username: 'director',
+      password: 'director123',
+      role: 'director',
+      name: 'Director Desk',
+      createdAt: '2026-07-15T00:00:00.000Z'
+    },
+    {
+      id: 'acc-2',
+      username: 'hr',
+      password: 'hr123',
+      role: 'hr',
+      name: 'HR Manager',
+      createdAt: '2026-07-15T00:00:00.000Z'
+    },
+    {
+      id: 'acc-3',
+      username: 'manager',
+      password: 'manager123',
+      role: 'branch_manager',
+      name: 'Branch Manager',
+      createdAt: '2026-07-15T00:00:00.000Z',
+      branch: 'Bangalore HQ'
+    }
+  ],
+  rolePermissions: {
+    admin: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin'],
+    director: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
+    hr: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
+    branch_manager: ['dashboard', 'employees', 'attendance', 'leaves'],
+    employee: []
+  },
+  enableEmployeePayslips: false
 };
 
 export default function Settings({ 
@@ -155,8 +190,17 @@ export default function Settings({
   onImportData,
   onClearSheetsSession
 }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'notices_support' | 'database'>('company');
+  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'notices_support' | 'database' | 'roles_permissions'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
+  
+  // User Roles & Access states
+  const [newAccName, setNewAccName] = useState('');
+  const [newAccUsername, setNewAccUsername] = useState('');
+  const [newAccPassword, setNewAccPassword] = useState('');
+  const [newAccRole, setNewAccRole] = useState<'admin' | 'director' | 'hr' | 'branch_manager'>('hr');
+  const [newAccBranch, setNewAccBranch] = useState('');
+  const [newAccBranches, setNewAccBranches] = useState<string[]>([]);
+  const [roleFormError, setRoleFormError] = useState('');
   const [newMasterVal, setNewMasterVal] = useState<string>('');
   const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'>>('departments');
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
@@ -322,6 +366,8 @@ export default function Settings({
       paidLeaveStartAfterLabel: "Paid Leave Starts After (Months of Service required)",
       paidLeaveStartImmediately: "Start Immediately Upon Joining",
       toggleCalcSub: "Toggle which salary components are dynamically processed in payroll generation.",
+      enableEmployeePayslipsLabel: "Enable Payslip View & Download for Employees",
+      employeePortalSettingsTitle: "Employee Portal Control Settings",
     },
     hi: {
       adminTitle: "एडमिन पैनल और सिस्टम सेटिंग्स",
@@ -393,6 +439,8 @@ export default function Settings({
       paidLeaveStartAfterLabel: "सवैतनिक अवकाश कितने महीने बाद शुरू हो (सेवा अवधि)",
       paidLeaveStartImmediately: "शामिल होने के तुरंत बाद शुरू करें",
       toggleCalcSub: "चुनें कि पेरोल गणना के दौरान कौन से वेतन घटक सक्रिय रूप से संसाधित किए जाते हैं।",
+      enableEmployeePayslipsLabel: "कर्मचारियों के लिए पे-स्लिप देखने और डाउनलोड करने की सुविधा चालू करें",
+      employeePortalSettingsTitle: "कर्मचारी पोर्टल नियंत्रण सेटिंग्स",
     }
   }[language];
 
@@ -461,6 +509,75 @@ export default function Settings({
     setLocalSettings({
       ...localSettings,
       [activeMasterList]: updatedList
+    });
+  };
+
+  const roleAccounts = localSettings.roleAccounts || [];
+  const rolePermissions = localSettings.rolePermissions || {
+    admin: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin'],
+    director: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
+    hr: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
+    branch_manager: ['dashboard', 'employees', 'attendance', 'leaves'],
+    employee: []
+  };
+
+  const handleTogglePermission = (role: string, tabId: string) => {
+    const updatedPermissions = { ...rolePermissions };
+    const currentList = updatedPermissions[role] || [];
+    if (currentList.includes(tabId)) {
+      updatedPermissions[role] = currentList.filter(t => t !== tabId);
+    } else {
+      updatedPermissions[role] = [...currentList, tabId];
+    }
+    setLocalSettings({
+      ...localSettings,
+      rolePermissions: updatedPermissions
+    });
+  };
+
+  const handleAddRoleAccount = () => {
+    if (!newAccName.trim() || !newAccUsername.trim() || !newAccPassword.trim()) {
+      setRoleFormError(language === 'en' ? 'Please fill in all fields' : 'कृपया सभी फ़ील्ड भरें');
+      return;
+    }
+    
+    // Check if username already exists
+    const exists = roleAccounts.some(acc => acc.username.toLowerCase() === newAccUsername.trim().toLowerCase());
+    if (exists || newAccUsername.trim().toLowerCase() === (localSettings.adminUsername || 'admin').toLowerCase()) {
+      setRoleFormError(language === 'en' ? 'Username already exists' : 'उपयोगकर्ता नाम पहले से मौजूद है');
+      return;
+    }
+
+    const newAcc: UserRoleAccount = {
+      id: 'acc-' + Date.now(),
+      name: newAccName.trim(),
+      username: newAccUsername.trim(),
+      password: newAccPassword.trim(),
+      role: newAccRole,
+      branch: (newAccRole === 'branch_manager' || newAccRole === 'director') && newAccBranches.length > 0 ? newAccBranches[0] : undefined,
+      branches: (newAccRole === 'branch_manager' || newAccRole === 'director') ? newAccBranches : undefined,
+      createdAt: new Date().toISOString()
+    };
+
+    setLocalSettings({
+      ...localSettings,
+      roleAccounts: [...roleAccounts, newAcc]
+    });
+
+    // Reset form
+    setNewAccName('');
+    setNewAccUsername('');
+    setNewAccPassword('');
+    setNewAccRole('hr');
+    setNewAccBranch('');
+    setNewAccBranches([]);
+    setRoleFormError('');
+  };
+
+  const handleDeleteRoleAccount = (id: string) => {
+    setLocalSettings({
+      ...localSettings,
+      roleAccounts: roleAccounts.filter(acc => acc.id !== id)
     });
   };
 
@@ -606,6 +723,18 @@ export default function Settings({
           >
             <Database className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
             <span>{t.tabDatabase}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('roles_permissions')}
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
+              activeSubTab === 'roles_permissions'
+                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
+                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
+            <span>{language === 'en' ? 'User Roles & Access' : 'भूमिकाएं और अनुमतियां'}</span>
           </button>
 
           <div className="hidden md:block pt-6 mt-6 border-t border-gray-200/60">
@@ -1092,6 +1221,36 @@ export default function Settings({
                   </div>
                 </div>
               )}
+
+              {/* Employee Portal Access Configuration */}
+              <div className="border-t border-gray-100 pt-4 mt-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full inline-block"></span>
+                  {t.employeePortalSettingsTitle}
+                </h4>
+                <p className="text-[10px] text-gray-400 font-medium mb-3">
+                  {language === 'en' 
+                    ? "Configure feature visibility and permissions for logged-in employees."
+                    : "लॉग इन किए गए कर्मचारियों के लिए फीचर दृश्यता और अनुमतियों को कॉन्फ़िगर करें।"}
+                </p>
+                
+                <label className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 rounded-lg border border-gray-150 cursor-pointer transition-colors max-w-lg shadow-2xs">
+                  <input 
+                    type="checkbox"
+                    checked={localSettings.enableEmployeePayslips === true}
+                    onChange={(e) => setLocalSettings({...localSettings, enableEmployeePayslips: e.target.checked})}
+                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
+                  />
+                  <div>
+                    <span className="block text-xs font-bold text-gray-800">{t.enableEmployeePayslipsLabel}</span>
+                    <span className="text-[9px] text-slate-400 font-medium block mt-0.5">
+                      {language === 'en'
+                        ? "Currently: " + (localSettings.enableEmployeePayslips ? "ON" : "OFF (Deactivated for Employees)")
+                        : "वर्तमान स्थिति: " + (localSettings.enableEmployeePayslips ? "सक्रिय (ON)" : "निष्क्रिय (OFF - कर्मचारियों के लिए बंद)")}
+                    </span>
+                  </div>
+                </label>
+              </div>
             </div>
           )}
 
@@ -1824,6 +1983,320 @@ export default function Settings({
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSubTab === 'roles_permissions' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xs font-bold text-gray-800 border-b border-gray-100 pb-2 flex items-center gap-1.5">
+                  <KeyRound className="w-4 h-4 text-emerald-600" />
+                  {language === 'en' ? 'User Roles & Access Permissions' : 'मल्टी-यूज़र भूमिकाएं और अनुमतियां'}
+                </h3>
+                <p className="text-[10px] text-gray-500 mt-1 leading-normal font-sans">
+                  {language === 'en'
+                    ? 'Define custom login accounts for different stakeholders (Admin, Director, HR, Branch Manager) and configure which dashboard modules they are allowed to access.'
+                    : 'विभिन्न हितधारकों (एडमिन, डायरेक्टर, एचआर, ब्रांच मैनेजर) के लिए लॉगिन खाते परिभाषित करें और कॉन्फ़िगर करें कि उन्हें किन डैशबोर्ड मॉड्यूल तक पहुंचने की अनुमति है।'}
+                </p>
+              </div>
+
+              {/* 1. Permissions Matrix */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs font-sans">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    {language === 'en' ? 'Module Permission Matrix' : 'मॉड्यूल अनुमति मैट्रिक्स'}
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                    {language === 'en'
+                      ? 'Toggle checkbox to grant or restrict specific page modules for each user role.'
+                      : 'प्रत्येक उपयोगकर्ता भूमिका के लिए विशिष्ट पृष्ठ मॉड्यूल को अनुमति देने या प्रतिबंधित करने के लिए चेकबॉक्स पर क्लिक करें।'}
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold text-[10px] uppercase tracking-wider">
+                        <th className="p-3 font-black">{language === 'en' ? 'Module / View' : 'मॉड्यूल / व्यू'}</th>
+                        <th className="p-3 text-center">{language === 'en' ? 'Director' : 'डायरेक्टर'}</th>
+                        <th className="p-3 text-center">{language === 'en' ? 'HR Manager' : 'एचआर'}</th>
+                        <th className="p-3 text-center">{language === 'en' ? 'Branch Manager' : 'ब्रांच मैनेजर'}</th>
+                        <th className="p-3 text-center">{language === 'en' ? 'Employee' : 'कर्मचारी'}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                      {[
+                        { id: 'dashboard', label: language === 'en' ? 'System Dashboard' : 'सिस्टम डैशबोर्ड' },
+                        { id: 'employees', label: language === 'en' ? 'Employee Registry' : 'कर्मचारी सूची' },
+                        { id: 'attendance', label: language === 'en' ? 'Attendance & Logs' : 'उपस्थिति और लॉग्स' },
+                        { id: 'payroll', label: language === 'en' ? 'Payroll & Payslips' : 'पेरोल और वेतन पर्ची' },
+                        { id: 'leaves', label: language === 'en' ? 'Leaves & Holidays' : 'छुट्टियां और अवकाश' },
+                        { id: 'ledger', label: language === 'en' ? 'Employee Ledger' : 'कर्मचारी बहीखाता (Ledger)' },
+                        { id: 'admin', label: language === 'en' ? 'System Settings' : 'सिस्टम सेटिंग्स' },
+                      ].map((mod) => (
+                        <tr key={mod.id} className="hover:bg-slate-50/50">
+                          <td className="p-3 font-bold text-slate-900">{mod.label}</td>
+                          
+                          {/* Director */}
+                          <td className="p-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={(rolePermissions.director || []).includes(mod.id)}
+                              onChange={() => handleTogglePermission('director', mod.id)}
+                              className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                            />
+                          </td>
+                          
+                          {/* HR Manager */}
+                          <td className="p-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={(rolePermissions.hr || []).includes(mod.id)}
+                              onChange={() => handleTogglePermission('hr', mod.id)}
+                              className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                            />
+                          </td>
+                          
+                          {/* Branch Manager */}
+                          <td className="p-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={(rolePermissions.branch_manager || []).includes(mod.id)}
+                              onChange={() => handleTogglePermission('branch_manager', mod.id)}
+                              className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                            />
+                          </td>
+                          
+                          {/* Employee */}
+                          <td className="p-3 text-center text-slate-400 text-[10px] font-medium">
+                            {language === 'en' ? 'Dedicated Portal' : 'समर्पित पोर्टल'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="text-[9px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg border border-amber-200">
+                  {language === 'en'
+                    ? '* Note: System Administrator ("admin") always has permanent access to all sections and cannot be restricted.'
+                    : '* ध्यान दें: सिस्टम एडमिनिस्ट्रेटर ("admin") के पास हमेशा सभी अनुभागों के लिए स्थायी पहुंच होती है और इसे प्रतिबंधित नहीं किया जा सकता है।'}
+                </div>
+              </div>
+
+              {/* 2. User Accounts List & Form */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
+                {/* Accounts list table */}
+                <div className="lg:col-span-2 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-800">
+                    {language === 'en' ? 'Active Multi-User Accounts' : 'सक्रिय मल्टी-यूज़र खाते'}
+                  </h4>
+                  
+                  <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-2xs">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold text-[10px] uppercase">
+                          <th className="p-3">{language === 'en' ? 'User Details' : 'विवरण'}</th>
+                          <th className="p-3">{language === 'en' ? 'Role' : 'भूमिका'}</th>
+                          <th className="p-3">{language === 'en' ? 'Branch' : 'शाखा'}</th>
+                          <th className="p-3 text-right">{language === 'en' ? 'Action' : 'कार्रवाई'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                        {/* Always show the main admin */}
+                        <tr className="bg-emerald-50/20">
+                          <td className="p-3">
+                            <p className="font-extrabold text-slate-900">{language === 'en' ? 'Primary Administrator' : 'मुख्य एडमिन'}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">@{localSettings.adminUsername || 'admin'}</p>
+                          </td>
+                          <td className="p-3">
+                            <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-black uppercase">
+                              Admin
+                            </span>
+                          </td>
+                          <td className="p-3 text-slate-400 text-[10px] font-medium">-</td>
+                          <td className="p-3 text-right text-slate-400 text-[10px] font-medium">
+                            {language === 'en' ? 'System Default' : 'सिस्टम डिफॉल्ट'}
+                          </td>
+                        </tr>
+
+                        {roleAccounts.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="p-6 text-center text-slate-400 text-[10px] font-medium">
+                              {language === 'en' ? 'No additional user accounts configured.' : 'कोई अन्य उपयोगकर्ता खाता कॉन्फ़िगर नहीं किया गया है।'}
+                            </td>
+                          </tr>
+                        ) : (
+                          roleAccounts.map((acc) => (
+                            <tr key={acc.id} className="hover:bg-slate-50/50">
+                              <td className="p-3">
+                                <p className="font-extrabold text-slate-900">{acc.name}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">@{acc.username}</p>
+                              </td>
+                              <td className="p-3">
+                                <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${
+                                  acc.role === 'admin' 
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : acc.role === 'director'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : acc.role === 'hr'
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {acc.role.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="p-3 text-[10px] text-slate-600">
+                                {acc.branches && acc.branches.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {acc.branches.map(b => (
+                                      <span key={b} className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                        {b}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : acc.branch ? (
+                                  <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                    {acc.branch}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 font-medium">{language === 'en' ? 'All Branches' : 'सभी शाखाएं'}</span>
+                                )}
+                              </td>
+                              <td className="p-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRoleAccount(acc.id)}
+                                  className="text-rose-600 hover:text-rose-800 p-1 rounded-md hover:bg-rose-50 cursor-pointer animate-fadeIn"
+                                >
+                                  <Trash2 className="w-4 h-4 inline" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Form to add new account */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs">
+                  <h4 className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-2">
+                    {language === 'en' ? 'Create User Account' : 'नया लॉगिन खाता बनाएं'}
+                  </h4>
+
+                  {roleFormError && (
+                    <div className="text-[10px] text-rose-600 font-bold bg-rose-50 p-2.5 rounded border border-rose-200">
+                      {roleFormError}
+                    </div>
+                  )}
+
+                  <div className="space-y-3 text-xs font-semibold">
+                    <div>
+                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Full Name' : 'पूरा नाम'}</label>
+                      <input
+                        type="text"
+                        value={newAccName}
+                        onChange={(e) => setNewAccName(e.target.value)}
+                        placeholder="Rahul Sharma"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Login Username' : 'लॉगिन आईडी (Username)'}</label>
+                      <input
+                        type="text"
+                        value={newAccUsername}
+                        onChange={(e) => setNewAccUsername(e.target.value)}
+                        placeholder="rahul_hr"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Password' : 'पासवर्ड'}</label>
+                      <input
+                        type="text"
+                        value={newAccPassword}
+                        onChange={(e) => setNewAccPassword(e.target.value)}
+                        placeholder="hr1234"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Assigned Role' : 'सौंपी गई भूमिका'}</label>
+                      <select
+                        value={newAccRole}
+                        onChange={(e: any) => {
+                          setNewAccRole(e.target.value);
+                          if (e.target.value !== 'branch_manager' && e.target.value !== 'director') {
+                            setNewAccBranch('');
+                            setNewAccBranches([]);
+                          }
+                        }}
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-slate-700"
+                      >
+                        <option value="admin">{language === 'en' ? 'System Admin (सह-प्रशासक)' : 'सिस्टम एडमिन (सह-प्रशासक)'}</option>
+                        <option value="director">{language === 'en' ? 'Director (डायरेक्टर)' : 'डायरेक्टर'}</option>
+                        <option value="hr">{language === 'en' ? 'HR Manager (एचआर मैनेजर)' : 'एचआर मैनेजर'}</option>
+                        <option value="branch_manager">{language === 'en' ? 'Branch Manager (ब्रांच मैनेजर)' : 'ब्रांच मैनेजर'}</option>
+                      </select>
+                    </div>
+
+                    {(newAccRole === 'branch_manager' || newAccRole === 'director') && (
+                      <div className="space-y-2 border border-slate-100 p-2.5 rounded-lg bg-slate-50/50">
+                        <label className="block text-slate-600 font-bold">
+                          {language === 'en' ? 'Restricted Branches' : 'शाखा प्रतिबंध'}
+                        </label>
+                        
+                        <div className="max-h-28 overflow-y-auto space-y-1.5 p-1.5 bg-white border border-slate-200 rounded">
+                          {localSettings.branches.length === 0 ? (
+                            <p className="text-[10px] text-slate-400 italic p-1">No branches configured yet</p>
+                          ) : (
+                            localSettings.branches.map((br) => {
+                              const isChecked = newAccBranches.includes(br);
+                              return (
+                                <label key={br} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer select-none text-[11px] font-medium text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      if (isChecked) {
+                                        setNewAccBranches(newAccBranches.filter(b => b !== br));
+                                      } else {
+                                        setNewAccBranches([...newAccBranches, br]);
+                                      }
+                                    }}
+                                    className="w-3.5 h-3.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+                                  />
+                                  <span>{br}</span>
+                                </label>
+                              );
+                            })
+                          )}
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1 leading-normal">
+                          {language === 'en'
+                            ? 'Check the branch(es) this manager is allowed to see. Leave all unchecked to allow viewing ALL branches.'
+                            : 'उन शाखाओं को चेक करें जिन्हें यह मैनेजर देख सकता है। सभी शाखाओं को देखने की अनुमति देने के लिए सभी को अनचेक छोड़ दें।'}
+                        </p>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleAddRoleAccount}
+                      className="w-full bg-[#03623c] hover:bg-[#024d2e] text-white text-xs font-black py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs mt-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {language === 'en' ? 'Add User Account' : 'खाता जोड़ें'}
+                    </button>
                   </div>
                 </div>
               </div>

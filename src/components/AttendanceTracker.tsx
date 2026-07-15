@@ -22,6 +22,7 @@ interface AttendanceTrackerProps {
   onUpdateAttendanceRecords?: (records: Attendance[]) => Promise<void>;
   language: 'en' | 'hi';
   adminSettings?: AdminSettings;
+  portalUser?: any;
 }
 
 export default function AttendanceTracker({ 
@@ -30,7 +31,8 @@ export default function AttendanceTracker({
   onSaveAttendance, 
   onUpdateAttendanceRecords,
   language,
-  adminSettings
+  adminSettings,
+  portalUser
 }: AttendanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<'daily' | 'misspunch' | 'halfday' | 'calendar'>('daily');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -901,9 +903,35 @@ export default function AttendanceTracker({
                       const remarksVal = getLogCurrentValue(log, 'remarks') || '';
                       const isRowEdited = pendingChanges.some(p => p.employeeId === log.employeeId && p.date === log.date);
 
+                      // Limit calculation: Count other APPROVED miss punches for the same employee in the same month
+                      const logMonth = log.date.substring(0, 7); // YYYY-MM
+                      const approvedCountForMonth = attendanceRecords.filter(r => 
+                        r.employeeId === log.employeeId && 
+                        r.status === 'Miss Punch' && 
+                        r.approvalStatus === 'Approved' && 
+                        r.date.substring(0, 7) === logMonth &&
+                        r.date !== log.date
+                      ).length;
+
+                      const userRole = portalUser?.role || 'admin';
+                      const isHRorBranchManager = userRole === 'hr' || userRole === 'branch_manager';
+                      const isLimitExceeded = approvedCountForMonth >= 3;
+                      const isApprovalBlockedForUser = isLimitExceeded && isHRorBranchManager;
+
                       return (
                         <tr key={`${log.employeeId}-${log.date}`} className={`hover:bg-gray-50/30 transition-colors ${isRowEdited ? 'bg-amber-50/20' : ''}`}>
-                          <td className="py-4 px-6 font-mono font-bold text-gray-900">{log.date}</td>
+                          <td className="py-4 px-6 font-mono font-bold text-gray-900">
+                            <div>
+                              <span>{log.date}</span>
+                              {isLimitExceeded && (
+                                <span className="block text-[9px] font-extrabold text-amber-600 mt-0.5">
+                                  {language === 'en' 
+                                    ? `[Approved: ${approvedCountForMonth}/3]` 
+                                    : `[स्वीकृत: ${approvedCountForMonth}/3]`}
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-4 px-6">
                             <div>
                               <div className="font-bold text-gray-900">{getEmployeeName(log.employeeId)}</div>
@@ -933,21 +961,43 @@ export default function AttendanceTracker({
                             </div>
                           </td>
                           <td className="py-4 px-6 text-center">
-                            <select
-                              value={currentStatus}
-                              onChange={(e) => handleApprovalChange(log, 'approvalStatus', e.target.value)}
-                              className={`border rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none ${
-                                currentStatus === 'Approved' 
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                  : currentStatus === 'Rejected' 
-                                    ? 'bg-red-50 text-red-700 border-red-200' 
-                                    : 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-                              }`}
-                            >
-                              <option value="Pending">{t.pending}</option>
-                              <option value="Approved">{t.approved}</option>
-                              <option value="Rejected">{t.rejected}</option>
-                            </select>
+                            <div className="space-y-1">
+                              <select
+                                value={currentStatus}
+                                onChange={(e) => {
+                                  if (e.target.value === 'Approved' && isApprovalBlockedForUser) {
+                                    alert(language === 'en' 
+                                      ? `Direct HR approval limit exceeded (${approvedCountForMonth}/3) for this employee in ${logMonth}. Only Directors can approve this request.` 
+                                      : `इस कर्मचारी के लिए ${logMonth} में प्रत्यक्ष HR मंजूरी सीमा (${approvedCountForMonth}/3) से अधिक हो गई है। केवल डायरेक्टर ही इसे स्वीकृत कर सकते हैं।`);
+                                    return;
+                                  }
+                                  handleApprovalChange(log, 'approvalStatus', e.target.value);
+                                }}
+                                className={`border rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none ${
+                                  currentStatus === 'Approved' 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                    : currentStatus === 'Rejected' 
+                                      ? 'bg-red-50 text-red-700 border-red-200' 
+                                      : 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                                }`}
+                              >
+                                <option value="Pending">{t.pending}</option>
+                                <option value="Approved" disabled={isApprovalBlockedForUser}>
+                                  {t.approved} {isApprovalBlockedForUser ? (language === 'en' ? ' (Req. Director)' : ' (डायरेक्टर आवश्यक)') : ''}
+                                </option>
+                                <option value="Rejected">{t.rejected}</option>
+                              </select>
+                              {isApprovalBlockedForUser && (
+                                <span className="block text-[8px] font-black text-red-600 uppercase tracking-tighter">
+                                  {language === 'en' ? '⚠️ Director Approval Req.' : '⚠️ डायरेक्टर मंजूरी आवश्यक'}
+                                </span>
+                              )}
+                              {isLimitExceeded && !isHRorBranchManager && (
+                                <span className="block text-[8px] font-black text-emerald-600 uppercase tracking-tighter">
+                                  {language === 'en' ? '✨ Director Override Active' : '✨ डायरेक्टर ओवरराइड सक्रिय'}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-4 px-6">
                             <input
@@ -962,10 +1012,24 @@ export default function AttendanceTracker({
                             <div className="flex justify-end gap-1.5">
                               <button
                                 onClick={() => {
+                                  if (isApprovalBlockedForUser) {
+                                    alert(language === 'en' 
+                                      ? `Direct HR approval limit exceeded (${approvedCountForMonth}/3) for this employee in ${logMonth}. Only Directors can approve this request.` 
+                                      : `इस कर्मचारी के लिए ${logMonth} में प्रत्यक्ष HR मंजूरी सीमा (${approvedCountForMonth}/3) से अधिक हो गई है। केवल डायरेक्टर ही इसे स्वीकृत कर सकते हैं।`);
+                                    return;
+                                  }
                                   handleApprovalChange(log, 'approvalStatus', 'Approved');
                                 }}
-                                className="p-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg cursor-pointer transition-all"
-                                title="Quick Approve"
+                                disabled={isApprovalBlockedForUser}
+                                className={`p-1 border rounded-lg cursor-pointer transition-all ${
+                                  isApprovalBlockedForUser 
+                                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50' 
+                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                }`}
+                                title={isApprovalBlockedForUser 
+                                  ? "Requires Director Approval" 
+                                  : "Quick Approve"
+                                }
                               >
                                 <ThumbsUp className="w-3.5 h-3.5" />
                               </button>

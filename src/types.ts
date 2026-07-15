@@ -119,6 +119,17 @@ export interface Holiday {
   imgUrl?: string;
 }
 
+export interface UserRoleAccount {
+  id: string;
+  username: string;
+  password?: string;
+  role: 'admin' | 'director' | 'hr' | 'branch_manager' | 'employee';
+  name: string;
+  branch?: string; // Legacy single-branch
+  branches?: string[]; // Multiple branch selection
+  createdAt: string;
+}
+
 export interface AdminSettings {
   companyName: string;
   companyAddress: string;
@@ -146,6 +157,9 @@ export interface AdminSettings {
   enableProfessionalTax?: boolean;
   enablePaidLeaveCalculation?: boolean;
   paidLeaveStartAfterMonths?: number;
+  roleAccounts?: UserRoleAccount[];
+  rolePermissions?: Record<string, string[]>;
+  enableEmployeePayslips?: boolean;
 }
 
 export interface Attendance {

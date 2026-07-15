@@ -62,8 +62,10 @@ import EmployeeLedger from './components/EmployeeLedger';
 export interface PortalUser {
   id: string;
   name: string;
-  role: 'admin' | 'employee';
+  role: 'admin' | 'director' | 'hr' | 'branch_manager' | 'employee';
   employee?: Employee;
+  branch?: string;
+  branches?: string[];
 }
 
 // Merge utility functions to handle offline modifications merging back with Google Sheets
@@ -543,6 +545,7 @@ export default function App() {
   }, []);
 
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger'>('dashboard');
+
   const [isSidebarHovered, setIsSidebarHovered] = useState<boolean>(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en'); // Set default to English as bilingual toggle is disabled
   const [showSeedDialog, setShowSeedDialog] = useState<boolean>(false);
@@ -569,6 +572,19 @@ export default function App() {
     }
     return INITIAL_ADMIN_SETTINGS;
   });
+
+  // Auto-redirect to first allowed tab based on user role permissions
+  useEffect(() => {
+    if (!portalUser || portalUser.role === 'employee') return;
+    
+    const allowed = portalUser.role === 'admin'
+      ? ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin']
+      : adminSettings.rolePermissions?.[portalUser.role] || [];
+      
+    if (allowed.length > 0 && !allowed.includes(currentTab)) {
+      setCurrentTab(allowed[0] as any);
+    }
+  }, [portalUser, adminSettings, currentTab]);
 
   // Dynamically update document title and favicon when company name or logo changes
   useEffect(() => {
@@ -1629,32 +1645,57 @@ export default function App() {
                     setLoginErr(language === 'en' ? 'Incorrect Administrator password.' : 'अमान्य एडमिनिस्ट्रेटर पासवर्ड।');
                   }
                 } else {
-                  const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
-                  if (emp) {
-                    const targetPass = (emp.password || '').trim();
-                    const isCorrectPass = targetPass 
-                      ? (inputPass.trim() === targetPass) 
-                      : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
+                  const roleAccounts = adminSettings.roleAccounts || [];
+                  const matchedRoleAcc = roleAccounts.find(
+                    acc => acc.username.trim().toLowerCase() === inputID.toLowerCase()
+                  );
 
-                    if (isCorrectPass) {
-                      const empUser: PortalUser = {
-                        id: emp.id,
-                        name: emp.name,
-                        role: 'employee',
-                        employee: emp
+                  if (matchedRoleAcc) {
+                    if (inputPass === matchedRoleAcc.password) {
+                      const portalUserObj: PortalUser = {
+                        id: matchedRoleAcc.id,
+                        name: matchedRoleAcc.name,
+                        role: matchedRoleAcc.role,
+                        branch: matchedRoleAcc.branch,
+                        branches: matchedRoleAcc.branches
                       };
-                      setPortalUser(empUser);
-                      localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                      setPortalUser(portalUserObj);
+                      localStorage.setItem('payroll_portal_user', JSON.stringify(portalUserObj));
                       setLoginId('');
                       setLoginPass('');
                       setLoginErr(null);
                     } else {
                       recordUnsuccessfulLogin(inputID, 'Incorrect Password');
-                      setLoginErr(language === 'en' ? "Incorrect Password! Standard password is your Employee ID or '123456'." : "गलत पासवर्ड! मानक पासवर्ड आपकी कर्मचारी आईडी या '123456' है।");
+                      setLoginErr(language === 'en' ? 'Incorrect Password.' : 'गलत पासवर्ड।');
                     }
                   } else {
-                    recordUnsuccessfulLogin(inputID, 'User ID not found');
-                    setLoginErr(language === 'en' ? "User ID / Employee ID not found. Contact administration." : "उपयोगकर्ता आईडी / कर्मचारी आईडी नहीं मिली। प्रशासन से संपर्क करें।");
+                    const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
+                    if (emp) {
+                      const targetPass = (emp.password || '').trim();
+                      const isCorrectPass = targetPass 
+                        ? (inputPass.trim() === targetPass) 
+                        : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
+
+                      if (isCorrectPass) {
+                        const empUser: PortalUser = {
+                          id: emp.id,
+                          name: emp.name,
+                          role: 'employee',
+                          employee: emp
+                        };
+                        setPortalUser(empUser);
+                        localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                        setLoginId('');
+                        setLoginPass('');
+                        setLoginErr(null);
+                      } else {
+                        recordUnsuccessfulLogin(inputID, 'Incorrect Password');
+                        setLoginErr(language === 'en' ? "Incorrect Password! Standard password is your Employee ID or '123456'." : "गलत पासवर्ड! मानक पासवर्ड आपकी कर्मचारी आईडी या '123456' है।");
+                      }
+                    } else {
+                      recordUnsuccessfulLogin(inputID, 'User ID not found');
+                      setLoginErr(language === 'en' ? "User ID / Employee ID not found. Contact administration." : "उपयोगकर्ता आईडी / कर्मचारी आईडी नहीं मिली। प्रशासन से संपर्क करें।");
+                    }
                   }
                 }
               }} className="space-y-4 mt-6">
@@ -2149,6 +2190,7 @@ export default function App() {
             payrollRecords={payroll}
             language={language}
             adminSettings={adminSettings}
+            onUpdateAttendanceRecords={handleUpdateAttendanceRecords}
           />
         </main>
 
@@ -2187,6 +2229,34 @@ export default function App() {
       </div>
     );
   }
+
+  // Filter data for Branch Manager & Director restrictions
+  const filteredEmployees = (() => {
+    if (portalUser?.role !== 'branch_manager' && portalUser?.role !== 'director') return employees;
+    
+    const allowedBranches = portalUser.branches || [];
+    if (allowedBranches.length > 0) {
+      const allowedLower = allowedBranches.map(b => b.trim().toLowerCase());
+      return employees.filter(emp => allowedLower.includes((emp.branch || '').trim().toLowerCase()));
+    }
+    
+    if (portalUser.branch) {
+      const singleLower = portalUser.branch.trim().toLowerCase();
+      return employees.filter(emp => (emp.branch || '').trim().toLowerCase() === singleLower);
+    }
+    
+    return employees; // If no branches or branch is restricted, allow all branches
+  })();
+
+  const filteredEmployeesIds = new Set(filteredEmployees.map(e => e.id));
+
+  const filteredAttendance = (portalUser?.role === 'branch_manager' || portalUser?.role === 'director')
+    ? attendance.filter(rec => filteredEmployeesIds.has(rec.employeeId))
+    : attendance;
+
+  const filteredPayroll = (portalUser?.role === 'branch_manager' || portalUser?.role === 'director')
+    ? payroll.filter(rec => filteredEmployeesIds.has(rec.employeeId))
+    : payroll;
 
   // 3. Render Dashboard / Workspace after Login
   return (
@@ -2231,15 +2301,21 @@ export default function App() {
 
           {/* Navigation Links */}
           <nav className={`flex flex-col ${isSidebarHovered ? 'items-start w-full gap-2' : 'items-center gap-4'}`}>
-            {[
-              { id: 'dashboard' as const, label: uiTexts.dashboard, icon: TrendingUp },
-              { id: 'employees' as const, label: uiTexts.employees, icon: Users },
-              { id: 'attendance' as const, label: uiTexts.attendance, icon: Calendar },
-              { id: 'payroll' as const, label: uiTexts.payroll, icon: CreditCard },
-              { id: 'leaves' as const, label: uiTexts.leaves, icon: CalendarDays },
-              { id: 'ledger' as const, label: uiTexts.ledger, icon: FileSpreadsheet },
-              { id: 'admin' as const, label: uiTexts.adminSettings, icon: SettingsIcon },
-            ].map((item) => {
+            {(() => {
+              const allowedTabs = portalUser?.role === 'admin'
+                ? ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin']
+                : adminSettings.rolePermissions?.[portalUser?.role || 'employee'] || [];
+
+              return [
+                { id: 'dashboard' as const, label: uiTexts.dashboard, icon: TrendingUp },
+                { id: 'employees' as const, label: uiTexts.employees, icon: Users },
+                { id: 'attendance' as const, label: uiTexts.attendance, icon: Calendar },
+                { id: 'payroll' as const, label: uiTexts.payroll, icon: CreditCard },
+                { id: 'leaves' as const, label: uiTexts.leaves, icon: CalendarDays },
+                { id: 'ledger' as const, label: uiTexts.ledger, icon: FileSpreadsheet },
+                { id: 'admin' as const, label: uiTexts.adminSettings, icon: SettingsIcon },
+              ].filter(item => allowedTabs.includes(item.id));
+            })().map((item) => {
               const IconComponent = item.icon;
               const isActive = currentTab === item.id;
               return (
@@ -2738,16 +2814,16 @@ export default function App() {
             <div className="w-full">
               {currentTab === 'dashboard' && (
                 <Dashboard 
-                  employees={employees} 
-                  attendance={attendance} 
-                  payroll={payroll} 
+                  employees={filteredEmployees} 
+                  attendance={filteredAttendance} 
+                  payroll={filteredPayroll} 
                   language={language} 
                   onNavigate={setCurrentTab}
                 />
               )}
               {currentTab === 'employees' && (
                 <EmployeeList 
-                  employees={employees} 
+                  employees={filteredEmployees} 
                   onAddEmployee={handleAddEmployee} 
                   onUpdateEmployee={handleUpdateEmployee} 
                   onBulkAddEmployees={handleBulkAddEmployees}
@@ -2757,19 +2833,20 @@ export default function App() {
               )}
               {currentTab === 'attendance' && (
                 <AttendanceTracker 
-                  employees={employees} 
-                  attendanceRecords={attendance} 
+                  employees={filteredEmployees} 
+                  attendanceRecords={filteredAttendance} 
                   onSaveAttendance={handleSaveAttendance} 
                   onUpdateAttendanceRecords={handleUpdateAttendanceRecords}
                   language={language} 
                   adminSettings={adminSettings}
+                  portalUser={portalUser}
                 />
               )}
               {currentTab === 'payroll' && (
                 <PayrollCalculator 
-                  employees={employees} 
-                  attendanceRecords={attendance} 
-                  payrollRecords={payroll} 
+                  employees={filteredEmployees} 
+                  attendanceRecords={filteredAttendance} 
+                  payrollRecords={filteredPayroll} 
                   onSavePayroll={handleSavePayroll} 
                   onUpdateEmployees={handleBulkAddEmployees}
                   language={language} 
@@ -2778,8 +2855,8 @@ export default function App() {
               )}
               {currentTab === 'leaves' && (
                 <LeavesHolidays 
-                  employees={employees}
-                  attendance={attendance}
+                  employees={filteredEmployees}
+                  attendance={filteredAttendance}
                   language={language}
                   adminSettings={adminSettings}
                   onUpdateSettings={handleSaveSettings}
@@ -2787,8 +2864,8 @@ export default function App() {
               )}
               {currentTab === 'ledger' && (
                 <EmployeeLedger 
-                  employees={employees}
-                  payrollRecords={payroll}
+                  employees={filteredEmployees}
+                  payrollRecords={filteredPayroll}
                   language={language}
                   adminSettings={adminSettings}
                 />
