@@ -123,7 +123,7 @@ export interface UserRoleAccount {
   id: string;
   username: string;
   password?: string;
-  role: 'admin' | 'director' | 'hr' | 'branch_manager' | 'employee';
+  role: 'admin' | 'director' | 'sub_admin' | 'hr' | 'branch_manager' | 'employee';
   name: string;
   branch?: string; // Legacy single-branch
   branches?: string[]; // Multiple branch selection
@@ -230,3 +230,19 @@ export interface FailedLoginAttempt {
   browserInfo?: string;
   ipAddress?: string;
 }
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  actorUsername: string;
+  actorRole: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  actionType: 'create' | 'update' | 'approve' | 'reject' | 'delete_logs';
+  fieldChanged: string;
+  oldValue: string;
+  newValue: string;
+  remarks?: string;
+}
+

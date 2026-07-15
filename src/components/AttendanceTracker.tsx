@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, Check, Save, UserCheck, UserX, AlertTriangle, Clock, RefreshCw, 
   ListCollapse, ThumbsUp, ThumbsDown, CheckCircle, XCircle, AlertCircle, FileSpreadsheet, List,
-  Filter, Building, Users, ChevronLeft, ChevronRight
+  Filter, Building, Users, ChevronLeft, ChevronRight, History
 } from 'lucide-react';
-import { Employee, Attendance, AdminSettings } from '../types';
+import { Employee, Attendance, AdminSettings, AuditLog } from '../types';
 import { 
   getShiftTimings, 
   getHalfDayCheckOut, 
@@ -23,6 +23,8 @@ interface AttendanceTrackerProps {
   language: 'en' | 'hi';
   adminSettings?: AdminSettings;
   portalUser?: any;
+  auditLogs?: AuditLog[];
+  onAddAuditLogs?: (logs: AuditLog[]) => void;
 }
 
 export default function AttendanceTracker({ 
@@ -32,8 +34,18 @@ export default function AttendanceTracker({
   onUpdateAttendanceRecords,
   language,
   adminSettings,
-  portalUser
+  portalUser,
+  auditLogs = [],
+  onAddAuditLogs
 }: AttendanceTrackerProps) {
+  const hasPermission = (action: 'view' | 'add' | 'edit' | 'approve') => {
+    if (!portalUser) return true;
+    if (portalUser.role === 'admin') return true;
+    const permissions = adminSettings?.rolePermissions?.[portalUser.role] || [];
+    if (permissions.includes('attendance')) return true;
+    return permissions.includes(`attendance:${action}`);
+  };
+
   const [activeTab, setActiveTab] = useState<'daily' | 'misspunch' | 'halfday' | 'calendar'>('daily');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [localRecords, setLocalRecords] = useState<{ [empId: string]: Attendance }>({});
@@ -71,6 +83,12 @@ export default function AttendanceTracker({
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('All');
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Particular record history modal states
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyModalEmpId, setHistoryModalEmpId] = useState('');
+  const [historyModalDate, setHistoryModalDate] = useState('');
+  const [historyModalEmpName, setHistoryModalEmpName] = useState('');
 
   const branchOptions = useMemo(() => {
     const branches = new Set<string>();
@@ -221,6 +239,10 @@ export default function AttendanceTracker({
   }, [selectedDate, attendanceRecords, employees]);
 
   const handleStatusChange = (empId: string, status: Attendance['status']) => {
+    if (!hasPermission('edit')) {
+      alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+      return;
+    }
     const emp = employees.find(e => e.id === empId);
     const timings = getShiftTimings(emp?.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
 
@@ -264,6 +286,10 @@ export default function AttendanceTracker({
   };
 
   const handleTimeChange = (empId: string, field: 'checkIn' | 'checkOut', value: string) => {
+    if (!hasPermission('edit')) {
+      alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+      return;
+    }
     setLocalRecords(prev => {
       const rec = prev[empId];
       const updated = { ...rec, [field]: value };
@@ -294,6 +320,10 @@ export default function AttendanceTracker({
   };
 
   const handleNumericChange = (empId: string, value: number) => {
+    if (!hasPermission('edit')) {
+      alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+      return;
+    }
     setLocalRecords(prev => ({
       ...prev,
       [empId]: { ...prev[empId], overtimeHours: Math.max(0, value) }
@@ -301,6 +331,10 @@ export default function AttendanceTracker({
   };
 
   const handleRemarksChange = (empId: string, value: string) => {
+    if (!hasPermission('edit')) {
+      alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+      return;
+    }
     setLocalRecords(prev => ({
       ...prev,
       [empId]: { ...prev[empId], remarks: value }
@@ -330,7 +364,71 @@ export default function AttendanceTracker({
     setIsSaving(true);
     try {
       const recordsToSave = Object.values(localRecords) as Attendance[];
+      
+      // Compare and generate audit logs
+      const newAuditLogs: AuditLog[] = [];
+      const actorUsername = portalUser?.username || 'admin';
+      const actorRole = portalUser?.role || 'admin';
+      
+      recordsToSave.forEach(rec => {
+        const prevRec = attendanceRecords.find(
+          r => r.employeeId === rec.employeeId && r.date === selectedDate
+        );
+
+        const empName = getEmployeeName(rec.employeeId);
+
+        if (!prevRec) {
+          // New record created
+          newAuditLogs.push({
+            id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+            timestamp: new Date().toISOString(),
+            actorUsername,
+            actorRole,
+            employeeId: rec.employeeId,
+            employeeName: empName,
+            date: selectedDate,
+            actionType: 'create',
+            fieldChanged: 'attendance',
+            oldValue: 'None',
+            newValue: `${rec.status} (${rec.checkIn || 'No-In'} - ${rec.checkOut || 'No-Out'})`,
+            remarks: rec.remarks || 'Daily Attendance initial entry'
+          });
+        } else {
+          // Check what fields changed
+          const fieldsToCompare: ('status' | 'checkIn' | 'checkOut' | 'overtimeHours' | 'remarks')[] = [
+            'status', 'checkIn', 'checkOut', 'overtimeHours', 'remarks'
+          ];
+
+          fieldsToCompare.forEach(field => {
+            const oldVal = String(prevRec[field] !== undefined ? prevRec[field] : '');
+            const newVal = String(rec[field] !== undefined ? rec[field] : '');
+
+            if (oldVal !== newVal) {
+              newAuditLogs.push({
+                id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+                timestamp: new Date().toISOString(),
+                actorUsername,
+                actorRole,
+                employeeId: rec.employeeId,
+                employeeName: empName,
+                date: selectedDate,
+                actionType: 'update',
+                fieldChanged: field,
+                oldValue: oldVal || 'empty',
+                newValue: newVal || 'empty',
+                remarks: rec.remarks || 'Manual adjustment'
+              });
+            }
+          });
+        }
+      });
+
       await onSaveAttendance(selectedDate, recordsToSave);
+      
+      if (newAuditLogs.length > 0 && onAddAuditLogs) {
+        onAddAuditLogs(newAuditLogs);
+      }
+
       alert(t.savedSuccess);
     } catch (err) {
       console.error(err);
@@ -350,6 +448,17 @@ export default function AttendanceTracker({
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const handleApprovalChange = (record: Attendance, field: 'approvalStatus' | 'checkIn' | 'checkOut' | 'remarks' | 'status', value: any) => {
+    if (field === 'approvalStatus') {
+      if (!hasPermission('approve')) {
+        alert(language === 'en' ? 'You do not have permission to approve attendance.' : 'आपके पास उपस्थिति स्वीकृत करने की अनुमति नहीं है।');
+        return;
+      }
+    } else {
+      if (!hasPermission('edit')) {
+        alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+        return;
+      }
+    }
     setPendingChanges(prev => {
       const existsIdx = prev.findIndex(r => r.employeeId === record.employeeId && r.date === record.date);
       const updatedRecord = existsIdx > -1 
@@ -391,7 +500,73 @@ export default function AttendanceTracker({
     setIsSavingApprovals(true);
     try {
       if (onUpdateAttendanceRecords) {
+        // Compare and generate audit logs for approvals
+        const approvalAuditLogs: AuditLog[] = [];
+        const actorUsername = portalUser?.username || 'admin';
+        const actorRole = portalUser?.role || 'admin';
+
+        pendingChanges.forEach(rec => {
+          const prevRec = attendanceRecords.find(
+            r => r.employeeId === rec.employeeId && r.date === rec.date
+          );
+          const empName = getEmployeeName(rec.employeeId);
+
+          if (!prevRec) {
+            approvalAuditLogs.push({
+              id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+              timestamp: new Date().toISOString(),
+              actorUsername,
+              actorRole,
+              employeeId: rec.employeeId,
+              employeeName: empName,
+              date: rec.date,
+              actionType: 'create',
+              fieldChanged: 'attendance',
+              oldValue: 'None',
+              newValue: `${rec.status} (${rec.checkIn || 'No-In'} - ${rec.checkOut || 'No-Out'})`,
+              remarks: rec.remarks || 'Approval entry created'
+            });
+          } else {
+            const fieldsToCompare: ('status' | 'checkIn' | 'checkOut' | 'approvalStatus' | 'remarks')[] = [
+              'status', 'checkIn', 'checkOut', 'approvalStatus', 'remarks'
+            ];
+
+            fieldsToCompare.forEach(field => {
+              const oldVal = String(prevRec[field] !== undefined ? prevRec[field] : '');
+              const newVal = String(rec[field] !== undefined ? rec[field] : '');
+
+              if (oldVal !== newVal) {
+                let actionType: 'create' | 'update' | 'approve' | 'reject' | 'delete_logs' = 'update';
+                if (field === 'approvalStatus') {
+                  if (newVal === 'Approved') actionType = 'approve';
+                  else if (newVal === 'Rejected') actionType = 'reject';
+                }
+
+                approvalAuditLogs.push({
+                  id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+                  timestamp: new Date().toISOString(),
+                  actorUsername,
+                  actorRole,
+                  employeeId: rec.employeeId,
+                  employeeName: empName,
+                  date: rec.date,
+                  actionType,
+                  fieldChanged: field,
+                  oldValue: oldVal || 'empty',
+                  newValue: newVal || 'empty',
+                  remarks: rec.remarks || 'Approval status update'
+                });
+              }
+            });
+          }
+        });
+
         await onUpdateAttendanceRecords(pendingChanges);
+
+        if (approvalAuditLogs.length > 0 && onAddAuditLogs) {
+          onAddAuditLogs(approvalAuditLogs);
+        }
+
         setPendingChanges([]);
         alert(t.approvalUpdated);
       } else {
@@ -501,32 +676,34 @@ export default function AttendanceTracker({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setIsImportModalOpen(true)}
-                className="px-4 py-2 border border-[#03623c]/20 bg-[#03623c]/5 text-[#03623c] hover:bg-[#03623c]/10 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer hover:shadow-3xs"
-                id="bulk-import-punch"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                {language === 'en' ? 'Upload Punch Machine Data' : 'पंच मशीन डाटा अपलोड करें'}
-              </button>
-              <button
-                onClick={() => markBulkStatus('Present')}
-                className="px-4 py-2 border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-                id="bulk-present"
-              >
-                <UserCheck className="w-4 h-4" />
-                {t.bulkPresent}
-              </button>
-              <button
-                onClick={() => markBulkStatus('Absent')}
-                className="px-4 py-2 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-                id="bulk-absent"
-              >
-                <UserX className="w-4 h-4" />
-                {t.bulkAbsent}
-              </button>
-            </div>
+            {hasPermission('add') && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="px-4 py-2 border border-[#03623c]/20 bg-[#03623c]/5 text-[#03623c] hover:bg-[#03623c]/10 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer hover:shadow-3xs"
+                  id="bulk-import-punch"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  {language === 'en' ? 'Upload Punch Machine Data' : 'पंच मशीन डाटा अपलोड करें'}
+                </button>
+                <button
+                  onClick={() => markBulkStatus('Present')}
+                  className="px-4 py-2 border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                  id="bulk-present"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  {t.bulkPresent}
+                </button>
+                <button
+                  onClick={() => markBulkStatus('Absent')}
+                  className="px-4 py-2 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                  id="bulk-absent"
+                >
+                  <UserX className="w-4 h-4" />
+                  {t.bulkAbsent}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Robust Filters segment */}
@@ -592,6 +769,7 @@ export default function AttendanceTracker({
                       <th className="py-4 px-6 text-center min-w-[180px]">{t.colTiming}</th>
                       <th className="py-4 px-6 text-center min-w-[100px]">{t.colOvertime}</th>
                       <th className="py-4 px-6">{t.colRemarks}</th>
+                      <th className="py-4 px-6 text-center min-w-[90px]">{language === 'en' ? 'History' : 'इतिहास'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm">
@@ -781,6 +959,22 @@ export default function AttendanceTracker({
                               className="w-full border border-gray-200 rounded-lg px-3 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#03623c]"
                             />
                           </td>
+                          <td className="py-4 px-6 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHistoryModalEmpId(emp.id);
+                                setHistoryModalDate(selectedDate);
+                                setHistoryModalEmpName(emp.name);
+                                setHistoryModalOpen(true);
+                              }}
+                              className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-emerald-700 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold"
+                              title={language === 'en' ? 'View change history' : 'बदलाव इतिहास देखें'}
+                            >
+                              <History className="w-3.5 h-3.5 text-slate-500" />
+                              <span>{language === 'en' ? 'History' : 'इतिहास'}</span>
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -844,24 +1038,26 @@ export default function AttendanceTracker({
                   <Clock className="w-3.5 h-3.5" />
                   {t.autoOvertimeTitle}
                 </span>
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="bg-[#03623c] hover:bg-[#024d2e] disabled:bg-[#03623c]/50 text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
-                  id="save-attendance"
-                >
-                  {isSaving ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      {t.saving}
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      {t.saveBtn}
-                    </>
-                  )}
-                </button>
+                {hasPermission('edit') && (
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="bg-[#03623c] hover:bg-[#024d2e] disabled:bg-[#03623c]/50 text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                    id="save-attendance"
+                  >
+                    {isSaving ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        {t.saving}
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        {t.saveBtn}
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1010,6 +1206,18 @@ export default function AttendanceTracker({
                           </td>
                           <td className="py-4 px-6 text-right">
                             <div className="flex justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setHistoryModalEmpId(log.employeeId);
+                                  setHistoryModalDate(log.date);
+                                  setHistoryModalEmpName(getEmployeeName(log.employeeId));
+                                  setHistoryModalOpen(true);
+                                }}
+                                className="p-1 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg cursor-pointer transition-all"
+                                title={language === 'en' ? 'View change history' : 'बदलाव इतिहास देखें'}
+                              >
+                                <History className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 onClick={() => {
                                   if (isApprovalBlockedForUser) {
@@ -1182,6 +1390,18 @@ export default function AttendanceTracker({
                             <div className="flex justify-end gap-1.5">
                               <button
                                 onClick={() => {
+                                  setHistoryModalEmpId(log.employeeId);
+                                  setHistoryModalDate(log.date);
+                                  setHistoryModalEmpName(getEmployeeName(log.employeeId));
+                                  setHistoryModalOpen(true);
+                                }}
+                                className="p-1 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg cursor-pointer transition-all"
+                                title={language === 'en' ? 'View change history' : 'बदलाव इतिहास देखें'}
+                              >
+                                <History className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
                                   handleApprovalChange(log, 'approvalStatus', 'Approved');
                                 }}
                                 className="p-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg cursor-pointer transition-all"
@@ -1262,6 +1482,132 @@ export default function AttendanceTracker({
         language={language}
         adminSettings={adminSettings}
       />
+
+      {/* Particular Attendance Audit Logs Modal */}
+      {historyModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl w-full max-w-2xl border border-gray-100 shadow-2xl flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-3xl">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-100 text-emerald-700">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-gray-900 text-sm">
+                    {language === 'en' ? 'Attendance Audit Trail' : 'उपस्थिति ऑडिट इतिहास'}
+                  </h3>
+                  <p className="text-xs text-gray-400 font-bold font-mono mt-0.5 uppercase tracking-wide">
+                    {historyModalEmpName} ({historyModalEmpId}) · {historyModalDate}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setHistoryModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {(() => {
+                const filteredLogs = auditLogs.filter(
+                  log => log.employeeId === historyModalEmpId && log.date === historyModalDate
+                );
+
+                if (filteredLogs.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-gray-400">
+                      <AlertCircle className="w-12 h-12 mx-auto text-gray-200 mb-2" />
+                      <p className="text-xs font-bold">
+                        {language === 'en'
+                          ? 'No manual modifications logged for this attendance record.'
+                          : 'इस उपस्थिति रिकॉर्ड के लिए कोई मैन्युअल बदलाव लॉग नहीं मिला।'}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        {language === 'en'
+                          ? 'Modifications made during this session will be recorded upon saving.'
+                          : 'इस सत्र के दौरान किए गए बदलावों को सहेजने पर दर्ज किया जाएगा।'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {filteredLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="p-4 rounded-2xl border border-gray-100 bg-gray-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-gray-200 transition-all"
+                      >
+                        <div className="space-y-1 text-left">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-extrabold text-gray-800">
+                              {log.actorUsername}
+                            </span>
+                            <span className="text-[9px] bg-slate-100 text-slate-700 font-black px-1.5 py-0.5 rounded-lg uppercase tracking-wider">
+                              {log.actorRole}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {language === 'en' ? 'Field Changed: ' : 'बदला गया क्षेत्र: '}
+                            <span className="font-bold text-gray-700 font-mono text-[10px] bg-emerald-50 text-emerald-800 px-1 py-0.5 rounded-md">
+                              {log.fieldChanged}
+                            </span>
+                          </div>
+                          <div className="text-xs flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="text-gray-400 line-through">{log.oldValue}</span>
+                            <span className="text-gray-400">➔</span>
+                            <span className="font-bold text-emerald-700">{log.newValue}</span>
+                          </div>
+                          {log.remarks && (
+                            <p className="text-[10px] text-gray-400 font-medium italic mt-1 bg-amber-50/50 p-1.5 rounded-lg border border-amber-100">
+                              Remark: {log.remarks}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="text-right flex flex-col items-end gap-1.5 shrink-0">
+                          <span
+                            className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest ${
+                              log.actionType === 'create'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                                : log.actionType === 'approve'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                : log.actionType === 'reject'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-100'
+                                : 'bg-amber-50 text-amber-700 border border-amber-100'
+                            }`}
+                          >
+                            {log.actionType}
+                          </span>
+                          <span className="text-[10px] font-mono text-gray-400 font-bold">
+                            {new Date(log.timestamp).toLocaleString(
+                              language === 'en' ? 'en-US' : 'hi-IN'
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-100 flex justify-end bg-gray-50/30 rounded-b-3xl">
+              <button
+                onClick={() => setHistoryModalOpen(false)}
+                className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                {language === 'en' ? 'Close' : 'बंद करें'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

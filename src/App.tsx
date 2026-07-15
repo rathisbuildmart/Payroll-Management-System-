@@ -46,7 +46,7 @@ import {
   fetchAdminSettings,
   saveAdminSettings
 } from './services/sheets';
-import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt } from './types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog } from './types';
 import { saveToFirestore, loadFromFirestore } from './services/firestore';
 
 // Importing Tab Components
@@ -62,7 +62,7 @@ import EmployeeLedger from './components/EmployeeLedger';
 export interface PortalUser {
   id: string;
   name: string;
-  role: 'admin' | 'director' | 'hr' | 'branch_manager' | 'employee';
+  role: 'admin' | 'director' | 'sub_admin' | 'hr' | 'branch_manager' | 'employee';
   employee?: Employee;
   branch?: string;
   branches?: string[];
@@ -356,6 +356,47 @@ export default function App() {
     const saved = localStorage.getItem('cached_failed_logins');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // User Audit Logs state
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
+    const saved = localStorage.getItem('cached_audit_logs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const handleClearAuditLogs = () => {
+    if (!portalUser || portalUser.role !== 'admin') {
+      alert(language === 'en' ? 'Only Admin can clear audit logs!' : 'केवल एडमिन ही ऑडिट लॉग साफ़ कर सकते हैं!');
+      return;
+    }
+    const deleteLog: AuditLog = {
+      id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+      timestamp: new Date().toISOString(),
+      actorUsername: portalUser.username,
+      actorRole: portalUser.role,
+      employeeId: 'SYSTEM',
+      employeeName: 'ALL AUDIT LOGS',
+      date: new Date().toISOString().substring(0, 10),
+      actionType: 'delete_logs',
+      fieldChanged: 'ALL',
+      oldValue: `${auditLogs.length} logs existed`,
+      newValue: '0 logs (Cleared)',
+      remarks: 'All audit logs cleared by System Admin'
+    };
+    const cleared = [deleteLog];
+    setAuditLogs(cleared);
+    localStorage.setItem('cached_audit_logs', JSON.stringify(cleared));
+    setIsDataModified(true);
+    addSyncLog('Clear Audit Logs', 'success', 'All system audit logs cleared permanently.');
+  };
+
+  const handleAddAuditLogs = (newLogs: AuditLog[]) => {
+    setAuditLogs(prev => {
+      const updated = [...newLogs, ...prev];
+      localStorage.setItem('cached_audit_logs', JSON.stringify(updated));
+      return updated;
+    });
+    setIsDataModified(true);
+  };
 
   // Portal login states
   const [loginId, setLoginId] = useState('');
@@ -2230,9 +2271,9 @@ export default function App() {
     );
   }
 
-  // Filter data for Branch Manager & Director restrictions
+  // Filter data for Branch Manager, Director & Sub Admin restrictions
   const filteredEmployees = (() => {
-    if (portalUser?.role !== 'branch_manager' && portalUser?.role !== 'director') return employees;
+    if (portalUser?.role !== 'branch_manager' && portalUser?.role !== 'director' && portalUser?.role !== 'sub_admin') return employees;
     
     const allowedBranches = portalUser.branches || [];
     if (allowedBranches.length > 0) {
@@ -2250,11 +2291,11 @@ export default function App() {
 
   const filteredEmployeesIds = new Set(filteredEmployees.map(e => e.id));
 
-  const filteredAttendance = (portalUser?.role === 'branch_manager' || portalUser?.role === 'director')
+  const filteredAttendance = (portalUser?.role === 'branch_manager' || portalUser?.role === 'director' || portalUser?.role === 'sub_admin')
     ? attendance.filter(rec => filteredEmployeesIds.has(rec.employeeId))
     : attendance;
 
-  const filteredPayroll = (portalUser?.role === 'branch_manager' || portalUser?.role === 'director')
+  const filteredPayroll = (portalUser?.role === 'branch_manager' || portalUser?.role === 'director' || portalUser?.role === 'sub_admin')
     ? payroll.filter(rec => filteredEmployeesIds.has(rec.employeeId))
     : payroll;
 
@@ -2840,6 +2881,8 @@ export default function App() {
                   language={language} 
                   adminSettings={adminSettings}
                   portalUser={portalUser}
+                  auditLogs={auditLogs}
+                  onAddAuditLogs={handleAddAuditLogs}
                 />
               )}
               {currentTab === 'payroll' && (
@@ -2888,6 +2931,9 @@ export default function App() {
                   payroll={payroll}
                   onImportData={handleImportDatabase}
                   onClearSheetsSession={handleClearSheetsSession}
+                  auditLogs={auditLogs}
+                  onClearAuditLogs={handleClearAuditLogs}
+                  portalUser={portalUser}
                 />
               )}
             </div>

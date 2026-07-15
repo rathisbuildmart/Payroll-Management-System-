@@ -24,9 +24,10 @@ import {
   Upload,
   Download,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  History
 } from 'lucide-react';
-import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount } from '../types';
+import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog } from '../types';
 
 interface SettingsProps {
   settings: AdminSettings;
@@ -47,6 +48,10 @@ interface SettingsProps {
   payroll?: any[];
   onImportData?: (data: { employees?: any[]; attendance?: any[]; payroll?: any[]; adminSettings?: AdminSettings }) => void;
   onClearSheetsSession?: () => void;
+  
+  auditLogs?: AuditLog[];
+  onClearAuditLogs?: () => void;
+  portalUser?: any;
 }
 
 export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
@@ -165,6 +170,7 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   rolePermissions: {
     admin: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin'],
     director: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
+    sub_admin: ['dashboard', 'employees', 'attendance', 'leaves'],
     hr: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
     branch_manager: ['dashboard', 'employees', 'attendance', 'leaves'],
     employee: []
@@ -188,16 +194,19 @@ export default function Settings({
   attendance = [],
   payroll = [],
   onImportData,
-  onClearSheetsSession
+  onClearSheetsSession,
+  auditLogs = [],
+  onClearAuditLogs,
+  portalUser
 }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'notices_support' | 'database' | 'roles_permissions'>('company');
+  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'notices_support' | 'database' | 'roles_permissions' | 'audit_logs'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
   
   // User Roles & Access states
   const [newAccName, setNewAccName] = useState('');
   const [newAccUsername, setNewAccUsername] = useState('');
   const [newAccPassword, setNewAccPassword] = useState('');
-  const [newAccRole, setNewAccRole] = useState<'admin' | 'director' | 'hr' | 'branch_manager'>('hr');
+  const [newAccRole, setNewAccRole] = useState<'admin' | 'director' | 'sub_admin' | 'hr' | 'branch_manager'>('hr');
   const [newAccBranch, setNewAccBranch] = useState('');
   const [newAccBranches, setNewAccBranches] = useState<string[]>([]);
   const [roleFormError, setRoleFormError] = useState('');
@@ -217,6 +226,10 @@ export default function Settings({
   // Security Log Search/Filter States
   const [securitySearch, setSecuritySearch] = useState('');
   const [securityReasonFilter, setSecurityReasonFilter] = useState<'all' | 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password'>('all');
+
+  // Audit Logs Search & Filter States
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [auditActionFilter, setAuditActionFilter] = useState<'all' | 'create' | 'update' | 'approve' | 'reject'>('all');
 
   // Database Backup, Sync, and Troubleshoot States
   const [importData, setImportData] = useState<any>(null);
@@ -516,6 +529,7 @@ export default function Settings({
   const rolePermissions = localSettings.rolePermissions || {
     admin: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin'],
     director: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
+    sub_admin: ['dashboard', 'employees', 'attendance', 'leaves'],
     hr: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
     branch_manager: ['dashboard', 'employees', 'attendance', 'leaves'],
     employee: []
@@ -554,8 +568,8 @@ export default function Settings({
       username: newAccUsername.trim(),
       password: newAccPassword.trim(),
       role: newAccRole,
-      branch: (newAccRole === 'branch_manager' || newAccRole === 'director') && newAccBranches.length > 0 ? newAccBranches[0] : undefined,
-      branches: (newAccRole === 'branch_manager' || newAccRole === 'director') ? newAccBranches : undefined,
+      branch: (newAccRole === 'branch_manager' || newAccRole === 'director' || newAccRole === 'sub_admin') && newAccBranches.length > 0 ? newAccBranches[0] : undefined,
+      branches: (newAccRole === 'branch_manager' || newAccRole === 'director' || newAccRole === 'sub_admin') ? newAccBranches : undefined,
       createdAt: new Date().toISOString()
     };
 
@@ -735,6 +749,18 @@ export default function Settings({
           >
             <KeyRound className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
             <span>{language === 'en' ? 'User Roles & Access' : 'भूमिकाएं और अनुमतियां'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('audit_logs')}
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
+              activeSubTab === 'audit_logs'
+                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
+                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <History className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
+            <span>{language === 'en' ? 'User Audit Report' : 'यूजर ऑडिट रिपोर्ट'}</span>
           </button>
 
           <div className="hidden md:block pt-6 mt-6 border-t border-gray-200/60">
@@ -2023,6 +2049,7 @@ export default function Settings({
                       <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold text-[10px] uppercase tracking-wider">
                         <th className="p-3 font-black">{language === 'en' ? 'Module / View' : 'मॉड्यूल / व्यू'}</th>
                         <th className="p-3 text-center">{language === 'en' ? 'Director' : 'डायरेक्टर'}</th>
+                        <th className="p-3 text-center">{language === 'en' ? 'Sub Admin' : 'सब एडमिन'}</th>
                         <th className="p-3 text-center">{language === 'en' ? 'HR Manager' : 'एचआर'}</th>
                         <th className="p-3 text-center">{language === 'en' ? 'Branch Manager' : 'ब्रांच मैनेजर'}</th>
                         <th className="p-3 text-center">{language === 'en' ? 'Employee' : 'कर्मचारी'}</th>
@@ -2047,6 +2074,16 @@ export default function Settings({
                               type="checkbox"
                               checked={(rolePermissions.director || []).includes(mod.id)}
                               onChange={() => handleTogglePermission('director', mod.id)}
+                              className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                            />
+                          </td>
+
+                          {/* Sub Admin */}
+                          <td className="p-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={(rolePermissions.sub_admin || []).includes(mod.id)}
+                              onChange={() => handleTogglePermission('sub_admin', mod.id)}
                               className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
                             />
                           </td>
@@ -2142,6 +2179,8 @@ export default function Settings({
                                     ? 'bg-emerald-100 text-emerald-800'
                                     : acc.role === 'director'
                                     ? 'bg-blue-100 text-blue-800'
+                                    : acc.role === 'sub_admin'
+                                    ? 'bg-indigo-100 text-indigo-800'
                                     : acc.role === 'hr'
                                     ? 'bg-purple-100 text-purple-800'
                                     : 'bg-amber-100 text-amber-800'
@@ -2235,7 +2274,7 @@ export default function Settings({
                         value={newAccRole}
                         onChange={(e: any) => {
                           setNewAccRole(e.target.value);
-                          if (e.target.value !== 'branch_manager' && e.target.value !== 'director') {
+                          if (e.target.value !== 'branch_manager' && e.target.value !== 'director' && e.target.value !== 'sub_admin') {
                             setNewAccBranch('');
                             setNewAccBranches([]);
                           }
@@ -2244,12 +2283,13 @@ export default function Settings({
                       >
                         <option value="admin">{language === 'en' ? 'System Admin (सह-प्रशासक)' : 'सिस्टम एडमिन (सह-प्रशासक)'}</option>
                         <option value="director">{language === 'en' ? 'Director (डायरेक्टर)' : 'डायरेक्टर'}</option>
+                        <option value="sub_admin">{language === 'en' ? 'Sub Admin (सब एडमिन)' : 'सब एडमिन'}</option>
                         <option value="hr">{language === 'en' ? 'HR Manager (एचआर मैनेजर)' : 'एचआर मैनेजर'}</option>
                         <option value="branch_manager">{language === 'en' ? 'Branch Manager (ब्रांच मैनेजर)' : 'ब्रांच मैनेजर'}</option>
                       </select>
                     </div>
 
-                    {(newAccRole === 'branch_manager' || newAccRole === 'director') && (
+                    {(newAccRole === 'branch_manager' || newAccRole === 'director' || newAccRole === 'sub_admin') && (
                       <div className="space-y-2 border border-slate-100 p-2.5 rounded-lg bg-slate-50/50">
                         <label className="block text-slate-600 font-bold">
                           {language === 'en' ? 'Restricted Branches' : 'शाखा प्रतिबंध'}
@@ -2300,6 +2340,185 @@ export default function Settings({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeSubTab === 'audit_logs' && (
+            <div className="space-y-6">
+              <div className="bg-slate-100/50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="font-extrabold text-gray-900 text-sm">
+                    {language === 'en' ? 'User Audit Log Report' : 'यूजर ऑडिट लॉग रिपोर्ट'}
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-normal font-medium">
+                    {language === 'en'
+                      ? 'Detailed history of all modifications, entries, and approval events.'
+                      : 'सभी संशोधनों, प्रविष्टियों और अनुमोदन घटनाओं का विस्तृत इतिहास।'}
+                  </p>
+                </div>
+                
+                {/* Clear button - restricted to Admin */}
+                <div className="shrink-0">
+                  {portalUser?.role === 'admin' ? (
+                    <button
+                      onClick={() => {
+                        if (confirm(language === 'en' ? 'Are you sure you want to permanently clear all audit logs?' : 'क्या आप वाकई सभी ऑडिट लॉग को स्थायी रूप से हटाना चाहते हैं?')) {
+                          if (onClearAuditLogs) onClearAuditLogs();
+                        }
+                      }}
+                      className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-3xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{language === 'en' ? 'Clear Audit Logs' : 'ऑडिट लॉग साफ़ करें'}</span>
+                    </button>
+                  ) : (
+                    <div className="text-right">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 border border-gray-200 text-gray-500 rounded-xl text-[10px] font-bold">
+                        <Lock className="w-3 h-3 text-gray-400" />
+                        <span>{language === 'en' ? 'Admin only can clear logs' : 'केवल एडमिन लॉग साफ़ कर सकते हैं'}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Search & Filter Controls */}
+              {(() => {
+                const filtered = auditLogs.filter(log => {
+                  const query = auditSearchQuery.toLowerCase().trim();
+                  const matchesQuery = !query || 
+                    log.actorUsername.toLowerCase().includes(query) ||
+                    log.employeeName.toLowerCase().includes(query) ||
+                    log.employeeId.toLowerCase().includes(query) ||
+                    log.date.includes(query) ||
+                    log.fieldChanged.toLowerCase().includes(query);
+
+                  const matchesAction = auditActionFilter === 'all' || log.actionType === auditActionFilter;
+
+                  return matchesQuery && matchesAction;
+                });
+
+                return (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={auditSearchQuery}
+                          onChange={(e) => setAuditSearchQuery(e.target.value)}
+                          placeholder={language === 'en' ? 'Search by actor, employee, field...' : 'खोजें: अभिनेता, कर्मचारी, क्षेत्र...'}
+                          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#03623c] bg-white font-medium"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-gray-400 shrink-0" />
+                        <select
+                          value={auditActionFilter}
+                          onChange={(e: any) => setAuditActionFilter(e.target.value as any)}
+                          className="border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:outline-none bg-white font-bold"
+                        >
+                          <option value="all">{language === 'en' ? 'All Actions' : 'सभी क्रियाएं'}</option>
+                          <option value="create">{language === 'en' ? 'Creates' : 'नई प्रविष्टियां'}</option>
+                          <option value="update">{language === 'en' ? 'Updates' : 'संशोधन'}</option>
+                          <option value="approve">{language === 'en' ? 'Approvals' : 'स्वीकृति'}</option>
+                          <option value="reject">{language === 'en' ? 'Rejections' : 'अस्वीकृति'}</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Audit Logs Table */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-3xs overflow-hidden">
+                      {filtered.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                                <th className="py-4 px-6">{language === 'en' ? 'Timestamp' : 'समय सीमा'}</th>
+                                <th className="py-4 px-6">{language === 'en' ? 'Actor' : 'कर्ता'}</th>
+                                <th className="py-4 px-6">{language === 'en' ? 'Target' : 'लक्ष्य'}</th>
+                                <th className="py-4 px-6 text-center">{language === 'en' ? 'Action' : 'क्रिया'}</th>
+                                <th className="py-4 px-6">{language === 'en' ? 'Changes' : 'बदलाव'}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 font-medium">
+                              {filtered.map((log) => (
+                                <tr key={log.id} className="hover:bg-gray-50/25 transition-colors">
+                                  <td className="py-4 px-6 whitespace-nowrap font-mono text-gray-400 text-xxs font-bold">
+                                    {new Date(log.timestamp).toLocaleString(language === 'en' ? 'en-US' : 'hi-IN')}
+                                  </td>
+                                  <td className="py-4 px-6 whitespace-nowrap">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-extrabold text-gray-800">{log.actorUsername}</span>
+                                      <span className="text-[8px] bg-slate-100 text-slate-600 font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                        {log.actorRole}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-4 px-6 whitespace-nowrap">
+                                    <div>
+                                      <div className="font-bold text-gray-900">{log.employeeName}</div>
+                                      <div className="text-[10px] font-mono text-gray-400 font-bold mt-0.5">
+                                        {log.employeeId} · {log.date}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-4 px-6 text-center whitespace-nowrap">
+                                    <span
+                                      className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest ${
+                                        log.actionType === 'create'
+                                          ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                                          : log.actionType === 'approve'
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                          : log.actionType === 'reject'
+                                          ? 'bg-rose-50 text-rose-700 border border-rose-100'
+                                          : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                      }`}
+                                    >
+                                      {log.actionType}
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-6">
+                                    <div className="space-y-1 max-w-[320px]">
+                                      <div className="text-xxs text-slate-400">
+                                        {language === 'en' ? 'Field: ' : 'क्षेत्र: '}
+                                        <span className="font-bold text-slate-700 font-mono bg-slate-100 px-1 py-0.5 rounded">
+                                          {log.fieldChanged}
+                                        </span>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-700">
+                                        <span className="text-gray-400 line-through truncate max-w-[120px]" title={log.oldValue}>
+                                          {log.oldValue}
+                                        </span>
+                                        <span className="text-gray-400">➔</span>
+                                        <span className="font-extrabold text-emerald-800 truncate max-w-[150px]" title={log.newValue}>
+                                          {log.newValue}
+                                        </span>
+                                      </div>
+                                      {log.remarks && (
+                                        <p className="text-[10px] text-gray-400 italic font-medium bg-amber-50/40 px-1.5 py-1 rounded border border-amber-100">
+                                          {log.remarks}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-16 text-gray-400">
+                          <AlertCircle className="w-12 h-12 mx-auto text-gray-200 mb-2" />
+                          <p className="text-xs font-bold">
+                            {language === 'en' ? 'No audit records matching filters.' : 'फ़िल्टर से मेल खाते कोई ऑडिट रिकॉर्ड नहीं मिले।'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

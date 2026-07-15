@@ -9,12 +9,13 @@ interface EmployeeListProps {
   onBulkAddEmployees: (newEmployees: Employee[]) => Promise<void>;
   language: 'en' | 'hi';
   adminSettings: AdminSettings;
+  portalUser?: any;
 }
 
 const DEPARTMENTS = ['Management', 'Engineering', 'Human Resources', 'Sales', 'Marketing', 'Finance', 'Operations', 'IT Support', 'Other'];
 const PAYMENT_METHODS: Employee['paymentMethod'][] = ['Bank Transfer', 'Cash', 'Cheque'];
 
-export default function EmployeeList({ employees, onAddEmployee, onUpdateEmployee, onBulkAddEmployees, language, adminSettings }: EmployeeListProps) {
+export default function EmployeeList({ employees, onAddEmployee, onUpdateEmployee, onBulkAddEmployees, language, adminSettings, portalUser }: EmployeeListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedBranch, setSelectedBranch] = useState('All');
@@ -24,6 +25,14 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const hasPermission = (action: 'view' | 'add' | 'edit' | 'delete') => {
+    if (!portalUser) return true;
+    if (portalUser.role === 'admin') return true;
+    const permissions = adminSettings?.rolePermissions?.[portalUser.role] || [];
+    if (permissions.includes('employees')) return true;
+    return permissions.includes(`employees:${action}`);
+  };
 
   // CSV Bulk Import States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -945,27 +954,29 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Bulk Import Button */}
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-            id="btn-bulk-import-trigger"
-          >
-            <Upload className="w-4 h-4 text-gray-500" />
-            {t.bulkImportBtn}
-          </button>
+        {hasPermission('add') && (
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Bulk Import Button */}
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
+              id="btn-bulk-import-trigger"
+            >
+              <Upload className="w-4 h-4 text-gray-500" />
+              {t.bulkImportBtn}
+            </button>
 
-          {/* Add Employee Button */}
-          <button
-            onClick={openAddModal}
-            className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-            id="btn-add-emp"
-          >
-            <Plus className="w-4 h-4" />
-            {t.addBtn}
-          </button>
-        </div>
+            {/* Add Employee Button */}
+            <button
+              onClick={openAddModal}
+              className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
+              id="btn-add-emp"
+            >
+              <Plus className="w-4 h-4" />
+              {t.addBtn}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Employees Table */}
@@ -1040,26 +1051,30 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     </td>
                     <td className="py-4 px-6 text-right">
                       <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => openEditModal(emp)}
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                          title="Edit Details"
-                          id={`edit-${emp.id}`}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => toggleActiveStatus(emp)}
-                          className={`p-1.5 rounded-lg transition-all ${
-                            emp.isActive 
-                              ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' 
-                              : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                          }`}
-                          title={emp.isActive ? t.deactivate : t.activate}
-                          id={`toggle-${emp.id}`}
-                        >
-                          {emp.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                        </button>
+                        {hasPermission('edit') && (
+                          <button
+                            onClick={() => openEditModal(emp)}
+                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                            title="Edit Details"
+                            id={`edit-${emp.id}`}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {hasPermission('delete') && (
+                          <button
+                            onClick={() => toggleActiveStatus(emp)}
+                            className={`p-1.5 rounded-lg transition-all ${
+                              emp.isActive 
+                                ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' 
+                                : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                            }`}
+                            title={emp.isActive ? t.deactivate : t.activate}
+                            id={`toggle-${emp.id}`}
+                          >
+                            {emp.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1798,18 +1813,20 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                 <Clock className="w-3.5 h-3.5 text-gray-400" />
                                 <span>History ({increments.length})</span>
                               </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedEmployeeForIncrement(emp);
-                                  setIncAmount(0);
-                                  setIncNewSalary(emp.basicSalary);
-                                  setIncDate(new Date().toISOString().split('T')[0]);
-                                }}
-                                className="bg-[#03623c]/10 hover:bg-[#03623c]/20 text-[#03623c] border border-[#03623c]/20 px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-all active:scale-97 shadow-xxs"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>Record Appraisal</span>
-                              </button>
+                              {hasPermission('edit') && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedEmployeeForIncrement(emp);
+                                    setIncAmount(0);
+                                    setIncNewSalary(emp.basicSalary);
+                                    setIncDate(new Date().toISOString().split('T')[0]);
+                                  }}
+                                  className="bg-[#03623c]/10 hover:bg-[#03623c]/20 text-[#03623c] border border-[#03623c]/20 px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-all active:scale-97 shadow-xxs"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Record Appraisal</span>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
