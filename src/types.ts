@@ -89,6 +89,7 @@ export interface Employee {
   isDaApplicable?: boolean;
   isConveyanceApplicable?: boolean;
   isPaidLeaveApplicable?: boolean;
+  enableGeofencing?: boolean;
 }
 
 export interface SalaryIncrement {
@@ -125,9 +126,19 @@ export interface UserRoleAccount {
   password?: string;
   role: 'admin' | 'director' | 'sub_admin' | 'hr' | 'branch_manager' | 'employee';
   name: string;
+  email?: string;
+  mobileNo?: string;
   branch?: string; // Legacy single-branch
   branches?: string[]; // Multiple branch selection
   createdAt: string;
+}
+
+export interface GeofenceOutlet {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number; // Allowed distance in meters, e.g., 100
 }
 
 export interface AdminSettings {
@@ -160,6 +171,9 @@ export interface AdminSettings {
   roleAccounts?: UserRoleAccount[];
   rolePermissions?: Record<string, string[]>;
   enableEmployeePayslips?: boolean;
+  geofenceOutlets?: GeofenceOutlet[];
+  enableGeofencing?: boolean;
+  enableMobileAttendance?: boolean;
 }
 
 export interface Attendance {
@@ -171,6 +185,12 @@ export interface Attendance {
   overtimeHours: number;
   remarks: string;
   approvalStatus?: 'Pending' | 'Approved' | 'Rejected';
+  punchInOutlet?: string;
+  punchOutOutlet?: string;
+  punchInCoords?: string;
+  punchOutCoords?: string;
+  punchInDevice?: string;
+  punchOutDevice?: string;
 }
 
 export interface PayrollRecord {

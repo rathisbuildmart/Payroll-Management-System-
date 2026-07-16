@@ -256,98 +256,103 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3.5">
       {/* Title & Actions Row */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-xs no-print">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-              <FileSpreadsheet className="w-5 h-5" />
-            </div>
-            <h1 className="text-xl font-extrabold text-slate-900 font-display tracking-tight">{t.title}</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 px-4 rounded-xl border border-gray-200/80 shadow-3xs no-print">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 bg-emerald-500/10 text-emerald-600 rounded-lg shrink-0">
+            <FileSpreadsheet className="w-4 h-4" />
           </div>
-          <p className="text-xs text-gray-500 mt-1 font-medium">{t.subtitle}</p>
+          <div>
+            <h1 className="text-sm font-black text-slate-900 tracking-tight leading-none">{t.title}</h1>
+            <p className="text-[10px] text-gray-500 mt-1 font-semibold leading-none">{t.subtitle}</p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-250 border border-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider font-mono transition-all cursor-pointer shadow-xs"
+            className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-150 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider font-mono transition-all cursor-pointer"
           >
-            <Printer className="w-4 h-4" />
-            {t.print}
+            <Printer className="w-3.5 h-3.5" />
+            <span>{t.print}</span>
           </button>
           
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-2 bg-[#03623c] hover:bg-[#024d2e] text-white px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider font-mono transition-all cursor-pointer shadow-sm shadow-emerald-950/20"
+            className="flex items-center gap-1.5 bg-[#03623c] hover:bg-[#024d2e] text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider font-mono transition-all cursor-pointer shadow-3xs"
           >
-            <Download className="w-4 h-4" />
-            {t.exportCSV}
+            <Download className="w-3.5 h-3.5" />
+            <span>{t.exportCSV}</span>
           </button>
         </div>
       </div>
 
       {/* Aggregate Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-blue-50 text-blue-600">
-            <Users className="w-5 h-5" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white p-2.5 px-3 rounded-xl border border-gray-200 shadow-3xs flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+            <Users className="w-4 h-4" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">{t.totalRecords}</p>
-            <p className="text-xl font-extrabold text-slate-900 font-display">{filteredLedger.length}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-orange-50 text-orange-600">
-            <TrendingUp className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">{t.totalGross}</p>
-            <p className="text-xl font-extrabold text-slate-900 font-mono">{t.currency}{totals.gross.toLocaleString('en-IN')}</p>
+          <div className="min-w-0">
+            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono truncate">{t.totalRecords}</p>
+            <p className="text-sm font-black text-slate-900 leading-tight">{filteredLedger.length}</p>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-rose-50 text-rose-600">
-            <SlidersHorizontal className="w-5 h-5" />
+        <div className="bg-white p-2.5 px-3 rounded-xl border border-gray-200 shadow-3xs flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-orange-50 text-orange-600 shrink-0">
+            <TrendingUp className="w-4 h-4" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">{t.totalDeductions}</p>
-            <p className="text-xl font-extrabold text-slate-900 font-mono">{t.currency}{totals.deductions.toLocaleString('en-IN')}</p>
+          <div className="min-w-0">
+            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono truncate">{t.totalGross}</p>
+            <p className="text-sm font-black text-slate-900 font-mono leading-tight truncate">{t.currency}{totals.gross.toLocaleString('en-IN')}</p>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-emerald-50 text-[#03623c]">
-            <DollarSign className="w-5 h-5" />
+        <div className="bg-white p-2.5 px-3 rounded-xl border border-gray-200 shadow-3xs flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-rose-50 text-rose-600 shrink-0">
+            <SlidersHorizontal className="w-4 h-4" />
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">{t.totalNet}</p>
-            <p className="text-xl font-extrabold text-[#03623c] font-mono">{t.currency}{totals.net.toLocaleString('en-IN')}</p>
+          <div className="min-w-0">
+            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono truncate">{t.totalDeductions}</p>
+            <p className="text-sm font-black text-slate-900 font-mono leading-tight truncate">{t.currency}{totals.deductions.toLocaleString('en-IN')}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-2.5 px-3 rounded-xl border border-gray-200 shadow-3xs flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-emerald-50 text-[#03623c] shrink-0">
+            <DollarSign className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono truncate">{t.totalNet}</p>
+            <p className="text-sm font-black text-[#03623c] font-mono leading-tight truncate">{t.currency}{totals.net.toLocaleString('en-IN')}</p>
           </div>
         </div>
       </div>
 
       {/* Robust Filtering Control Section */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200/85 shadow-2xs space-y-4 no-print">
-        <div className="flex items-center gap-2 text-slate-800 font-bold text-sm border-b border-gray-100 pb-2">
-          <SlidersHorizontal className="w-4 h-4 text-[#10b981]" />
-          <span>{language === 'en' ? 'Report Parameters & Filters' : 'रिपोर्ट पैरामीटर और फ़िल्टर'}</span>
+      <div className="bg-white p-3 px-4 rounded-xl border border-gray-200 shadow-3xs space-y-2.5 no-print">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+          <div className="flex items-center gap-1.5 text-slate-800 font-black text-[10px] uppercase tracking-wider">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{language === 'en' ? 'Report Parameters & Filters' : 'रिपोर्ट पैरामीटर और फ़िल्टर'}</span>
+          </div>
+          <div className="text-[10px] text-slate-500 font-bold">
+            {t.showing} <span className="text-slate-800">{filteredLedger.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> {t.to} <span className="text-slate-800">{Math.min(currentPage * pageSize, filteredLedger.length)}</span> {t.of} <span className="text-slate-800">{filteredLedger.length}</span> {t.entries}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
           {/* Branch Select */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-black text-gray-800 uppercase tracking-wider font-mono">{t.filterBranch}</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono leading-tight">{t.filterBranch}</label>
             <div className="relative">
-              <Building className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400" />
+              <Building className="absolute left-2.5 top-2 w-3 h-3 text-gray-400" />
               <select
                 value={selectedBranch}
                 onChange={(e) => { setSelectedBranch(e.target.value); setCurrentPage(1); }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
               >
                 {branchOptions.map(branch => (
                   <option key={branch} value={branch}>{branch}</option>
@@ -357,14 +362,14 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
           </div>
 
           {/* Department Select */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-black text-gray-800 uppercase tracking-wider font-mono">{t.filterDept}</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono leading-tight">{t.filterDept}</label>
             <div className="relative">
-              <Briefcase className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400" />
+              <Briefcase className="absolute left-2.5 top-2 w-3 h-3 text-gray-400" />
               <select
                 value={selectedDept}
                 onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
               >
                 {departmentOptions.map(dept => (
                   <option key={dept} value={dept}>{dept}</option>
@@ -374,14 +379,14 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
           </div>
 
           {/* Employee ID & Name Select */}
-          <div className="flex flex-col gap-1.5 col-span-1 md:col-span-1">
-            <label className="text-[10px] font-black text-gray-800 uppercase tracking-wider font-mono">{t.filterEmployee}</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono leading-tight">{t.filterEmployee}</label>
             <div className="relative">
-              <Users className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400" />
+              <Users className="absolute left-2.5 top-2 w-3 h-3 text-gray-400" />
               <select
                 value={selectedEmployeeId}
                 onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
               >
                 <option value="All">{t.all}</option>
                 {employeeOptions.map(emp => (
@@ -392,12 +397,12 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
           </div>
 
           {/* Month Filter */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-black text-gray-800 uppercase tracking-wider font-mono">{t.filterMonth}</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono leading-tight">{t.filterMonth}</label>
             <select
               value={monthFilter}
               onChange={(e) => { setMonthFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
             >
               <option value="All">{t.all}</option>
               {monthOptions.filter(m => m !== t.all).map(m => (
@@ -407,38 +412,32 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
           </div>
 
           {/* Payment Status Filter */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-black text-gray-800 uppercase tracking-wider font-mono">{t.filterStatus}</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono leading-tight">{t.filterStatus}</label>
             <select
               value={paymentStatusFilter}
               onChange={(e) => { setPaymentStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
             >
               <option value="All">{t.all}</option>
               <option value="Paid">{t.paid}</option>
               <option value="Pending">{t.pending}</option>
             </select>
           </div>
-        </div>
 
-        {/* Entries control bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-gray-100">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-700">{t.showEntries}:</span>
+          {/* Show Entries */}
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest font-mono leading-tight">{t.showEntries}</label>
             <select
               value={pageSize}
               onChange={handlePageSizeChange}
-              className="bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-emerald-500 cursor-pointer"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all cursor-pointer"
             >
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
-          </div>
-
-          <div className="text-xs text-gray-500 font-medium">
-            {t.showing} <span className="font-bold text-slate-800">{filteredLedger.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> {t.to} <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, filteredLedger.length)}</span> {t.of} <span className="font-bold text-slate-800">{filteredLedger.length}</span> {t.entries}
           </div>
         </div>
       </div>

@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Database,
   ArrowRight,
+  Bell,
   Settings as SettingsIcon,
   ShieldCheck,
   User as LucideUser,
@@ -29,7 +30,8 @@ import {
   LifeBuoy,
   KeyRound,
   X,
-  CheckCircle2
+  CheckCircle2,
+  Menu
 } from 'lucide-react';
 import { initAuth, googleSignIn, googleSignInRedirect, logout } from './services/auth';
 import { 
@@ -209,6 +211,7 @@ export default function App() {
     return localStorage.getItem('payroll_last_success_sync') || null;
   });
   const [isSyncPanelOpen, setIsSyncPanelOpen] = useState(false);
+  const [isBellPopoverOpen, setIsBellPopoverOpen] = useState(false);
 
   const addSyncLog = (operation: string, status: 'success' | 'error' | 'syncing', details: string) => {
     setSyncLogs(prev => {
@@ -588,6 +591,7 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger'>('dashboard');
 
   const [isSidebarHovered, setIsSidebarHovered] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en'); // Set default to English as bilingual toggle is disabled
   const [showSeedDialog, setShowSeedDialog] = useState<boolean>(false);
   const [showSheetsNotice, setShowSheetsNotice] = useState<boolean>(() => {
@@ -622,8 +626,13 @@ export default function App() {
       ? ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin']
       : adminSettings.rolePermissions?.[portalUser.role] || [];
       
-    if (allowed.length > 0 && !allowed.includes(currentTab)) {
-      setCurrentTab(allowed[0] as any);
+    const hasAccess = portalUser.role === 'admin' || allowed.includes(currentTab) || allowed.some(p => p.startsWith(currentTab + ':'));
+    if (!hasAccess && allowed.length > 0) {
+      const allTabs = ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin'] as const;
+      const firstAllowedTab = allTabs.find(tab => allowed.includes(tab) || allowed.some(p => p.startsWith(tab + ':')));
+      if (firstAllowedTab) {
+        setCurrentTab(firstAllowedTab);
+      }
     }
   }, [portalUser, adminSettings, currentTab]);
 
@@ -2299,72 +2308,80 @@ export default function App() {
     ? payroll.filter(rec => filteredEmployeesIds.has(rec.employeeId))
     : payroll;
 
-  // 3. Render Dashboard / Workspace after Login
-  return (
-    <div className="h-screen w-screen bg-[#f1f5f9] text-[#1e293b] flex overflow-hidden font-sans">
-      
-      {/* Left Sidebar navigation */}
-      <aside 
-        onMouseEnter={() => setIsSidebarHovered(true)}
-        onMouseLeave={() => setIsSidebarHovered(false)}
-        className={`my-4 ml-4 mr-2 h-[calc(100vh-2rem)] bg-gradient-to-b from-[#031c12] via-[#02110c] to-[#010906] text-[#cbd5e1] flex flex-col justify-between rounded-[2.25rem] border border-emerald-500/15 shadow-[0_20px_50px_-12px_rgba(2,17,12,0.8)] shrink-0 no-print py-6 transition-all duration-300 ease-in-out relative z-40 ${
-          isSidebarHovered ? 'w-[240px] px-5 items-start' : 'w-[78px] px-3 items-center'
-        }`}
-      >
-        {/* Brand Logo inside a perfect white squircle */}
-        <div className={`flex flex-col ${isSidebarHovered ? 'items-start w-full' : 'items-center'}`}>
-          <div className="flex items-center gap-3 mb-8 w-full">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 hover:rotate-3 transition-all duration-300 cursor-pointer relative group border border-emerald-500/20 shadow-emerald-950/20 shrink-0 overflow-hidden">
-              <img 
-                src={getDirectImageUrl(adminSettings.companyLogo)} 
-                alt={adminSettings.companyName || 'Rathi Buildmart'} 
-                className="w-full h-full object-cover" 
-                referrerPolicy="no-referrer"
-              />
-              {/* Logo Tooltip */}
-              {!isSidebarHovered && (
-                <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-2 rounded-xl shadow-xl pointer-events-none z-50 text-[11px] font-bold whitespace-nowrap">
-                  {uiTexts.appName}
+  const renderSidebarContent = (isMobile: boolean) => {
+    const showExpanded = isMobile || isSidebarHovered;
+    const allowedTabs = portalUser?.role === 'admin'
+      ? ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin']
+      : adminSettings.rolePermissions?.[portalUser?.role || 'employee'] || [];
+
+    const tabs = [
+      { id: 'dashboard' as const, label: uiTexts.dashboard, icon: TrendingUp },
+      { id: 'employees' as const, label: uiTexts.employees, icon: Users },
+      { id: 'attendance' as const, label: uiTexts.attendance, icon: Calendar },
+      { id: 'payroll' as const, label: uiTexts.payroll, icon: CreditCard },
+      { id: 'leaves' as const, label: uiTexts.leaves, icon: CalendarDays },
+      { id: 'ledger' as const, label: uiTexts.ledger, icon: FileSpreadsheet },
+      { id: 'admin' as const, label: uiTexts.adminSettings, icon: SettingsIcon },
+    ].filter(item => allowedTabs.includes(item.id) || allowedTabs.some(p => p.startsWith(item.id + ':')));
+
+    return (
+      <div className="flex flex-col h-full justify-between w-full select-none">
+        <div className={`flex flex-col ${showExpanded ? 'items-start w-full' : 'items-center'}`}>
+          {/* Header & Logo */}
+          <div className="flex items-center justify-between w-full mb-8">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 hover:rotate-3 transition-all duration-300 cursor-pointer relative group border border-emerald-500/20 shadow-emerald-950/20 shrink-0 overflow-hidden">
+                <img 
+                  src={getDirectImageUrl(adminSettings.companyLogo)} 
+                  alt={adminSettings.companyName || 'Rathi Buildmart'} 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+                {!showExpanded && (
+                  <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-2 rounded-xl shadow-xl pointer-events-none z-50 text-[11px] font-bold whitespace-nowrap">
+                    {uiTexts.appName}
+                  </div>
+                )}
+              </div>
+              {showExpanded && (
+                <div className="flex flex-col min-w-0 animate-fadeIn">
+                  <span className="text-[12px] font-black tracking-wider text-white uppercase font-sans truncate">
+                    {adminSettings.companyName || 'RATHI MART'}
+                  </span>
+                  <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest font-mono truncate">
+                    {uiTexts.appName}
+                  </span>
                 </div>
               )}
             </div>
-            {isSidebarHovered && (
-              <div className="flex flex-col min-w-0 animate-fadeIn">
-                <span className="text-[12px] font-black tracking-wider text-white uppercase font-sans truncate">
-                  {adminSettings.companyName || 'RATHI MART'}
-                </span>
-                <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest font-mono truncate">
-                  {uiTexts.appName}
-                </span>
-              </div>
+
+            {/* Close button for Mobile only */}
+            {isMobile && (
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-1.5 rounded-xl bg-emerald-950/50 border border-emerald-500/20 text-emerald-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
             )}
           </div>
 
-          {/* Navigation Links */}
-          <nav className={`flex flex-col ${isSidebarHovered ? 'items-start w-full gap-2' : 'items-center gap-4'}`}>
-            {(() => {
-              const allowedTabs = portalUser?.role === 'admin'
-                ? ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin']
-                : adminSettings.rolePermissions?.[portalUser?.role || 'employee'] || [];
-
-              return [
-                { id: 'dashboard' as const, label: uiTexts.dashboard, icon: TrendingUp },
-                { id: 'employees' as const, label: uiTexts.employees, icon: Users },
-                { id: 'attendance' as const, label: uiTexts.attendance, icon: Calendar },
-                { id: 'payroll' as const, label: uiTexts.payroll, icon: CreditCard },
-                { id: 'leaves' as const, label: uiTexts.leaves, icon: CalendarDays },
-                { id: 'ledger' as const, label: uiTexts.ledger, icon: FileSpreadsheet },
-                { id: 'admin' as const, label: uiTexts.adminSettings, icon: SettingsIcon },
-              ].filter(item => allowedTabs.includes(item.id));
-            })().map((item) => {
+          {/* Tabs */}
+          <nav className={`flex flex-col ${showExpanded ? 'items-start w-full gap-2' : 'items-center gap-4'}`}>
+            {tabs.map((item) => {
               const IconComponent = item.icon;
               const isActive = currentTab === item.id;
               return (
                 <div key={item.id} className="relative group flex items-center justify-start w-full">
                   <button
-                    onClick={() => setCurrentTab(item.id)}
+                    onClick={() => {
+                      setCurrentTab(item.id);
+                      if (isMobile) {
+                        setIsMobileMenuOpen(false);
+                      }
+                    }}
                     className={`flex items-center rounded-2xl transition-all duration-300 cursor-pointer relative ${
-                      isSidebarHovered ? 'w-full h-11 px-3 justify-start gap-3' : 'w-12 h-12 justify-center'
+                      showExpanded ? 'w-full h-11 px-3 justify-start gap-3' : 'w-12 h-12 justify-center'
                     } ${
                       isActive
                         ? 'bg-emerald-500/15 text-[#10b981] shadow-[0_0_15px_rgba(16,185,129,0.12)] border border-emerald-500/30'
@@ -2374,18 +2391,17 @@ export default function App() {
                   >
                     {isActive && (
                       <span className={`absolute left-0 w-1 bg-[#10b981] rounded-r-full shadow-[0_0_8px_#10b981] ${
-                        isSidebarHovered ? 'h-4' : 'h-5'
+                        showExpanded ? 'h-4' : 'h-5'
                       }`} />
                     )}
                     <IconComponent className="w-5 h-5 shrink-0" />
-                    {isSidebarHovered && (
+                    {showExpanded && (
                       <span className="text-[11px] font-bold tracking-wide whitespace-nowrap animate-fadeIn">
                         {item.label}
                       </span>
                     )}
                   </button>
-                  {/* Tooltip */}
-                  {!isSidebarHovered && (
+                  {!showExpanded && (
                     <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
                       {item.label}
                     </div>
@@ -2397,11 +2413,9 @@ export default function App() {
         </div>
 
         {/* Sidebar Footer */}
-        <div className={`flex flex-col ${isSidebarHovered ? 'items-start w-full' : 'items-center'} gap-3 w-full`}>
-          {/* Divider */}
-          <div className={`${isSidebarHovered ? 'w-full' : 'w-8'} h-[1px] bg-emerald-950/60 transition-all`} />
+        <div className={`flex flex-col ${showExpanded ? 'items-start w-full' : 'items-center'} gap-3 w-full`}>
+          <div className={`${showExpanded ? 'w-full' : 'w-8'} h-[1px] bg-emerald-950/60 transition-all`} />
 
-          {/* Spreadsheet Link Badge */}
           {spreadsheetLink && (
             <div className="relative group flex items-center justify-start w-full">
               <a
@@ -2409,17 +2423,17 @@ export default function App() {
                 target="_blank"
                 rel="noreferrer"
                 className={`flex items-center rounded-xl text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-all ${
-                  isSidebarHovered ? 'w-full h-11 px-3.5 justify-start gap-3.5' : 'w-11 h-11 justify-center'
+                  showExpanded ? 'w-full h-11 px-3.5 justify-start gap-3.5' : 'w-11 h-11 justify-center'
                 }`}
               >
                 <FileSpreadsheet className="w-5 h-5 shrink-0" />
-                {isSidebarHovered && (
+                {showExpanded && (
                   <span className="text-[11px] font-bold whitespace-nowrap animate-fadeIn text-[#cbd5e1]">
                     {uiTexts.viewSheets}
                   </span>
                 )}
               </a>
-              {!isSidebarHovered && (
+              {!showExpanded && (
                 <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
                   {uiTexts.viewSheets}
                 </div>
@@ -2427,8 +2441,8 @@ export default function App() {
             </div>
           )}
 
-          {/* Light/Dark Toggle Mock representing premium dashboard details */}
-          <div className={`flex ${isSidebarHovered ? 'flex-row items-center justify-between w-full px-3.5 py-1.5 rounded-xl hover:bg-emerald-500/5' : 'flex-col items-center gap-1.5 py-1'}`}>
+          {/* Theme Indicator */}
+          <div className={`flex ${showExpanded ? 'flex-row items-center justify-between w-full px-3.5 py-1.5 rounded-xl hover:bg-emerald-500/5' : 'flex-col items-center gap-1.5 py-1'}`}>
             <div className="relative group flex items-center">
               <span className="text-slate-400">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sun w-4 h-4">
@@ -2443,48 +2457,47 @@ export default function App() {
                   <path d="m19.07 4.93-1.41 1.41"/>
                 </svg>
               </span>
-              {isSidebarHovered && (
+              {showExpanded && (
                 <span className="text-[11px] font-bold text-slate-300 ml-3.5 whitespace-nowrap animate-fadeIn">
                   Premium Light Mode
                 </span>
               )}
-              {!isSidebarHovered && (
+              {!showExpanded && (
                 <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
                   Premium Light Mode Active
                 </div>
               )}
             </div>
-            {/* Custom Toggle Switch Capsule */}
             <div className="w-7 h-4 bg-emerald-950 border border-emerald-900 rounded-full p-[2px] cursor-pointer flex items-center justify-start relative shadow-inner shrink-0">
               <div className="w-3.5 h-3.5 bg-white rounded-full shadow-sm transform translate-x-2.5 transition-transform"></div>
             </div>
           </div>
 
-          {/* Sign Out Button */}
+          {/* Logout */}
           <div className="relative group flex items-center justify-start w-full">
             <button
               onClick={handleLogout}
               className={`flex items-center rounded-xl text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer ${
-                isSidebarHovered ? 'w-full h-11 px-3.5 justify-start gap-3.5' : 'w-11 h-11 justify-center'
+                showExpanded ? 'w-full h-11 px-3.5 justify-start gap-3.5' : 'w-11 h-11 justify-center'
               }`}
               id="btn-signout"
             >
               <LogOut className="w-5 h-5 shrink-0" />
-              {isSidebarHovered && (
+              {showExpanded && (
                 <span className="text-[11px] font-bold whitespace-nowrap animate-fadeIn">
                   {uiTexts.signout}
                 </span>
               )}
             </button>
-            {!isSidebarHovered && (
+            {!showExpanded && (
               <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-red-950 text-red-200 border border-red-900/30 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
                 {uiTexts.signout}
               </div>
             )}
           </div>
 
-          {/* User Account with Slide out detail card */}
-          <div className={`relative group mt-1 flex items-center justify-start ${isSidebarHovered ? 'w-full px-1.5 gap-3' : ''}`}>
+          {/* User profile */}
+          <div className={`relative group mt-1 flex items-center justify-start ${showExpanded ? 'w-full px-1.5 gap-3' : ''}`}>
             {user?.photoURL ? (
               <img
                 src={user.photoURL}
@@ -2500,42 +2513,85 @@ export default function App() {
                 referrerPolicy="no-referrer"
               />
             )}
-            {isSidebarHovered && (
+            {showExpanded && (
               <div className="flex flex-col min-w-0 animate-fadeIn">
                 <p className="text-[11px] font-black text-slate-100 truncate">
                   {user?.displayName || 'Admin'}
                 </p>
                 <p className="text-[9px] font-medium text-emerald-400 truncate">
-                  {user?.email || 'rathi@buildmart.com'}
+                  {user?.email || 'admin@rathibuildmart.com'}
                 </p>
               </div>
             )}
-            {!isSidebarHovered && (
+            {!showExpanded && (
               <div className="absolute left-16 bottom-0 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-3 rounded-2xl shadow-2xl pointer-events-none z-50 min-w-[180px]">
                 <p className="font-black text-[9px] text-emerald-400 tracking-wider uppercase mb-1">Active Portal Admin</p>
                 <p className="text-xs font-bold text-slate-200 truncate">{user?.displayName || 'Rathi Build Mart'}</p>
-                <p className="text-[10px] text-slate-400 truncate mt-0.5">{user?.email}</p>
+                <p className="text-[10px] text-slate-400 truncate mt-0.5">{user?.email || 'admin@rathibuildmart.com'}</p>
               </div>
             )}
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // 3. Render Dashboard / Workspace after Login
+  return (
+    <div className="h-screen w-screen bg-[#f1f5f9] text-[#1e293b] flex overflow-hidden font-sans">
+      
+      {/* Mobile Drawer Overlay Backdrop */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 md:hidden animate-fadeIn"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar Navigation Drawer */}
+      <aside 
+        className={`fixed inset-y-0 left-0 h-full bg-gradient-to-b from-[#031c12] via-[#02110c] to-[#010906] text-[#cbd5e1] flex flex-col justify-between z-50 p-6 no-print w-[250px] border-r border-emerald-500/15 transition-transform duration-300 ease-in-out transform md:hidden shadow-2xl ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {renderSidebarContent(true)}
+      </aside>
+
+      {/* Left Sidebar navigation */}
+      <aside 
+        onMouseEnter={() => setIsSidebarHovered(true)}
+        onMouseLeave={() => setIsSidebarHovered(false)}
+        className={`my-4 ml-4 mr-2 h-[calc(100vh-2rem)] bg-gradient-to-b from-[#031c12] via-[#02110c] to-[#010906] text-[#cbd5e1] flex flex-col justify-between rounded-[2.25rem] border border-emerald-500/15 shadow-[0_20px_50px_-12px_rgba(2,17,12,0.8)] shrink-0 no-print py-6 transition-all duration-300 ease-in-out relative z-40 hidden md:flex ${
+          isSidebarHovered ? 'w-[240px] px-5 items-start' : 'w-[78px] px-3 items-center'
+        }`}
+      >
+        {renderSidebarContent(false)}
       </aside>
 
       {/* Main Workspace Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         
         {/* Compact Header */}
-        <header className="h-[52px] bg-white border-b border-[#e2e8f0] px-5 flex items-center justify-between shrink-0 shadow-xxs">
-          <div className="flex items-center gap-2.5">
-            <span className="text-[11px] font-semibold text-gray-500">
+        <header className="h-[52px] bg-white border-b border-[#e2e8f0] px-3 sm:px-5 flex items-center justify-between shrink-0 shadow-xxs">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+            {/* Mobile Toggle Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 bg-white cursor-pointer mr-1 shrink-0 transition-all active:scale-95"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+
+            <span className="text-[11px] font-semibold text-gray-500 hidden sm:inline">
               {language === 'en' ? 'Database:' : 'डेटाबेस:'}
             </span>
-            <span className="bg-emerald-50 text-emerald-800 border border-emerald-100 text-[10px] font-mono px-2 py-0.5 rounded font-bold max-w-[200px] truncate">
+            <span className="bg-emerald-50 text-emerald-800 border border-emerald-100 text-[10px] font-mono px-2 py-0.5 rounded font-bold max-w-[120px] sm:max-w-[200px] truncate">
               {spreadsheetId ? 'Google Sheet & Firestore' : 'Cloud Firestore (Active)'}
             </span>
 
             {/* Real-time Connection Badge */}
-            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border shrink-0 ${
               isOnline 
                 ? 'bg-emerald-50/50 text-emerald-700 border-emerald-200/50' 
                 : 'bg-amber-50 text-amber-700 border-amber-200'
@@ -2580,6 +2636,89 @@ export default function App() {
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingData ? 'animate-spin text-blue-600' : ''}`} />
             </button>
+
+            {/* Notification Bell */}
+            {portalUser?.role === 'admin' && (
+              <div className="relative flex items-center">
+                <button
+                  onClick={() => setIsBellPopoverOpen(!isBellPopoverOpen)}
+                  className={`p-1.5 rounded-lg border shadow-xxs cursor-pointer transition-all active:scale-95 relative ${
+                    needsAuth
+                      ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
+                      : 'bg-white text-gray-400 hover:text-gray-600 hover:bg-gray-100 border-gray-200'
+                  }`}
+                  title={language === 'en' ? 'Database Notifications' : 'डेटाबेस सूचनाएं'}
+                >
+                  <Bell className={`w-3.5 h-3.5 ${needsAuth ? 'animate-bounce' : ''}`} />
+                  {needsAuth && (
+                    <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full border border-white" />
+                  )}
+                </button>
+
+                {isBellPopoverOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40 cursor-default" 
+                      onClick={() => setIsBellPopoverOpen(false)}
+                    />
+                    <div className="absolute right-0 top-10 w-80 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-4 space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">
+                          {language === 'en' ? 'Database Notification' : 'डेटाबेस सूचना'}
+                        </span>
+                        <button 
+                          onClick={() => setIsBellPopoverOpen(false)}
+                          className="text-slate-400 hover:text-slate-600 text-xs font-bold px-1 rounded"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-3 font-sans">
+                        <div className="flex items-start gap-2.5 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
+                          <Database className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <p className="text-[11px] font-bold text-slate-800 leading-tight">
+                              {language === 'en' ? 'Cloud Firestore Active' : 'क्लाउड फ़ायरस्टोर सक्रिय है'}
+                            </p>
+                            <p className="text-[9px] text-slate-500 leading-normal font-semibold">
+                              {language === 'en' 
+                                ? 'Your database is securely connected and active on Cloud Firestore. Google Sheets integration is optional.'
+                                : 'आपका डेटाबेस क्लाउड फ़ायरस्टोर पर सुरक्षित रूप से कनेक्ट और सक्रिय है। गूगल शीट्स जोड़ना वैकल्पिक है।'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {needsAuth && (
+                          <div className="bg-amber-50/70 p-2.5 rounded-xl border border-amber-100 space-y-2">
+                            <p className="text-[9px] text-amber-800 leading-normal font-semibold">
+                              {language === 'en'
+                                ? 'Connect your Google Account to automatically sync & backup all records to a live Google Sheet.'
+                                : 'सभी रिकॉर्ड को लाइव Google शीट में स्वचालित रूप से सिंक और बैकअप करने के लिए अपने Google खाते को कनेक्ट करें।'}
+                            </p>
+                            <button
+                              onClick={() => {
+                                setIsBellPopoverOpen(false);
+                                handleLogin();
+                              }}
+                              disabled={isLoggingIn}
+                              className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-black uppercase tracking-wider py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-3xs"
+                            >
+                              {isLoggingIn ? (
+                                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Database className="w-3 h-3" />
+                              )}
+                              <span>{language === 'en' ? 'Connect Google Sheets' : 'गूगल शीट्स कनेक्ट करें'}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Detailed Sync Log Panel Popover */}
             {isSyncPanelOpen && (
@@ -2807,45 +2946,6 @@ export default function App() {
 
         {/* Scrollable Workspace Wrapper */}
         <main className="flex-1 overflow-y-auto p-4 space-y-4">
-          {portalUser?.role === 'admin' && needsAuth && !isLoadingAuth && showSheetsNotice && (
-            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm bg-emerald-50/50 text-emerald-900 mb-2 font-sans relative">
-              <div className="flex items-center gap-3">
-                <div className="bg-emerald-100 text-emerald-800 p-2.5 rounded-xl shrink-0">
-                  <Database className="w-5 h-5 text-emerald-800" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-extrabold tracking-tight">Cloud Firestore Database Active</h4>
-                  <p className="text-[11px] text-slate-700 font-medium mt-0.5 leading-normal font-semibold">
-                    Your database is securely connected and active on Cloud Firestore. Google Sheets integration is optional. Connect your Google Account if you wish to also sync and backup all payroll records to a live Google Sheet.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 self-end md:self-auto">
-                <button
-                  onClick={() => {
-                    setShowSheetsNotice(false);
-                    localStorage.setItem('dismiss_sheets_notice', 'true');
-                  }}
-                  className="bg-transparent hover:bg-slate-100 text-slate-500 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all border border-slate-200"
-                >
-                  Hide Notice
-                </button>
-                <button
-                  onClick={handleLogin}
-                  disabled={isLoggingIn}
-                  className="bg-emerald-750 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shrink-0 cursor-pointer transition-all flex items-center gap-2 shadow-sm"
-                >
-                  {isLoggingIn ? (
-                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  ) : (
-                    <Database className="w-3.5 h-3.5" />
-                  )}
-                  <span>Connect Google Sheets</span>
-                </button>
-              </div>
-            </div>
-          )}
-
           {isLoadingData && employees.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 bg-white/50 rounded-lg border border-gray-200">
               <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -2894,6 +2994,7 @@ export default function App() {
                   onUpdateEmployees={handleBulkAddEmployees}
                   language={language} 
                   adminSettings={adminSettings}
+                  portalUser={portalUser}
                 />
               )}
               {currentTab === 'leaves' && (
@@ -2903,6 +3004,7 @@ export default function App() {
                   language={language}
                   adminSettings={adminSettings}
                   onUpdateSettings={handleSaveSettings}
+                  portalUser={portalUser}
                 />
               )}
               {currentTab === 'ledger' && (

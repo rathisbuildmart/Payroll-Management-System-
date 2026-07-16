@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   User, Calendar, CreditCard, Check, Printer, FileText, AlertCircle, 
   TrendingUp, Users, ShieldCheck, Building, Sparkles, MapPin, Briefcase, Phone, Mail, FileCheck, DollarSign,
-  CalendarDays, Plus
+  CalendarDays, Plus, Locate
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Employee, Attendance, PayrollRecord, AdminSettings } from '../types';
@@ -27,10 +27,297 @@ export default function EmployeePortal({
   adminSettings,
   onUpdateAttendanceRecords
 }: EmployeePortalProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'attendance' | 'payslips' | 'exceptions' | 'leaves' | 'calendar'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'attendance' | 'payslips' | 'exceptions' | 'leaves' | 'calendar' | 'self_attendance'>('profile');
   const [attendanceYear, setAttendanceYear] = useState<string>(new Date().getFullYear().toString());
   const [attendanceMonth, setAttendanceMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [activePayslip, setActivePayslip] = useState<any | null>(null);
+
+  // Self Attendance & GPS Geofencing States
+  const [currentGpsCoords, setCurrentGpsCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [gpsError, setGpsError] = useState<string>('');
+  const [isDetectingGps, setIsDetectingGps] = useState(false);
+  const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+  const [punchRemarks, setPunchRemarks] = useState('');
+  const [isSubmittingPunch, setIsSubmittingPunch] = useState(false);
+  const [punchSuccessMsg, setPunchSuccessMsg] = useState('');
+  const [punchErrorMsg, setPunchErrorMsg] = useState('');
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const detectGpsAndVerifyOutlet = () => {
+    setIsDetectingGps(true);
+    setGpsError('');
+    setPunchErrorMsg('');
+    setPunchSuccessMsg('');
+
+    const handleSuccess = (position: GeolocationPosition) => {
+      setCurrentGpsCoords({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      });
+      setIsDetectingGps(false);
+    };
+
+    const handleFailure = (error: GeolocationPositionError) => {
+      console.warn("High accuracy GPS failed in portal, retrying with low accuracy...", error);
+      // Retry with low accuracy
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentGpsCoords({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
+          setIsDetectingGps(false);
+        },
+        (fallbackError) => {
+          console.error("GPS error in portal fallback:", fallbackError);
+          let msg = language === 'en' 
+            ? "Failed to acquire location. Please enable GPS/location services on your device or verify location sharing in your browser." 
+            : "स्थान प्राप्त करने में विफल। कृपया अपने डिवाइस पर जीपीएस/लोकेशन सक्षम करें या ब्राउज़र में लोकेशन शेयरिंग की जांच करें।";
+          if (fallbackError.code === fallbackError.PERMISSION_DENIED) {
+            msg = language === 'en' 
+              ? "Location permission denied. Please reset location sharing permissions for this site in your browser."
+              : "लोकेशन अनुमति अस्वीकार कर दी गई। कृपया अपने ब्राउज़र में इस साइट के लिए लोकेशन अनुमति रीसेट करें।";
+          }
+          setGpsError(msg);
+          setIsDetectingGps(false);
+        },
+        { enableHighAccuracy: false, timeout: 15000 }
+      );
+    };
+
+    navigator.geolocation.getCurrentPosition(handleSuccess, handleFailure, { 
+      enableHighAccuracy: true, 
+      timeout: 5000 
+    });
+  };
+
+  const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371000; // Radius of the earth in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const getOutletCheckResult = () => {
+    if (!adminSettings.enableGeofencing || !employee.enableGeofencing) {
+      return { isAllowed: true, nearestOutlet: null, distanceMeters: 0, requiredRadius: 0, isBypassed: !employee.enableGeofencing };
+    }
+
+    const outlets = adminSettings.geofenceOutlets || [];
+    if (outlets.length === 0) {
+      return { isAllowed: true, nearestOutlet: null, distanceMeters: 0, requiredRadius: 0, isNoOutletsConfigured: true };
+    }
+
+    if (!currentGpsCoords) {
+      return { isAllowed: false, nearestOutlet: null, distanceMeters: 0, requiredRadius: 0, needsGps: true };
+    }
+
+    // Identify if the employee has a specific branch assigned
+    const employeeBranchName = employee.branch || '';
+    const employeeBranchGeofence = outlets.find(o => o.name.toLowerCase().trim() === employeeBranchName.toLowerCase().trim());
+
+    if (employeeBranchName && employeeBranchGeofence) {
+      // The employee has a specific branch and there is a geofence configured for it. Enforce checking against this branch only!
+      const dist = getDistanceInMeters(
+        currentGpsCoords.latitude,
+        currentGpsCoords.longitude,
+        employeeBranchGeofence.latitude,
+        employeeBranchGeofence.longitude
+      );
+      const isAllowed = dist <= employeeBranchGeofence.radiusMeters;
+      return {
+        isAllowed,
+        nearestOutlet: employeeBranchGeofence,
+        distanceMeters: dist,
+        requiredRadius: employeeBranchGeofence.radiusMeters,
+        isSpecificBranchRequired: true,
+        specificBranchName: employeeBranchName
+      };
+    }
+
+    // Otherwise, fall back to checking all geofences
+    let nearestOutlet = outlets[0];
+    let minDistance = Infinity;
+    let isWithinAny = false;
+    let matchedOutlet = null;
+
+    for (const outlet of outlets) {
+      const dist = getDistanceInMeters(
+        currentGpsCoords.latitude,
+        currentGpsCoords.longitude,
+        outlet.latitude,
+        outlet.longitude
+      );
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearestOutlet = outlet;
+      }
+      if (dist <= outlet.radiusMeters) {
+        isWithinAny = true;
+        matchedOutlet = outlet;
+      }
+    }
+
+    return {
+      isAllowed: isWithinAny,
+      nearestOutlet: matchedOutlet || nearestOutlet,
+      distanceMeters: minDistance,
+      requiredRadius: (matchedOutlet || nearestOutlet).radiusMeters,
+      isSpecificBranchRequired: false
+    };
+  };
+
+  const handlePunchIn = async () => {
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const checkResult = getOutletCheckResult();
+    if (!checkResult.isAllowed) {
+      if (checkResult.isSpecificBranchRequired) {
+        setPunchErrorMsg(language === 'en'
+          ? `Outside registered branch geofence! You must be inside your assigned branch "${checkResult.nearestOutlet?.name}" (Current distance is ${checkResult.distanceMeters.toFixed(1)}m, Allowed: ${checkResult.requiredRadius}m).`
+          : `रजिस्टर्ड शाखा जियोफेंस से बाहर! आपको अपनी आवंटित शाखा "${checkResult.nearestOutlet?.name}" के भीतर होना चाहिए (वर्तमान दूरी ${checkResult.distanceMeters.toFixed(1)}मी है, अनुमत: ${checkResult.requiredRadius}मी)।`
+        );
+      } else {
+        setPunchErrorMsg(language === 'en' 
+          ? "Outside verified geofence! Please ensure you are inside an authorized branch premises."
+          : "सत्यापित जियोफेंस से बाहर! कृपया सुनिश्चित करें कि आप किसी अधिकृत शाखा परिसर के अंदर हैं।"
+        );
+      }
+      return;
+    }
+
+    setIsSubmittingPunch(true);
+    setPunchErrorMsg('');
+    setPunchSuccessMsg('');
+
+    try {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${hh}:${mm}`;
+
+      const coordsStr = currentGpsCoords 
+        ? `${currentGpsCoords.latitude.toFixed(6)}, ${currentGpsCoords.longitude.toFixed(6)}`
+        : '';
+      const ua = navigator.userAgent;
+      const deviceStr = /mobile/i.test(ua) ? "Mobile Browser" : "Desktop Browser";
+
+      const newRecord: Attendance = {
+        date: todayStr,
+        employeeId: employee.id,
+        status: 'Present',
+        checkIn: timeStr,
+        checkOut: '',
+        overtimeHours: 0,
+        remarks: punchRemarks || 'Mobile Punch In (Verified)',
+        approvalStatus: 'Approved',
+        punchInOutlet: checkResult.nearestOutlet?.name || employee.branch || 'Verified Branch',
+        punchInCoords: coordsStr,
+        punchInDevice: deviceStr
+      };
+
+      if (onUpdateAttendanceRecords) {
+        await onUpdateAttendanceRecords([newRecord]);
+        setPunchSuccessMsg(language === 'en' ? 'Punched In successfully!' : 'आगमन उपस्थिति (Punch In) सफलतापूर्वक दर्ज की गई!');
+        setPunchRemarks('');
+      } else {
+        setPunchErrorMsg('Update handler not registered.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setPunchErrorMsg(language === 'en' ? 'Failed to record punch.' : 'उपस्थिति दर्ज करने में विफल।');
+    } finally {
+      setIsSubmittingPunch(false);
+    }
+  };
+
+  const handlePunchOut = async () => {
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const todayRecord = attendanceRecords.find(r => r.employeeId === employee.id && r.date === todayStr);
+
+    if (!todayRecord) {
+      setPunchErrorMsg(language === 'en' ? "Punch In record not found for today." : "आज के लिए कोई आगमन रिकॉर्ड नहीं मिला। पहले पंच-इन करें।");
+      return;
+    }
+
+    const checkResult = getOutletCheckResult();
+    if (!checkResult.isAllowed) {
+      if (checkResult.isSpecificBranchRequired) {
+        setPunchErrorMsg(language === 'en'
+          ? `Outside registered branch geofence! You must be inside your assigned branch "${checkResult.nearestOutlet?.name}" (Current distance is ${checkResult.distanceMeters.toFixed(1)}m, Allowed: ${checkResult.requiredRadius}m).`
+          : `रजिस्टर्ड शाखा जियोफेंस से बाहर! आपको अपनी आवंटित शाखा "${checkResult.nearestOutlet?.name}" के भीतर होना चाहिए (वर्तमान दूरी ${checkResult.distanceMeters.toFixed(1)}मी है, अनुमत: ${checkResult.requiredRadius}मी)।`
+        );
+      } else {
+        setPunchErrorMsg(language === 'en' 
+          ? "Outside verified geofence! Please ensure you are inside an authorized branch premises."
+          : "सत्यापित जियोफेंस से बाहर! कृपया सुनिश्चित करें कि आप किसी अधिकृत शाखा परिसर के अंदर हैं।"
+        );
+      }
+      return;
+    }
+
+    setIsSubmittingPunch(true);
+    setPunchErrorMsg('');
+    setPunchSuccessMsg('');
+
+    try {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${hh}:${mm}`;
+
+      const coordsStr = currentGpsCoords 
+        ? `${currentGpsCoords.latitude.toFixed(6)}, ${currentGpsCoords.longitude.toFixed(6)}`
+        : '';
+      const ua = navigator.userAgent;
+      const deviceStr = /mobile/i.test(ua) ? "Mobile Browser" : "Desktop Browser";
+
+      let overtime = 0;
+      if (todayRecord.checkIn) {
+        const defOut = adminSettings.defaultCheckOut || "18:00";
+        const [defOutH, defOutM] = defOut.split(':').map(Number);
+        const [outH, outM] = timeStr.split(':').map(Number);
+        const diffHours = (outH + outM/60) - (defOutH + defOutM/60);
+        if (diffHours > 0) {
+          overtime = Math.round(diffHours * 100) / 100;
+        }
+      }
+
+      const updatedRecord: Attendance = {
+        ...todayRecord,
+        checkOut: timeStr,
+        overtimeHours: overtime,
+        status: todayRecord.status === 'Present' ? 'Present' : todayRecord.status,
+        remarks: todayRecord.remarks ? todayRecord.remarks + ' | Mobile Punch Out' : 'Mobile Punch Out (Verified)',
+        punchOutOutlet: checkResult.nearestOutlet?.name || employee.branch || 'Verified Branch',
+        punchOutCoords: coordsStr,
+        punchOutDevice: deviceStr
+      };
+
+      if (onUpdateAttendanceRecords) {
+        await onUpdateAttendanceRecords([updatedRecord]);
+        setPunchSuccessMsg(language === 'en' ? 'Punched Out successfully!' : 'प्रस्थान उपस्थिति (Punch Out) सफलतापूर्वक दर्ज की गई!');
+        setPunchRemarks('');
+      } else {
+        setPunchErrorMsg('Update handler not registered.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setPunchErrorMsg(language === 'en' ? 'Failed to record punch.' : 'उपस्थिति दर्ज करने में विफल।');
+    } finally {
+      setIsSubmittingPunch(false);
+    }
+  };
 
   // Miss punch ticket raising states
   const [showRaiseModal, setShowRaiseModal] = useState(false);
@@ -483,6 +770,22 @@ export default function EmployeePortal({
             <User className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{t.profile}</span>
           </button>
+          {adminSettings.enableMobileAttendance === true && (
+            <button
+              onClick={() => {
+                setActiveTab('self_attendance');
+                detectGpsAndVerifyOutlet();
+              }}
+              className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
+                activeTab === 'self_attendance' 
+                  ? 'bg-emerald-600 text-white shadow-md' 
+                  : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{language === 'en' ? "Self Attendance" : "स्वयं उपस्थिति"}</span>
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('attendance')}
             className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
@@ -548,6 +851,308 @@ export default function EmployeePortal({
 
       {/* Main Container */}
       <div className="space-y-6">
+
+        {/* SELF ATTENDANCE (MOBILE PUNCH) TAB */}
+        {activeTab === 'self_attendance' && adminSettings.enableMobileAttendance === true && (() => {
+          const todayStr = new Date().toLocaleDateString('en-CA');
+          const todayRecord = attendanceRecords.find(r => r.employeeId === employee.id && r.date === todayStr);
+          const checkResult = getOutletCheckResult();
+
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in" id="self-attendance-panel">
+              {/* Left & Middle Column: Punch Form & Live Verification */}
+              <div className="lg:col-span-2 space-y-6">
+                
+                {/* Geofence Status Header / Alert Card */}
+                <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm space-y-4">
+                  {employee.branch && (
+                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs font-sans">
+                      <span className="font-bold text-slate-600">
+                        {language === 'en' ? "Your Assigned Branch:" : "आपकी आवंटित शाखा:"}
+                      </span>
+                      <span className="bg-[#03623c] text-white font-black px-2.5 py-1 rounded-lg text-[11px]">
+                        {employee.branch}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-emerald-50 rounded-xl text-emerald-700 shrink-0">
+                        <MapPin className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                          {language === 'en' ? "Secure Mobile Attendance Lock" : "सुरक्षित मोबाइल उपस्थिति लॉक"}
+                        </h2>
+                        <p className="text-[10px] text-slate-400 font-bold">
+                          {language === 'en' ? "GPS Geofencing Active Verification" : "जीपीएस जियोफेंसिंग सक्रिय स्थान सत्यापन"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={detectGpsAndVerifyOutlet}
+                      disabled={isDetectingGps}
+                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 text-xs font-extrabold rounded-xl border border-emerald-200/50 flex items-center justify-center gap-1.5 cursor-pointer transition-all shrink-0"
+                    >
+                      <Locate className={`w-3.5 h-3.5 ${isDetectingGps ? 'animate-spin' : ''}`} />
+                      <span>{isDetectingGps ? (language === 'en' ? "Verifying..." : "सत्यापित कर रहा है...") : (language === 'en' ? "Refresh GPS" : "जीपीएस रिफ्रेश करें")}</span>
+                    </button>
+                  </div>
+
+                  {/* Dynamic Geofence Response Widget */}
+                  {gpsError ? (
+                    <div className="p-4 bg-rose-50 border border-rose-150 rounded-xl flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <span className="block text-xs font-black text-rose-900">
+                          {language === 'en' ? "GPS Location Unavailable" : "जीपीएस लोकेशन अनुपलब्ध"}
+                        </span>
+                        <p className="text-[10px] text-rose-700 font-medium leading-relaxed">{gpsError}</p>
+                      </div>
+                    </div>
+                  ) : !currentGpsCoords ? (
+                    <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center space-y-3">
+                      <div className="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-full">
+                        <Locate className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <div className="max-w-md mx-auto space-y-1">
+                        <span className="block text-xs font-extrabold text-slate-800">
+                          {language === 'en' ? "Location Permission Required" : "स्थान का पता लगाने की आवश्यकता है"}
+                        </span>
+                        <p className="text-[10px] text-slate-400 font-medium">
+                          {language === 'en' 
+                            ? "We need your physical location coordinates to verify you are currently at your branch premises before submitting your attendance."
+                            : "उपस्थिति दर्ज करने से पहले यह सत्यापित करने के लिए कि आप अभी अपनी आवंटित शाखा में हैं, हमें आपकी भौगोलिक स्थिति (GPS) की आवश्यकता है।"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={detectGpsAndVerifyOutlet}
+                        className="mt-1 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer transition-colors"
+                      >
+                        {language === 'en' ? "Verify My Location Now" : "लोकेशन सत्यापित करें"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Coords display */}
+                      <div className="flex flex-wrap gap-2 text-[10px] font-mono text-slate-400 bg-slate-50 p-2.5 rounded-lg border border-slate-100 font-bold">
+                        <span>LAT: {currentGpsCoords.latitude.toFixed(6)}</span>
+                        <span className="text-slate-300">|</span>
+                        <span>LNG: {currentGpsCoords.longitude.toFixed(6)}</span>
+                        <span className="ml-auto text-slate-400 bg-white border border-slate-200 px-1.5 rounded text-[9px] uppercase tracking-wide">Verified Coords</span>
+                      </div>
+
+                      {/* Distance / Outlet Match status card */}
+                      {checkResult.isAllowed ? (
+                        <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-3">
+                          <div className="p-1.5 bg-emerald-500 rounded-lg text-white mt-0.5 shrink-0">
+                            <Check className="w-4 h-4 font-black" />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="block text-xs font-black text-emerald-900">
+                              {language === 'en' ? "Geofence Verification Successful" : "स्थान सत्यापन सफल - आप सुरक्षित क्षेत्र में हैं"}
+                            </span>
+                            <p className="text-[10px] text-emerald-700 font-semibold leading-relaxed">
+                              {checkResult.isBypassed ? (
+                                language === 'en'
+                                  ? "Geofencing restrictions are bypassed for you by Administrator permission. Location logging remains active."
+                                  : "जियोफेंसिंग प्रतिबंध आपके लिए एडमिन अनुमति द्वारा बायपास कर दिए गए हैं। स्थान लॉगिंग सक्रिय है।"
+                              ) : adminSettings.enableGeofencing ? (
+                                language === 'en'
+                                  ? `You are within the authorized boundaries of branch: "${checkResult.nearestOutlet?.name || 'Verified branch'}". Current distance is ${checkResult.distanceMeters.toFixed(1)} meters (Allowed: ${checkResult.requiredRadius}m).`
+                                  : `आप अधिकृत शाखा के सुरक्षित दायरे में हैं: "${checkResult.nearestOutlet?.name || 'सुरक्षित शाखा'}"। आपकी दूरी ${checkResult.distanceMeters.toFixed(1)} मीटर है (अनुमत: ${checkResult.requiredRadius}मी)।`
+                              ) : (
+                                language === 'en'
+                                  ? "Geofencing restrictions are currently disabled by Admin settings. Location logging remains active."
+                                  : "जीपीएस प्रतिबंध वर्तमान में एडमिन द्वारा निष्क्रिय हैं। स्थान का रिकॉर्ड दर्ज किया जाएगा।"
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3">
+                          <div className="p-1.5 bg-rose-600 rounded-lg text-white mt-0.5 shrink-0">
+                            <AlertCircle className="w-4 h-4" />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="block text-xs font-black text-rose-900">
+                              {language === 'en' ? "Geofence Access Denied!" : "स्थान सत्यापन विफल - आप सुरक्षित क्षेत्र से बाहर हैं"}
+                            </span>
+                            <p className="text-[10px] text-rose-700 font-bold leading-relaxed">
+                              {language === 'en'
+                                ? `Your current position is outside the branch geofence boundary. Your assigned branch geofence: "${checkResult.nearestOutlet?.name || 'Registered Branch'}" is ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(2) + ' km' : checkResult.distanceMeters.toFixed(1) + ' meters'} away. (Your permitted radius is ${checkResult.requiredRadius}m).`
+                                : `आपकी वर्तमान स्थिति आवंटित सुरक्षित शाखा के दायरे से बाहर है। आपकी आवंटित शाखा: "${checkResult.nearestOutlet?.name || 'मुख्य शाखा'}" आपसे ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(2) + ' किमी' : checkResult.distanceMeters.toFixed(1) + ' मीटर'} दूर है। (अनुमत सीमा ${checkResult.requiredRadius}मी है)।`}
+                            </p>
+                            <span className="block text-[9px] font-black uppercase text-rose-800 mt-1">
+                              {language === 'en' ? "Please come inside your assigned branch premises to mark your attendance." : "कृपया उपस्थिति दर्ज करने के लिए अपनी आवंटित शाखा कार्यालय परिसर के भीतर आएं।"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Digital Clock & Punch Controls */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center space-y-6">
+                  
+                  {/* Visual Digital Clock */}
+                  <div className="text-center space-y-1 bg-slate-50 border border-slate-100 rounded-2xl px-8 py-5 shadow-xs max-w-sm w-full">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'en' ? "Live System Time (IST)" : "लाइव डिजिटल क्लॉक"}</span>
+                    <h3 className="text-3xl font-black text-slate-800 font-mono tracking-tight">{currentTime}</h3>
+                    <p className="text-[11px] text-slate-500 font-extrabold">{new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'hi-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  </div>
+
+                  {/* Feedback alerts */}
+                  {punchSuccessMsg && (
+                    <div className="w-full max-w-md p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{punchSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {punchErrorMsg && (
+                    <div className="w-full max-w-md p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{punchErrorMsg}</span>
+                    </div>
+                  )}
+
+                  {/* Remarks Field */}
+                  {(!todayRecord || !todayRecord.checkOut) && (
+                    <div className="w-full max-w-md">
+                      <label className="block text-xs font-bold text-slate-600 mb-1">
+                        {language === 'en' ? "Punch Remarks / Activity (Optional)" : "पंच रिमार्क्स / कार्य विवरण (वैकल्पिक)"}
+                      </label>
+                      <input 
+                        type="text"
+                        value={punchRemarks}
+                        onChange={(e) => setPunchRemarks(e.target.value)}
+                        placeholder={language === 'en' ? "e.g., Arrived for Morning Shift..." : "जैसे, रायपुर ऑफिस आगमन..."}
+                        className="w-full border border-slate-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-slate-50/50"
+                      />
+                    </div>
+                  )}
+
+                  {/* Action Buttons Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md">
+                    {/* Punch In */}
+                    {todayRecord && todayRecord.checkIn ? (
+                      <div className="p-4 bg-emerald-50 border border-emerald-150 rounded-2xl flex flex-col items-center justify-center text-center space-y-1">
+                        <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">{language === 'en' ? "Punched In Today" : "आगमन दर्ज है!"}</span>
+                        <span className="text-lg font-black font-mono text-emerald-700">{todayRecord.checkIn}</span>
+                        <span className="text-[9px] text-emerald-500 font-bold">{todayRecord.punchInOutlet || employee.branch || (language === 'en' ? "Branch" : "शाखा")}</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePunchIn}
+                        disabled={isSubmittingPunch || !currentGpsCoords || !checkResult.isAllowed}
+                        className="py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:hover:bg-emerald-600 text-white font-black text-sm rounded-2xl shadow-sm flex flex-col items-center justify-center gap-1 cursor-pointer transition-all border border-emerald-500/25"
+                      >
+                        <span className="uppercase text-[10px] tracking-widest leading-none text-emerald-100 font-extrabold">{language === 'en' ? "Register Punch" : "शाखा आगमन"}</span>
+                        <span>{language === 'en' ? "PUNCH IN (आगमन)" : "आगमन (Punch In)"}</span>
+                      </button>
+                    )}
+
+                    {/* Punch Out */}
+                    {todayRecord && todayRecord.checkOut ? (
+                      <div className="p-4 bg-slate-100 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center space-y-1">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{language === 'en' ? "Punched Out Today" : "प्रस्थान दर्ज है!"}</span>
+                        <span className="text-lg font-black font-mono text-slate-600">{todayRecord.checkOut}</span>
+                        <span className="text-[9px] text-slate-400 font-bold">{todayRecord.punchOutOutlet || employee.branch || (language === 'en' ? "Branch" : "शाखा")}</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePunchOut}
+                        disabled={isSubmittingPunch || !currentGpsCoords || !checkResult.isAllowed || !todayRecord || !todayRecord.checkIn}
+                        className="py-4 px-6 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-slate-900 text-white font-black text-sm rounded-2xl shadow-sm flex flex-col items-center justify-center gap-1 cursor-pointer transition-all"
+                      >
+                        <span className="uppercase text-[10px] tracking-widest leading-none text-slate-400 font-extrabold">{language === 'en' ? "Register Departure" : "शाखा प्रस्थान"}</span>
+                        <span>{language === 'en' ? "PUNCH OUT (प्रस्थान)" : "प्रस्थान (Punch Out)"}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Simple Help Line */}
+                  <span className="text-[9px] font-semibold text-slate-400 max-w-sm text-center">
+                    {language === 'en'
+                      ? "* Standard shift work timings and overtime rates are automatically calculated upon punch checkout."
+                      : "* आपके कार्य घंटों और ओवरटाइम भत्तों की गणना कंपनी नियमों के अनुसार प्रस्थान दर्ज करने पर की जाती है।"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right Column: Information & Guidelines */}
+              <div className="space-y-6">
+                
+                {/* Active Authorized Branches Card */}
+                <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm space-y-4">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                    <Building className="w-4 h-4 text-emerald-600" />
+                    <span>{language === 'en' ? "Authorized Branch Zones" : "अधिकृत सुरक्षित शाखाएं"}</span>
+                  </h4>
+
+                  {(!adminSettings.geofenceOutlets || adminSettings.geofenceOutlets.length === 0) ? (
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      {language === 'en' 
+                        ? "No geofenced branches configured. You can punch attendance from any location." 
+                        : "कोई जियोफेंस शाखा कॉन्फ़िगर नहीं है। आप किसी भी स्थान से अपनी उपस्थिति दर्ज कर सकते हैं।"}
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {adminSettings.geofenceOutlets.map(outlet => (
+                        <div key={outlet.id} className="p-3 bg-slate-50 hover:bg-slate-100/55 rounded-xl border border-slate-150 transition-all flex justify-between items-center gap-2">
+                          <div className="min-w-0">
+                            <span className="block text-xs font-black text-slate-800 truncate">{outlet.name}</span>
+                            <span className="text-[9px] text-slate-400 font-mono font-bold block">Lat: {outlet.latitude.toFixed(4)}, Lng: {outlet.longitude.toFixed(4)}</span>
+                          </div>
+                          <span className="bg-emerald-50 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-150 shrink-0">
+                            {outlet.radiusMeters}m {language === 'en' ? "Lock" : "लॉक"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Secure Instructions Guide Card */}
+                <div className="bg-gradient-to-tr from-slate-900 to-slate-950 text-white p-5 rounded-2xl shadow-md space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>{language === 'en' ? "Geofence Guidelines" : "सुरक्षित उपस्थिति नियम"}</span>
+                  </h4>
+
+                  <div className="space-y-3 text-[10px] text-slate-300 font-medium leading-relaxed">
+                    <div className="flex gap-2">
+                      <span className="text-emerald-400 font-bold">1.</span>
+                      <p>{language === 'en' 
+                        ? "Ensure GPS location/Wifi is enabled on your phone before clicking Punch In/Out." 
+                        : "पंच करने से पहले अपने फोन का जीपीएस लोकेशन और इंटरनेट वाई-फाई अवश्य चालू रखें।"}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-emerald-400 font-bold">2.</span>
+                      <p>{language === 'en'
+                        ? "You must be physically present inside your branch's geofenced boundary (e.g. within 100 meters)."
+                        : "उपस्थिति दर्ज करने के लिए आपका शारीरिक रूप से अपनी आवंटित शाखा कार्यालय परिसर के भीतर होना अनिवार्य है।"}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-emerald-400 font-bold">3.</span>
+                      <p>{language === 'en'
+                        ? "Attempts to spoof coordinates, use location fake software, or punch out of bounds are blocked automatically and flagged in security audits."
+                        : "गलत लोकेशन का उपयोग करने या फर्जी जीपीएस सॉफ्टवेयर का उपयोग करने पर उपस्थिति स्वतः ही निरस्त हो जाएगी।"}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* PROFILE TAB */}
         {activeTab === 'profile' && (

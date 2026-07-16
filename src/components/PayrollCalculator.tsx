@@ -11,6 +11,7 @@ interface PayrollCalculatorProps {
   onUpdateEmployees?: (updatedEmployees: Employee[]) => Promise<void>;
   language: 'en' | 'hi';
   adminSettings?: AdminSettings;
+  portalUser?: any;
 }
 
 const MONTHS = [
@@ -30,7 +31,14 @@ const MONTHS = [
 
 import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
 
-export default function PayrollCalculator({ employees, attendanceRecords, payrollRecords, onSavePayroll, onUpdateEmployees, language, adminSettings }: PayrollCalculatorProps) {
+export default function PayrollCalculator({ employees, attendanceRecords, payrollRecords, onSavePayroll, onUpdateEmployees, language, adminSettings, portalUser }: PayrollCalculatorProps) {
+  const hasPermission = (action: 'view' | 'add' | 'edit' | 'delete') => {
+    if (!portalUser) return true;
+    if (portalUser.role === 'admin') return true;
+    const permissions = adminSettings?.rolePermissions?.[portalUser.role] || [];
+    if (permissions.includes('payroll')) return true;
+    return permissions.includes(`payroll:${action}`);
+  };
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [workingDays, setWorkingDays] = useState<number>(26);
@@ -723,6 +731,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
   const handleAddDeductionPlan = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission('add')) {
+      alert(language === 'en' ? 'You do not have permission to add deduction & refund plans.' : 'आपके पास कटौती और रिफंड योजना जोड़ने की अनुमति नहीं है।');
+      return;
+    }
     if (!newDeductEmpId) {
       alert('Please select an employee!');
       return;
@@ -750,6 +762,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   };
 
   const handleDeleteDeductionPlan = (id: string) => {
+    if (!hasPermission('delete')) {
+      alert(language === 'en' ? 'You do not have permission to delete plans.' : 'आपके पास योजनाओं को हटाने की अनुमति नहीं है।');
+      return;
+    }
     if (confirm('Are you sure you want to delete this deduction & refund plan?')) {
       setOneTimeDeductions(prev => prev.filter(d => d.id !== id));
       setTimeout(() => {
@@ -848,6 +864,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   };
 
   const handleRecalculate = () => {
+    if (!hasPermission('add')) {
+      alert(language === 'en' ? 'You do not have permission to calculate payroll.' : 'आपके पास पेरोल की गणना करने की अनुमति नहीं है।');
+      return;
+    }
     const computed: PayrollRecord[] = activeEmployees.map(emp => {
       return calculateSingleEmployeePayroll(emp);
     });
@@ -856,6 +876,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   };
 
   const handleMarkPaid = async (empId: string) => {
+    if (!hasPermission('delete')) {
+      alert(language === 'en' ? 'You do not have permission to record payment status.' : 'आपके पास भुगतान स्थिति दर्ज करने की अनुमति नहीं है।');
+      return;
+    }
     if (confirmPayEmpId !== empId) {
       setConfirmPayEmpId(empId);
       setTimeout(() => setConfirmPayEmpId(null), 5000);
@@ -929,6 +953,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   };
 
   const handleMarkAllPaid = async () => {
+    if (!hasPermission('delete')) {
+      alert(language === 'en' ? 'You do not have permission to record payment status.' : 'आपके पास भुगतान स्थिति दर्ज करने की अनुमति नहीं है।');
+      return;
+    }
     if (!confirmPayAll) {
       setConfirmPayAll(true);
       setTimeout(() => setConfirmPayAll(false), 5000);
@@ -1005,6 +1033,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   };
 
   const handleSavePayroll = async () => {
+    if (!hasPermission('add')) {
+      alert(language === 'en' ? 'You do not have permission to save payroll sheets.' : 'आपके पास पेरोल शीट सहेजने की अनुमति नहीं है।');
+      return;
+    }
     setIsSaving(true);
     try {
       const otherMonthsHistory = payrollRecords.filter(p => p.monthYear !== selectedMonthYear);
@@ -1654,6 +1686,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                           {/* Adjustments on-the-fly */}
                           <button
                             onClick={() => {
+                              if (!hasPermission('edit')) {
+                                alert(language === 'en' ? 'You do not have permission to adjust payroll.' : 'आपके पास पेरोल संयोजित करने की अनुमति नहीं है।');
+                                return;
+                              }
                               setEditingRecord(rec);
                               setIsAdjustModalOpen(true);
                             }}

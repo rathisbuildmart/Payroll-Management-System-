@@ -11,21 +11,25 @@ import {
   Eye, 
   EyeOff, 
   Lock, 
-  HelpCircle,
-  Undo,
-  ShieldAlert,
-  Search,
-  Filter,
-  Megaphone,
-  LifeBuoy,
-  KeyRound,
-  CheckCircle2,
-  Database,
-  Upload,
-  Download,
-  RefreshCw,
-  AlertTriangle,
-  History
+  HelpCircle, 
+  Undo, 
+  ShieldAlert, 
+  Search, 
+  Filter, 
+  Megaphone, 
+  LifeBuoy, 
+  KeyRound, 
+  CheckCircle2, 
+  Database, 
+  Upload, 
+  Download, 
+  RefreshCw, 
+  AlertTriangle, 
+  History, 
+  Edit2, 
+  X,
+  MapPin,
+  Locate
 } from 'lucide-react';
 import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog } from '../types';
 
@@ -175,7 +179,9 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
     branch_manager: ['dashboard', 'employees', 'attendance', 'leaves'],
     employee: []
   },
-  enableEmployeePayslips: false
+  enableEmployeePayslips: false,
+  enableGeofencing: false,
+  enableMobileAttendance: false
 };
 
 export default function Settings({ 
@@ -206,15 +212,110 @@ export default function Settings({
   const [newAccName, setNewAccName] = useState('');
   const [newAccUsername, setNewAccUsername] = useState('');
   const [newAccPassword, setNewAccPassword] = useState('');
+  const [newAccEmail, setNewAccEmail] = useState('');
+  const [newAccMobileNo, setNewAccMobileNo] = useState('');
   const [newAccRole, setNewAccRole] = useState<'admin' | 'director' | 'sub_admin' | 'hr' | 'branch_manager'>('hr');
   const [newAccBranch, setNewAccBranch] = useState('');
   const [newAccBranches, setNewAccBranches] = useState<string[]>([]);
   const [roleFormError, setRoleFormError] = useState('');
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const [editingAccountPassword, setEditingAccountPassword] = useState<string>('');
+  const [editingAccount, setEditingAccount] = useState<UserRoleAccount | null>(null);
   const [newMasterVal, setNewMasterVal] = useState<string>('');
   const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'>>('departments');
+  const [activeConfigRole, setActiveConfigRole] = useState<'director' | 'sub_admin' | 'hr' | 'branch_manager'>('director');
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
+
+  // Geofencing Outlet Registration States
+  const [newOutletName, setNewOutletName] = useState('');
+  const [newOutletLat, setNewOutletLat] = useState('');
+  const [newOutletLng, setNewOutletLng] = useState('');
+  const [newOutletRadius, setNewOutletRadius] = useState<number>(100);
+  const [isFetchingAdminCoords, setIsFetchingAdminCoords] = useState(false);
+
+  const fetchAdminLocation = () => {
+    setIsFetchingAdminCoords(true);
+    
+    const handleSuccess = (position: GeolocationPosition) => {
+      setNewOutletLat(position.coords.latitude.toFixed(6));
+      setNewOutletLng(position.coords.longitude.toFixed(6));
+      setIsFetchingAdminCoords(false);
+    };
+
+    const handleFailure = (error: GeolocationPositionError) => {
+      console.warn("High accuracy GPS failed, retrying with low accuracy...", error);
+      // Retry with low accuracy
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setNewOutletLat(position.coords.latitude.toFixed(6));
+          setNewOutletLng(position.coords.longitude.toFixed(6));
+          setIsFetchingAdminCoords(false);
+        },
+        (fallbackError) => {
+          console.error("GPS error on fallback:", fallbackError);
+          let userMsg = language === 'en' 
+            ? "Failed to fetch GPS coordinates. Please make sure location access is enabled for this application in your browser settings, or enter coordinates manually."
+            : "जीपीएस लोकेशन प्राप्त करने में विफल। कृपया अपने ब्राउज़र सेटिंग्स में लोकेशन अनुमति सक्षम करें, या मैन्युअल रूप से दर्ज करें।";
+          if (fallbackError.code === fallbackError.PERMISSION_DENIED) {
+            userMsg = language === 'en'
+              ? "Location access was denied. Please allow location sharing for this site in your browser address bar/settings."
+              : "लोकेशन साझा करने की अनुमति नहीं दी गई। कृपया ब्राउज़र एड्रेस बार में लोकेशन साझा करने की अनुमति दें।";
+          }
+          alert(userMsg);
+          setIsFetchingAdminCoords(false);
+        },
+        { enableHighAccuracy: false, timeout: 15000 }
+      );
+    };
+
+    navigator.geolocation.getCurrentPosition(handleSuccess, handleFailure, { 
+      enableHighAccuracy: true, 
+      timeout: 5000 
+    });
+  };
+
+  const handleAddGeofenceOutlet = () => {
+    if (!newOutletName.trim() || !newOutletLat.trim() || !newOutletLng.trim()) {
+      alert(language === 'en' ? "Please fill in all fields to add a secure outlet!" : "सक्रिय सुरक्षित आउटलेट जोड़ने के लिए कृपया सभी फ़ील्ड भरें!");
+      return;
+    }
+    const latNum = parseFloat(newOutletLat);
+    const lngNum = parseFloat(newOutletLng);
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      alert(language === 'en' ? "Please enter valid numeric latitude and longitude coordinates." : "कृपया मान्य संख्यात्मक अक्षांश और देशांतर निर्देशांक दर्ज करें।");
+      return;
+    }
+
+    const newOutlet = {
+      id: 'outlet-' + Date.now(),
+      name: newOutletName.trim(),
+      latitude: latNum,
+      longitude: lngNum,
+      radiusMeters: Number(newOutletRadius) || 100
+    };
+
+    const currentOutlets = localSettings.geofenceOutlets || [];
+    setLocalSettings({
+      ...localSettings,
+      geofenceOutlets: [...currentOutlets, newOutlet]
+    });
+
+    // Reset Form
+    setNewOutletName('');
+    setNewOutletLat('');
+    setNewOutletLng('');
+    setNewOutletRadius(100);
+  };
+
+  const handleRemoveGeofenceOutlet = (id: string) => {
+    const currentOutlets = localSettings.geofenceOutlets || [];
+    setLocalSettings({
+      ...localSettings,
+      geofenceOutlets: currentOutlets.filter(o => o.id !== id)
+    });
+  };
 
   // Corporate notices & HR Helpdesk management states
   const [newNoticeTitle, setNewNoticeTitle] = useState('');
@@ -535,18 +636,89 @@ export default function Settings({
     employee: []
   };
 
-  const handleTogglePermission = (role: string, tabId: string) => {
-    const updatedPermissions = { ...rolePermissions };
-    const currentList = updatedPermissions[role] || [];
-    if (currentList.includes(tabId)) {
-      updatedPermissions[role] = currentList.filter(t => t !== tabId);
-    } else {
-      updatedPermissions[role] = [...currentList, tabId];
+  const PERMISSION_MODULES = [
+    { id: 'dashboard', labelEn: 'System Dashboard', labelHi: 'सिस्टम डैशबोर्ड' },
+    { id: 'employees', labelEn: 'Employee Registry', labelHi: 'कर्मचारी सूची' },
+    { id: 'attendance', labelEn: 'Attendance & Logs', labelHi: 'उपस्थिति और लॉग्स' },
+    { id: 'payroll', labelEn: 'Payroll & Payslips', labelHi: 'पेरोल और वेतन पर्ची' },
+    { id: 'leaves', labelEn: 'Leaves & Holidays', labelHi: 'छुट्टियां और अवकाश' },
+    { id: 'ledger', labelEn: 'Employee Ledger', labelHi: 'कर्मचारी बहीखाता (Ledger)' },
+    { id: 'admin', labelEn: 'System Settings', labelHi: 'सिस्टम सेटिंग्स' },
+  ];
+
+  const getActionForColumn = (modId: string, colIndex: number) => {
+    if (colIndex === 0) {
+      return { id: 'view', label: language === 'en' ? 'View' : 'देखें' };
     }
+    if (colIndex === 1) {
+      if (['employees', 'attendance', 'payroll', 'leaves'].includes(modId)) {
+        let label = language === 'en' ? 'Add' : 'जोड़ें';
+        if (modId === 'attendance') label = language === 'en' ? 'Bulk Punch' : 'बल्क पंच';
+        if (modId === 'payroll') label = language === 'en' ? 'Calculate' : 'गणना';
+        if (modId === 'leaves') label = language === 'en' ? 'Add Holiday' : 'अवकाश जोड़ें';
+        return { id: 'add', label };
+      }
+    }
+    if (colIndex === 2) {
+      if (['employees', 'attendance', 'payroll', 'leaves', 'admin'].includes(modId)) {
+        let label = language === 'en' ? 'Edit' : 'संशोधित';
+        if (modId === 'attendance') label = language === 'en' ? 'Adjust Log' : 'एडजस्ट';
+        if (modId === 'payroll') label = language === 'en' ? 'Adjust' : 'संयोजन';
+        if (modId === 'leaves') label = language === 'en' ? 'Edit Holiday' : 'अवकाश बदलें';
+        return { id: 'edit', label };
+      }
+    }
+    if (colIndex === 3) {
+      if (['employees', 'attendance', 'payroll', 'leaves'].includes(modId)) {
+        let id = 'delete';
+        let label = language === 'en' ? 'Delete' : 'हटाएं';
+        if (modId === 'employees') label = language === 'en' ? 'Deactivate' : 'निष्क्रिय करें';
+        if (modId === 'attendance') { id = 'approve'; label = language === 'en' ? 'Approve' : 'स्वीकृत करें'; }
+        if (modId === 'payroll') label = language === 'en' ? 'Mark Paid' : 'भुगतान चिह्नित';
+        if (modId === 'leaves') label = language === 'en' ? 'Delete Holiday' : 'अवकाश हटाएं';
+        return { id, label };
+      }
+    }
+    return null;
+  };
+
+  const handleToggleFineGrainedPermission = (role: string, modId: string, actionId: string) => {
+    const updatedPermissions = { ...rolePermissions };
+    const currentList = [...(updatedPermissions[role] || [])];
+    const permKey = `${modId}:${actionId}`;
+
+    let listWithFineGrained = [...currentList];
+    
+    const parentModuleInList = currentList.includes(modId);
+    if (parentModuleInList) {
+      listWithFineGrained = currentList.filter(p => p !== modId);
+      [0, 1, 2, 3].forEach(colIndex => {
+        const act = getActionForColumn(modId, colIndex);
+        if (act) {
+          const key = `${modId}:${act.id}`;
+          if (!listWithFineGrained.includes(key)) {
+            listWithFineGrained.push(key);
+          }
+        }
+      });
+    }
+
+    if (listWithFineGrained.includes(permKey)) {
+      listWithFineGrained = listWithFineGrained.filter(p => p !== permKey);
+    } else {
+      listWithFineGrained.push(permKey);
+    }
+
+    updatedPermissions[role] = listWithFineGrained;
     setLocalSettings({
       ...localSettings,
       rolePermissions: updatedPermissions
     });
+  };
+
+  const isPermissionChecked = (role: string, modId: string, actionId: string) => {
+    const list = rolePermissions[role] || [];
+    return list.includes(`${modId}:${actionId}`) || list.includes(modId);
   };
 
   const handleAddRoleAccount = () => {
@@ -567,6 +739,8 @@ export default function Settings({
       name: newAccName.trim(),
       username: newAccUsername.trim(),
       password: newAccPassword.trim(),
+      email: newAccEmail.trim() || undefined,
+      mobileNo: newAccMobileNo.trim() || undefined,
       role: newAccRole,
       branch: (newAccRole === 'branch_manager' || newAccRole === 'director' || newAccRole === 'sub_admin') && newAccBranches.length > 0 ? newAccBranches[0] : undefined,
       branches: (newAccRole === 'branch_manager' || newAccRole === 'director' || newAccRole === 'sub_admin') ? newAccBranches : undefined,
@@ -582,6 +756,8 @@ export default function Settings({
     setNewAccName('');
     setNewAccUsername('');
     setNewAccPassword('');
+    setNewAccEmail('');
+    setNewAccMobileNo('');
     setNewAccRole('hr');
     setNewAccBranch('');
     setNewAccBranches([]);
@@ -593,6 +769,22 @@ export default function Settings({
       ...localSettings,
       roleAccounts: roleAccounts.filter(acc => acc.id !== id)
     });
+  };
+
+  const handleUpdateAccountPassword = (accountId: string, newPass: string) => {
+    if (!newPass.trim()) return;
+    const updatedAccounts = roleAccounts.map(acc => {
+      if (acc.id === accountId) {
+        return { ...acc, password: newPass.trim() };
+      }
+      return acc;
+    });
+    setLocalSettings({
+      ...localSettings,
+      roleAccounts: updatedAccounts
+    });
+    setEditingAccountId(null);
+    setEditingAccountPassword('');
   };
 
   const handleSave = () => {
@@ -1260,7 +1452,7 @@ export default function Settings({
                     : "लॉग इन किए गए कर्मचारियों के लिए फीचर दृश्यता और अनुमतियों को कॉन्फ़िगर करें।"}
                 </p>
                 
-                <label className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 rounded-lg border border-gray-150 cursor-pointer transition-colors max-w-lg shadow-2xs">
+                <label className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 rounded-lg border border-gray-150 cursor-pointer transition-colors max-w-lg shadow-2xs mb-4">
                   <input 
                     type="checkbox"
                     checked={localSettings.enableEmployeePayslips === true}
@@ -1276,6 +1468,202 @@ export default function Settings({
                     </span>
                   </div>
                 </label>
+
+                {/* Secure GPS Geofencing Configuration */}
+                <div className="border-t border-gray-200/60 pt-4 mt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-emerald-600" />
+                        {language === 'en' ? "Secure Mobile Geofencing & Location Lock" : "सुरक्षित मोबाइल जियोफेंसिंग और लोकेशन लॉक"}
+                      </h5>
+                      <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                        {language === 'en' 
+                          ? "Restrict employee attendance marking to designated office branches or outlet geofences."
+                          : "कर्मचारी उपस्थिति दर्ज करने की प्रक्रिया को केवल नामित कार्यालय शाखाओं या आउटलेट जियोफेंस तक सीमित करें।"}
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={localSettings.enableGeofencing === true}
+                        onChange={(e) => setLocalSettings({...localSettings, enableGeofencing: e.target.checked})}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                      <span className="ml-2 text-xs font-bold text-slate-700">
+                        {localSettings.enableGeofencing ? (language === 'en' ? "ACTIVE" : "सक्रिय") : (language === 'en' ? "INACTIVE" : "निष्क्रिय")}
+                      </span>
+                    </label>
+                  </div>
+
+                  {localSettings.enableGeofencing && (
+                    <div className="mt-4 bg-white border border-slate-200 rounded-lg p-4 space-y-4 shadow-2xs">
+                      {/* Register New Branch Form */}
+                      <div className="bg-slate-50/70 p-3 rounded-lg border border-slate-150">
+                        <span className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-2.5">
+                          {language === 'en' ? "Register Secure Branch Geofence" : "नया सुरक्षित जियोफेंस शाखा पंजीकृत करें"}
+                        </span>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                              {language === 'en' ? "Branch Name" : "शाखा का नाम"}
+                            </label>
+                            <div className="space-y-1.5">
+                              <select
+                                value={(localSettings.branches || []).includes(newOutletName) ? newOutletName : (newOutletName === '' ? '' : 'custom')}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === 'custom') {
+                                    setNewOutletName('');
+                                  } else {
+                                    setNewOutletName(val);
+                                  }
+                                }}
+                                className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                              >
+                                <option value="">{language === 'en' ? "-- Select Registered Branch --" : "-- पंजीकृत शाखा चुनें --"}</option>
+                                {(localSettings.branches || []).map((b) => (
+                                  <option key={b} value={b}>{b}</option>
+                                ))}
+                                <option value="custom">{language === 'en' ? "Other / Custom Branch..." : "अन्य / कस्टम शाखा..."}</option>
+                              </select>
+                              
+                              {(!localSettings.branches || localSettings.branches.length === 0 || !(localSettings.branches || []).includes(newOutletName)) && (
+                                <input 
+                                  type="text"
+                                  value={newOutletName}
+                                  onChange={(e) => setNewOutletName(e.target.value)}
+                                  placeholder={language === 'en' ? "Type branch name manually..." : "शाखा का नाम टाइप करें..."}
+                                  className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                                />
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                              {language === 'en' ? "Geofence Radius (Meters)" : "अनुमत जियोफेंस दायरा (मीटर)"}
+                            </label>
+                            <select
+                              value={newOutletRadius}
+                              onChange={(e) => setNewOutletRadius(Number(e.target.value) || 100)}
+                              className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                            >
+                              <option value={50}>50 {language === 'en' ? "Meters (High Security / Inside Office Only)" : "मीटर (उच्च सुरक्षा - केवल ऑफिस के अंदर)"}</option>
+                              <option value={100}>100 {language === 'en' ? "Meters (Recommended Office Standard)" : "मीटर (अनुशंसित मानक)"}</option>
+                              <option value={200}>200 {language === 'en' ? "Meters (Large Facility / Compound)" : "मीटर (बड़ा परिसर/फैक्ट्री)"}</option>
+                              <option value={500}>500 {language === 'en' ? "Meters (Wider Area Boundary)" : "मीटर (विस्तृत क्षेत्र)"}</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                              {language === 'en' ? "Latitude (e.g., 21.2514)" : "अक्षांश (Latitude - जैसे, 21.2514)"}
+                            </label>
+                            <input 
+                              type="text"
+                              value={newOutletLat}
+                              onChange={(e) => setNewOutletLat(e.target.value)}
+                              placeholder="e.g. 21.251412"
+                              className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-mono font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                              {language === 'en' ? "Longitude (e.g., 81.6296)" : "देशांतर (Longitude - जैसे, 81.6296)"}
+                            </label>
+                            <div className="flex gap-2">
+                              <input 
+                                type="text"
+                                value={newOutletLng}
+                                onChange={(e) => setNewOutletLng(e.target.value)}
+                                placeholder="e.g. 81.629615"
+                                className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-mono font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={fetchAdminLocation}
+                                disabled={isFetchingAdminCoords}
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 border border-slate-250 text-slate-700 text-xs font-bold rounded flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                                title={language === 'en' ? "Capture current GPS location" : "वर्तमान स्थान का जीपीएस कैप्चर करें"}
+                              >
+                                <Locate className={`w-3.5 h-3.5 ${isFetchingAdminCoords ? 'animate-spin text-emerald-600' : ''}`} />
+                                <span>{isFetchingAdminCoords ? "..." : (language === 'en' ? "Get GPS" : "स्थान प्राप्त करें")}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={handleAddGeofenceOutlet}
+                            className="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-4 py-2 rounded-md shadow-2xs flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{language === 'en' ? "Lock Location & Save" : "लोकेशन लॉक करें और जोड़ें"}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Registered Locations List */}
+                      <div>
+                        <span className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
+                          {language === 'en' ? "Active Safe Geofences" : "सक्रिय सुरक्षित जियोफेंस सूची"}
+                        </span>
+
+                        {(!localSettings.geofenceOutlets || localSettings.geofenceOutlets.length === 0) ? (
+                          <div className="text-center py-6 px-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs font-medium">
+                            {language === 'en' 
+                              ? "No location geofences configured. Register at least one branch coordinates above to activate mobile punch restrictions." 
+                              : "कोई जियोफेंस कॉन्फ़िगर नहीं किया गया है। मोबाइल उपस्थिति को लॉक करने के लिए ऊपर शाखा कोऑर्डिनेट्स जोड़ें।"}
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto border border-slate-150 rounded-lg">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-55 border-b border-slate-150 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                                <tr>
+                                  <th className="px-3 py-2">{language === 'en' ? "Branch Name" : "शाखा का नाम"}</th>
+                                  <th className="px-3 py-2">{language === 'en' ? "GPS Coordinates" : "जीपीएस कोऑर्डिनेट्स"}</th>
+                                  <th className="px-3 py-2">{language === 'en' ? "Safe Radius" : "सुरक्षित दायरा"}</th>
+                                  <th className="px-3 py-2 text-right">{language === 'en' ? "Action" : "कार्रवाई"}</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                {localSettings.geofenceOutlets.map((outlet) => (
+                                  <tr key={outlet.id} className="hover:bg-slate-50/55">
+                                    <td className="px-3 py-2.5 font-bold text-slate-900">{outlet.name}</td>
+                                    <td className="px-3 py-2.5 font-mono text-slate-500">
+                                      Lat: {outlet.latitude.toFixed(6)}, Lng: {outlet.longitude.toFixed(6)}
+                                    </td>
+                                    <td className="px-3 py-2.5">
+                                      <span className="bg-emerald-50 border border-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                        {outlet.radiusMeters}m
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveGeofenceOutlet(outlet.id)}
+                                        className="text-red-600 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer transition-colors inline-flex"
+                                        title={language === 'en' ? "Delete branch geofence lock" : "शाखा जियोफेंस लॉक हटाएं"}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -2034,84 +2422,79 @@ export default function Settings({
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    {language === 'en' ? 'Module Permission Matrix' : 'मॉड्यूल अनुमति मैट्रिक्स'}
+                    {language === 'en' ? 'Granular Permission Matrix' : 'विस्तृत अनुमति नियंत्रण मैट्रिक्स'}
                   </h4>
                   <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
                     {language === 'en'
-                      ? 'Toggle checkbox to grant or restrict specific page modules for each user role.'
-                      : 'प्रत्येक उपयोगकर्ता भूमिका के लिए विशिष्ट पृष्ठ मॉड्यूल को अनुमति देने या प्रतिबंधित करने के लिए चेकबॉक्स पर क्लिक करें।'}
+                      ? 'Select a user role, then toggle checkboxes to configure granular action-level access (View, Add, Edit, Delete/Approve) for each page module.'
+                      : 'उपयोगकर्ता भूमिका चुनें, फिर प्रत्येक पृष्ठ मॉड्यूल के लिए विस्तृत कार्रवाई-स्तरीय पहुंच (देखें, जोड़ें, संपादित करें, हटाएं / स्वीकृत करें) कॉन्फ़िगर करने के लिए चेकबॉक्स पर क्लिक करें।'}
                   </p>
                 </div>
 
-                <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+                {/* Role Selector Tabs */}
+                <div className="flex flex-wrap gap-2 p-1.5 bg-slate-150/50 rounded-xl border border-slate-200">
+                  {[
+                    { id: 'director', label: language === 'en' ? 'Director' : 'डायरेक्टर' },
+                    { id: 'sub_admin', label: language === 'en' ? 'Sub Admin' : 'सब एडमिन' },
+                    { id: 'hr', label: language === 'en' ? 'HR Manager' : 'एचआर मैनेजर' },
+                    { id: 'branch_manager', label: language === 'en' ? 'Branch Manager' : 'शाखा प्रबंधक' },
+                  ].map(roleItem => (
+                    <button
+                      key={roleItem.id}
+                      type="button"
+                      onClick={() => setActiveConfigRole(roleItem.id as any)}
+                      className={`flex-1 min-w-[120px] px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                        activeConfigRole === roleItem.id
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                      }`}
+                    >
+                      {roleItem.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-3xs">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold text-[10px] uppercase tracking-wider">
-                        <th className="p-3 font-black">{language === 'en' ? 'Module / View' : 'मॉड्यूल / व्यू'}</th>
-                        <th className="p-3 text-center">{language === 'en' ? 'Director' : 'डायरेक्टर'}</th>
-                        <th className="p-3 text-center">{language === 'en' ? 'Sub Admin' : 'सब एडमिन'}</th>
-                        <th className="p-3 text-center">{language === 'en' ? 'HR Manager' : 'एचआर'}</th>
-                        <th className="p-3 text-center">{language === 'en' ? 'Branch Manager' : 'ब्रांच मैनेजर'}</th>
-                        <th className="p-3 text-center">{language === 'en' ? 'Employee' : 'कर्मचारी'}</th>
+                        <th className="p-3.5 font-black">{language === 'en' ? 'Module Name' : 'मॉड्यूल का नाम'}</th>
+                        <th className="p-3.5 text-center">{language === 'en' ? '1. View / Access' : '1. देखें / पहुंच'}</th>
+                        <th className="p-3.5 text-center">{language === 'en' ? '2. Add / Create' : '2. जोड़ें / बनाएं'}</th>
+                        <th className="p-3.5 text-center">{language === 'en' ? '3. Edit / Modify' : '3. बदलें / संशोधित'}</th>
+                        <th className="p-3.5 text-center">{language === 'en' ? '4. Delete / Action' : '4. हटाएं / कार्रवाई'}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                      {[
-                        { id: 'dashboard', label: language === 'en' ? 'System Dashboard' : 'सिस्टम डैशबोर्ड' },
-                        { id: 'employees', label: language === 'en' ? 'Employee Registry' : 'कर्मचारी सूची' },
-                        { id: 'attendance', label: language === 'en' ? 'Attendance & Logs' : 'उपस्थिति और लॉग्स' },
-                        { id: 'payroll', label: language === 'en' ? 'Payroll & Payslips' : 'पेरोल और वेतन पर्ची' },
-                        { id: 'leaves', label: language === 'en' ? 'Leaves & Holidays' : 'छुट्टियां और अवकाश' },
-                        { id: 'ledger', label: language === 'en' ? 'Employee Ledger' : 'कर्मचारी बहीखाता (Ledger)' },
-                        { id: 'admin', label: language === 'en' ? 'System Settings' : 'सिस्टम सेटिंग्स' },
-                      ].map((mod) => (
-                        <tr key={mod.id} className="hover:bg-slate-50/50">
-                          <td className="p-3 font-bold text-slate-900">{mod.label}</td>
-                          
-                          {/* Director */}
-                          <td className="p-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={(rolePermissions.director || []).includes(mod.id)}
-                              onChange={() => handleTogglePermission('director', mod.id)}
-                              className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                            />
-                          </td>
-
-                          {/* Sub Admin */}
-                          <td className="p-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={(rolePermissions.sub_admin || []).includes(mod.id)}
-                              onChange={() => handleTogglePermission('sub_admin', mod.id)}
-                              className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                            />
+                      {PERMISSION_MODULES.map((mod) => (
+                        <tr key={mod.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="p-3.5">
+                            <div className="font-bold text-slate-900">{language === 'en' ? mod.labelEn : mod.labelHi}</div>
+                            <div className="text-[9px] text-slate-400 font-mono mt-0.5">ID: {mod.id}</div>
                           </td>
                           
-                          {/* HR Manager */}
-                          <td className="p-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={(rolePermissions.hr || []).includes(mod.id)}
-                              onChange={() => handleTogglePermission('hr', mod.id)}
-                              className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                            />
-                          </td>
-                          
-                          {/* Branch Manager */}
-                          <td className="p-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={(rolePermissions.branch_manager || []).includes(mod.id)}
-                              onChange={() => handleTogglePermission('branch_manager', mod.id)}
-                              className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                            />
-                          </td>
-                          
-                          {/* Employee */}
-                          <td className="p-3 text-center text-slate-400 text-[10px] font-medium">
-                            {language === 'en' ? 'Dedicated Portal' : 'समर्पित पोर्टल'}
-                          </td>
+                          {[0, 1, 2, 3].map((colIndex) => {
+                            const act = getActionForColumn(mod.id, colIndex);
+                            return (
+                              <td key={colIndex} className="p-3.5 text-center">
+                                {act ? (
+                                  <div className="flex flex-col items-center justify-center gap-1.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={isPermissionChecked(activeConfigRole, mod.id, act.id)}
+                                      onChange={() => handleToggleFineGrainedPermission(activeConfigRole, mod.id, act.id)}
+                                      className="w-4.5 h-4.5 rounded-md text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all focus:scale-105"
+                                    />
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">
+                                      {act.label}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 text-xs font-mono">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
                         </tr>
                       ))}
                     </tbody>
@@ -2148,6 +2531,56 @@ export default function Settings({
                           <td className="p-3">
                             <p className="font-extrabold text-slate-900">{language === 'en' ? 'Primary Administrator' : 'मुख्य एडमिन'}</p>
                             <p className="text-[10px] text-slate-400 font-mono">@{localSettings.adminUsername || 'admin'}</p>
+                            
+                            {editingAccountId === 'admin' ? (
+                              <div className="mt-1.5 flex items-center gap-2 animate-fadeIn">
+                                <input
+                                  type="text"
+                                  value={editingAccountPassword}
+                                  onChange={(e) => setEditingAccountPassword(e.target.value)}
+                                  className="border border-emerald-300 px-2 py-0.5 rounded text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28 bg-white"
+                                  placeholder={language === 'en' ? 'New password' : 'नया पासवर्ड'}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!editingAccountPassword.trim()) return;
+                                    setLocalSettings({
+                                      ...localSettings,
+                                      adminPassword: editingAccountPassword.trim()
+                                    });
+                                    setEditingAccountId(null);
+                                    setEditingAccountPassword('');
+                                  }}
+                                  className="bg-emerald-600 text-white text-[9px] font-bold px-2 py-1 rounded hover:bg-emerald-700 cursor-pointer"
+                                >
+                                  {language === 'en' ? 'Save' : 'सहेजें'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setEditingAccountId(null); setEditingAccountPassword(''); }}
+                                  className="text-slate-400 hover:text-slate-600 text-[9px] font-bold px-1.5 py-1 rounded hover:bg-slate-100 cursor-pointer"
+                                >
+                                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="mt-1.5 flex items-center gap-1.5">
+                                <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600">
+                                  🔑 ••••••••
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingAccountId('admin');
+                                    setEditingAccountPassword(localSettings.adminPassword || 'admin123');
+                                  }}
+                                  className="text-emerald-600 hover:text-emerald-700 text-[10px] font-black underline cursor-pointer hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all"
+                                >
+                                  {language === 'en' ? 'Edit Pass' : 'पासवर्ड बदलें'}
+                                </button>
+                              </div>
+                            )}
                           </td>
                           <td className="p-3">
                             <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-black uppercase">
@@ -2172,6 +2605,24 @@ export default function Settings({
                               <td className="p-3">
                                 <p className="font-extrabold text-slate-900">{acc.name}</p>
                                 <p className="text-[10px] text-slate-400 font-mono">@{acc.username}</p>
+                                {acc.email && (
+                                  <p className="text-[10px] text-slate-500 mt-0.5">📧 {acc.email}</p>
+                                )}
+                                {acc.mobileNo && (
+                                  <p className="text-[10px] text-slate-500 mt-0.5">📞 {acc.mobileNo}</p>
+                                )}
+                                <div className="mt-1.5 flex items-center gap-1.5">
+                                  <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600">
+                                    🔑 ••••••••
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingAccount(acc)}
+                                    className="text-emerald-600 hover:text-emerald-700 text-[10px] font-black underline cursor-pointer hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all"
+                                  >
+                                    {language === 'en' ? 'Edit Details' : 'विवरण/शाखा संपादित करें'}
+                                  </button>
+                                </div>
                               </td>
                               <td className="p-3">
                                 <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${
@@ -2206,13 +2657,24 @@ export default function Settings({
                                 )}
                               </td>
                               <td className="p-3 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteRoleAccount(acc.id)}
-                                  className="text-rose-600 hover:text-rose-800 p-1 rounded-md hover:bg-rose-50 cursor-pointer animate-fadeIn"
-                                >
-                                  <Trash2 className="w-4 h-4 inline" />
-                                </button>
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingAccount(acc)}
+                                    className="text-emerald-600 hover:text-emerald-800 p-1 rounded-md hover:bg-emerald-50 cursor-pointer animate-fadeIn"
+                                    title={language === 'en' ? 'Edit Account' : 'खाता संपादित करें'}
+                                  >
+                                    <Edit2 className="w-4 h-4 inline" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteRoleAccount(acc.id)}
+                                    className="text-rose-600 hover:text-rose-800 p-1 rounded-md hover:bg-rose-50 cursor-pointer animate-fadeIn"
+                                    title={language === 'en' ? 'Delete Account' : 'खाता हटाएं'}
+                                  >
+                                    <Trash2 className="w-4 h-4 inline" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -2265,6 +2727,28 @@ export default function Settings({
                         onChange={(e) => setNewAccPassword(e.target.value)}
                         placeholder="hr1234"
                         className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Email ID' : 'ईमेल आईडी'}</label>
+                      <input
+                        type="email"
+                        value={newAccEmail}
+                        onChange={(e) => setNewAccEmail(e.target.value)}
+                        placeholder="rahul@rathi.com"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Mobile No.' : 'मोबाइल नंबर'}</label>
+                      <input
+                        type="text"
+                        value={newAccMobileNo}
+                        onChange={(e) => setNewAccMobileNo(e.target.value)}
+                        placeholder="9876543210"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
                       />
                     </div>
 
@@ -2535,6 +3019,175 @@ export default function Settings({
               * Note: Settings are synced locally for immediate response.
             </span>
           </div>
+
+          {/* Edit User Account Modal */}
+          {editingAccount && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+                {/* Modal Header */}
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50 rounded-t-2xl shrink-0">
+                  <h3 className="text-sm font-bold text-gray-900 font-display">
+                    {language === 'en' ? 'Edit User Account' : 'खाता विवरण व शाखा संपादित करें'}
+                  </h3>
+                  <button 
+                    onClick={() => setEditingAccount(null)}
+                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Modal Form */}
+                <div className="p-5 overflow-y-auto space-y-4 text-xs font-semibold">
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Full Name' : 'पूरा नाम'}</label>
+                    <input
+                      type="text"
+                      value={editingAccount.name}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, name: e.target.value })}
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Login Username' : 'लॉगिन आईडी (Username)'}</label>
+                    <input
+                      type="text"
+                      value={editingAccount.username}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, username: e.target.value })}
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Email ID' : 'ईमेल आईडी'}</label>
+                    <input
+                      type="email"
+                      value={editingAccount.email || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, email: e.target.value })}
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
+                      placeholder="example@rathi.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Mobile No.' : 'मोबाइल नंबर'}</label>
+                    <input
+                      type="text"
+                      value={editingAccount.mobileNo || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, mobileNo: e.target.value })}
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
+                      placeholder="9876543210"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Password' : 'पासवर्ड'}</label>
+                    <input
+                      type="text"
+                      value={editingAccount.password || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, password: e.target.value })}
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Assigned Role' : 'सौंपी गई भूमिका'}</label>
+                    <select
+                      value={editingAccount.role}
+                      onChange={(e: any) => {
+                        const r = e.target.value;
+                        setEditingAccount({
+                          ...editingAccount,
+                          role: r,
+                          branches: (r === 'branch_manager' || r === 'director' || r === 'sub_admin') ? (editingAccount.branches || []) : undefined,
+                          branch: (r === 'branch_manager' || r === 'director' || r === 'sub_admin') ? (editingAccount.branches?.[0] || '') : undefined
+                        });
+                      }}
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-slate-700"
+                    >
+                      <option value="admin">{language === 'en' ? 'System Admin (सह-प्रशासक)' : 'सिस्टम एडमिन (सह-प्रशासक)'}</option>
+                      <option value="director">{language === 'en' ? 'Director (डायरेक्टर)' : 'डायरेक्टर'}</option>
+                      <option value="sub_admin">{language === 'en' ? 'Sub Admin (सब एडमिन)' : 'सब एडमिन'}</option>
+                      <option value="hr">{language === 'en' ? 'HR Manager (एचआर मैनेजर)' : 'एचआर मैनेजर'}</option>
+                      <option value="branch_manager">{language === 'en' ? 'Branch Manager (ब्रांच मैनेजर)' : 'ब्रांच मैनेजर'}</option>
+                    </select>
+                  </div>
+
+                  {(editingAccount.role === 'branch_manager' || editingAccount.role === 'director' || editingAccount.role === 'sub_admin') && (
+                    <div className="space-y-2 border border-slate-100 p-2.5 rounded-lg bg-slate-50/50">
+                      <label className="block text-slate-600 font-bold">
+                        {language === 'en' ? 'Restricted Branches' : 'शाखा प्रतिबंध (चुनें)'}
+                      </label>
+                      
+                      <div className="max-h-28 overflow-y-auto space-y-1.5 p-1.5 bg-white border border-slate-200 rounded">
+                        {localSettings.branches.length === 0 ? (
+                          <p className="text-[10px] text-slate-400 italic p-1">No branches configured yet</p>
+                        ) : (
+                          localSettings.branches.map((br) => {
+                            const currentBranches = editingAccount.branches || [];
+                            const isChecked = currentBranches.includes(br);
+                            return (
+                              <label key={br} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer select-none text-[11px] font-medium text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    let updated;
+                                    if (isChecked) {
+                                      updated = currentBranches.filter(b => b !== br);
+                                    } else {
+                                      updated = [...currentBranches, br];
+                                    }
+                                    setEditingAccount({
+                                      ...editingAccount,
+                                      branches: updated,
+                                      branch: updated[0] || ''
+                                    });
+                                  }}
+                                  className="w-3.5 h-3.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+                                />
+                                <span>{br}</span>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Actions */}
+                <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setEditingAccount(null)}
+                    className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer"
+                  >
+                    {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editingAccount.name.trim() || !editingAccount.username.trim()) {
+                        alert(language === 'en' ? 'Name and username are required' : 'नाम और उपयोगकर्ता नाम आवश्यक हैं');
+                        return;
+                      }
+                      const updated = roleAccounts.map(acc => acc.id === editingAccount.id ? editingAccount : acc);
+                      setLocalSettings({
+                        ...localSettings,
+                        roleAccounts: updated
+                      });
+                      setEditingAccount(null);
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-white bg-[#03623c] hover:bg-[#024d2e] rounded-xl cursor-pointer"
+                  >
+                    {language === 'en' ? 'Save Changes' : 'बदलाव सहेजें'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>

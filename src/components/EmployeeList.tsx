@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders } from 'lucide-react';
 import { Employee, AdminSettings } from '../types';
 
 interface EmployeeListProps {
@@ -20,6 +20,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState<string>('Active');
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,6 +34,33 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     if (permissions.includes('employees')) return true;
     return permissions.includes(`employees:${action}`);
   };
+
+  // Column visibility options for directory
+  const ALL_COLUMNS = useMemo(() => [
+    { key: 'id', labelEn: 'Employee ID', labelHi: 'आईडी', default: true },
+    { key: 'name', labelEn: 'Name & Email', labelHi: 'नाम और ईमेल', default: true },
+    { key: 'role', labelEn: 'Role & Department', labelHi: 'पद और विभाग', default: true },
+    { key: 'joiningDate', labelEn: 'Joining Date', labelHi: 'ज्वाइनिंग तिथि', default: true },
+    { key: 'salary', labelEn: 'Monthly Salary', labelHi: 'मासिक वेतन', default: true },
+    { key: 'paymentMethod', labelEn: 'Payment Method', labelHi: 'भुगतान विधि', default: true },
+    { key: 'status', labelEn: 'Status', labelHi: 'स्थिति', default: true },
+    { key: 'mobileNo', labelEn: 'Mobile No', labelHi: 'मोबाइल नंबर', default: false },
+    { key: 'personalMobileNo', labelEn: 'Personal Mobile', labelHi: 'व्यक्तिगत मोबाइल', default: false },
+    { key: 'personalEmail', labelEn: 'Personal Email', labelHi: 'व्यक्तिगत ईमेल', default: false },
+    { key: 'dob', labelEn: 'Date of Birth (DOB)', labelHi: 'जन्म तिथि', default: false },
+    { key: 'gender', labelEn: 'Gender', labelHi: 'लिंग', default: false },
+    { key: 'bloodGroup', labelEn: 'Blood Group', labelHi: 'ब्लड ग्रुप', default: false },
+    { key: 'emergencyContactNo', labelEn: 'Emergency Contact', labelHi: 'आपातकालीन संपर्क', default: false },
+    { key: 'bankDetails', labelEn: 'Bank Account Details', labelHi: 'बैंक विवरण', default: false },
+    { key: 'identityDetails', labelEn: 'Aadhaar / PAN', labelHi: 'आधार / पैन कार्ड', default: false },
+    { key: 'pfEsicDetails', labelEn: 'PF / ESIC Account Numbers', labelHi: 'पीएफ / ईएसआईसी नंबर', default: false },
+    { key: 'geofenceBypass', labelEn: 'Geofence GPS Bypass', labelHi: 'जीपीएस बायपास स्थिति', default: false },
+  ], []);
+
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(
+    ALL_COLUMNS.filter(c => c.default).map(c => c.key)
+  );
+  const [showColumnDropdown, setShowColumnDropdown] = useState(false);
 
   // CSV Bulk Import States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -258,9 +286,12 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
       const matchesBranch = selectedBranch === 'All' || emp.branch === selectedBranch;
       const matchesEmployee = selectedEmployeeId === 'All' || emp.id === selectedEmployeeId;
-      return matchesSearch && matchesDept && matchesBranch && matchesEmployee;
+      const matchesStatus = selectedStatus === 'All' || 
+                            (selectedStatus === 'Active' && emp.isActive) || 
+                            (selectedStatus === 'Inactive' && !emp.isActive);
+      return matchesSearch && matchesDept && matchesBranch && matchesEmployee && matchesStatus;
     });
-  }, [employees, searchTerm, selectedDept, selectedBranch, selectedEmployeeId]);
+  }, [employees, searchTerm, selectedDept, selectedBranch, selectedEmployeeId, selectedStatus]);
 
   // Paginated Sliced list
   const paginatedEmployees = useMemo(() => {
@@ -344,6 +375,73 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       const paymentIdx = findIndex(['paymentmethod', 'payment', 'भुगतानकाप्रकार']);
       const activeIdx = findIndex(['isactive', 'active', 'सक्रिय']);
 
+      const firstNameIdx = findIndex(['firstname', 'first', 'पहलानाम']);
+      const lastNameIdx = findIndex(['lastname', 'last', 'अंतिमनाम']);
+      const emailIdx = findIndex(['email', 'emailid', 'ईमेल']);
+      const mobileNoIdx = findIndex(['mobileno', 'mobile', 'phone', 'phoneno', 'मोबाइल']);
+      const personalMobileNoIdx = findIndex(['personalmobileno', 'personalmobile', 'पर्सनलमोबाइल']);
+      const personalEmailIdx = findIndex(['personalemail', 'पर्सनलईमेल']);
+      const dobIdx = findIndex(['dob', 'dateofbirth', 'जन्मतिथि']);
+      const bloodGroupIdx = findIndex(['bloodgroup', 'blood', 'रक्तसमूह']);
+      const emergencyContactNoIdx = findIndex(['emergencycontactno', 'emergencycontact', 'आपातकालीनसंपर्क']);
+      const ctcOfferedIdx = findIndex(['ctcoffered', 'ctc', 'सीटीसी']);
+      const genderIdx = findIndex(['gender', 'sex', 'लिंग']);
+      const employmentTypeIdx = findIndex(['employmenttype', 'type', 'रोजगारकाप्रकार']);
+      const probationDateIdx = findIndex(['probationdate', 'probation', 'परिवीक्षाअवधि']);
+      
+      const resLine1Idx = findIndex(['resline1', 'residentialaddressline1', 'आवासीयपता१']);
+      const resLine2Idx = findIndex(['resline2', 'residentialaddressline2', 'आवासीयपता२']);
+      const resCountryIdx = findIndex(['rescountry', 'residentialcountry', 'देश']);
+      const resStateIdx = findIndex(['resstate', 'residentialstate', 'राज्य']);
+      const resCityIdx = findIndex(['rescity', 'residentialcity', 'शहर']);
+      const resPinCodeIdx = findIndex(['respincode', 'residentialpincode', 'पिनकोड']);
+      
+      const permLine1Idx = findIndex(['permline1', 'permanentaddressline1', 'स्थायीपता१']);
+      const permLine2Idx = findIndex(['permline2', 'permanentaddressline2', 'स्थायीपता२']);
+      const permCountryIdx = findIndex(['permcountry', 'permanentcountry']);
+      const permStateIdx = findIndex(['permstate', 'permanentstate']);
+      const permCityIdx = findIndex(['permcity', 'permanentcity']);
+      const permPinCodeIdx = findIndex(['permpincode', 'permanentpincode']);
+      
+      const bankAccountNoIdx = findIndex(['bankaccountno', 'accountno', 'bankaccount', 'खातासंख्या']);
+      const bankAccountHolderNameIdx = findIndex(['bankaccountholdername', 'accountholdername', 'खाताधारककानाम']);
+      const bankNameIdx = findIndex(['bankname', 'bank', 'बैंककानाम']);
+      const ifscCodeIdx = findIndex(['ifsccode', 'ifsc', 'आईएफएससी']);
+      
+      const panNoIdx = findIndex(['panno', 'pan', 'पैननंबर']);
+      const pfAccountNoIdx = findIndex(['pfaccountno', 'pfno', 'पीएफनंबर']);
+      const esicNoIdx = findIndex(['esicno', 'esic', 'ईएसआईसीनंबर']);
+      const aadhaarNoIdx = findIndex(['aadhaarno', 'aadhaar', 'आधारनंबर']);
+      const uanIdx = findIndex(['uan', 'यूएएन']);
+      
+      const confirmationDateIdx = findIndex(['confirmationdate', 'confirmation', 'पुष्टिथिति']);
+      const branchIdx = findIndex(['branch', 'शाखा']);
+      const costCenterIdx = findIndex(['costcenter', 'लागतकेंद्र']);
+      const reportingToIdx = findIndex(['reportingto', 'reportto', 'रिपोर्टिंगअधिकारी']);
+      const noticePeriodIdx = findIndex(['noticeperiod', 'नोटिसअवधि']);
+      const workTimingIdx = findIndex(['worktiming', 'कार्यसमय']);
+      const employeeGroupIdx = findIndex(['employeegroup', 'कर्मचारीसमूह']);
+      const weeklyOffProfileIdx = findIndex(['weeklyoffprofile', 'साप्ताहिकअवकाश']);
+      const leaveTypeIdx = findIndex(['leavetype', 'छुट्टीकाप्रकार']);
+      const referenceNumberIdx = findIndex(['referencenumber', 'reference', 'संदर्भसंख्या']);
+      const passwordIdx = findIndex(['password', 'pass', 'पासवर्ड']);
+
+      const hraIdx = findIndex(['hra', 'हाउसरेन्टअलाउंस']);
+      const daIdx = findIndex(['da', 'महंगाईभत्ता']);
+      const conveyanceAllowanceIdx = findIndex(['conveyanceallowance', 'conveyance', 'यातायातभत्ता']);
+      const advanceSalaryBalanceIdx = findIndex(['advancesalarybalance', 'advancebalance', 'ऋणशेष']);
+      const advanceSalaryDeductionIdx = findIndex(['advancesalarydeduction', 'advancededuction', 'ऋणकटौती']);
+      const clBalanceIdx = findIndex(['clbalance', 'cl', 'आकस्मिकअवकाशशेष']);
+      const elBalanceIdx = findIndex(['elbalance', 'el', 'अर्जितअवकाशशेष']);
+
+      const isPfApplicableIdx = findIndex(['ispfapplicable', 'pfapplicable']);
+      const isEsicApplicableIdx = findIndex(['isesicapplicable', 'esicapplicable']);
+      const isPtApplicableIdx = findIndex(['isptapplicable', 'ptapplicable']);
+      const isHraApplicableIdx = findIndex(['ishraapplicable', 'hraapplicable']);
+      const isDaApplicableIdx = findIndex(['isdaapplicable', 'daapplicable']);
+      const isConveyanceApplicableIdx = findIndex(['isconveyanceapplicable', 'conveyanceapplicable']);
+      const isPaidLeaveApplicableIdx = findIndex(['ispaidleaveapplicable', 'paidleaveapplicable']);
+
       if (idIdx === -1 || nameIdx === -1) {
         setImportErrors([t.invalidCsv]);
         setImportedEmployees([]);
@@ -358,18 +456,28 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
         const getVal = (idx: number, defVal = ''): string => {
           return idx !== -1 && idx < row.length ? row[idx] : defVal;
         };
+        const getFloat = (idx: number, defVal = 0): number => {
+          if (idx === -1 || idx >= row.length) return defVal;
+          const cleaned = row[idx].replace(/[^0-9.]/g, '');
+          return parseFloat(cleaned) || defVal;
+        };
+        const getBool = (idx: number, defVal = true): boolean => {
+          if (idx === -1 || idx >= row.length) return defVal;
+          const lower = row[idx].trim().toLowerCase();
+          return !(lower === 'false' || lower === '0' || lower === 'no' || lower === 'inactive' || lower === 'निष्क्रिय');
+        };
 
         const id = getVal(idIdx).trim();
         const name = getVal(nameIdx).trim();
         const departmentRaw = getVal(deptIdx, 'Engineering').trim();
         const designation = getVal(desigIdx, 'Staff').trim();
         let joiningDate = getVal(dateIdx).trim();
-        const basicSalary = parseFloat(getVal(salaryIdx, '0').replace(/[^0-9.]/g, '')) || 0;
-        const allowances = parseFloat(getVal(allowanceIdx, '0').replace(/[^0-9.]/g, '')) || 0;
-        const deductions = parseFloat(getVal(deductionIdx, '0').replace(/[^0-9.]/g, '')) || 0;
-        const hourlyRate = parseFloat(getVal(hourlyIdx, '0').replace(/[^0-9.]/g, '')) || 0;
+        const basicSalary = getFloat(salaryIdx, 25000);
+        const allowances = getFloat(allowanceIdx, 2000);
+        const deductions = getFloat(deductionIdx, 1000);
+        const hourlyRate = getFloat(hourlyIdx, 150);
         const paymentMethodRaw = getVal(paymentIdx, 'Bank Transfer').trim();
-        const isActiveRaw = getVal(activeIdx, 'true').trim().toLowerCase();
+        const isActive = getBool(activeIdx, true);
 
         if (!id) {
           tempErrors.push(`Row ${rowNum}: Missing Employee ID`);
@@ -424,8 +532,74 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
           paymentMethod = 'Cheque';
         }
 
-        // Validate isActive
-        const isActive = !(isActiveRaw === 'false' || isActiveRaw === '0' || isActiveRaw === 'no' || isActiveRaw === 'inactive' || isActiveRaw === 'निष्क्रिय');
+        const firstName = getVal(firstNameIdx).trim() || name.split(' ')[0] || '';
+        const lastName = getVal(lastNameIdx).trim() || name.split(' ').slice(1).join(' ') || '';
+        const email = getVal(emailIdx).trim();
+        const mobileNo = getVal(mobileNoIdx).trim();
+        const personalMobileNo = getVal(personalMobileNoIdx).trim();
+        const personalEmail = getVal(personalEmailIdx).trim();
+        const dob = getVal(dobIdx).trim();
+        const bloodGroup = getVal(bloodGroupIdx).trim();
+        const emergencyContactNo = getVal(emergencyContactNoIdx).trim();
+        const ctcOffered = getFloat(ctcOfferedIdx, basicSalary * 12);
+        const genderRaw = getVal(genderIdx, 'Male').trim();
+        const gender = (genderRaw.toLowerCase() === 'female' || genderRaw === 'महिला') ? 'Female' : (genderRaw.toLowerCase() === 'other' || genderRaw === 'अन्य') ? 'Other' : 'Male';
+        const employmentTypeRaw = getVal(employmentTypeIdx, 'Fresher').trim();
+        const employmentType = (employmentTypeRaw.toLowerCase() === 'experienced' || employmentTypeRaw === 'अनुभवी') ? 'Experienced' : 'Fresher';
+        const probationDate = getVal(probationDateIdx).trim();
+
+        const resLine1 = getVal(resLine1Idx).trim();
+        const resLine2 = getVal(resLine2Idx).trim();
+        const resCountry = getVal(resCountryIdx, 'India').trim();
+        const resState = getVal(resStateIdx, 'Karnataka').trim();
+        const resCity = getVal(resCityIdx).trim();
+        const resPinCode = getVal(resPinCodeIdx).trim();
+
+        const permLine1 = getVal(permLine1Idx).trim();
+        const permLine2 = getVal(permLine2Idx).trim();
+        const permCountry = getVal(permCountryIdx, 'India').trim();
+        const permState = getVal(permStateIdx, 'Karnataka').trim();
+        const permCity = getVal(permCityIdx).trim();
+        const permPinCode = getVal(permPinCodeIdx).trim();
+
+        const bankAccountNo = getVal(bankAccountNoIdx).trim();
+        const bankAccountHolderName = getVal(bankAccountHolderNameIdx).trim() || name;
+        const bankName = getVal(bankNameIdx).trim();
+        const ifscCode = getVal(ifscCodeIdx).trim();
+
+        const panNo = getVal(panNoIdx).trim();
+        const pfAccountNo = getVal(pfAccountNoIdx).trim();
+        const esicNo = getVal(esicNoIdx).trim();
+        const aadhaarNo = getVal(aadhaarNoIdx).trim();
+        const uan = getVal(uanIdx).trim();
+
+        const confirmationDate = getVal(confirmationDateIdx).trim();
+        const branch = getVal(branchIdx).trim();
+        const costCenter = getVal(costCenterIdx).trim();
+        const reportingTo = getVal(reportingToIdx).trim();
+        const noticePeriod = getVal(noticePeriodIdx).trim();
+        const workTiming = getVal(workTimingIdx).trim();
+        const employeeGroup = getVal(employeeGroupIdx).trim();
+        const weeklyOffProfile = getVal(weeklyOffProfileIdx).trim();
+        const leaveType = getVal(leaveTypeIdx).trim();
+        const referenceNumber = getVal(referenceNumberIdx).trim();
+        const password = getVal(passwordIdx).trim() || '123456';
+
+        const hra = getFloat(hraIdx, 0);
+        const da = getFloat(daIdx, 0);
+        const conveyanceAllowance = getFloat(conveyanceAllowanceIdx, 0);
+        const advanceSalaryBalance = getFloat(advanceSalaryBalanceIdx, 0);
+        const advanceSalaryDeduction = getFloat(advanceSalaryDeductionIdx, 0);
+        const clBalance = getFloat(clBalanceIdx, 12);
+        const elBalance = getFloat(elBalanceIdx, 15);
+
+        const isPfApplicable = getBool(isPfApplicableIdx, true);
+        const isEsicApplicable = getBool(isEsicApplicableIdx, true);
+        const isPtApplicable = getBool(isPtApplicableIdx, true);
+        const isHraApplicable = getBool(isHraApplicableIdx, true);
+        const isDaApplicable = getBool(isDaApplicableIdx, true);
+        const isConveyanceApplicable = getBool(isConveyanceApplicableIdx, true);
+        const isPaidLeaveApplicable = getBool(isPaidLeaveApplicableIdx, true);
 
         tempEmployees.push({
           id,
@@ -438,7 +612,74 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
           deductions,
           hourlyRate,
           paymentMethod,
-          isActive
+          isActive,
+
+          firstName,
+          lastName,
+          email,
+          mobileNo,
+          personalMobileNo,
+          personalEmail,
+          dob,
+          bloodGroup,
+          emergencyContactNo,
+          ctcOffered,
+          gender,
+          employmentType,
+          probationDate,
+
+          resLine1,
+          resLine2,
+          resCountry,
+          resState,
+          resCity,
+          resPinCode,
+
+          permLine1,
+          permLine2,
+          permCountry,
+          permState,
+          permCity,
+          permPinCode,
+
+          bankAccountNo,
+          bankAccountHolderName,
+          bankName,
+          ifscCode,
+
+          panNo,
+          pfAccountNo,
+          esicNo,
+          aadhaarNo,
+          uan,
+
+          confirmationDate,
+          branch,
+          costCenter,
+          reportingTo,
+          noticePeriod,
+          workTiming,
+          employeeGroup,
+          weeklyOffProfile,
+          leaveType,
+          referenceNumber,
+          password,
+
+          hra,
+          da,
+          conveyanceAllowance,
+          advanceSalaryBalance,
+          advanceSalaryDeduction,
+          clBalance,
+          elBalance,
+
+          isPfApplicable,
+          isEsicApplicable,
+          isPtApplicable,
+          isHraApplicable,
+          isDaApplicable,
+          isConveyanceApplicable,
+          isPaidLeaveApplicable
         });
       });
 
@@ -488,12 +729,88 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       'Deductions',
       'Overtime Hourly Rate',
       'Payment Method',
-      'Is Active'
+      'Is Active',
+      'First Name',
+      'Last Name',
+      'Email',
+      'Mobile No',
+      'Personal Mobile No',
+      'Personal Email',
+      'DOB (YYYY-MM-DD)',
+      'Blood Group',
+      'Emergency Contact No',
+      'CTC Offered',
+      'Gender',
+      'Employment Type',
+      'Probation Date (YYYY-MM-DD)',
+      'Res Line 1',
+      'Res Line 2',
+      'Res Country',
+      'Res State',
+      'Res City',
+      'Res Pin Code',
+      'Perm Line 1',
+      'Perm Line 2',
+      'Perm Country',
+      'Perm State',
+      'Perm City',
+      'Perm Pin Code',
+      'Bank Account No',
+      'Bank Account Holder Name',
+      'Bank Name',
+      'IFSC Code',
+      'PAN No',
+      'PF Account No',
+      'ESIC No',
+      'Aadhaar No',
+      'UAN',
+      'Confirmation Date (YYYY-MM-DD)',
+      'Branch',
+      'Cost Center',
+      'Reporting To',
+      'Notice Period',
+      'Work Timing',
+      'Employee Group',
+      'Weekly Off Profile',
+      'Leave Type',
+      'Reference Number',
+      'Password',
+      'HRA',
+      'DA',
+      'Conveyance Allowance',
+      'Advance Salary Balance',
+      'Advance Salary Deduction',
+      'CL Balance',
+      'EL Balance',
+      'Is PF Applicable',
+      'Is ESIC Applicable',
+      'Is PT Applicable',
+      'Is HRA Applicable',
+      'Is DA Applicable',
+      'Is Conveyance Applicable',
+      'Is Paid Leave Applicable'
     ];
     const sampleRows = [
-      ['EMP004', 'Vikram Singh', 'Engineering', 'Software Architect', '2026-03-01', '65000', '5000', '2000', '250', 'Bank Transfer', 'true'],
-      ['EMP005', 'Meera Nair', 'Human Resources', 'HR Manager', '2026-04-15', '45000', '3000', '1500', '180', 'Bank Transfer', 'true'],
-      ['EMP006', 'Karan Johar', 'Sales', 'Sales Agent', '2026-05-10', '20000', '4000', '1000', '120', 'Cash', 'true']
+      [
+        'EMP004', 'Vikram Singh', 'Engineering', 'Software Architect', '2026-03-01', '65000', '5000', '2000', '250', 'Bank Transfer', 'true',
+        'Vikram', 'Singh', 'vikram@example.com', '9876543210', '9876543211', 'vikram.personal@example.com', '1992-05-15', 'O+', '9876543212', '840000',
+        'Male', 'Experienced', '2026-06-01', 'Flat 402, Green Glen Layout', 'Outer Ring Road', 'India', 'Karnataka', 'Bangalore', '560103',
+        'Flat 402, Green Glen Layout', 'Outer Ring Road', 'India', 'Karnataka', 'Bangalore', '560103',
+        '1234567890', 'Vikram Singh', 'HDFC Bank', 'HDFC0000123', 'ABCDE1234F', 'PF-12345', 'ESIC-12345', '123456789012', '100123456789',
+        '2026-09-01', 'Bangalore HQ', 'CC-Engineering', 'Reporting Officer Name', '90 Days', '9 AM - 6 PM', 'Staff', 'Sunday Off', 'Sick/Casual', 'REF123',
+        'vikram123', '10000', '5000', '1600', '0', '0', '12', '15',
+        'true', 'true', 'true', 'true', 'true', 'true', 'true'
+      ],
+      [
+        'EMP005', 'Meera Nair', 'Human Resources', 'HR Manager', '2026-04-15', '45000', '3000', '1500', '180', 'Bank Transfer', 'true',
+        'Meera', 'Nair', 'meera@example.com', '9876543220', '9876543221', 'meera.personal@example.com', '1995-08-20', 'A+', '9876543222', '576000',
+        'Female', 'Experienced', '2026-07-15', 'Apt 101, Serene Enclave', 'Whitefield', 'India', 'Karnataka', 'Bangalore', '560066',
+        'Apt 101, Serene Enclave', 'Whitefield', 'India', 'Karnataka', 'Bangalore', '560066',
+        '0987654321', 'Meera Nair', 'ICICI Bank', 'ICIC0000456', 'XYZW9876K', 'PF-67890', 'ESIC-67890', '987654321098', '100987654321',
+        '2026-10-15', 'Bangalore HQ', 'CC-HR', 'Reporting Officer Name', '30 Days', '9:30 AM - 6:30 PM', 'Staff', 'Sunday Off', 'Sick/Casual', 'REF456',
+        'meera123', '8000', '4000', '1600', '0', '0', '12', '15',
+        'true', 'true', 'true', 'true', 'true', 'true', 'true'
+      ]
     ];
 
     const csvContent = [
@@ -567,6 +884,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       isDaApplicable: true,
       isConveyanceApplicable: true,
       isPaidLeaveApplicable: true,
+      disableGeofencing: false,
 
       firstName: '',
       lastName: '',
@@ -653,6 +971,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       isDaApplicable: emp.isDaApplicable !== false,
       isConveyanceApplicable: emp.isConveyanceApplicable !== false,
       isPaidLeaveApplicable: emp.isPaidLeaveApplicable !== false,
+      disableGeofencing: !!emp.disableGeofencing,
 
       firstName: emp.firstName || '',
       lastName: emp.lastName || '',
@@ -951,32 +1270,122 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
               ))}
             </select>
           </div>
+
+          {/* Active Status Filter */}
+          <div className="relative flex-1 min-w-[150px]">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+              <UserCheck className="w-4 h-4" />
+            </span>
+            <select
+              value={selectedStatus}
+              onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
+              id="status-filter"
+            >
+              <option value="Active">{language === 'en' ? 'Active Employees' : 'सक्रिय कर्मचारी'}</option>
+              <option value="Inactive">{language === 'en' ? 'Left / Inactive' : 'छोड़ चुके / निष्क्रिय'}</option>
+              <option value="All">{language === 'en' ? 'All (Active & Left)' : 'सभी (सक्रिय और निष्क्रिय)'}</option>
+            </select>
+          </div>
         </div>
 
         {/* Action Buttons */}
-        {hasPermission('add') && (
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Bulk Import Button */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Column Visibility Selector Button with Popover */}
+          <div className="relative">
             <button
-              onClick={() => setIsImportModalOpen(true)}
+              onClick={() => setShowColumnDropdown(!showColumnDropdown)}
               className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-              id="btn-bulk-import-trigger"
+              type="button"
+              id="btn-column-selector"
             >
-              <Upload className="w-4 h-4 text-gray-500" />
-              {t.bulkImportBtn}
+              <Sliders className="w-4 h-4 text-[#03623c]" />
+              <span>{language === 'en' ? 'Columns' : 'कॉलम चुनें'}</span>
+              <span className="bg-emerald-50 text-[#03623c] font-bold text-[10px] px-1.5 py-0.2 rounded-full border border-emerald-100">
+                {visibleColumns.length}
+              </span>
             </button>
 
-            {/* Add Employee Button */}
-            <button
-              onClick={openAddModal}
-              className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-              id="btn-add-emp"
-            >
-              <Plus className="w-4 h-4" />
-              {t.addBtn}
-            </button>
+            {showColumnDropdown && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setShowColumnDropdown(false)}
+                />
+                <div className="absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-20 p-3 space-y-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                      {language === 'en' ? 'Show / Hide Columns' : 'कॉलम दिखाएं या छिपाएं'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        // Reset to default columns
+                        setVisibleColumns(ALL_COLUMNS.filter(c => c.default).map(c => c.key));
+                      }}
+                      className="text-[10px] text-blue-600 hover:underline font-bold"
+                    >
+                      {language === 'en' ? 'Reset' : 'रीसेट करें'}
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {ALL_COLUMNS.map(col => {
+                      const isVisible = visibleColumns.includes(col.key);
+                      return (
+                        <label 
+                          key={col.key} 
+                          className={`flex items-center gap-2.5 p-1.5 rounded-lg cursor-pointer transition-colors text-xs font-semibold ${
+                            isVisible ? 'bg-emerald-50/40 text-slate-800' : 'text-slate-500 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isVisible}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setVisibleColumns([...visibleColumns, col.key]);
+                              } else {
+                                // Keep at least one column visible to avoid completely empty table
+                                if (visibleColumns.length > 1) {
+                                  setVisibleColumns(visibleColumns.filter(k => k !== col.key));
+                                }
+                              }
+                            }}
+                            className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
+                          />
+                          <span>{language === 'en' ? col.labelEn : col.labelHi}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        )}
+
+          {hasPermission('add') && (
+            <>
+              {/* Bulk Import Button */}
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
+                id="btn-bulk-import-trigger"
+              >
+                <Upload className="w-4 h-4 text-gray-500" />
+                {t.bulkImportBtn}
+              </button>
+
+              {/* Add Employee Button */}
+              <button
+                onClick={openAddModal}
+                className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
+                id="btn-add-emp"
+              >
+                <Plus className="w-4 h-4" />
+                {t.addBtn}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Employees Table */}
@@ -986,69 +1395,176 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  <th className="py-4 px-6">{t.colId}</th>
-                  <th className="py-4 px-6">{t.colName}</th>
-                  <th className="py-4 px-6">{t.colRole}</th>
-                  <th className="py-4 px-6">{t.colJoining}</th>
-                  <th className="py-4 px-6">{t.colSalary}</th>
-                  <th className="py-4 px-6">{t.colPayment}</th>
-                  <th className="py-4 px-6 text-center">{t.colStatus}</th>
+                  {visibleColumns.includes('id') && <th className="py-4 px-6">{t.colId}</th>}
+                  {visibleColumns.includes('name') && <th className="py-4 px-6">{t.colName}</th>}
+                  {visibleColumns.includes('role') && <th className="py-4 px-6">{t.colRole}</th>}
+                  {visibleColumns.includes('joiningDate') && <th className="py-4 px-6">{t.colJoining}</th>}
+                  {visibleColumns.includes('salary') && <th className="py-4 px-6">{t.colSalary}</th>}
+                  {visibleColumns.includes('paymentMethod') && <th className="py-4 px-6">{t.colPayment}</th>}
+                  {visibleColumns.includes('status') && <th className="py-4 px-6 text-center">{t.colStatus}</th>}
+                  
+                  {/* Optional Custom Columns Headers */}
+                  {visibleColumns.includes('mobileNo') && <th className="py-4 px-6">{language === 'en' ? 'Mobile No' : 'मोबाइल नंबर'}</th>}
+                  {visibleColumns.includes('personalMobileNo') && <th className="py-4 px-6">{language === 'en' ? 'Personal Mobile' : 'व्यक्तिगत मोबाइल'}</th>}
+                  {visibleColumns.includes('personalEmail') && <th className="py-4 px-6">{language === 'en' ? 'Personal Email' : 'व्यक्तिगत ईमेल'}</th>}
+                  {visibleColumns.includes('dob') && <th className="py-4 px-6">{language === 'en' ? 'DOB' : 'जन्म तिथि'}</th>}
+                  {visibleColumns.includes('gender') && <th className="py-4 px-6">{language === 'en' ? 'Gender' : 'लिंग'}</th>}
+                  {visibleColumns.includes('bloodGroup') && <th className="py-4 px-6">{language === 'en' ? 'Blood Group' : 'ब्लड ग्रुप'}</th>}
+                  {visibleColumns.includes('emergencyContactNo') && <th className="py-4 px-6">{language === 'en' ? 'Emergency Contact' : 'आपातकालीन संपर्क'}</th>}
+                  {visibleColumns.includes('bankDetails') && <th className="py-4 px-6">{language === 'en' ? 'Bank Details' : 'बैंक विवरण'}</th>}
+                  {visibleColumns.includes('identityDetails') && <th className="py-4 px-6">{language === 'en' ? 'Govt IDs' : 'पहचान पत्र'}</th>}
+                  {visibleColumns.includes('pfEsicDetails') && <th className="py-4 px-6">{language === 'en' ? 'PF & ESIC' : 'पीएफ और ईएसआईसी'}</th>}
+                  {visibleColumns.includes('geofenceBypass') && <th className="py-4 px-6 text-center">{language === 'en' ? 'GPS Bypass' : 'जीपीएस बायपास'}</th>}
+                  
                   <th className="py-4 px-6 text-right">{t.colActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-sm">
                 {paginatedEmployees.map((emp) => (
                   <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-4 px-6 font-mono text-xs text-gray-500 font-semibold">{emp.id}</td>
-                    <td className="py-4 px-6 font-semibold text-gray-900">
-                      <div className="flex items-center gap-3">
-                        {emp.photoUrl ? (
-                          <img 
-                            src={emp.photoUrl} 
-                            alt={emp.name} 
-                            className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#03623c] flex items-center justify-center font-bold text-xs shrink-0 uppercase">
-                            {emp.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                    {visibleColumns.includes('id') && <td className="py-4 px-6 font-mono text-xs text-gray-500 font-semibold">{emp.id}</td>}
+                    {visibleColumns.includes('name') && (
+                      <td className="py-4 px-6 font-semibold text-gray-900">
+                        <div className="flex items-center gap-3">
+                          {emp.photoUrl ? (
+                            <img 
+                              src={emp.photoUrl} 
+                              alt={emp.name} 
+                              className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#03623c] flex items-center justify-center font-bold text-xs shrink-0 uppercase">
+                              {emp.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-semibold text-gray-900 leading-tight">{emp.name}</div>
+                            {emp.email && <div className="text-[10px] text-gray-400 font-normal mt-0.5 normal-case">{emp.email}</div>}
                           </div>
-                        )}
-                        <div>
-                          <div className="font-semibold text-gray-900 leading-tight">{emp.name}</div>
-                          {emp.email && <div className="text-[10px] text-gray-400 font-normal mt-0.5 normal-case">{emp.email}</div>}
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div>
-                        <div className="font-semibold text-gray-800 leading-tight">{emp.designation}</div>
-                        <div className="text-xs text-gray-400 font-medium">{emp.department}</div>
-                        {emp.branch && <div className="text-[10px] text-[#03623c] font-bold mt-0.5">{emp.branch}</div>}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-gray-500 font-mono text-xs">
-                      {new Date(emp.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="font-semibold text-gray-800">₹{emp.basicSalary.toLocaleString('en-IN')}</div>
-                      <div className="text-xxs text-gray-400">₹{emp.allowances} (Allowance) / -₹{emp.deductions} (Deduct)</div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        <CreditCard className="w-3.5 h-3.5" />
-                        {emp.paymentMethod}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-center">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        emp.isActive 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {emp.isActive ? t.active : t.inactive}
-                      </span>
-                    </td>
+                      </td>
+                    )}
+                    {visibleColumns.includes('role') && (
+                      <td className="py-4 px-6">
+                        <div>
+                          <div className="font-semibold text-gray-800 leading-tight">{emp.designation}</div>
+                          <div className="text-xs text-gray-400 font-medium">{emp.department}</div>
+                          {emp.branch && <div className="text-[10px] text-[#03623c] font-bold mt-0.5">{emp.branch}</div>}
+                        </div>
+                      </td>
+                    )}
+                    {visibleColumns.includes('joiningDate') && (
+                      <td className="py-4 px-6 text-gray-500 font-mono text-xs">
+                        {new Date(emp.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                    )}
+                    {visibleColumns.includes('salary') && (
+                      <td className="py-4 px-6">
+                        <div className="font-semibold text-gray-800">₹{emp.basicSalary.toLocaleString('en-IN')}</div>
+                        <div className="text-xxs text-gray-400">₹{emp.allowances} (Allowance) / -₹{emp.deductions} (Deduct)</div>
+                      </td>
+                    )}
+                    {visibleColumns.includes('paymentMethod') && (
+                      <td className="py-4 px-6">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          <CreditCard className="w-3.5 h-3.5" />
+                          {emp.paymentMethod}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.includes('status') && (
+                      <td className="py-4 px-6 text-center">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          emp.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {emp.isActive ? t.active : t.inactive}
+                        </span>
+                      </td>
+                    )}
+
+                    {/* Optional Custom Columns Cells */}
+                    {visibleColumns.includes('mobileNo') && (
+                      <td className="py-4 px-6 font-mono text-xs text-gray-700">
+                        {emp.mobileNo || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('personalMobileNo') && (
+                      <td className="py-4 px-6 font-mono text-xs text-gray-700">
+                        {emp.personalMobileNo || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('personalEmail') && (
+                      <td className="py-4 px-6 text-xs text-gray-700 normal-case">
+                        {emp.personalEmail || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('dob') && (
+                      <td className="py-4 px-6 font-mono text-xs text-gray-700">
+                        {emp.dob ? new Date(emp.dob).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('gender') && (
+                      <td className="py-4 px-6 text-xs text-gray-700">
+                        {emp.gender || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('bloodGroup') && (
+                      <td className="py-4 px-6 font-mono text-xs text-gray-700 font-bold text-rose-700">
+                        {emp.bloodGroup || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('emergencyContactNo') && (
+                      <td className="py-4 px-6 font-mono text-xs text-gray-700">
+                        {emp.emergencyContactNo || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('bankDetails') && (
+                      <td className="py-4 px-6 text-xs text-gray-700 leading-snug">
+                        {emp.bankAccountNo ? (
+                          <div>
+                            <div className="font-bold">{emp.bankName}</div>
+                            <div className="font-mono text-[10px]">A/C: {emp.bankAccountNo}</div>
+                            <div className="font-mono text-[10px] text-gray-400">IFSC: {emp.ifscCode}</div>
+                          </div>
+                        ) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('identityDetails') && (
+                      <td className="py-4 px-6 text-xs text-gray-700 leading-snug">
+                        {(emp.aadhaarNo || emp.panNo) ? (
+                          <div>
+                            {emp.aadhaarNo && <div><span className="font-bold text-gray-500 text-[10px]">ADR:</span> <span className="font-mono">{emp.aadhaarNo}</span></div>}
+                            {emp.panNo && <div><span className="font-bold text-gray-500 text-[10px]">PAN:</span> <span className="font-mono uppercase">{emp.panNo}</span></div>}
+                          </div>
+                        ) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('pfEsicDetails') && (
+                      <td className="py-4 px-6 text-xs text-gray-700 leading-snug">
+                        {(emp.pfAccountNo || emp.esicNo || emp.uan) ? (
+                          <div>
+                            {emp.pfAccountNo && <div><span className="font-bold text-gray-500 text-[10px]">PF:</span> <span className="font-mono">{emp.pfAccountNo}</span></div>}
+                            {emp.esicNo && <div><span className="font-bold text-gray-500 text-[10px]">ESIC:</span> <span className="font-mono">{emp.esicNo}</span></div>}
+                            {emp.uan && <div><span className="font-bold text-gray-500 text-[10px]">UAN:</span> <span className="font-mono">{emp.uan}</span></div>}
+                          </div>
+                        ) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.includes('geofenceBypass') && (
+                      <td className="py-4 px-6 text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                          emp.disableGeofencing 
+                            ? 'bg-amber-100 text-amber-800' 
+                            : 'bg-slate-100 text-slate-800'
+                        }`}>
+                          {emp.disableGeofencing ? (language === 'en' ? 'Bypassed' : 'बायपास') : (language === 'en' ? 'Enforced' : 'लागू')}
+                        </span>
+                      </td>
+                    )}
+
                     <td className="py-4 px-6 text-right">
                       <div className="flex justify-end gap-2">
                         {hasPermission('edit') && (
@@ -1441,6 +1957,20 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                           <div>
                             <span className="block text-[11px] text-gray-800 font-bold">Paid Leave Policy (सवैतनिक अवकाश नियम)</span>
                             <span className="text-[9px] text-gray-400 font-medium">Earned Leave Credit & Status</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-amber-50/50 hover:bg-amber-100/30 border border-amber-200/50 rounded-lg cursor-pointer transition-colors sm:col-span-2">
+                          <input 
+                            type="checkbox"
+                            name="disableGeofencing"
+                            checked={!!formData.disableGeofencing}
+                            onChange={handleInputChange}
+                            className="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500 border-amber-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-amber-950 font-bold">Bypass Geofencing Check (जीपीएस वेरिफिकेशन बायपास करें)</span>
+                            <span className="text-[9px] text-amber-700 font-medium">Allows this employee to punch attendance from any location/any branch</span>
                           </div>
                         </label>
                       </div>

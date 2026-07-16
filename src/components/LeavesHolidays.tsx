@@ -14,6 +14,7 @@ interface LeavesHolidaysProps {
   employeeId?: string;
   adminSettings?: AdminSettings;
   onUpdateSettings?: (updated: AdminSettings) => Promise<void> | void;
+  portalUser?: any;
 }
 
 // Current year helper
@@ -119,8 +120,17 @@ export default function LeavesHolidays({
   isEmployeeView = false, 
   employeeId,
   adminSettings,
-  onUpdateSettings
+  onUpdateSettings,
+  portalUser
 }: LeavesHolidaysProps) {
+  const hasPermission = (action: 'view' | 'add' | 'edit' | 'delete') => {
+    if (!portalUser) return true;
+    if (portalUser.role === 'admin') return true;
+    const permissions = adminSettings?.rolePermissions?.[portalUser.role] || [];
+    if (permissions.includes('leaves')) return true;
+    return permissions.includes(`leaves:${action}`);
+  };
+
   const [subTab, setSubTab] = useState<'balance' | 'calendar'>('balance');
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All');
@@ -173,6 +183,10 @@ export default function LeavesHolidays({
   };
 
   const handleOpenAddHolidayModal = () => {
+    if (!hasPermission('add')) {
+      alert(language === 'en' ? 'You do not have permission to add holidays.' : 'आपके पास अवकाश जोड़ने की अनुमति नहीं है।');
+      return;
+    }
     setEditingHolidayIndex(null);
     setHolidayOccasion('');
     setHolidayHindiOccasion('');
@@ -186,6 +200,10 @@ export default function LeavesHolidays({
   };
 
   const handleOpenEditHolidayModal = (h: Holiday, index: number) => {
+    if (!hasPermission('edit')) {
+      alert(language === 'en' ? 'You do not have permission to edit holidays.' : 'आपके पास अवकाश संशोधित करने की अनुमति नहीं है।');
+      return;
+    }
     setEditingHolidayIndex(index);
     setHolidayOccasion(h.occasion);
     setHolidayHindiOccasion(h.hindiOccasion);
@@ -223,6 +241,10 @@ export default function LeavesHolidays({
   };
 
   const handleDeleteHoliday = (indexToDelete: number) => {
+    if (!hasPermission('delete')) {
+      alert(language === 'en' ? 'You do not have permission to delete holidays.' : 'आपके पास अवकाश हटाने की अनुमति नहीं है।');
+      return;
+    }
     if (window.confirm(language === 'en' ? 'Are you sure you want to delete this holiday?' : 'क्या आप वाकई इस छुट्टी को हटाना चाहते हैं?')) {
       const updatedList = holidays.filter((_, idx) => idx !== indexToDelete);
       handleSaveHolidaysList(updatedList);

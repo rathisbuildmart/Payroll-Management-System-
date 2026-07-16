@@ -1,6 +1,6 @@
 {
   "name": "Payroll Management System",
   "description": "Employee salary calculation and attendance tracking system with Google Sheets and Google Drive persistence.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
