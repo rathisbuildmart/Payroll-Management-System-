@@ -3,7 +3,8 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieC
 import { 
   Users, Calendar, CreditCard, CheckCircle, TrendingUp, Briefcase, 
   Sparkles, Filter, ArrowRight, DollarSign, Activity, FileSpreadsheet, 
-  Clock, AlertTriangle, ChevronRight, PieChart as PieIcon, Award
+  Clock, AlertTriangle, ChevronRight, PieChart as PieIcon, Award,
+  Bell, KeyRound, LifeBuoy, CheckCircle2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Employee, Attendance, PayrollRecord } from '../types';
@@ -13,10 +14,22 @@ interface DashboardProps {
   attendance: Attendance[];
   payroll: PayrollRecord[];
   language: 'en' | 'hi';
-  onNavigate?: (tab: 'dashboard' | 'employees' | 'attendance' | 'payroll') => void;
+  onNavigate?: (tab: 'dashboard' | 'employees' | 'attendance' | 'payroll' | 'notices_support' | 'admin') => void;
+  passwordRequests?: any[];
+  hrTickets?: any[];
+  onNavigateNoticeSubTab?: (subTab: 'passwords' | 'tickets' | 'notices') => void;
 }
 
-export default function Dashboard({ employees, attendance, payroll, language, onNavigate }: DashboardProps) {
+export default function Dashboard({ 
+  employees, 
+  attendance, 
+  payroll, 
+  language, 
+  onNavigate,
+  passwordRequests = [],
+  hrTickets = [],
+  onNavigateNoticeSubTab
+}: DashboardProps) {
   // Format current month string (YYYY-MM) in local timezone to avoid offset issues
   const currentMonthStr = useMemo(() => {
     const d = new Date();
@@ -38,6 +51,16 @@ export default function Dashboard({ employees, attendance, payroll, language, on
   const [selectedDept, setSelectedDept] = useState<string>('All');
   const [selectedBranch, setSelectedBranch] = useState<string>('All');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('All');
+
+  const pendingPasswordReqs = useMemo(() => {
+    return (passwordRequests || []).filter((r: any) => r.status === 'Pending');
+  }, [passwordRequests]);
+
+  const pendingHrTkts = useMemo(() => {
+    return (hrTickets || []).filter((r: any) => r.status === 'Pending');
+  }, [hrTickets]);
+
+  const totalPending = pendingPasswordReqs.length + pendingHrTkts.length;
 
   // List of unique months available in system
   const monthOptions = useMemo(() => {
@@ -410,6 +433,58 @@ export default function Dashboard({ employees, attendance, payroll, language, on
           </div>
         </div>
       </div>
+
+      {/* PENDING ITEMS CONSOLIDATED SUMMARY CARD */}
+      {totalPending > 0 && (
+        <div 
+          style={{ borderRadius: '14px' }}
+          className="bg-amber-50 border border-amber-200/80 p-3.5 shadow-3xs relative overflow-hidden text-slate-800"
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 text-amber-700 rounded-lg shrink-0 animate-pulse">
+                <Bell className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-xs font-black tracking-tight text-slate-900 uppercase">
+                    {language === 'en' ? 'Urgent Actions Required' : 'त्वरित कार्रवाई आवश्यक'}
+                  </h3>
+                  <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-2 py-0.25 rounded-md font-mono animate-bounce">
+                    {totalPending} {language === 'en' ? 'Pending' : 'लंबित'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 font-semibold leading-none mt-0.5 hidden md:block">
+                  {language === 'en' 
+                    ? `There are unresolved employee login password requests and HR Helpdesk support tickets awaiting your action.`
+                    : `आपके एक्शन की प्रतीक्षा कर रहे कर्मचारियों के पासवर्ड रीसेट अनुरोध और एचआर सहायता टिकट लंबित हैं।`}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap gap-2 shrink-0 items-center">
+              {pendingPasswordReqs.length > 0 && (
+                <button
+                  onClick={() => onNavigateNoticeSubTab?.('passwords')}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black px-3 py-1.5 rounded-lg transition-all shadow-3xs flex items-center gap-1.5 uppercase tracking-wider cursor-pointer"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>{language === 'en' ? 'Reset Passwords' : 'पासवर्ड रीसेट'} ({pendingPasswordReqs.length})</span>
+                </button>
+              )}
+              {pendingHrTkts.length > 0 && (
+                <button
+                  onClick={() => onNavigateNoticeSubTab?.('tickets')}
+                  className="bg-[#03623c] hover:bg-[#02492d] text-white text-[10px] font-black px-3 py-1.5 rounded-lg transition-all shadow-3xs flex items-center gap-1.5 uppercase tracking-wider cursor-pointer"
+                >
+                  <LifeBuoy className="w-3.5 h-3.5" />
+                  <span>{language === 'en' ? 'Manage Tickets' : 'टिकट प्रबंधित करें'} ({pendingHrTkts.length})</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bento Grid layout with stagger */}
       <motion.div 

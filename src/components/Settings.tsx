@@ -29,7 +29,9 @@ import {
   Edit2, 
   X,
   MapPin,
-  Locate
+  Locate,
+  Mail,
+  Send
 } from 'lucide-react';
 import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog } from '../types';
 
@@ -181,7 +183,13 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   },
   enableEmployeePayslips: false,
   enableGeofencing: false,
-  enableMobileAttendance: false
+  enableMobileAttendance: false,
+  smtpHost: 'smtp.gmail.com',
+  smtpPort: 587,
+  smtpUsername: 'misrpr@rathibuildmart.com',
+  smtpPassword: '',
+  senderName: 'Rathi LMS System',
+  senderEmail: 'rbmlms@rathibuildmart.com'
 };
 
 export default function Settings({ 
@@ -205,7 +213,7 @@ export default function Settings({
   onClearAuditLogs,
   portalUser
 }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'notices_support' | 'database' | 'roles_permissions' | 'audit_logs'>('company');
+  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'roles_permissions' | 'audit_logs' | 'email_smtp'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
   
   // User Roles & Access states
@@ -227,6 +235,11 @@ export default function Settings({
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
+
+  // SMTP Tester states
+  const [testRecipient, setTestRecipient] = useState('');
+  const [isTestingSmtp, setIsTestingSmtp] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Geofencing Outlet Registration States
   const [newOutletName, setNewOutletName] = useState('');
@@ -421,6 +434,7 @@ export default function Settings({
       tabSecurity: "Login Security Audit",
       tabNoticesSupport: "Notices & HR Helpdesk",
       tabDatabase: "Database & Backups",
+      tabEmailSmtp: "SMTP Email Settings",
       
       // Company
       compName: "Company Name",
@@ -494,6 +508,7 @@ export default function Settings({
       tabSecurity: "लॉगिन सुरक्षा ऑडिट",
       tabNoticesSupport: "कंपनी नोटिस और हेल्पडेस्क",
       tabDatabase: "डेटाबेस और बैकअप",
+      tabEmailSmtp: "ईमेल और SMTP सेटिंग्स",
       
       // Company
       compName: "कंपनी का नाम",
@@ -787,6 +802,69 @@ export default function Settings({
     setEditingAccountPassword('');
   };
 
+  const handleResetSmtpToDefaults = () => {
+    setLocalSettings({
+      ...localSettings,
+      smtpHost: 'smtp.gmail.com',
+      smtpPort: 587,
+      smtpUsername: 'misrpr@rathibuildmart.com',
+      smtpPassword: '',
+      senderName: 'Rathi LMS System',
+      senderEmail: 'rbmlms@rathibuildmart.com'
+    });
+  };
+
+  const handleTestSmtp = async () => {
+    if (!testRecipient.trim()) {
+      alert(language === 'en' ? "Please enter a valid recipient email address!" : "कृपया एक मान्य प्राप्तकर्ता ईमेल पता दर्ज करें!");
+      return;
+    }
+    
+    setIsTestingSmtp(true);
+    setTestResult(null);
+    
+    try {
+      const response = await fetch('/api/test-smtp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          recipient: testRecipient.trim(),
+          smtpHost: localSettings.smtpHost || '',
+          smtpPort: Number(localSettings.smtpPort || 587),
+          smtpUsername: localSettings.smtpUsername || '',
+          smtpPassword: localSettings.smtpPassword || '',
+          senderName: localSettings.senderName || '',
+          senderEmail: localSettings.senderEmail || '',
+          language
+        })
+      });
+      
+      const resData = await response.json();
+      if (resData.success) {
+        setTestResult({
+          success: true,
+          message: language === 'en' 
+            ? `Live SMTP Dispatch Success! A secure test verification email has been successfully delivered to ${testRecipient.trim()} via ${localSettings.smtpHost}.`
+            : `लाइव SMTP प्रेषण सफल! ${localSettings.smtpHost} के माध्यम से ${testRecipient.trim()} को एक सुरक्षित परीक्षण सत्यापन ईमेल सफलतापूर्वक भेजा गया है।`
+        });
+      } else {
+        setTestResult({
+          success: false,
+          message: resData.error || (language === 'en' ? "SMTP dispatch failed. Please verify credentials." : "SMTP प्रेषण विफल। कृपया क्रेडेंशियल सत्यापित करें।")
+        });
+      }
+    } catch (error: any) {
+      setTestResult({
+        success: false,
+        message: error.message || (language === 'en' ? "Connection timed out or network error." : "कनेक्शन का समय समाप्त या नेटवर्क त्रुटि।")
+      });
+    } finally {
+      setIsTestingSmtp(false);
+    }
+  };
+
   const handleSave = () => {
     onSaveSettings(localSettings);
     setSaveSuccess(true);
@@ -902,22 +980,7 @@ export default function Settings({
             )}
           </button>
 
-          <button
-            onClick={() => setActiveSubTab('notices_support')}
-            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
-              activeSubTab === 'notices_support'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <Megaphone className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
-            <span>{t.tabNoticesSupport}</span>
-            {(hrTickets.filter(tk => tk.status === 'Pending').length + passwordRequests.filter(pr => pr.status === 'Pending').length) > 0 && (
-              <span className="absolute top-1.5 right-1.5 md:relative md:top-0 md:right-0 md:ml-auto bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none animate-pulse">
-                {hrTickets.filter(tk => tk.status === 'Pending').length + passwordRequests.filter(pr => pr.status === 'Pending').length}
-              </span>
-            )}
-          </button>
+
 
           <button
             onClick={() => setActiveSubTab('database')}
@@ -929,6 +992,18 @@ export default function Settings({
           >
             <Database className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
             <span>{t.tabDatabase}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('email_smtp')}
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
+              activeSubTab === 'email_smtp'
+                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
+                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Mail className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
+            <span>{(t as any).tabEmailSmtp}</span>
           </button>
 
           <button
@@ -1745,7 +1820,7 @@ export default function Settings({
 
                 if (flaggedIds.length > 0) {
                   return (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 animate-fade-in">
                       <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                       <div className="space-y-1">
                         <h4 className="text-xs font-black text-amber-900 uppercase tracking-wide">
@@ -1771,7 +1846,7 @@ export default function Settings({
               })()}
 
               {/* Filter controls bar */}
-              <div className="bg-slate-50 border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="bg-slate-50 border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 font-sans">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
                   {/* Search input */}
                   <div className="relative">
@@ -1827,437 +1902,50 @@ export default function Settings({
 
                 if (filteredLogs.length === 0) {
                   return (
-                    <div className="border border-dashed border-gray-250 rounded-2xl p-10 text-center space-y-2 bg-slate-25/40">
-                      <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
-                        <CheckCircle className="w-6 h-6" />
-                      </div>
-                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest pt-2">
-                        {language === 'en' ? 'System Audit Clear' : 'सिस्टम ऑडिट साफ़'}
-                      </h4>
-                      <p className="text-[10px] text-gray-500 font-medium max-w-sm mx-auto">
-                        {language === 'en' 
-                          ? 'No unsuccessful attempts match your current search/filters, or the login security log is entirely clear. Excellent!' 
-                          : 'सक्रिय फ़िल्टर या खोज के अनुसार कोई असफल प्रयास नहीं मिला, या सुरक्षा लॉग पूरी तरह से खाली है। बहुत बढ़िया!'}
+                    <div className="border border-dashed border-gray-250 rounded-2xl p-10 text-center font-sans">
+                      <p className="text-sm text-gray-500 italic">
+                        {language === 'en' ? 'No failed login attempts found.' : 'कोई असफल लॉगिन प्रयास नहीं मिला।'}
                       </p>
                     </div>
                   );
                 }
 
                 return (
-                  <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-gray-200 font-mono">
-                            <th className="py-2.5 px-4">{language === 'en' ? 'Status' : 'स्थिति'}</th>
-                            <th className="py-2.5 px-4">{language === 'en' ? 'Entered User ID' : 'दर्ज उपयोगकर्ता आईडी'}</th>
-                            <th className="py-2.5 px-4">{language === 'en' ? 'Timestamp' : 'समय और दिनांक'}</th>
-                            <th className="py-2.5 px-4">{language === 'en' ? 'Reason' : 'विफलता का कारण'}</th>
-                            <th className="py-2.5 px-4 hidden md:table-cell">{language === 'en' ? 'Device/Browser' : 'ब्राउज़र विवरण'}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {filteredLogs.map((log) => {
-                            let dateStr = '';
-                            try {
-                              dateStr = new Date(log.timestamp).toLocaleString(undefined, {
-                                dateStyle: 'medium',
-                                timeStyle: 'short'
-                              });
-                            } catch (_) {
-                              dateStr = log.timestamp;
-                            }
-
-                            let badgeStyle = '';
-                            let badgeText = '';
-                            let statusDot = '';
-
-                            if (log.reason === 'Admin Incorrect Password') {
-                              badgeStyle = 'bg-slate-100 text-slate-800 border-slate-200';
-                              badgeText = language === 'en' ? 'System Administrator' : 'सिस्टम व्यवस्थापक';
-                              statusDot = 'bg-slate-900 ring-slate-100 animate-pulse';
-                            } else if (log.reason === 'Incorrect Password') {
-                              badgeStyle = 'bg-amber-100 text-amber-800 border-amber-200';
-                              badgeText = language === 'en' ? 'Registered Employee' : 'पंजीकृत कर्मचारी';
-                              statusDot = 'bg-amber-500 ring-amber-100';
-                            } else {
-                              badgeStyle = 'bg-rose-100 text-rose-800 border-rose-200';
-                              badgeText = language === 'en' ? 'Unknown/Invalid User' : 'अज्ञात उपयोगकर्ता';
-                              statusDot = 'bg-rose-500 ring-rose-100';
-                            }
-
-                            return (
-                              <tr key={log.id} className="hover:bg-slate-50/50 transition-colors text-xs font-semibold text-slate-700">
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={`w-2 h-2 rounded-full ring-4 ${statusDot}`} />
-                                    {log.reason === 'User ID not found' ? (
-                                      <span className="text-[10px] text-rose-600 font-extrabold uppercase font-mono">{language === 'en' ? 'UNREGISTERED' : 'अपंजीकृत'}</span>
-                                    ) : (
-                                      <span className="text-[10px] text-amber-600 font-extrabold uppercase font-mono">{language === 'en' ? 'REGISTERED' : 'पंजीकृत'}</span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 font-mono text-slate-900 font-bold">
-                                  <div className="flex flex-col gap-0.5">
-                                    <span>{log.enteredId}</span>
-                                    <span className={`inline-self-start text-[9px] font-bold px-1.5 py-0.25 rounded-md border ${badgeStyle} mt-0.5`}>
-                                      {badgeText}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 text-gray-500 font-mono">
-                                  {dateStr}
-                                </td>
-                                <td className="py-3 px-4">
-                                  <span className="inline-flex items-center gap-1 text-gray-800">
-                                    <Lock className="w-3 h-3 text-gray-400 shrink-0" />
-                                    {log.reason === 'Admin Incorrect Password' ? (
-                                      <span className="text-rose-700 font-extrabold">{log.reason}</span>
-                                    ) : log.reason === 'Incorrect Password' ? (
-                                      <span className="text-amber-700 font-bold">{log.reason}</span>
-                                    ) : (
-                                      <span className="text-slate-500 italic">{log.reason}</span>
-                                    )}
-                                  </span>
-                                </td>
-                                <td className="py-3 px-4 hidden md:table-cell text-[10px] text-gray-400 font-mono max-w-xs truncate" title={log.browserInfo}>
-                                  {log.browserInfo || 'N/A'}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          {activeSubTab === 'notices_support' && (
-            <div className="space-y-6 animate-fadeIn font-sans">
-              
-              {/* Header Info */}
-              <div className="border-b border-gray-150 pb-4">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest font-mono flex items-center gap-2">
-                  <Megaphone className="w-4 h-4 text-emerald-600" />
-                  {language === 'en' ? 'Notices & HR Support Helpdesk' : 'कंपनी नोटिस और एचआर सहायता हेल्पडेस्क'}
-                </h3>
-                <p className="text-[10px] text-gray-500 font-bold mt-1">
-                  {language === 'en' 
-                    ? 'Publish general announcements to the login screen, review forgot password requests, and answer employee helpdesk tickets.'
-                    : 'लॉगिन स्क्रीन पर सामान्य कंपनी घोषणाएं प्रकाशित करें, पासवर्ड रीसेट अनुरोधों की समीक्षा करें और कर्मचारियों के हेल्पडेस्क टिकटों का समाधान करें।'}
-                </p>
-              </div>
-
-              {/* Grid 2 Columns: (1) Notices Publisher, (2) Password reset gateway queue */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                {/* Notice Board Manager */}
-                <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-xl space-y-4">
-                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between font-sans">
-                    <span>📢 {language === 'en' ? 'Manage Announcements' : 'घोषणाओं का प्रबंधन'}</span>
-                    <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-100 font-mono">
-                      {announcements.length} {language === 'en' ? 'Total' : 'कुल'}
-                    </span>
-                  </h4>
-
-                  {/* Create New Announcement Form */}
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!newNoticeTitle.trim() || !newNoticeContent.trim()) return;
-                    
-                    const newAnn = {
-                      id: `ann-${Date.now()}`,
-                      title: newNoticeTitle.trim(),
-                      titleHi: newNoticeTitleHi.trim() || newNoticeTitle.trim(),
-                      date: new Date().toISOString().split('T')[0],
-                      content: newNoticeContent.trim(),
-                      contentHi: newNoticeContentHi.trim() || newNoticeContent.trim(),
-                      badge: newNoticeBadge,
-                      badgeHi: newNoticeBadge === 'Critical' ? 'महत्वपूर्ण' : newNoticeBadge === 'Holiday' ? 'छुट्टी' : newNoticeBadge === 'Policy' ? 'नीति' : 'सामान्य'
-                    };
-
-                    if (setAnnouncements) {
-                      setAnnouncements(prev => [newAnn, ...prev]);
-                    }
-                    
-                    // Reset fields
-                    setNewNoticeTitle('');
-                    setNewNoticeTitleHi('');
-                    setNewNoticeContent('');
-                    setNewNoticeContentHi('');
-                    setNewNoticeBadge('General');
-                  }} className="bg-white border border-slate-200 p-3 rounded-lg space-y-3 shadow-xs">
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block border-b border-slate-100 pb-1 font-sans">
-                      ➕ {language === 'en' ? 'Publish Circular / Notice' : 'नया परिपत्र / सूचना प्रकाशित करें'}
-                    </span>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-500 block font-sans">{language === 'en' ? 'Title (English)' : 'शीर्षक (अंग्रेजी)'}</label>
-                        <input
-                          type="text"
-                          required
-                          value={newNoticeTitle}
-                          onChange={(e) => setNewNoticeTitle(e.target.value)}
-                          placeholder="e.g. Office Closed on Independence Day"
-                          className="w-full border border-gray-250 rounded-md px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-slate-50/40 text-slate-800 font-sans"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-500 block font-sans">{language === 'en' ? 'Title (Hindi)' : 'शीर्षक (हिंदी)'}</label>
-                        <input
-                          type="text"
-                          value={newNoticeTitleHi}
-                          onChange={(e) => setNewNoticeTitleHi(e.target.value)}
-                          placeholder="उदा., स्वतंत्रता दिवस पर कार्यालय बंद"
-                          className="w-full border border-gray-250 rounded-md px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-slate-50/40 text-slate-800 font-sans"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-500 block font-sans">{language === 'en' ? 'Content (English)' : 'विवरण (अंग्रेजी)'}</label>
-                        <textarea
-                          required
-                          rows={2}
-                          value={newNoticeContent}
-                          onChange={(e) => setNewNoticeContent(e.target.value)}
-                          placeholder="Write English circular detail..."
-                          className="w-full border border-gray-250 rounded-md p-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-slate-50/40 text-slate-800 resize-none font-sans"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-500 block font-sans">{language === 'en' ? 'Content (Hindi)' : 'विवरण (हिंदी)'}</label>
-                        <textarea
-                          rows={2}
-                          value={newNoticeContentHi}
-                          onChange={(e) => setNewNoticeContentHi(e.target.value)}
-                          placeholder="हिंदी परिपत्र विवरण लिखें..."
-                          className="w-full border border-gray-250 rounded-md p-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-slate-50/40 text-slate-800 resize-none font-sans"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3 pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-bold text-gray-500 font-sans">{language === 'en' ? 'Badge Type:' : 'वर्ग टाइप:'}</span>
-                        <select
-                          value={newNoticeBadge}
-                          onChange={(e: any) => setNewNoticeBadge(e.target.value)}
-                          className="border border-gray-250 rounded px-2 py-0.5 text-[10px] font-bold bg-white text-slate-700 cursor-pointer font-sans"
-                        >
-                          <option value="General">General</option>
-                          <option value="Critical">Critical</option>
-                          <option value="Holiday">Holiday</option>
-                          <option value="Policy">Policy</option>
-                        </select>
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-3.5 py-1 rounded-md transition-colors uppercase tracking-wider cursor-pointer font-sans"
-                      >
-                        {language === 'en' ? 'Publish Notice' : 'सूचना प्रकाशित करें'}
-                      </button>
-                    </div>
-                  </form>
-
-                  {/* Active Notices List */}
-                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                    {announcements.length === 0 ? (
-                      <p className="text-[11px] text-gray-500 italic text-center py-4 bg-white border border-dashed border-gray-200 rounded-lg font-sans">
-                        {language === 'en' ? 'No active notice board items.' : 'कोई सक्रिय नोटिस बोर्ड आइटम नहीं है।'}
-                      </p>
-                    ) : (
-                      announcements.map((ann) => {
-                        let badgeCol = 'bg-slate-100 text-slate-700 border-slate-200';
-                        if (ann.badge === 'Critical') badgeCol = 'bg-red-50 text-red-700 border-red-200';
-                        if (ann.badge === 'Holiday') badgeCol = 'bg-amber-50 text-amber-700 border-amber-200';
-                        if (ann.badge === 'Policy') badgeCol = 'bg-blue-50 text-blue-700 border-blue-200';
-
-                        return (
-                          <div key={ann.id} className="bg-white border border-slate-150 p-3 rounded-lg shadow-2xs flex justify-between items-start gap-3 font-sans">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.25 rounded border ${badgeCol} font-mono`}>
-                                  {language === 'en' ? ann.badge : ann.badgeHi}
-                                </span>
-                                <h5 className="text-xs font-black text-slate-800 font-sans">
-                                  {language === 'en' ? ann.title : ann.titleHi}
-                                </h5>
-                              </div>
-                              <p className="text-[10px] text-slate-600 leading-relaxed font-semibold">
-                                {language === 'en' ? ann.content : ann.contentHi}
-                              </p>
-                              <span className="text-[9px] text-gray-400 font-mono block pt-0.5">{ann.date} • Published by Admin</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (setAnnouncements) {
-                                  setAnnouncements(prev => prev.filter(a => a.id !== ann.id));
-                                }
-                              }}
-                              className="text-gray-400 hover:text-red-600 p-1 rounded-md hover:bg-slate-50 transition-all shrink-0 cursor-pointer"
-                              title={language === 'en' ? 'Remove Notice' : 'सूचना हटाएँ'}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                {/* Password reset gateway request queue */}
-                <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-xl space-y-4">
-                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between font-sans">
-                    <span className="flex items-center gap-1.5">
-                      <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
-                      {language === 'en' ? 'Forgot Password Gateways' : 'पासवर्ड रीसेट गेटवे अनुरोध'}
-                    </span>
-                    <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-100 font-mono">
-                      {passwordRequests.filter(r => r.status === 'Pending').length} Pending
-                    </span>
-                  </h4>
-
-                  <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                    {passwordRequests.length === 0 ? (
-                      <p className="text-[11px] text-gray-500 italic text-center py-8 bg-white border border-dashed border-gray-200 rounded-lg font-sans">
-                        {language === 'en' ? 'No password reset requests logged.' : 'कोई पासवर्ड रीसेट अनुरोध दर्ज नहीं है।'}
-                      </p>
-                    ) : (
-                      passwordRequests.map((req) => (
-                        <div key={req.id} className="bg-white border border-slate-150 p-3 rounded-lg shadow-2xs space-y-2 font-sans">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-black text-slate-800 font-mono uppercase bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                  {req.empId}
-                                </span>
-                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full font-sans ${
-                                  req.status === 'Pending' ? 'bg-amber-100 text-amber-700 border border-amber-200/50' : 'bg-emerald-100 text-emerald-700 border border-emerald-200/50'
-                                }`}>
-                                  {req.status}
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-slate-600 font-semibold mt-1">
-                                {language === 'en' ? 'Email:' : 'ईमेल:'} <span className="font-mono font-bold text-slate-900">{req.email}</span>
-                              </p>
-                              <p className="text-[10px] text-slate-600 font-semibold font-sans">
-                                {language === 'en' ? 'Mobile:' : 'मोबाइल:'} <span className="font-mono font-bold text-slate-900">{req.mobile}</span>
-                              </p>
-                            </div>
-                            <span className="text-[8px] font-mono text-gray-400 shrink-0">
-                              {new Date(req.date).toLocaleDateString()}
-                            </span>
-                          </div>
-
-                          {req.status === 'Pending' && (
-                            <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (setPasswordRequests) {
-                                    setPasswordRequests(prev => prev.map(p => p.id === req.id ? { ...p, status: 'Resolved' } : p));
-                                  }
-                                }}
-                                className="bg-emerald-50 hover:bg-emerald-600 border border-emerald-200 hover:border-emerald-600 text-emerald-700 hover:text-white font-bold text-[9px] px-2.5 py-1 rounded transition-all flex items-center gap-1 cursor-pointer uppercase font-sans"
-                              >
-                                <CheckCircle2 className="w-3 h-3" />
-                                {language === 'en' ? 'Mark Resolved (Reset)' : 'रीसेट करें (समाधान)'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
-              {/* HR Helpdesk Tickets Queue Block */}
-              <div className="bg-slate-50 border border-slate-200/60 p-4 rounded-xl space-y-4">
-                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between font-sans">
-                  <span className="flex items-center gap-1.5">
-                    <LifeBuoy className="w-4 h-4 text-emerald-600" />
-                    {language === 'en' ? 'HR Helpdesk Support Tickets' : 'कर्मचारी सहायता हेल्पडेस्क टिकट'}
-                  </span>
-                  <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-100 font-mono">
-                    {hrTickets.filter(tk => tk.status === 'Pending').length} Pending
-                  </span>
-                </h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto max-h-[300px] pr-1">
-                  {hrTickets.length === 0 ? (
-                    <div className="col-span-full py-8 text-center text-gray-500 italic bg-white border border-dashed border-gray-200 rounded-lg font-sans">
-                      {language === 'en' ? 'No support tickets logged.' : 'कोई सहायता टिकट दर्ज नहीं है।'}
-                    </div>
-                  ) : (
-                    hrTickets.map((ticket) => (
-                      <div key={ticket.id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-3xs flex flex-col justify-between space-y-3 relative hover:border-slate-350 transition-all font-sans">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-sans max-h-[400px] overflow-y-auto pr-1">
+                    {filteredLogs.map((log) => (
+                      <div key={log.id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-3xs flex flex-col justify-between space-y-3 relative hover:border-slate-350 transition-all">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[9px] font-black font-mono text-indigo-600 bg-indigo-50 border border-indigo-150 px-2 py-0.5 rounded">
-                              {ticket.id}
+                            <span className="text-[10px] font-black font-mono text-rose-600 bg-rose-50 border border-rose-150 px-2 py-0.5 rounded">
+                              {log.enteredId}
                             </span>
-                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
-                              ticket.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            }`}>
-                              {ticket.status}
+                            <span className="text-[9px] font-mono text-gray-400">
+                              {new Date(log.timestamp).toLocaleString()}
                             </span>
                           </div>
 
                           <div className="space-y-1">
-                            <h5 className="text-xs font-black text-slate-800 font-sans leading-snug">
-                              {ticket.name} <span className="text-[10px] font-bold text-slate-400 font-mono ml-1">({ticket.empId})</span>
-                            </h5>
-                            <p className="text-[9px] font-mono text-gray-400 font-bold">{ticket.email}</p>
-                          </div>
-
-                          <div className="p-2.5 bg-slate-50 border border-slate-150 rounded-lg">
-                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block mb-0.5 font-sans">
-                              Category: <span className="text-slate-800 font-extrabold font-sans">{ticket.category}</span>
-                            </span>
-                            <p className="text-[10px] text-slate-600 font-semibold leading-relaxed line-clamp-3 font-sans" title={ticket.message}>
-                              "{ticket.message}"
+                            <p className="text-[11px] font-semibold text-slate-700">
+                              <span className="text-gray-400 mr-1">{language === 'en' ? 'Reason:' : 'कारण:'}</span>
+                              <span className="text-rose-700 font-extrabold">{log.reason}</span>
                             </p>
+                            {log.browserInfo && (
+                              <p className="text-[9px] text-gray-400 font-medium truncate font-sans" title={log.browserInfo}>
+                                {language === 'en' ? 'Browser:' : 'ब्राउज़र:'} {log.browserInfo}
+                              </p>
+                            )}
+                            {log.ipAddress && (
+                              <p className="text-[9px] text-gray-400 font-mono font-semibold">
+                                IP: {log.ipAddress}
+                              </p>
+                            )}
                           </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
-                          <span className="text-[8px] font-mono text-gray-400">
-                            {new Date(ticket.date).toLocaleString()}
-                          </span>
-                          
-                          {ticket.status === 'Pending' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (setHrTickets) {
-                                  setHrTickets(prev => prev.map(t => t.id === ticket.id ? { ...t, status: 'Resolved' } : t));
-                                }
-                              }}
-                              className="bg-emerald-50 hover:bg-emerald-600 border border-emerald-200 hover:border-emerald-600 text-emerald-700 hover:text-white font-bold text-[9px] px-2.5 py-1 rounded transition-all flex items-center gap-1 cursor-pointer uppercase font-mono"
-                            >
-                              <CheckCircle2 className="w-3 h-3" />
-                              {language === 'en' ? 'Resolve' : 'समाधान'}
-                            </button>
-                          )}
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -3003,6 +2691,231 @@ export default function Settings({
                   </div>
                 );
               })()}
+            </div>
+          )}
+
+          {/* Sub Tab: SMTP Custom Email Server Settings */}
+          {activeSubTab === 'email_smtp' && (
+            <div className="space-y-6 font-sans">
+              
+              {/* Header card matching the style */}
+              <div className="bg-[#03623c]/5 border border-[#03623c]/15 rounded-xl p-5 shadow-3xs">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-[#03623c] rounded-xl text-white mt-0.5 animate-pulse">
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                        {language === 'en' 
+                          ? 'PART 4: SMTP EMAIL SERVER & SENDER ALIAS SETTINGS' 
+                          : 'भाग 4: SMTP ईमेल सर्वर और प्रेषक उपनाम सेटिंग्स'}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 font-semibold mt-1 max-w-2xl leading-relaxed">
+                        {language === 'en'
+                          ? 'Configure custom SMTP connection details to send 2-Step Verification and passkey reset emails to Trainees directly through your corporate mail server using a custom sender alias name.'
+                          : 'अपने कॉर्पोरेट मेल सर्वर का उपयोग करके सीधे प्रशिक्षुओं को 2-चरण सत्यापन और पासकी रीसेट ईमेल भेजने के लिए कस्टम SMTP कनेक्शन विवरण कॉन्फ़िगर करें।'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Pulse Badge */}
+                  <div className="self-start md:self-auto flex items-center gap-2 bg-slate-100 border border-slate-200/60 px-3 py-1 rounded-full shrink-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase text-slate-600 tracking-wider font-mono">
+                      {language === 'en' ? 'Live Delivery Gateway' : 'लाइव डिलीवरी गेटवे'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
+                    {language === 'en' ? 'SMTP Outbound Host' : 'SMTP आउटबाउंड होस्ट'}
+                  </label>
+                  <input
+                    type="text"
+                    value={localSettings.smtpHost || ''}
+                    placeholder="e.g. smtp.gmail.com"
+                    onChange={(e) => setLocalSettings({ ...localSettings, smtpHost: e.target.value })}
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
+                    {language === 'en' ? 'SMTP Port' : 'SMTP पोर्ट'}
+                  </label>
+                  <input
+                    type="number"
+                    value={localSettings.smtpPort ?? ''}
+                    placeholder="e.g. 587"
+                    onChange={(e) => setLocalSettings({ ...localSettings, smtpPort: e.target.value ? Number(e.target.value) : undefined })}
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
+                    {language === 'en' ? 'SMTP Password' : 'SMTP पासवर्ड'}
+                  </label>
+                  <input
+                    type="password"
+                    value={localSettings.smtpPassword || ''}
+                    placeholder="••••••••••••••••"
+                    onChange={(e) => setLocalSettings({ ...localSettings, smtpPassword: e.target.value })}
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs font-mono"
+                  />
+                </div>
+
+                <div className="md:col-span-4">
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
+                    {language === 'en' ? 'SMTP Username' : 'SMTP यूज़रनेम (ईमेल)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={localSettings.smtpUsername || ''}
+                    placeholder="e.g. misrpr@rathibuildmart.com"
+                    onChange={(e) => setLocalSettings({ ...localSettings, smtpUsername: e.target.value })}
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
+                  />
+                </div>
+              </div>
+
+              {/* Warning/Guide Banner */}
+              <div className="bg-amber-50 border border-amber-200/60 rounded-xl p-4 text-[11px] text-amber-800 leading-relaxed font-semibold">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-extrabold text-amber-900 text-xs mb-1">
+                      {language === 'en' ? 'Gmail/Google Workspace SMTP Configuration Notice:' : 'जीमेल/गूगल वर्कस्पेस SMTP कॉन्फ़िगरेशन सूचना:'}
+                    </h4>
+                    <p className="font-medium text-slate-600 leading-relaxed">
+                      {language === 'en'
+                        ? 'If you are using Google Mail (smtp.gmail.com) as your host, ensure 2-Step Verification is ON under your Google Account Security, generate a 16-character App Password (without spaces), and paste it into the SMTP Password field above.'
+                        : 'यदि आप होस्ट के रूप में गूगल मेल (smtp.gmail.com) का उपयोग कर रहे हैं, तो सुनिश्चित करें कि आपके गूगल खाता सुरक्षा के तहत 2-चरण सत्यापन चालू है, एक 16-अक्षर का ऐप पासवर्ड (बिना रिक्त स्थान के) जेनरेट करें, और उसे ऊपर SMTP पासवर्ड फ़ील्ड में पेस्ट करें।'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Second row of inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
+                    {language === 'en' ? 'Sender Display Name (Alias)' : 'प्रेषक का नाम (Sender Name)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={localSettings.senderName || ''}
+                    placeholder="e.g. Rathi LMS System"
+                    onChange={(e) => setLocalSettings({ ...localSettings, senderName: e.target.value })}
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
+                    {language === 'en' ? 'Sender Email Address' : 'प्रेषक का ईमेल (Sender Email)'}
+                  </label>
+                  <input
+                    type="email"
+                    value={localSettings.senderEmail || ''}
+                    placeholder="e.g. rbmlms@rathibuildmart.com"
+                    onChange={(e) => setLocalSettings({ ...localSettings, senderEmail: e.target.value })}
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
+                  />
+                </div>
+              </div>
+
+              {/* Reset & Save Form Actions specifically for SMTP */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleResetSmtpToDefaults}
+                  className="bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-3xs"
+                >
+                  {language === 'en' ? 'Reset Defaults' : 'डिफ़ॉल्ट रीसेट करें'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="bg-[#03623c] hover:bg-[#024d2e] text-white px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-2xs"
+                >
+                  {language === 'en' ? 'Save SMTP Configurations' : 'SMTP कॉन्फ़िगरेशन सहेजें'}
+                </button>
+              </div>
+
+              {/* Subsection: Dispatch Tester */}
+              <div className="border-t border-dashed border-slate-200 pt-6 mt-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-1 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block align-middle mb-0.5 mr-0.5" />
+                    <span className="font-extrabold uppercase tracking-widest text-[9px] font-mono">LIVE</span>
+                  </span>
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest font-mono">
+                    {language === 'en' ? 'LIVE SMTP GATEWAY DISPATCH TESTER' : 'लाइव SMTP गेटवे प्रेषण परीक्षक'}
+                  </h4>
+                </div>
+                
+                <p className="text-[11px] text-slate-500 font-semibold leading-relaxed">
+                  {language === 'en'
+                    ? 'Enter any recipient email to instantly test the configured SMTP routing and sender name alias.'
+                    : 'कॉन्फ़िगर किए गए SMTP रूटिंग और प्रेषक नाम उपनाम का तुरंत परीक्षण करने के लिए कोई भी प्राप्तकर्ता ईमेल दर्ज करें।'}
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
+                  <input
+                    type="email"
+                    value={testRecipient}
+                    placeholder="Enter recipient email address..."
+                    onChange={(e) => setTestRecipient(e.target.value)}
+                    className="flex-1 border border-gray-200 px-4 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none text-slate-800 transition-all bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTestSmtp}
+                    disabled={isTestingSmtp}
+                    className="bg-[#4f46e5] hover:bg-[#4338ca] text-white px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-2 shrink-0 disabled:opacity-55 disabled:cursor-not-allowed"
+                  >
+                    {isTestingSmtp ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        {language === 'en' ? 'Dispatching...' : 'भेजा जा रहा है...'}
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        {language === 'en' ? 'Dispatch Test' : 'परीक्षण भेजें'}
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Tester output alert */}
+                {testResult && (
+                  <div className={`p-4 rounded-xl text-[11px] font-semibold leading-relaxed border transition-all animate-fadeIn ${
+                    testResult.success 
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200/60' 
+                      : 'bg-red-50 text-red-800 border-red-200/60'
+                  }`}>
+                    <div className="flex items-start gap-2.5">
+                      {testResult.success ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <p className="font-bold">{testResult.success ? "SUCCESS" : "ERROR / FAILURE"}</p>
+                        <p className="mt-0.5 text-slate-600 font-medium">{testResult.message}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 

@@ -90,6 +90,10 @@ export interface Employee {
   isConveyanceApplicable?: boolean;
   isPaidLeaveApplicable?: boolean;
   enableGeofencing?: boolean;
+  enableMobileAttendance?: boolean;
+  isApproved?: boolean;
+  approvedDeviceId?: string;
+  allowMultipleDevices?: boolean;
 }
 
 export interface SalaryIncrement {
@@ -174,6 +178,12 @@ export interface AdminSettings {
   geofenceOutlets?: GeofenceOutlet[];
   enableGeofencing?: boolean;
   enableMobileAttendance?: boolean;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUsername?: string;
+  smtpPassword?: string;
+  senderName?: string;
+  senderEmail?: string;
 }
 
 export interface Attendance {
@@ -246,7 +256,7 @@ export interface FailedLoginAttempt {
   id: string;
   enteredId: string;
   timestamp: string; // ISO string
-  reason: 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password';
+  reason: 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password' | 'Account pending approval' | 'Device lock active';
   browserInfo?: string;
   ipAddress?: string;
 }

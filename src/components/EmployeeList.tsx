@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders } from 'lucide-react';
+import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders, Smartphone, Key, UserCog } from 'lucide-react';
 import { Employee, AdminSettings } from '../types';
 
 interface EmployeeListProps {
@@ -26,6 +26,8 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [resetQuickSearchId, setResetQuickSearchId] = useState('');
+  const [activeAccessMenuId, setActiveAccessMenuId] = useState<string | null>(null);
 
   const hasPermission = (action: 'view' | 'add' | 'edit' | 'delete') => {
     if (!portalUser) return true;
@@ -54,7 +56,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     { key: 'bankDetails', labelEn: 'Bank Account Details', labelHi: 'बैंक विवरण', default: false },
     { key: 'identityDetails', labelEn: 'Aadhaar / PAN', labelHi: 'आधार / पैन कार्ड', default: false },
     { key: 'pfEsicDetails', labelEn: 'PF / ESIC Account Numbers', labelHi: 'पीएफ / ईएसआईसी नंबर', default: false },
-    { key: 'geofenceBypass', labelEn: 'Geofence GPS Bypass', labelHi: 'जीपीएस बायपास स्थिति', default: false },
+    { key: 'gpsAndMobile', labelEn: 'GPS & Mobile Attendance', labelHi: 'जीपीएस और मोबाइल अटेंडेंस', default: true },
   ], []);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
@@ -884,7 +886,11 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       isDaApplicable: true,
       isConveyanceApplicable: true,
       isPaidLeaveApplicable: true,
-      disableGeofencing: false,
+      enableGeofencing: false,
+      enableMobileAttendance: false,
+      isApproved: false,
+      allowMultipleDevices: false,
+      approvedDeviceId: '',
 
       firstName: '',
       lastName: '',
@@ -971,7 +977,11 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       isDaApplicable: emp.isDaApplicable !== false,
       isConveyanceApplicable: emp.isConveyanceApplicable !== false,
       isPaidLeaveApplicable: emp.isPaidLeaveApplicable !== false,
-      disableGeofencing: !!emp.disableGeofencing,
+      enableGeofencing: !!emp.enableGeofencing,
+      enableMobileAttendance: !!emp.enableMobileAttendance,
+      isApproved: emp.isApproved !== false, // Default to true if not explicitly false (helps old employees)
+      allowMultipleDevices: !!emp.allowMultipleDevices,
+      approvedDeviceId: emp.approvedDeviceId || '',
 
       firstName: emp.firstName || '',
       lastName: emp.lastName || '',
@@ -1414,7 +1424,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                   {visibleColumns.includes('bankDetails') && <th className="py-4 px-6">{language === 'en' ? 'Bank Details' : 'बैंक विवरण'}</th>}
                   {visibleColumns.includes('identityDetails') && <th className="py-4 px-6">{language === 'en' ? 'Govt IDs' : 'पहचान पत्र'}</th>}
                   {visibleColumns.includes('pfEsicDetails') && <th className="py-4 px-6">{language === 'en' ? 'PF & ESIC' : 'पीएफ और ईएसआईसी'}</th>}
-                  {visibleColumns.includes('geofenceBypass') && <th className="py-4 px-6 text-center">{language === 'en' ? 'GPS Bypass' : 'जीपीएस बायपास'}</th>}
+                  {visibleColumns.includes('gpsAndMobile') && <th className="py-4 px-6 text-center">{language === 'en' ? 'GPS & Mobile' : 'जीपीएस और मोबाइल'}</th>}
                   
                   <th className="py-4 px-6 text-right">{t.colActions}</th>
                 </tr>
@@ -1553,20 +1563,143 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         ) : '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('geofenceBypass') && (
+                    {visibleColumns.includes('gpsAndMobile') && (
                       <td className="py-4 px-6 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                          emp.disableGeofencing 
-                            ? 'bg-amber-100 text-amber-800' 
-                            : 'bg-slate-100 text-slate-800'
-                        }`}>
-                          {emp.disableGeofencing ? (language === 'en' ? 'Bypassed' : 'बायपास') : (language === 'en' ? 'Enforced' : 'लागू')}
-                        </span>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
+                            emp.enableMobileAttendance 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : 'bg-slate-100 text-slate-400 line-through'
+                          }`}>
+                            {language === 'en' ? 'Mobile' : 'मोबाइल'}: {emp.enableMobileAttendance ? 'ON' : 'OFF'}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
+                            emp.enableGeofencing 
+                              ? 'bg-blue-100 text-blue-800 font-extrabold' 
+                              : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            {language === 'en' ? 'GPS' : 'जीपीएस'}: {emp.enableGeofencing ? 'ENFORCED' : 'OFF'}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
+                            emp.isApproved !== false 
+                              ? 'bg-[#03623c]/10 text-[#03623c]' 
+                              : 'bg-rose-100 text-rose-800 animate-pulse'
+                          }`}>
+                            {language === 'en' ? 'Status' : 'स्थिति'}: {emp.isApproved !== false ? (language === 'en' ? 'Approved' : 'मंजूर') : (language === 'en' ? 'Pending' : 'लंबित')}
+                          </span>
+                        </div>
                       </td>
                     )}
 
                     <td className="py-4 px-6 text-right">
                       <div className="flex justify-end gap-2">
+                        {/* Device & Access Reset Popover */}
+                        {hasPermission('edit') && (
+                          <div className="relative inline-block text-left">
+                            <button
+                              onClick={() => setActiveAccessMenuId(activeAccessMenuId === emp.id ? null : emp.id)}
+                              className={`p-1.5 rounded-lg transition-all ${
+                                activeAccessMenuId === emp.id 
+                                  ? 'bg-[#03623c]/15 text-[#03623c]' 
+                                  : 'text-gray-500 hover:text-[#03623c] hover:bg-emerald-50'
+                              }`}
+                              title={language === 'en' ? 'Manage Device Lock, First Login & Multi-Device Permission' : 'डिवाइस लॉक, फर्स्ट लॉगिन और मल्टी-डिवाइस स्वीकृति'}
+                              id={`access-control-${emp.id}`}
+                            >
+                              <Smartphone className="w-4 h-4" />
+                            </button>
+                            
+                            {activeAccessMenuId === emp.id && (
+                              <>
+                                <div 
+                                  className="fixed inset-0 z-40" 
+                                  onClick={() => setActiveAccessMenuId(null)} 
+                                />
+                                <div className="absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-gray-150 z-50 p-3 text-left">
+                                  <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-gray-100">
+                                    <span className="font-extrabold text-slate-950 text-xs truncate max-w-[150px]">{emp.name}</span>
+                                    <span className="text-[10px] text-gray-400 font-mono">ID: {emp.id}</span>
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                    {/* Info Panel */}
+                                    <div className="bg-slate-50 border border-slate-150 rounded-lg p-2 text-[10px] space-y-1 font-medium text-slate-700">
+                                      <div className="flex justify-between items-center">
+                                        <span>Status:</span>
+                                        <span className={`font-bold ${emp.isApproved !== false ? 'text-emerald-700' : 'text-rose-600 animate-pulse'}`}>
+                                          {emp.isApproved !== false ? 'Approved' : 'Pending Approval'}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span>Device lock:</span>
+                                        <span className="font-mono text-slate-600 truncate max-w-[110px]" title={emp.approvedDeviceId || 'None'}>
+                                          {emp.approvedDeviceId ? 'Locked' : 'None'}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span>Multi-Device:</span>
+                                        <span className={`font-bold ${emp.allowMultipleDevices ? 'text-indigo-600' : 'text-slate-500'}`}>
+                                          {emp.allowMultipleDevices ? 'ON' : 'OFF (1 Device)'}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Action items */}
+                                    <div className="flex flex-col gap-1.5">
+                                      {emp.isApproved === false && (
+                                        <button
+                                          onClick={async () => {
+                                            await onUpdateEmployee({ ...emp, isApproved: true });
+                                            setActiveAccessMenuId(null);
+                                          }}
+                                          className="w-full text-center py-1.5 bg-[#03623c] hover:bg-[#02492d] text-white rounded text-[10px] font-bold cursor-pointer transition-all"
+                                        >
+                                          {language === 'en' ? 'Approve Now' : 'तुरंत मंजूर करें'}
+                                        </button>
+                                      )}
+
+                                      {emp.approvedDeviceId && (
+                                        <button
+                                          onClick={async () => {
+                                            await onUpdateEmployee({ ...emp, approvedDeviceId: '' });
+                                            setActiveAccessMenuId(null);
+                                          }}
+                                          className="w-full text-left px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded text-[10px] font-bold border border-amber-200/60 transition-all cursor-pointer"
+                                        >
+                                          🔄 {language === 'en' ? 'Reset Device Lock' : 'डिवाइस लॉक अनलॉक'}
+                                        </button>
+                                      )}
+
+                                      <button
+                                        onClick={async () => {
+                                          await onUpdateEmployee({ ...emp, isApproved: false, approvedDeviceId: '' });
+                                          setActiveAccessMenuId(null);
+                                        }}
+                                        className="w-full text-left px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded text-[10px] font-bold border border-rose-200/60 transition-all cursor-pointer"
+                                        title="Resets employee status so they must be approved again on next login"
+                                      >
+                                        ⚠️ {language === 'en' ? 'Reset to First Login' : 'फर्स्ट लॉगिन रीसेट करें'}
+                                      </button>
+
+                                      <button
+                                        onClick={async () => {
+                                          await onUpdateEmployee({ ...emp, allowMultipleDevices: !emp.allowMultipleDevices });
+                                          setActiveAccessMenuId(null);
+                                        }}
+                                        className="w-full text-left px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded text-[10px] font-bold border border-indigo-200/60 transition-all cursor-pointer"
+                                      >
+                                        📱 {emp.allowMultipleDevices 
+                                          ? (language === 'en' ? 'Restrict to 1 Device' : '1 डिवाइस सीमा लगाएं') 
+                                          : (language === 'en' ? 'Allow Multi-Device' : 'मल्टी-डिवाइस अनुमति दें')}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+
                         {hasPermission('edit') && (
                           <button
                             onClick={() => openEditModal(emp)}
@@ -1960,19 +2093,77 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                           </div>
                         </label>
 
-                        <label className="flex items-center gap-2 p-2 bg-amber-50/50 hover:bg-amber-100/30 border border-amber-200/50 rounded-lg cursor-pointer transition-colors sm:col-span-2">
+                        <label className="flex items-center gap-2 p-2 bg-[#03623c]/5 hover:bg-[#03623c]/10 border border-[#03623c]/20 rounded-lg cursor-pointer transition-colors">
                           <input 
                             type="checkbox"
-                            name="disableGeofencing"
-                            checked={!!formData.disableGeofencing}
-                            onChange={handleInputChange}
-                            className="w-3.5 h-3.5 text-amber-600 focus:ring-amber-500 border-amber-300 rounded"
+                            name="isApproved"
+                            checked={formData.isApproved !== false}
+                            onChange={(e) => setFormData({ ...formData, isApproved: e.target.checked })}
+                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
                           />
                           <div>
-                            <span className="block text-[11px] text-amber-950 font-bold">Bypass Geofencing Check (जीपीएस वेरिफिकेशन बायपास करें)</span>
-                            <span className="text-[9px] text-amber-700 font-medium">Allows this employee to punch attendance from any location/any branch</span>
+                            <span className="block text-[11px] text-[#03623c] font-black">HR/Admin Approved (मंजूर लॉगिन)</span>
+                            <span className="text-[9px] text-gray-500 font-medium">Must be checked for the employee to login</span>
                           </div>
                         </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-emerald-50 hover:bg-emerald-100/60 border border-emerald-200 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="enableMobileAttendance"
+                            checked={!!formData.enableMobileAttendance}
+                            onChange={(e) => setFormData({ ...formData, enableMobileAttendance: e.target.checked })}
+                            className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 border-emerald-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-emerald-900 font-bold">Enable Mobile Attendance (मोबाइल उपस्थिति)</span>
+                            <span className="text-[9px] text-emerald-700 font-medium">Allows accessing Self Attendance Tab</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-blue-50/50 hover:bg-blue-100/30 border border-blue-200/50 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="enableGeofencing"
+                            checked={!!formData.enableGeofencing}
+                            onChange={(e) => setFormData({ ...formData, enableGeofencing: e.target.checked })}
+                            className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500 border-blue-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-blue-900 font-bold">Enforce GPS/Geofence (जीपीएस सत्यापन)</span>
+                            <span className="text-[9px] text-blue-700 font-medium">Requires punching near authorized branches</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 p-2 bg-indigo-50/50 hover:bg-indigo-100/30 border border-indigo-200/50 rounded-lg cursor-pointer transition-colors">
+                          <input 
+                            type="checkbox"
+                            name="allowMultipleDevices"
+                            checked={!!formData.allowMultipleDevices}
+                            onChange={(e) => setFormData({ ...formData, allowMultipleDevices: e.target.checked })}
+                            className="w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500 border-indigo-300 rounded"
+                          />
+                          <div>
+                            <span className="block text-[11px] text-indigo-900 font-bold">Allow Multi-Device Login (मल्टी-डिवाइस लॉगिन)</span>
+                            <span className="text-[9px] text-indigo-700 font-medium">Bypasses single device login lock</span>
+                          </div>
+                        </label>
+
+                        {formData.approvedDeviceId && (
+                          <div className="flex items-center justify-between p-2.5 bg-rose-50 border border-rose-150 rounded-lg sm:col-span-2">
+                            <div className="space-y-0.5">
+                              <span className="block text-[11px] text-rose-950 font-extrabold">Device Locked (डिवाइस लॉक सक्रिय है)</span>
+                              <span className="block font-mono text-[9px] text-rose-600 max-w-[280px] truncate">Fingerprint: {formData.approvedDeviceId}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, approvedDeviceId: '' })}
+                              className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold transition-all cursor-pointer animate-pulse"
+                            >
+                              Reset Device Lock (रीसेट करें)
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 

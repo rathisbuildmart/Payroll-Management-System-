@@ -51,6 +51,16 @@ import {
 import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog } from './types';
 import { saveToFirestore, loadFromFirestore } from './services/firestore';
 
+// Unique device fingerprint generator for browser lock
+const getDeviceFingerprint = (): string => {
+  let fingerprint = localStorage.getItem('payroll_device_fingerprint');
+  if (!fingerprint) {
+    fingerprint = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('payroll_device_fingerprint', fingerprint);
+  }
+  return fingerprint;
+};
+
 // Importing Tab Components
 import Dashboard from './components/Dashboard';
 import EmployeeList from './components/EmployeeList';
@@ -60,6 +70,7 @@ import Settings, { INITIAL_ADMIN_SETTINGS } from './components/Settings';
 import EmployeePortal from './components/EmployeePortal';
 import LeavesHolidays from './components/LeavesHolidays';
 import EmployeeLedger from './components/EmployeeLedger';
+import NoticesSupport from './components/NoticesSupport';
 
 export interface PortalUser {
   id: string;
@@ -424,6 +435,25 @@ export default function App() {
   const [forgotMobile, setForgotMobile] = useState('');
   const [forgotError, setForgotError] = useState<string | null>(null);
 
+  // OTP Reset and OTP Login States
+  const [lastSentEmail, setLastSentEmail] = useState<any>(null);
+  const [showEmailViewer, setShowEmailViewer] = useState(false);
+  
+  // Forgot Password Self-Service Flow States
+  const [forgotStep, setForgotStep] = useState<'request' | 'verify_otp' | 'new_password'>('request');
+  const [forgotGeneratedOtp, setForgotGeneratedOtp] = useState('');
+  const [forgotEnteredOtp, setForgotEnteredOtp] = useState('');
+  const [forgotNewPass, setForgotNewPass] = useState('');
+  const [isSendingForgotOtp, setIsSendingForgotOtp] = useState(false);
+
+  // OTP Login Flow States
+  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
+  const [loginOtpStep, setLoginOtpStep] = useState<'request_otp' | 'enter_otp'>('request_otp');
+  const [loginGeneratedOtp, setLoginGeneratedOtp] = useState('');
+  const [loginEnteredOtp, setLoginEnteredOtp] = useState('');
+  const [isSendingLoginOtp, setIsSendingLoginOtp] = useState(false);
+  const [loginOtpEmail, setLoginOtpEmail] = useState('');
+
   const [announcements, setAnnouncements] = useState<any[]>(() => {
     const saved = localStorage.getItem('payroll_announcements');
     return saved ? JSON.parse(saved) : [
@@ -588,7 +618,8 @@ export default function App() {
     };
   }, []);
 
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support'>('dashboard');
+  const [activeNoticeSubTab, setActiveNoticeSubTab] = useState<'announcements' | 'passwords' | 'tickets'>('announcements');
 
   const [isSidebarHovered, setIsSidebarHovered] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -604,6 +635,27 @@ export default function App() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
+
+  const [showPendingAlertModal, setShowPendingAlertModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!portalUser || portalUser.role === 'employee') {
+      setShowPendingAlertModal(false);
+      return;
+    }
+    
+    const pendingPasswords = passwordRequests.filter(r => r.status === 'Pending').length;
+    const pendingTkts = hrTickets.filter(r => r.status === 'Pending').length;
+    const totalPending = pendingPasswords + pendingTkts;
+
+    const isDismissed = sessionStorage.getItem('dismissed_pending_alert') === 'true';
+
+    if (totalPending > 0 && !isDismissed) {
+      setShowPendingAlertModal(true);
+    } else {
+      setShowPendingAlertModal(false);
+    }
+  }, [portalUser, passwordRequests, hrTickets]);
 
   // Admin settings loaded from localStorage with standard static fallback
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(() => {
@@ -977,7 +1029,7 @@ export default function App() {
     });
   };
 
-  const recordUnsuccessfulLogin = (enteredId: string, reason: 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password') => {
+  const recordUnsuccessfulLogin = (enteredId: string, reason: 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password' | 'Account pending approval' | 'Device lock active') => {
     const newAttempt: FailedLoginAttempt = {
       id: `fail-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       enteredId,
@@ -1176,6 +1228,38 @@ export default function App() {
 
   // Callback functions for syncing mutations
   const handleAddEmployee = async (newEmp: Employee) => {
+    // Dispatch Welcome Email Notification
+    if (newEmp.email && newEmp.email.trim()) {
+      fetch('/api/send-welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: newEmp.email.trim(),
+          empId: newEmp.id,
+          empName: newEmp.name,
+          tempPassword: newEmp.password || '123456',
+          language,
+          smtpSettings: {
+            host: adminSettings.smtpHost,
+            port: adminSettings.smtpPort,
+            username: adminSettings.smtpUsername,
+            password: adminSettings.smtpPassword,
+            senderName: adminSettings.senderName,
+            senderEmail: adminSettings.senderEmail
+          }
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        console.log('Welcome email API response:', data);
+        if (data.success && data.method === 'SIMULATION') {
+          setLastSentEmail(data.debugPayload);
+          setShowEmailViewer(true);
+        }
+      })
+      .catch(err => console.error('Welcome email dispatch error:', err));
+    }
+
     const updated = [...employees, newEmp];
     setEmployees(updated);
     setIsDataModified(true);
@@ -1665,159 +1749,418 @@ export default function App() {
                 </div>
               )}
 
-              {/* Main Credentials Form */}
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const inputID = loginId.trim();
-                const inputPass = loginPass;
-                if (!inputID || !inputPass) {
-                  setLoginErr(language === 'en' ? 'Please fill in all fields.' : 'कृपया सभी फ़ील्ड भरें।');
-                  return;
-                }
-
-                const adminUsername = adminSettings.adminUsername || 'admin';
-                const adminPassword = adminSettings.adminPassword || 'admin123';
-
-                if (inputID.toLowerCase() === adminUsername.toLowerCase()) {
-                  if (inputPass === adminPassword) {
-                    const adminUser: PortalUser = {
-                      id: 'admin',
-                      name: 'Administrator',
-                      role: 'admin'
-                    };
-                    setPortalUser(adminUser);
-                    localStorage.setItem('payroll_portal_user', JSON.stringify(adminUser));
-                    setLoginId('');
-                    setLoginPass('');
+              {/* Login Method Toggle Tabs */}
+              <div className="flex border-b border-slate-800/80 mt-6 font-mono text-[10px] font-black uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginMethod('password');
                     setLoginErr(null);
-                  } else {
-                    recordUnsuccessfulLogin(inputID, 'Admin Incorrect Password');
-                    setLoginErr(language === 'en' ? 'Incorrect Administrator password.' : 'अमान्य एडमिनिस्ट्रेटर पासवर्ड।');
-                  }
-                } else {
-                  const roleAccounts = adminSettings.roleAccounts || [];
-                  const matchedRoleAcc = roleAccounts.find(
-                    acc => acc.username.trim().toLowerCase() === inputID.toLowerCase()
-                  );
+                  }}
+                  className={`flex-1 pb-3 text-center border-b-2 cursor-pointer transition-all ${
+                    loginMethod === 'password'
+                      ? 'border-emerald-500 text-white font-extrabold'
+                      : 'border-transparent text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  🔑 {language === 'en' ? 'Password Login' : 'पासवर्ड लॉगिन'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginMethod('otp');
+                    setLoginErr(null);
+                    setLoginOtpStep('request_otp');
+                    setLoginEnteredOtp('');
+                  }}
+                  className={`flex-1 pb-3 text-center border-b-2 cursor-pointer transition-all ${
+                    loginMethod === 'otp'
+                      ? 'border-emerald-500 text-white font-extrabold'
+                      : 'border-transparent text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  📨 {language === 'en' ? 'Email OTP Login' : 'ईमेल ओटीपी लॉगिन'}
+                </button>
+              </div>
 
-                  if (matchedRoleAcc) {
-                    if (inputPass === matchedRoleAcc.password) {
-                      const portalUserObj: PortalUser = {
-                        id: matchedRoleAcc.id,
-                        name: matchedRoleAcc.name,
-                        role: matchedRoleAcc.role,
-                        branch: matchedRoleAcc.branch,
-                        branches: matchedRoleAcc.branches
+              {loginMethod === 'password' ? (
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const inputID = loginId.trim();
+                  const inputPass = loginPass;
+                  if (!inputID || !inputPass) {
+                    setLoginErr(language === 'en' ? 'Please fill in all fields.' : 'कृपया सभी फ़ील्ड भरें।');
+                    return;
+                  }
+
+                  const adminUsername = adminSettings.adminUsername || 'admin';
+                  const adminPassword = adminSettings.adminPassword || 'admin123';
+
+                  if (inputID.toLowerCase() === adminUsername.toLowerCase()) {
+                    if (inputPass === adminPassword) {
+                      const adminUser: PortalUser = {
+                        id: 'admin',
+                        name: 'Administrator',
+                        role: 'admin'
                       };
-                      setPortalUser(portalUserObj);
-                      localStorage.setItem('payroll_portal_user', JSON.stringify(portalUserObj));
+                      setPortalUser(adminUser);
+                      localStorage.setItem('payroll_portal_user', JSON.stringify(adminUser));
                       setLoginId('');
                       setLoginPass('');
                       setLoginErr(null);
                     } else {
-                      recordUnsuccessfulLogin(inputID, 'Incorrect Password');
-                      setLoginErr(language === 'en' ? 'Incorrect Password.' : 'गलत पासवर्ड।');
+                      recordUnsuccessfulLogin(inputID, 'Admin Incorrect Password');
+                      setLoginErr(language === 'en' ? 'Incorrect Administrator password.' : 'अमान्य एडमिनिस्ट्रेटर पासवर्ड।');
                     }
                   } else {
-                    const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
-                    if (emp) {
-                      const targetPass = (emp.password || '').trim();
-                      const isCorrectPass = targetPass 
-                        ? (inputPass.trim() === targetPass) 
-                        : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
+                    const roleAccounts = adminSettings.roleAccounts || [];
+                    const matchedRoleAcc = roleAccounts.find(
+                      acc => acc.username.trim().toLowerCase() === inputID.toLowerCase()
+                    );
 
-                      if (isCorrectPass) {
-                        const empUser: PortalUser = {
-                          id: emp.id,
-                          name: emp.name,
-                          role: 'employee',
-                          employee: emp
+                    if (matchedRoleAcc) {
+                      if (inputPass === matchedRoleAcc.password) {
+                        const portalUserObj: PortalUser = {
+                          id: matchedRoleAcc.id,
+                          name: matchedRoleAcc.name,
+                          role: matchedRoleAcc.role,
+                          branch: matchedRoleAcc.branch,
+                          branches: matchedRoleAcc.branches
                         };
-                        setPortalUser(empUser);
-                        localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                        setPortalUser(portalUserObj);
+                        localStorage.setItem('payroll_portal_user', JSON.stringify(portalUserObj));
                         setLoginId('');
                         setLoginPass('');
                         setLoginErr(null);
                       } else {
                         recordUnsuccessfulLogin(inputID, 'Incorrect Password');
-                        setLoginErr(language === 'en' ? "Incorrect Password! Standard password is your Employee ID or '123456'." : "गलत पासवर्ड! मानक पासवर्ड आपकी कर्मचारी आईडी या '123456' है।");
+                        setLoginErr(language === 'en' ? 'Incorrect Password.' : 'गलत पासवर्ड।');
                       }
                     } else {
-                      recordUnsuccessfulLogin(inputID, 'User ID not found');
-                      setLoginErr(language === 'en' ? "User ID / Employee ID not found. Contact administration." : "उपयोगकर्ता आईडी / कर्मचारी आईडी नहीं मिली। प्रशासन से संपर्क करें।");
+                      const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
+                      if (emp) {
+                        const targetPass = (emp.password || '').trim();
+                        const isCorrectPass = targetPass 
+                          ? (inputPass.trim() === targetPass) 
+                          : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
+
+                        if (isCorrectPass) {
+                          // 1. Approval Check
+                          if (emp.isApproved === false) {
+                            recordUnsuccessfulLogin(inputID, 'Account pending approval');
+                            setLoginErr(
+                              language === 'en'
+                                ? "Login blocked. HR or Administrator approval is required before your first login."
+                                : "लॉगिन अवरुद्ध। आपकी पहली लॉगिन से पहले एचआर या प्रशासक की मंजूरी आवश्यक है।"
+                            );
+                            return;
+                          }
+
+                          // 2. Device Fingerprint Check
+                          const currentDeviceId = getDeviceFingerprint();
+                          if (emp.approvedDeviceId && emp.approvedDeviceId !== currentDeviceId && !emp.allowMultipleDevices) {
+                            recordUnsuccessfulLogin(inputID, 'Device lock active');
+                            setLoginErr(
+                              language === 'en'
+                                ? "Login blocked. Device restriction is active. You can only log in from your registered device. Please contact HR/Admin."
+                                : "लॉगिन अवरुद्ध। डिवाइस लॉक सक्रिय है। आप केवल अपने पंजीकृत डिवाइस से लॉगिन कर सकते हैं। कृपया एचआर/एडमिन से संपर्क करें।"
+                            );
+                            return;
+                          }
+
+                          // Save updated device registration if none registered yet
+                          let updatedEmp = { ...emp };
+                          if (!emp.approvedDeviceId) {
+                            updatedEmp.approvedDeviceId = currentDeviceId;
+                            handleUpdateEmployee(updatedEmp);
+                          }
+
+                          const empUser: PortalUser = {
+                            id: emp.id,
+                            name: emp.name,
+                            role: 'employee',
+                            employee: updatedEmp
+                          };
+                          setPortalUser(empUser);
+                          localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                          setLoginId('');
+                          setLoginPass('');
+                          setLoginErr(null);
+                        } else {
+                          recordUnsuccessfulLogin(inputID, 'Incorrect Password');
+                          setLoginErr(language === 'en' ? "Incorrect Password! Standard password is your Employee ID or '123456'." : "गलत पासवर्ड! मानक पासवर्ड आपकी कर्मचारी आईडी या '123456' है।");
+                        }
+                      } else {
+                        recordUnsuccessfulLogin(inputID, 'User ID not found');
+                        setLoginErr(language === 'en' ? "User ID / Employee ID not found. Contact administration." : "उपयोगकर्ता आईडी / कर्मचारी आईडी नहीं मिली। प्रशासन से संपर्क करें।");
+                      }
                     }
                   }
-                }
-              }} className="space-y-4 mt-6">
-                
-                {/* User ID Field */}
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                    {language === 'en' ? 'User ID / Employee ID' : 'उपयोगकर्ता आईडी / कर्मचारी आईडी'}
-                  </label>
-                  <div className="relative">
-                    <LucideUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                      type="text"
-                      required
-                      value={loginId}
-                      onChange={(e) => setLoginId(e.target.value)}
-                      placeholder={language === 'en' ? 'e.g., admin or EMP001' : 'उदा., admin या EMP001'}
-                      className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* Password Field */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
+                }} className="space-y-4 mt-6 animate-fadeIn">
+                  
+                  {/* User ID Field */}
+                  <div className="space-y-1.5">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                      {language === 'en' ? 'Password' : 'पासवर्ड'}
+                      {language === 'en' ? 'User ID / Employee ID' : 'उपयोगकर्ता आईडी / कर्मचारी आईडी'}
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowForgotModal(true);
-                        setForgotSubmitted(false);
-                        setForgotEmpId('');
-                        setForgotEmail('');
-                        setForgotMobile('');
-                        setForgotError(null);
-                      }}
-                      className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                    >
-                      {language === 'en' ? 'Forgot Password?' : 'पासवर्ड भूल गए?'}
-                    </button>
+                    <div className="relative">
+                      <LucideUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        type="text"
+                        required
+                        value={loginId}
+                        onChange={(e) => setLoginId(e.target.value)}
+                        placeholder={language === 'en' ? 'e.g., admin or EMP001' : 'उदा., admin या EMP001'}
+                        className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                      />
+                    </div>
                   </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={loginPass}
-                      onChange={(e) => setLoginPass(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-sans"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 focus:outline-none p-1 rounded-md transition-colors cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+
+                  {/* Password Field */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? 'Password' : 'पासवर्ड'}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowForgotModal(true);
+                          setForgotStep('request');
+                          setForgotSubmitted(false);
+                          setForgotEmpId('');
+                          setForgotEmail('');
+                          setForgotMobile('');
+                          setForgotError(null);
+                        }}
+                        className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                      >
+                        {language === 'en' ? 'Forgot Password?' : 'पासवर्ड भूल गए?'}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={loginPass}
+                        onChange={(e) => setLoginPass(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-sans"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 focus:outline-none p-1 rounded-md transition-colors cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg shadow-emerald-950/40 hover:shadow-emerald-500/10 transition-all duration-200 text-center uppercase tracking-wider active:scale-98 mt-2"
+                  >
+                    {language === 'en' ? 'Sign In to Workspace' : 'कार्यक्षेत्र में साइन इन करें'}
+                  </button>
+                </form>
+              ) : (
+                // OTP Login Form
+                <div className="mt-6 animate-fadeIn">
+                  {loginOtpStep === 'request_otp' ? (
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      setLoginErr(null);
+                      const inputID = loginId.trim();
+                      if (!inputID) {
+                        setLoginErr(language === 'en' ? 'Please enter your Employee ID.' : 'कृपया अपनी कर्मचारी आईडी दर्ज करें।');
+                        return;
+                      }
+
+                      const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
+                      if (!emp) {
+                        setLoginErr(language === 'en' ? 'Employee ID not found.' : 'कर्मचारी आईडी नहीं मिली।');
+                        return;
+                      }
+
+                      if (!emp.email || !emp.email.trim()) {
+                        setLoginErr(language === 'en' 
+                          ? 'Email address is not configured for this user. Please use password login or contact HR.' 
+                          : 'इस उपयोगकर्ता के लिए ईमेल पता कॉन्फ़िगर नहीं किया गया है। कृपया पासवर्ड लॉगिन का उपयोग करें या एचआर से संपर्क करें।');
+                        return;
+                      }
+
+                      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                      setLoginGeneratedOtp(otp);
+                      setLoginOtpEmail(emp.email.trim());
+                      setIsSendingLoginOtp(true);
+
+                      fetch('/api/send-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          email: emp.email.trim(),
+                          otp,
+                          empName: emp.name,
+                          purpose: 'login',
+                          language,
+                          smtpSettings: {
+                            host: adminSettings.smtpHost,
+                            port: adminSettings.smtpPort,
+                            username: adminSettings.smtpUsername,
+                            password: adminSettings.smtpPassword,
+                            senderName: adminSettings.senderName,
+                            senderEmail: adminSettings.senderEmail
+                          }
+                        })
+                      })
+                      .then(res => res.json())
+                      .then(data => {
+                        setIsSendingLoginOtp(false);
+                        if (data.success) {
+                          setLoginOtpStep('enter_otp');
+                          if (data.method === 'SIMULATION') {
+                            setLastSentEmail(data.debugPayload);
+                            setShowEmailViewer(true);
+                          }
+                        } else {
+                          setLoginErr(data.error || 'Failed to dispatch login OTP.');
+                        }
+                      })
+                      .catch(err => {
+                        setIsSendingLoginOtp(false);
+                        setLoginErr(language === 'en' ? 'Network error sending OTP.' : 'ओटीपी भेजने में नेटवर्क त्रुटि।');
+                      });
+                    }} className="space-y-4">
+                      
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                          {language === 'en' ? 'Employee ID (Required)' : 'कर्मचारी आईडी (आवश्यक)'}
+                        </label>
+                        <div className="relative">
+                          <LucideUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                          <input
+                            type="text"
+                            required
+                            value={loginId}
+                            onChange={(e) => setLoginId(e.target.value)}
+                            placeholder="e.g. EMP001"
+                            className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono uppercase"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSendingLoginOtp}
+                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider disabled:opacity-50"
+                      >
+                        {isSendingLoginOtp 
+                          ? (language === 'en' ? 'Dispatching OTP...' : 'ओटीपी भेजा जा रहा है...') 
+                          : (language === 'en' ? 'Get Login OTP' : 'लॉगिन ओटीपी प्राप्त करें')}
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      setLoginErr(null);
+                      if (loginEnteredOtp.trim() === loginGeneratedOtp) {
+                        const emp = employees.find(e => e.id.trim().toLowerCase() === loginId.trim().toLowerCase());
+                        if (emp) {
+                          // 1. Approval Check
+                          if (emp.isApproved === false) {
+                            recordUnsuccessfulLogin(emp.id, 'Account pending approval');
+                            setLoginErr(
+                              language === 'en'
+                                ? "Login blocked. HR or Administrator approval is required before your first login."
+                                : "लॉगिन अवरुद्ध। आपकी पहली लॉगिन से पहले एचआर या प्रशासक की मंजूरी आवश्यक है।"
+                            );
+                            return;
+                          }
+
+                          // 2. Device Fingerprint Check
+                          const currentDeviceId = getDeviceFingerprint();
+                          if (emp.approvedDeviceId && emp.approvedDeviceId !== currentDeviceId && !emp.allowMultipleDevices) {
+                            recordUnsuccessfulLogin(emp.id, 'Device lock active');
+                            setLoginErr(
+                              language === 'en'
+                                ? "Login blocked. Device restriction is active. You can only log in from your registered device. Please contact HR/Admin."
+                                : "लॉगिन अवरुद्ध। डिवाइस लॉक सक्रिय है। आप केवल अपने पंजीकृत डिवाइस से लॉगिन कर सकते हैं। कृपया एचआर/एडमिन से संपर्क करें।"
+                            );
+                            return;
+                          }
+
+                          // Save updated device registration if none registered yet
+                          let updatedEmp = { ...emp };
+                          if (!emp.approvedDeviceId) {
+                            updatedEmp.approvedDeviceId = currentDeviceId;
+                            handleUpdateEmployee(updatedEmp);
+                          }
+
+                          const empUser: PortalUser = {
+                            id: emp.id,
+                            name: emp.name,
+                            role: 'employee',
+                            employee: updatedEmp
+                          };
+                          setPortalUser(empUser);
+                          localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                          setLoginId('');
+                          setLoginPass('');
+                          setLoginEnteredOtp('');
+                          setLoginGeneratedOtp('');
+                          setLoginOtpStep('request_otp');
+                          setLoginErr(null);
+                        }
+                      } else {
+                        setLoginErr(language === 'en' ? 'Invalid OTP. Please try again.' : 'अमान्य ओटीपी। कृपया पुनः प्रयास करें।');
+                      }
+                    }} className="space-y-4">
+                      
+                      <div className="bg-emerald-950/20 text-emerald-300 border border-emerald-900/30 p-3 rounded-xl text-[11px] font-semibold leading-normal animate-pulse">
+                        📧 {language === 'en' 
+                          ? `A secure login OTP has been sent to ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")}. Please enter the code below to sign in.`
+                          : `एक सुरक्षित लॉगिन ओटीपी ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")} पर भेजा गया है। साइन इन करने के लिए कृपया नीचे कोड दर्ज करें।`}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                          {language === 'en' ? '6-Digit OTP Code' : '6-अंकीय ओटीपी कोड'}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={6}
+                          value={loginEnteredOtp}
+                          onChange={(e) => setLoginEnteredOtp(e.target.value)}
+                          placeholder="e.g. 123456"
+                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
+                      >
+                        {language === 'en' ? 'Verify & Sign In' : 'सत्यापित करें और साइन इन करें'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoginOtpStep('request_otp');
+                          setLoginErr(null);
+                        }}
+                        className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 mt-1 transition-colors"
+                      >
+                        {language === 'en' ? 'Back' : 'पीछे'}
+                      </button>
+                    </form>
+                  )}
                 </div>
-
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg shadow-emerald-950/40 hover:shadow-emerald-500/10 transition-all duration-200 text-center uppercase tracking-wider active:scale-98 mt-2"
-                >
-                  {language === 'en' ? 'Sign In to Workspace' : 'कार्यक्षेत्र में साइन इन करें'}
-                </button>
-
-              </form>
+              )}
 
               {/* Help & FAQ Accordion Section */}
               <div className="mt-6 pt-5 border-t border-slate-800/80">
@@ -1900,42 +2243,48 @@ export default function App() {
                 <X className="w-5 h-5" />
               </button>
 
-              {!forgotSubmitted ? (
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  const targetEmp = employees.find(emp => emp.id.trim().toLowerCase() === forgotEmpId.trim().toLowerCase());
-                  if (!targetEmp) {
-                    setForgotError(language === 'en' 
-                      ? "Employee ID not found in Rathi Build Mart roster." 
-                      : "राठी बिल्डमार्ट रजिस्टर में कर्मचारी आईडी नहीं मिली।");
-                    return;
-                  }
-
-                  const newReq = {
-                    id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
-                    empId: forgotEmpId.trim().toUpperCase(),
-                    email: forgotEmail.trim(),
-                    mobile: forgotMobile.trim(),
-                    date: new Date().toISOString(),
-                    status: 'Pending'
-                  };
-                  setPasswordRequests(prev => [newReq, ...prev]);
-                  setForgotSubmitted(true);
-                  setForgotError(null);
-                }} className="space-y-4">
+              {forgotSubmitted ? (
+                <div className="text-center py-6 space-y-4 animate-fadeIn">
+                  <div className="w-12 h-12 rounded-full bg-emerald-950/50 text-emerald-400 border border-emerald-900/50 flex items-center justify-center mx-auto animate-pulse">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-base font-black text-white">
+                      {language === 'en' ? 'Password Reset Successfully!' : 'पासवर्ड सफलतापूर्वक रीसेट!'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-semibold leading-relaxed max-w-xs mx-auto">
+                      {language === 'en' 
+                        ? 'Your password has been changed successfully. You can now use your new password to sign into the Employee Portal.'
+                        : 'आपका पासवर्ड सफलतापूर्वक बदल गया है। अब आप कर्मचारी पोर्टल में लॉग इन करने के लिए अपने नए पासवर्ड का उपयोग कर सकते हैं।'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotModal(false);
+                      setForgotSubmitted(false);
+                      setForgotStep('request');
+                      setForgotEmpId('');
+                      setForgotEmail('');
+                      setForgotMobile('');
+                      setForgotEnteredOtp('');
+                      setForgotNewPass('');
+                    }}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all cursor-pointer"
+                  >
+                    {language === 'en' ? 'Return to Login' : 'लॉगिन पर लौटें'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
                   <div className="space-y-1">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest bg-emerald-950/50 text-emerald-400 border border-emerald-900/30">
                       <KeyRound className="w-3 h-3 text-emerald-400" />
-                      {language === 'en' ? 'Reset Gateway' : 'रीसेट गेटवे'}
+                      {language === 'en' ? 'Self-Service Reset' : 'स्वयं-सेवा रीसेट'}
                     </div>
                     <h3 className="text-lg font-black text-white font-display tracking-tight mt-1.5">
-                      {language === 'en' ? 'Forgot Your Password?' : 'पासवर्ड भूल गए?'}
+                      {language === 'en' ? 'Reset Your Password' : 'अपना पासवर्ड रीसेट करें'}
                     </h3>
-                    <p className="text-[11px] text-slate-400 font-semibold leading-normal">
-                      {language === 'en' 
-                        ? 'Submit your registered employee details. A password reset request will be dispatched to the HR Administrator instantly.'
-                        : 'अपने पंजीकृत कर्मचारी विवरण सबमिट करें। एक पासवर्ड रीसेट अनुरोध तुरंत एचआर एडमिनिस्ट्रेटर को भेजा जाएगा।'}
-                    </p>
                   </div>
 
                   {forgotError && (
@@ -1945,82 +2294,237 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className="space-y-3 mt-4">
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'Employee ID (Required)' : 'कर्मचारी आईडी (आवश्यक)'}
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={forgotEmpId}
-                        onChange={(e) => setForgotEmpId(e.target.value)}
-                        placeholder="e.g. EMP001"
-                        className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono uppercase"
-                      />
-                    </div>
+                  {forgotStep === 'request' && (
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      setForgotError(null);
+                      const targetEmp = employees.find(emp => emp.id.trim().toLowerCase() === forgotEmpId.trim().toLowerCase());
+                      if (!targetEmp) {
+                        setForgotError(language === 'en' 
+                          ? "Employee ID not found in Rathi Build Mart roster." 
+                          : "राठी बिल्डमार्ट रजिस्टर में कर्मचारी आईडी नहीं मिली।");
+                        return;
+                      }
 
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'Registered Email' : 'पंजीकृत ईमेल'}
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        value={forgotEmail}
-                        onChange={(e) => setForgotEmail(e.target.value)}
-                        placeholder="e.g. staff@rathibuildmart.com"
-                        className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans"
-                      />
-                    </div>
+                      if (!targetEmp.email || targetEmp.email.trim().toLowerCase() !== forgotEmail.trim().toLowerCase()) {
+                        setForgotError(language === 'en'
+                          ? "Registered email address does not match this Employee ID."
+                          : "पंजीकृत ईमेल पता इस कर्मचारी आईडी से मेल नहीं खाता है।");
+                        return;
+                      }
 
-                    <div className="space-y-1">
-                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'Mobile Number' : 'मोबाइल नंबर'}
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        value={forgotMobile}
-                        onChange={(e) => setForgotMobile(e.target.value)}
-                        placeholder="e.g. 9876543210"
-                        className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
-                      />
-                    </div>
-                  </div>
+                      // Generate OTP
+                      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                      setForgotGeneratedOtp(otp);
+                      setIsSendingForgotOtp(true);
 
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
-                  >
-                    {language === 'en' ? 'Submit Reset Request' : 'रीसेट अनुरोध सबमिट करें'}
-                  </button>
-                </form>
-              ) : (
-                <div className="text-center py-6 space-y-4 animate-fadeIn">
-                  <div className="w-12 h-12 rounded-full bg-emerald-950/50 text-emerald-400 border border-emerald-900/50 flex items-center justify-center mx-auto animate-pulse">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <h3 className="text-base font-black text-white">
-                      {language === 'en' ? 'Request Registered!' : 'अनुरोध पंजीकृत!'}
-                    </h3>
-                    <p className="text-[11px] text-slate-400 font-semibold leading-relaxed max-w-xs mx-auto">
-                      {language === 'en' 
-                        ? 'Your request has been securely registered. Your shift manager or payroll admin has been notified and will reset your password shortly.'
-                        : 'आपका अनुरोध सफलतापूर्वक पंजीकृत हो गया है। आपके शिफ्ट मैनेजर या पेरोल एडमिन को सूचित कर दिया गया है और वे जल्द ही आपका पासवर्ड रीसेट करेंगे।'}
-                    </p>
-                  </div>
-                  <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/80 text-[10px] font-mono text-slate-500">
-                    ID: REQ-{Math.floor(10000 + Math.random() * 90000)} • Status: PENDING_HR
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotModal(false)}
-                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2 px-4 rounded-xl transition-all cursor-pointer"
-                  >
-                    {language === 'en' ? 'Return to Login' : 'लॉगिन पर लौटें'}
-                  </button>
+                      fetch('/api/send-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          email: forgotEmail.trim(),
+                          otp,
+                          empName: targetEmp.name,
+                          purpose: 'forgot_password',
+                          language,
+                          smtpSettings: {
+                            host: adminSettings.smtpHost,
+                            port: adminSettings.smtpPort,
+                            username: adminSettings.smtpUsername,
+                            password: adminSettings.smtpPassword,
+                            senderName: adminSettings.senderName,
+                            senderEmail: adminSettings.senderEmail
+                          }
+                        })
+                      })
+                      .then(res => res.json())
+                      .then(data => {
+                        setIsSendingForgotOtp(false);
+                        if (data.success) {
+                          setForgotStep('verify_otp');
+                          if (data.method === 'SIMULATION') {
+                            setLastSentEmail(data.debugPayload);
+                            setShowEmailViewer(true);
+                          }
+                        } else {
+                          setForgotError(data.error || 'Failed to dispatch OTP. Please check SMTP settings.');
+                        }
+                      })
+                      .catch(err => {
+                        setIsSendingForgotOtp(false);
+                        setForgotError(language === 'en' ? 'Network error while sending OTP.' : 'ओटीपी भेजने के दौरान नेटवर्क त्रुटि।');
+                      });
+                    }} className="space-y-4">
+                      <p className="text-[11px] text-slate-400 font-semibold leading-normal">
+                        {language === 'en' 
+                          ? 'Enter your employee details below. We will send a secure 6-digit verification code to your registered email.'
+                          : 'नीचे अपना कर्मचारी विवरण दर्ज करें। हम आपके पंजीकृत ईमेल पर एक सुरक्षित 6-अंकीय सत्यापन कोड भेजेंगे।'}
+                      </p>
+
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                            {language === 'en' ? 'Employee ID (User ID)' : 'कर्मचारी आईडी (यूज़र आईडी)'}
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={forgotEmpId}
+                            onChange={(e) => setForgotEmpId(e.target.value)}
+                            placeholder="e.g. EMP001"
+                            className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono uppercase"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                            {language === 'en' ? 'Registered Email Address' : 'पंजीकृत ईमेल पता'}
+                          </label>
+                          <input
+                            type="email"
+                            required
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            placeholder="e.g. staff@rathibuildmart.com"
+                            className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                            {language === 'en' ? 'Mobile Number' : 'मोबाइल नंबर'}
+                          </label>
+                          <input
+                            type="tel"
+                            required
+                            value={forgotMobile}
+                            onChange={(e) => setForgotMobile(e.target.value)}
+                            placeholder="e.g. 9876543210"
+                            className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSendingForgotOtp}
+                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider disabled:opacity-50"
+                      >
+                        {isSendingForgotOtp 
+                          ? (language === 'en' ? 'Sending Code...' : 'कोड भेजा जा रहा है...') 
+                          : (language === 'en' ? 'Send Verification OTP' : 'सत्यापन ओटीपी भेजें')}
+                      </button>
+                    </form>
+                  )}
+
+                  {forgotStep === 'verify_otp' && (
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (forgotEnteredOtp.trim() === forgotGeneratedOtp) {
+                        setForgotStep('new_password');
+                        setForgotError(null);
+                      } else {
+                        setForgotError(language === 'en' ? 'Invalid 6-digit OTP code.' : 'अमान्य 6-अंकीय ओटीपी कोड।');
+                      }
+                    }} className="space-y-4">
+                      <p className="text-[11px] text-slate-400 font-semibold leading-normal">
+                        {language === 'en' 
+                          ? `A secure verification OTP has been sent to ${forgotEmail}. Please enter the 6-digit code below.`
+                          : `एक सुरक्षित सत्यापन ओटीपी ${forgotEmail} पर भेजा गया है। कृपया नीचे 6-अंकीय कोड दर्ज करें।`}
+                      </p>
+
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                          {language === 'en' ? '6-Digit Verification Code' : '6-अंकीय सत्यापन कोड'}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={6}
+                          value={forgotEnteredOtp}
+                          onChange={(e) => setForgotEnteredOtp(e.target.value)}
+                          placeholder="e.g. 123456"
+                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-2.5 font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
+                      >
+                        {language === 'en' ? 'Verify OTP Code' : 'ओटीपी कोड सत्यापित करें'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotStep('request');
+                          setForgotError(null);
+                        }}
+                        className="w-full text-center text-[10px] uppercase font-bold text-slate-400 hover:text-white mt-1 transition-colors"
+                      >
+                        {language === 'en' ? 'Back' : 'पीछे'}
+                      </button>
+                    </form>
+                  )}
+
+                  {forgotStep === 'new_password' && (
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (forgotNewPass.trim().length < 4) {
+                        setForgotError(language === 'en' ? 'Password must be at least 4 characters.' : 'पासवर्ड कम से कम 4 अक्षरों का होना चाहिए।');
+                        return;
+                      }
+
+                      const targetEmp = employees.find(emp => emp.id.trim().toLowerCase() === forgotEmpId.trim().toLowerCase());
+                      if (targetEmp) {
+                        const updatedEmp = { ...targetEmp, password: forgotNewPass.trim() };
+                        handleUpdateEmployee(updatedEmp);
+
+                        // Also add an audit log
+                        const newReq = {
+                          id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
+                          empId: forgotEmpId.trim().toUpperCase(),
+                          email: forgotEmail.trim(),
+                          mobile: forgotMobile.trim(),
+                          date: new Date().toISOString(),
+                          status: 'Resolved'
+                        };
+                        setPasswordRequests(prev => [newReq, ...prev]);
+                        setForgotSubmitted(true);
+                        setForgotError(null);
+                      } else {
+                        setForgotError('Employee not found.');
+                      }
+                    }} className="space-y-4">
+                      <p className="text-[11px] text-slate-400 font-semibold leading-normal">
+                        {language === 'en' 
+                          ? 'Your identity is verified! Please enter your new secure password below to update your account.'
+                          : 'आपकी पहचान सत्यापित हो गई है! अपने खाते को अपडेट करने के लिए कृपया नीचे अपना नया सुरक्षित पासवर्ड दर्ज करें।'}
+                      </p>
+
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                          {language === 'en' ? 'Choose New Password' : 'नया पासवर्ड चुनें'}
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          value={forgotNewPass}
+                          onChange={(e) => setForgotNewPass(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
+                      >
+                        {language === 'en' ? 'Update & Reset Password' : 'पासवर्ड अपडेट और रीसेट करें'}
+                      </button>
+                    </form>
+                  )}
                 </div>
               )}
             </div>
@@ -2310,9 +2814,17 @@ export default function App() {
 
   const renderSidebarContent = (isMobile: boolean) => {
     const showExpanded = isMobile || isSidebarHovered;
+    const isManagerRole = portalUser?.role && ['admin', 'director', 'sub_admin', 'hr', 'branch_manager'].includes(portalUser.role);
     const allowedTabs = portalUser?.role === 'admin'
-      ? ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin']
-      : adminSettings.rolePermissions?.[portalUser?.role || 'employee'] || [];
+      ? ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin', 'notices_support']
+      : [
+          ...(adminSettings.rolePermissions?.[portalUser?.role || 'employee'] || []),
+          ...(isManagerRole ? ['notices_support'] : [])
+        ];
+
+    const pendingPasswordRequests = passwordRequests.filter(r => r.status === 'Pending').length;
+    const pendingTickets = hrTickets.filter(tk => tk.status === 'Pending').length;
+    const totalPending = pendingPasswordRequests + pendingTickets;
 
     const tabs = [
       { id: 'dashboard' as const, label: uiTexts.dashboard, icon: TrendingUp },
@@ -2321,6 +2833,7 @@ export default function App() {
       { id: 'payroll' as const, label: uiTexts.payroll, icon: CreditCard },
       { id: 'leaves' as const, label: uiTexts.leaves, icon: CalendarDays },
       { id: 'ledger' as const, label: uiTexts.ledger, icon: FileSpreadsheet },
+      { id: 'notices_support' as const, label: language === 'en' ? 'Notices & HR Support Helpdesk' : 'घोषणाएँ और एचआर सहायता हेल्पडेस्क', icon: Megaphone },
       { id: 'admin' as const, label: uiTexts.adminSettings, icon: SettingsIcon },
     ].filter(item => allowedTabs.includes(item.id) || allowedTabs.some(p => p.startsWith(item.id + ':')));
 
@@ -2371,6 +2884,153 @@ export default function App() {
             {tabs.map((item) => {
               const IconComponent = item.icon;
               const isActive = currentTab === item.id;
+              
+              if (item.id === 'notices_support') {
+                return (
+                  <div key={item.id} className="relative group flex flex-col items-start w-full">
+                    <div className="relative flex items-center justify-start w-full">
+                      <button
+                        onClick={() => {
+                          setCurrentTab(item.id);
+                          if (isMobile) {
+                            setIsMobileMenuOpen(false);
+                          }
+                        }}
+                        className={`flex items-center rounded-2xl transition-all duration-300 cursor-pointer relative ${
+                          showExpanded ? 'w-full h-11 px-3 justify-start gap-3' : 'w-12 h-12 justify-center'
+                        } ${
+                          isActive
+                            ? 'bg-emerald-500/15 text-[#10b981] shadow-[0_0_15px_rgba(16,185,129,0.12)] border border-emerald-500/30'
+                            : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
+                        }`}
+                        id={`tab-${item.id}`}
+                      >
+                        {isActive && (
+                          <span className={`absolute left-0 w-1 bg-[#10b981] rounded-r-full shadow-[0_0_8px_#10b981] ${
+                            showExpanded ? 'h-4' : 'h-5'
+                          }`} />
+                        )}
+                        <div className="relative flex items-center justify-center shrink-0">
+                          <IconComponent className="w-5 h-5" />
+                          {!showExpanded && totalPending > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 ring-2 ring-slate-950 flex items-center justify-center text-[8px] text-white font-black animate-pulse">
+                              {totalPending}
+                            </span>
+                          )}
+                        </div>
+                        {showExpanded && (
+                          <div className="flex items-center justify-between w-full min-w-0 pr-1 gap-2">
+                            <span className="text-[11px] font-bold tracking-wide whitespace-nowrap animate-fadeIn truncate">
+                              {item.label}
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Bell className={`w-3.5 h-3.5 ${totalPending > 0 ? 'text-rose-500 animate-pulse' : 'text-slate-500'}`} />
+                              {totalPending > 0 && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black animate-pulse leading-none">
+                                  {totalPending}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                      {!showExpanded && (
+                        <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+                          {item.label}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SUB-MENU: Only when notices_support and showExpanded */}
+                    {showExpanded && (
+                      <div className="w-full flex flex-col gap-1.5 pl-4 ml-4.5 border-l border-emerald-500/20 mt-1.5 mb-1.5 animate-fadeIn">
+                        {/* Sub-item: Manage Announcements */}
+                        <button
+                          onClick={() => {
+                            setCurrentTab('notices_support');
+                            setActiveNoticeSubTab('announcements');
+                            if (isMobile) {
+                              setIsMobileMenuOpen(false);
+                            }
+                          }}
+                          className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
+                            isActive && activeNoticeSubTab === 'announcements'
+                              ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
+                              : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Megaphone className="w-3.5 h-3.5 shrink-0" />
+                            <span className="text-[10px] font-bold truncate">
+                              {language === 'en' ? 'Manage Announcements' : 'घोषणाओं का प्रबंधन'}
+                            </span>
+                          </div>
+                          <span className="px-1.5 py-0.25 text-[8px] font-bold rounded-full bg-slate-800 text-slate-300 font-mono">
+                            {announcements.length}
+                          </span>
+                        </button>
+
+                        {/* Sub-item: Forgot Password Gateways */}
+                        <button
+                          onClick={() => {
+                            setCurrentTab('notices_support');
+                            setActiveNoticeSubTab('passwords');
+                            if (isMobile) {
+                              setIsMobileMenuOpen(false);
+                            }
+                          }}
+                          className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
+                            isActive && activeNoticeSubTab === 'passwords'
+                              ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
+                              : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <KeyRound className="w-3.5 h-3.5 shrink-0" />
+                            <span className="text-[10px] font-bold truncate">
+                              {language === 'en' ? 'Forgot Password Gateways' : 'पासवर्ड रीसेट कतार'}
+                            </span>
+                          </div>
+                          {pendingPasswordRequests > 0 && (
+                            <span className="px-1.5 py-0.25 text-[8px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
+                              {pendingPasswordRequests}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* Sub-item: HR Helpdesk Support Tickets */}
+                        <button
+                          onClick={() => {
+                            setCurrentTab('notices_support');
+                            setActiveNoticeSubTab('tickets');
+                            if (isMobile) {
+                              setIsMobileMenuOpen(false);
+                            }
+                          }}
+                          className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
+                            isActive && activeNoticeSubTab === 'tickets'
+                              ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
+                              : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <LifeBuoy className="w-3.5 h-3.5 shrink-0" />
+                            <span className="text-[10px] font-bold truncate">
+                              {language === 'en' ? 'HR Helpdesk Support Tickets' : 'सहायता हेल्पडेस्क टिकट'}
+                            </span>
+                          </div>
+                          {pendingTickets > 0 && (
+                            <span className="px-1.5 py-0.25 text-[8px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
+                              {pendingTickets}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <div key={item.id} className="relative group flex items-center justify-start w-full">
                   <button
@@ -2394,11 +3054,23 @@ export default function App() {
                         showExpanded ? 'h-4' : 'h-5'
                       }`} />
                     )}
-                    <IconComponent className="w-5 h-5 shrink-0" />
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <IconComponent className="w-5 h-5" />
+                      {!showExpanded && item.id === 'employees' && employees.filter(emp => emp.isApproved === false).length > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-slate-950 animate-pulse" />
+                      )}
+                    </div>
                     {showExpanded && (
-                      <span className="text-[11px] font-bold tracking-wide whitespace-nowrap animate-fadeIn">
-                        {item.label}
-                      </span>
+                      <div className="flex items-center justify-between w-full min-w-0 pr-1 gap-2">
+                        <span className="text-[11px] font-bold tracking-wide whitespace-nowrap animate-fadeIn truncate">
+                          {item.label}
+                        </span>
+                        {item.id === 'employees' && employees.filter(emp => emp.isApproved === false).length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black animate-pulse leading-none shrink-0">
+                            {employees.filter(emp => emp.isApproved === false).length}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </button>
                   {!showExpanded && (
@@ -2960,6 +3632,12 @@ export default function App() {
                   payroll={filteredPayroll} 
                   language={language} 
                   onNavigate={setCurrentTab}
+                  passwordRequests={passwordRequests}
+                  hrTickets={hrTickets}
+                  onNavigateNoticeSubTab={(subTab) => {
+                    setCurrentTab('notices_support');
+                    setActiveNoticeSubTab(subTab);
+                  }}
                 />
               )}
               {currentTab === 'employees' && (
@@ -3013,6 +3691,20 @@ export default function App() {
                   payrollRecords={filteredPayroll}
                   language={language}
                   adminSettings={adminSettings}
+                />
+              )}
+              {currentTab === 'notices_support' && (
+                <NoticesSupport 
+                  language={language}
+                  announcements={announcements}
+                  setAnnouncements={setAnnouncements}
+                  hrTickets={hrTickets}
+                  setHrTickets={setHrTickets}
+                  passwordRequests={passwordRequests}
+                  setPasswordRequests={setPasswordRequests}
+                  portalUser={portalUser}
+                  activeSubTab={activeNoticeSubTab}
+                  setActiveSubTab={setActiveNoticeSubTab}
                 />
               )}
               {currentTab === 'admin' && (
@@ -3105,6 +3797,196 @@ export default function App() {
                 {language === 'en' ? 'Cancel' : 'रद्द करें'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Automatic Pending Items Alert Modal Popup */}
+      {showPendingAlertModal && (
+        <div className="fixed inset-0 bg-slate-950/80 z-[150] flex items-center justify-center p-4 backdrop-blur-md font-sans animate-fadeIn">
+          <div 
+            style={{ borderRadius: '24px' }}
+            className="bg-slate-950 border border-[#10b981]/30 shadow-[0_25px_60px_rgba(2,21,14,0.6)] max-w-lg w-full overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200 text-left text-white"
+          >
+            {/* Header with deep premium gradient */}
+            <div className="bg-gradient-to-r from-slate-900 via-[#041f15] to-[#01140e] border-b border-[#10b981]/15 px-6 py-4.5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg animate-pulse">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#10b981] font-mono">
+                    {language === 'en' ? 'Action Required' : 'कार्रवाई आवश्यक'}
+                  </h3>
+                  <h4 className="text-sm font-bold text-slate-100 tracking-tight">
+                    {language === 'en' ? 'Unresolved Action Items' : 'अनसुलझे लंबित मामले'}
+                  </h4>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  sessionStorage.setItem('dismissed_pending_alert', 'true');
+                  setShowPendingAlertModal(false);
+                }}
+                className="text-slate-400 hover:text-white hover:bg-white/5 p-2 rounded-xl transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
+              <div className="bg-gradient-to-r from-rose-500/10 to-transparent border border-rose-500/20 rounded-xl p-3.5 flex gap-3 items-start text-xs text-rose-200 leading-relaxed">
+                <AlertCircle className="w-4.5 h-4.5 text-rose-500 shrink-0 mt-0.5" />
+                <div>
+                  {language === 'en'
+                    ? 'Outstanding items require immediate attention. Employees may be locked out of their accounts, or have pressing payroll and helpdesk queries.'
+                    : 'लंबित मदों पर तत्काल ध्यान देने की आवश्यकता है। कर्मचारियों के खाते लॉक हो सकते हैं, या उनके पास महत्वपूर्ण पेरोल और सहायता संबंधी प्रश्न हो सकते हैं।'}
+                </div>
+              </div>
+
+              {/* Stats overview row with beautiful glow */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-900/60 border border-amber-500/20 p-4 rounded-2xl text-center shadow-inner relative overflow-hidden group hover:border-amber-500/40 transition-all duration-300">
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/5 rounded-full blur-xl" />
+                  <span className="text-3xl font-black text-amber-400 font-mono tracking-tight block">
+                    {passwordRequests.filter(r => r.status === 'Pending').length}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-1.5 block">
+                    {language === 'en' ? 'Password Resets' : 'पासवर्ड रीसेट'}
+                  </span>
+                </div>
+                <div className="bg-slate-900/60 border border-emerald-500/20 p-4 rounded-2xl text-center shadow-inner relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-300">
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl" />
+                  <span className="text-3xl font-black text-emerald-400 font-mono tracking-tight block">
+                    {hrTickets.filter(r => r.status === 'Pending').length}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-1.5 block">
+                    {language === 'en' ? 'Support Tickets' : 'सहायता टिकट'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Pending Password Requests Sub-section */}
+              {passwordRequests.filter(r => r.status === 'Pending').length > 0 && (
+                <div className="space-y-2.5">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 font-mono pl-1">
+                    <KeyRound className="w-4 h-4 text-amber-500" />
+                    {language === 'en' ? 'Password Reset Queue' : 'पासवर्ड रीसेट अनुरोध'}
+                  </h4>
+                  <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                    {passwordRequests.filter(r => r.status === 'Pending').map((req: any) => (
+                      <div key={req.id} className="flex items-center justify-between p-3.5 bg-slate-900/40 hover:bg-slate-900 border border-slate-800 rounded-xl transition-all duration-200">
+                        <div className="min-w-0 space-y-0.5">
+                          <span className="font-mono font-black text-xs text-slate-100 block tracking-wider">{req.empId}</span>
+                          <span className="text-[10.5px] text-slate-400 font-medium block truncate max-w-[220px] font-mono">{req.email}</span>
+                        </div>
+                        <span className="text-[9.5px] font-mono text-slate-500 font-bold shrink-0">
+                          {new Date(req.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Tickets Sub-section */}
+              {hrTickets.filter(r => r.status === 'Pending').length > 0 && (
+                <div className="space-y-2.5">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 font-mono pl-1">
+                    <LifeBuoy className="w-4 h-4 text-emerald-400" />
+                    {language === 'en' ? 'Active Support Tickets' : 'सहायता टिकट'}
+                  </h4>
+                  <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                    {hrTickets.filter(r => r.status === 'Pending').map((tkt: any) => (
+                      <div key={tkt.id} className="p-3.5 bg-[#041a12]/30 hover:bg-[#041a12]/60 border border-emerald-950 rounded-xl transition-all duration-200 space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-bold text-xs text-slate-100 truncate">{tkt.name}</span>
+                            <span className="text-[9.5px] font-mono font-bold text-slate-500 uppercase">({tkt.empId})</span>
+                          </div>
+                          <span className="text-[9.5px] font-mono text-slate-500 font-bold shrink-0 font-mono">
+                            {new Date(tkt.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                        <span className="text-[9.5px] text-emerald-400 font-black uppercase tracking-wider font-mono block">{tkt.category}</span>
+                        <p className="text-[11px] text-slate-350 font-medium italic truncate">"{tkt.message}"</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer with high contrast layout */}
+            <div className="bg-slate-950 px-6 py-4.5 border-t border-slate-900 flex flex-col sm:flex-row gap-3 justify-end shrink-0">
+              <button
+                onClick={() => {
+                  sessionStorage.setItem('dismissed_pending_alert', 'true');
+                  setShowPendingAlertModal(false);
+                }}
+                className="w-full sm:w-auto bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-850 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer text-center duration-200"
+              >
+                {language === 'en' ? 'Acknowledge' : 'स्वीकार करें'}
+              </button>
+              <button
+                onClick={() => {
+                  sessionStorage.setItem('dismissed_pending_alert', 'true');
+                  setShowPendingAlertModal(false);
+                  setCurrentTab('notices_support');
+                  setActiveNoticeSubTab('passwords');
+                }}
+                className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-slate-950 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(16,185,129,0.25)] hover:scale-[1.02]"
+              >
+                <span>{language === 'en' ? 'Resolve Now' : 'अभी समाधान करें'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================== */}
+      {/* SIMULATED SANDBOX EMAIL VIEWER */}
+      {/* ============================================== */}
+      {showEmailViewer && lastSentEmail && (
+        <div className="fixed bottom-4 right-4 z-[1000] max-w-sm w-full bg-slate-900 border border-emerald-500/40 rounded-2xl shadow-2xl overflow-hidden font-sans animate-slideUp text-white">
+          <div className="bg-gradient-to-r from-emerald-950 to-slate-900 border-b border-emerald-900/40 px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <h3 className="text-[10px] font-black uppercase tracking-wider text-emerald-400 font-mono">
+                {language === 'en' ? 'Sandbox Email Terminal' : 'सैंडबॉक्स ईमेल टर्मिनल'}
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowEmailViewer(false)}
+              className="text-slate-400 hover:text-white hover:bg-slate-800 p-1 rounded-lg transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-4 space-y-3">
+            <div className="text-[9px] font-semibold text-slate-400 space-y-1 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 font-mono">
+              <div><span className="text-slate-500">FROM:</span> {lastSentEmail.from}</div>
+              <div><span className="text-slate-500">TO:</span> {lastSentEmail.to}</div>
+              <div><span className="text-slate-500">SUBJECT:</span> {lastSentEmail.subject}</div>
+            </div>
+            <div className="bg-slate-950 rounded-xl border border-slate-800/60 overflow-hidden">
+              <div className="bg-slate-900 px-3 py-1 text-[8px] font-black uppercase text-slate-500 font-mono tracking-widest border-b border-slate-800/40 flex justify-between items-center">
+                <span>{language === 'en' ? 'Rendered HTML Email Content' : 'ईमेल HTML सामग्री'}</span>
+                <span className="text-[9px] text-emerald-400 font-semibold">{language === 'en' ? 'Simulated' : 'सिम्युलेटेड'}</span>
+              </div>
+              <div 
+                className="p-4 text-xs bg-slate-950/45 text-slate-300 leading-relaxed overflow-y-auto max-h-48 custom-scrollbar scrollbar-thin scrollbar-thumb-emerald-800/30 scrollbar-track-transparent"
+                dangerouslySetInnerHTML={{ __html: lastSentEmail.html }}
+              />
+            </div>
+            <button
+              onClick={() => setShowEmailViewer(false)}
+              className="w-full bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/20 text-emerald-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all cursor-pointer"
+            >
+              {language === 'en' ? 'Acknowledge & Close' : 'स्वीकार करें और बंद करें'}
+            </button>
           </div>
         </div>
       )}
