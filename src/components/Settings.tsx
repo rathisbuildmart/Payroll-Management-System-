@@ -189,7 +189,8 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   smtpUsername: 'misrpr@rathibuildmart.com',
   smtpPassword: '',
   senderName: 'Rathi LMS System',
-  senderEmail: 'rbmlms@rathibuildmart.com'
+  senderEmail: 'rbmlms@rathibuildmart.com',
+  enablePasswordLoginOtp: false
 };
 
 export default function Settings({ 
@@ -1521,7 +1522,7 @@ export default function Settings({
                     : "लॉग इन किए गए कर्मचारियों के लिए फीचर दृश्यता और अनुमतियों को कॉन्फ़िगर करें।"}
                 </p>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                   <label className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 rounded-lg border border-gray-150 cursor-pointer transition-colors shadow-2xs">
                     <input 
                       type="checkbox"
@@ -1554,6 +1555,25 @@ export default function Settings({
                         {language === 'en'
                           ? "Currently: " + (localSettings.enableMobileAttendance !== false ? "ON" : "OFF (Disabled for Employees)")
                           : "वर्तमान स्थिति: " + (localSettings.enableMobileAttendance !== false ? "सक्रिय (ON)" : "निष्क्रिय (OFF - बंद)")}
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 rounded-lg border border-gray-150 cursor-pointer transition-colors shadow-2xs col-span-1 sm:col-span-2 lg:col-span-1">
+                    <input 
+                      type="checkbox"
+                      checked={localSettings.enablePasswordLoginOtp === true}
+                      onChange={(e) => setLocalSettings({...localSettings, enablePasswordLoginOtp: e.target.checked})}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
+                    />
+                    <div>
+                      <span className="block text-xs font-bold text-gray-800">
+                        {language === 'en' ? "2FA Password Login OTP" : "पासवर्ड लॉगिन पर 2FA ओटीपी"}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-medium block mt-0.5">
+                        {language === 'en'
+                          ? "Currently: " + (localSettings.enablePasswordLoginOtp ? "ON (Mandatory OTP)" : "OFF (Password Only)")
+                          : "वर्तमान स्थिति: " + (localSettings.enablePasswordLoginOtp ? "चालू (ओटीपी जरूरी)" : "बंद (केवल पासवर्ड)")}
                       </span>
                     </div>
                   </label>

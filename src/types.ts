@@ -96,6 +96,11 @@ export interface Employee {
   allowMultipleDevices?: boolean;
   pendingDeviceApprovalCode?: string;
   pendingDeviceApprovalOtp?: string;
+  loggedDevices?: Array<{
+    deviceId: string;
+    browser: string;
+    lastUsed: string;
+  }>;
 }
 
 export interface SalaryIncrement {
@@ -186,6 +191,7 @@ export interface AdminSettings {
   smtpPassword?: string;
   senderName?: string;
   senderEmail?: string;
+  enablePasswordLoginOtp?: boolean;
 }
 
 export interface Attendance {

@@ -63,6 +63,65 @@ const getDeviceFingerprint = (): string => {
   return fingerprint;
 };
 
+// Helper to detect human-readable Browser & Operating System
+const getBrowserAndOSName = (): string => {
+  const ua = navigator.userAgent;
+  let browser = "Browser";
+  let os = "OS";
+
+  if (ua.indexOf("Firefox") > -1) {
+    browser = "Firefox";
+  } else if (ua.indexOf("SamsungBrowser") > -1) {
+    browser = "Samsung Internet";
+  } else if (ua.indexOf("Opera") > -1 || ua.indexOf("OPR") > -1) {
+    browser = "Opera";
+  } else if (ua.indexOf("Edge") > -1 || ua.indexOf("Edg") > -1) {
+    browser = "Edge";
+  } else if (ua.indexOf("Chrome") > -1) {
+    browser = "Chrome";
+  } else if (ua.indexOf("Safari") > -1) {
+    browser = "Safari";
+  }
+
+  if (ua.indexOf("Windows NT 10.0") > -1) os = "Windows 10/11";
+  else if (ua.indexOf("Windows NT 6.2") > -1) os = "Windows 8";
+  else if (ua.indexOf("Windows NT 6.1") > -1) os = "Windows 7";
+  else if (ua.indexOf("Macintosh") > -1) os = "macOS";
+  else if (ua.indexOf("Android") > -1) os = "Android";
+  else if (ua.indexOf("iPhone") > -1 || ua.indexOf("iPad") > -1) os = "iOS";
+  else if (ua.indexOf("Linux") > -1) os = "Linux";
+
+  return `${browser} (${os})`;
+};
+
+// Update an employee's loggedDevices list with the current device
+const updateLoggedDevicesForEmployee = (emp: Employee, deviceId: string): Employee => {
+  const browser = getBrowserAndOSName();
+  const lastUsed = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+  const loggedDevices = emp.loggedDevices || [];
+
+  const existingIdx = loggedDevices.findIndex(d => d.deviceId === deviceId);
+  let updatedDevices = [...loggedDevices];
+  if (existingIdx !== -1) {
+    updatedDevices[existingIdx] = {
+      deviceId,
+      browser,
+      lastUsed
+    };
+  } else {
+    updatedDevices.push({
+      deviceId,
+      browser,
+      lastUsed
+    });
+  }
+
+  return {
+    ...emp,
+    loggedDevices: updatedDevices
+  };
+};
+
 // Importing Tab Components
 import Dashboard from './components/Dashboard';
 import EmployeeList from './components/EmployeeList';
@@ -459,6 +518,15 @@ export default function App() {
   const [loginEnteredOtp, setLoginEnteredOtp] = useState('');
   const [isSendingLoginOtp, setIsSendingLoginOtp] = useState(false);
   const [loginOtpEmail, setLoginOtpEmail] = useState('');
+
+  // Password 2FA OTP States
+  const [passwordLoginOtpStep, setPasswordLoginOtpStep] = useState<'password' | 'enter_otp'>('password');
+  const [passwordLoginPendingUser, setPasswordLoginPendingUser] = useState<{
+    type: 'admin' | 'role' | 'employee';
+    userObj: any;
+  } | null>(null);
+  const [passwordLoginEnteredOtp, setPasswordLoginEnteredOtp] = useState('');
+  const [isSendingPasswordLoginOtp, setIsSendingPasswordLoginOtp] = useState(false);
 
   // First-Time Login Security Verification States
   const [isFirstLoginVerification, setIsFirstLoginVerification] = useState<boolean>(false);
@@ -1056,6 +1124,51 @@ export default function App() {
       console.error('Google Sign in failed', err);
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  const sendPassword2faOtp = async (email: string, userObj: any, type: 'admin' | 'role' | 'employee', name: string) => {
+    setLoginErr(null);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    setLoginGeneratedOtp(otp);
+    setLoginOtpEmail(email);
+    setPasswordLoginPendingUser({ type, userObj });
+    setIsSendingPasswordLoginOtp(true);
+
+    try {
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          otp,
+          empName: name,
+          purpose: 'login_2fa',
+          language,
+          smtpSettings: {
+            host: adminSettings.smtpHost,
+            port: adminSettings.smtpPort,
+            username: adminSettings.smtpUsername,
+            password: adminSettings.smtpPassword,
+            senderName: adminSettings.senderName,
+            senderEmail: adminSettings.senderEmail
+          }
+        })
+      });
+      const data = await res.json();
+      setIsSendingPasswordLoginOtp(false);
+      if (data.success) {
+        setPasswordLoginOtpStep('enter_otp');
+        if (data.method === 'SIMULATION') {
+          setLastSentEmail(data.debugPayload);
+          setShowEmailViewer(true);
+        }
+      } else {
+        setLoginErr(data.error || 'Failed to dispatch login 2FA OTP.');
+      }
+    } catch (err) {
+      setIsSendingPasswordLoginOtp(false);
+      setLoginErr(language === 'en' ? 'Network error sending 2FA OTP.' : '2FA ओटीपी भेजने में नेटवर्क त्रुटि।');
     }
   };
 
@@ -1978,10 +2091,10 @@ export default function App() {
                       setLoginErr(null);
                       if (firstLoginEnteredOtp.trim() === firstLoginGeneratedOtp) {
                         const currentDeviceId = getDeviceFingerprint();
-                        const updatedEmp = {
-                          ...firstLoginEmployee,
+                        const updatedEmp = updateLoggedDevicesForEmployee({
+                          ...firstLoginEmployee!,
                           approvedDeviceId: currentDeviceId
-                        };
+                        }, currentDeviceId);
 
                         // Sync updated employee to database
                         const updatedEmps = employees.map(emp => emp.id === updatedEmp.id ? updatedEmp : emp);
@@ -2087,12 +2200,12 @@ export default function App() {
                       const enteredOtpMatches = firstLoginAdminCode.trim() && currentEmp.pendingDeviceApprovalOtp && (firstLoginAdminCode.trim() === currentEmp.pendingDeviceApprovalOtp.trim());
 
                       if (isAlreadyApproved || enteredOtpMatches) {
-                        const updatedEmp = {
+                        const updatedEmp = updateLoggedDevicesForEmployee({
                           ...currentEmp,
                           approvedDeviceId: currentDeviceId,
                           pendingDeviceApprovalCode: '',
                           pendingDeviceApprovalOtp: ''
-                        };
+                        }, currentDeviceId);
 
                         const updatedEmps = latestEmployees.map(emp => emp.id === updatedEmp.id ? updatedEmp : emp);
                         setEmployees(updatedEmps);
@@ -2220,6 +2333,9 @@ export default function App() {
                       onClick={() => {
                         setLoginMethod('password');
                         setLoginErr(null);
+                        setPasswordLoginOtpStep('password');
+                        setPasswordLoginPendingUser(null);
+                        setPasswordLoginEnteredOtp('');
                       }}
                       className={`flex-1 pb-3 text-center border-b-2 cursor-pointer transition-all ${
                         loginMethod === 'password'
@@ -2248,205 +2364,379 @@ export default function App() {
                   </div>
 
               {loginMethod === 'password' ? (
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  const inputID = loginId.trim();
-                  const inputPass = loginPass;
-                  if (!inputID || !inputPass) {
-                    setLoginErr(language === 'en' ? 'Please fill in all fields.' : 'कृपया सभी फ़ील्ड भरें।');
-                    return;
-                  }
-
-                  // Load latest employees list from Firestore to verify correct and updated device lock and multi-device status
-                  let latestEmployees = employees;
-                  try {
-                    const result = await loadFromFirestore();
-                    if (result && result.success && result.data && result.data.employees) {
-                      latestEmployees = result.data.employees;
-                      setEmployees(latestEmployees);
-                    }
-                  } catch (err) {
-                    console.warn("Failed to retrieve latest employees for login check:", err);
-                  }
-
-                  const adminUsername = adminSettings.adminUsername || 'admin';
-                  const adminPassword = adminSettings.adminPassword || 'admin123';
-
-                  if (inputID.toLowerCase() === adminUsername.toLowerCase()) {
-                    if (inputPass === adminPassword) {
-                      const adminUser: PortalUser = {
-                        id: 'admin',
-                        name: 'Administrator',
-                        role: 'admin'
-                      };
-                      setPortalUser(adminUser);
-                      localStorage.setItem('payroll_portal_user', JSON.stringify(adminUser));
-                      setLoginId('');
-                      setLoginPass('');
-                      setLoginErr(null);
-                    } else {
-                      recordUnsuccessfulLogin(inputID, 'Admin Incorrect Password');
-                      setLoginErr(language === 'en' ? 'Incorrect Administrator password.' : 'अमान्य एडमिनिस्ट्रेटर पासवर्ड।');
-                    }
-                  } else {
-                    const roleAccounts = adminSettings.roleAccounts || [];
-                    const matchedRoleAcc = roleAccounts.find(
-                      acc => acc.username.trim().toLowerCase() === inputID.toLowerCase()
-                    );
-
-                    if (matchedRoleAcc) {
-                      if (inputPass === matchedRoleAcc.password) {
+                passwordLoginOtpStep === 'enter_otp' ? (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setLoginErr(null);
+                    if (passwordLoginEnteredOtp.trim() === loginGeneratedOtp) {
+                      if (!passwordLoginPendingUser) return;
+                      const { type, userObj } = passwordLoginPendingUser;
+                      
+                      if (type === 'admin') {
+                        const adminUserObj: PortalUser = {
+                          id: 'admin',
+                          name: 'Administrator',
+                          role: 'admin'
+                        };
+                        setPortalUser(adminUserObj);
+                        localStorage.setItem('payroll_portal_user', JSON.stringify(adminUserObj));
+                        setLoginId('');
+                        setLoginPass('');
+                        setLoginErr(null);
+                      } else if (type === 'role') {
                         const portalUserObj: PortalUser = {
-                          id: matchedRoleAcc.id,
-                          name: matchedRoleAcc.name,
-                          role: matchedRoleAcc.role,
-                          branch: matchedRoleAcc.branch,
-                          branches: matchedRoleAcc.branches
+                          id: userObj.id,
+                          name: userObj.name,
+                          role: userObj.role,
+                          branch: userObj.branch,
+                          branches: userObj.branches
                         };
                         setPortalUser(portalUserObj);
                         localStorage.setItem('payroll_portal_user', JSON.stringify(portalUserObj));
                         setLoginId('');
                         setLoginPass('');
                         setLoginErr(null);
-                      } else {
-                        recordUnsuccessfulLogin(inputID, 'Incorrect Password');
-                        setLoginErr(language === 'en' ? 'Incorrect Password.' : 'गलत पासवर्ड।');
-                      }
-                    } else {
-                      const emp = latestEmployees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
-                      if (emp) {
-                        const targetPass = (emp.password || '').trim();
-                        const isCorrectPass = targetPass 
-                          ? (inputPass.trim() === targetPass) 
-                          : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
-
-                        if (isCorrectPass) {
-                          // 1. Approval Check
-                          if (emp.isApproved === false) {
-                            recordUnsuccessfulLogin(inputID, 'Account pending approval');
-                            setLoginErr(
-                              language === 'en'
-                                ? "Login blocked. HR or Administrator approval is required before your first login."
-                                : "लॉगिन अवरुद्ध। आपकी पहली लॉगिन से पहले एचआर या प्रशासक की मंजूरी आवश्यक है।"
-                            );
-                            return;
+                      } else if (type === 'employee') {
+                        const currentDeviceId = getDeviceFingerprint();
+                        const emp = userObj;
+                        
+                        let latestEmployees = employees;
+                        try {
+                          const result = await loadFromFirestore();
+                          if (result && result.success && result.data && result.data.employees) {
+                            latestEmployees = result.data.employees;
+                            setEmployees(latestEmployees);
                           }
-
-                          // 2. Device Fingerprint Check
-                          const currentDeviceId = getDeviceFingerprint();
-                          if (emp.approvedDeviceId && emp.approvedDeviceId !== currentDeviceId && !emp.allowMultipleDevices) {
-                            recordUnsuccessfulLogin(inputID, 'Device lock active');
-                            setLoginErr(
-                              language === 'en'
-                                ? "Login blocked. Device restriction is active. You can only log in from your registered device. Please contact HR/Admin."
-                                : "लॉगिन अवरुद्ध। डिवाइस लॉक सक्रिय है। आप केवल अपने पंजीकृत डिवाइस से लॉगिन कर सकते हैं। कृपया एचआर/एडमिन से संपर्क करें।"
-                            );
-                            return;
-                          }
-
-                          // If no device bound yet, enforce mandatory first-time verification flow
-                          if (!emp.approvedDeviceId) {
-                            setFirstLoginEmployee(emp);
-                            setIsFirstLoginVerification(true);
-                            setFirstLoginStep('select_option');
-                            setFirstLoginGeneratedOtp('');
-                            setFirstLoginEnteredOtp('');
-                            setFirstLoginAdminCode('');
-                            setLoginErr(null);
-                            return;
-                          }
-
-                          const empUser: PortalUser = {
-                            id: emp.id,
-                            name: emp.name,
-                            role: 'employee',
-                            employee: emp
-                          };
-                          setPortalUser(empUser);
-                          localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
-                          setLoginId('');
-                          setLoginPass('');
-                          setLoginErr(null);
-                        } else {
-                          recordUnsuccessfulLogin(inputID, 'Incorrect Password');
-                          setLoginErr(language === 'en' ? "Incorrect Password! Standard password is your Employee ID or '123456'." : "गलत पासवर्ड! मानक पासवर्ड आपकी कर्मचारी आईडी या '123456' है।");
+                        } catch (err) {
+                          console.warn("Failed to retrieve latest employees for login check:", err);
                         }
-                      } else {
-                        recordUnsuccessfulLogin(inputID, 'User ID not found');
-                        setLoginErr(language === 'en' ? "User ID / Employee ID not found. Contact administration." : "उपयोगकर्ता आईडी / कर्मचारी आईडी नहीं मिली। प्रशासन से संपर्क करें।");
+
+                        const updatedEmp = updateLoggedDevicesForEmployee(emp, currentDeviceId);
+                        const updatedEmps = latestEmployees.map(e => e.id === updatedEmp.id ? updatedEmp : e);
+                        setEmployees(updatedEmps);
+                        try {
+                          await saveToFirestore({
+                            employees: updatedEmps,
+                            attendance,
+                            payroll,
+                            adminSettings,
+                            failedLogins,
+                            spreadsheetId,
+                            spreadsheetLink
+                          });
+                        } catch (err) {
+                          console.warn("Failed to sync logged devices list:", err);
+                        }
+
+                        const empUser: PortalUser = {
+                          id: updatedEmp.id,
+                          name: updatedEmp.name,
+                          role: 'employee',
+                          employee: updatedEmp
+                        };
+                        setPortalUser(empUser);
+                        localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                        setLoginId('');
+                        setLoginPass('');
+                        setLoginErr(null);
                       }
+                      setPasswordLoginOtpStep('password');
+                      setPasswordLoginPendingUser(null);
+                      setPasswordLoginEnteredOtp('');
+                    } else {
+                      setLoginErr(language === 'en' ? 'Invalid 2FA OTP. Please try again.' : 'अमान्य 2FA ओटीपी। कृपया पुनः प्रयास करें।');
                     }
-                  }
-                }} className="space-y-4 mt-6 animate-fadeIn">
-                  
-                  {/* User ID Field */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                      {language === 'en' ? 'User ID / Employee ID' : 'उपयोगकर्ता आईडी / कर्मचारी आईडी'}
-                    </label>
-                    <div className="relative">
-                      <LucideUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  }} className="space-y-4 mt-6 animate-fadeIn">
+                    <div className="bg-emerald-950/20 text-emerald-300 border border-emerald-900/30 p-3 rounded-xl text-[11px] font-semibold leading-normal animate-pulse">
+                      🛡️ {language === 'en' 
+                        ? `Two-Factor Authentication is active. A secure login OTP has been sent to ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")}.`
+                        : `टू-फैक्टर ऑथेंटिकेशन सक्रिय है। एक सुरक्षित लॉगिन ओटीपी ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")} पर भेजा गया है।`}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                        {language === 'en' ? '6-Digit OTP Code' : '6-अंकीय ओटीपी कोड'}
+                      </label>
                       <input
                         type="text"
                         required
-                        value={loginId}
-                        onChange={(e) => setLoginId(e.target.value)}
-                        placeholder={language === 'en' ? 'e.g., admin or EMP001' : 'उदा., admin या EMP001'}
-                        className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                        maxLength={6}
+                        value={passwordLoginEnteredOtp}
+                        onChange={(e) => setPasswordLoginEnteredOtp(e.target.value)}
+                        placeholder="e.g. 123456"
+                        className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
                       />
                     </div>
-                  </div>
 
-                  {/* Password Field */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
+                    <button
+                      type="submit"
+                      disabled={isSendingPasswordLoginOtp}
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider disabled:opacity-50"
+                    >
+                      {isSendingPasswordLoginOtp
+                        ? (language === 'en' ? 'Verifying...' : 'सत्यापित किया जा रहा है...')
+                        : (language === 'en' ? 'Verify & Sign In' : 'सत्यापित करें और साइन इन करें')}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPasswordLoginOtpStep('password');
+                        setPasswordLoginPendingUser(null);
+                        setPasswordLoginEnteredOtp('');
+                        setLoginErr(null);
+                      }}
+                      className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 mt-1 transition-colors"
+                    >
+                      {language === 'en' ? 'Back' : 'पीछे'}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const inputID = loginId.trim();
+                    const inputPass = loginPass;
+                    if (!inputID || !inputPass) {
+                      setLoginErr(language === 'en' ? 'Please fill in all fields.' : 'कृपया सभी फ़ील्ड भरें।');
+                      return;
+                    }
+
+                    // Load latest employees list from Firestore to verify correct and updated device lock and multi-device status
+                    let latestEmployees = employees;
+                    try {
+                      const result = await loadFromFirestore();
+                      if (result && result.success && result.data && result.data.employees) {
+                        latestEmployees = result.data.employees;
+                        setEmployees(latestEmployees);
+                      }
+                    } catch (err) {
+                      console.warn("Failed to retrieve latest employees for login check:", err);
+                    }
+
+                    const adminUsername = adminSettings.adminUsername || 'admin';
+                    const adminPassword = adminSettings.adminPassword || 'admin123';
+
+                    if (inputID.toLowerCase() === adminUsername.toLowerCase()) {
+                      if (inputPass === adminPassword) {
+                        const adminUser: PortalUser = {
+                          id: 'admin',
+                          name: 'Administrator',
+                          role: 'admin'
+                        };
+                        if (adminSettings.enablePasswordLoginOtp) {
+                          const email = adminSettings.senderEmail || adminSettings.smtpUsername || 'admin@rathibuildmart.com';
+                          await sendPassword2faOtp(email, adminUser, 'admin', 'Administrator');
+                        } else {
+                          setPortalUser(adminUser);
+                          localStorage.setItem('payroll_portal_user', JSON.stringify(adminUser));
+                          setLoginId('');
+                          setLoginPass('');
+                          setLoginErr(null);
+                        }
+                      } else {
+                        recordUnsuccessfulLogin(inputID, 'Admin Incorrect Password');
+                        setLoginErr(language === 'en' ? 'Incorrect Administrator password.' : 'अमान्य एडमिनिस्ट्रेटर पासवर्ड।');
+                      }
+                    } else {
+                      const roleAccounts = adminSettings.roleAccounts || [];
+                      const matchedRoleAcc = roleAccounts.find(
+                        acc => acc.username.trim().toLowerCase() === inputID.toLowerCase()
+                      );
+
+                      if (matchedRoleAcc) {
+                        if (inputPass === matchedRoleAcc.password) {
+                          const portalUserObj: PortalUser = {
+                            id: matchedRoleAcc.id,
+                            name: matchedRoleAcc.name,
+                            role: matchedRoleAcc.role,
+                            branch: matchedRoleAcc.branch,
+                            branches: matchedRoleAcc.branches
+                          };
+                          if (adminSettings.enablePasswordLoginOtp) {
+                            const email = matchedRoleAcc.email || '';
+                            if (!email || !email.trim()) {
+                              setLoginErr(language === 'en'
+                                ? 'Email address is not configured for this user. Please contact administrator.'
+                                : 'इस उपयोगकर्ता के लिए ईमेल पता कॉन्फ़िगर नहीं किया गया है। कृपया एडमिनिस्ट्रेटर से संपर्क करें।');
+                              return;
+                            }
+                            await sendPassword2faOtp(email, matchedRoleAcc, 'role', matchedRoleAcc.name);
+                          } else {
+                            setPortalUser(portalUserObj);
+                            localStorage.setItem('payroll_portal_user', JSON.stringify(portalUserObj));
+                            setLoginId('');
+                            setLoginPass('');
+                            setLoginErr(null);
+                          }
+                        } else {
+                          recordUnsuccessfulLogin(inputID, 'Incorrect Password');
+                          setLoginErr(language === 'en' ? 'Incorrect Password.' : 'गलत पासवर्ड।');
+                        }
+                      } else {
+                        const emp = latestEmployees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
+                        if (emp) {
+                          const targetPass = (emp.password || '').trim();
+                          const isCorrectPass = targetPass 
+                            ? (inputPass.trim() === targetPass) 
+                            : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
+
+                          if (isCorrectPass) {
+                            // 1. Approval Check
+                            if (emp.isApproved === false) {
+                              recordUnsuccessfulLogin(inputID, 'Account pending approval');
+                              setLoginErr(
+                                language === 'en'
+                                  ? "Login blocked. HR or Administrator approval is required before your first login."
+                                  : "लॉगिन अवरुद्ध। आपकी पहली लॉगिन से पहले एचआर या प्रशासक की मंजूरी आवश्यक है।"
+                              );
+                              return;
+                            }
+
+                            // 2. Device Fingerprint Check
+                            const currentDeviceId = getDeviceFingerprint();
+                            if (emp.approvedDeviceId && emp.approvedDeviceId !== currentDeviceId && !emp.allowMultipleDevices) {
+                              recordUnsuccessfulLogin(inputID, 'Device lock active');
+                              setLoginErr(
+                                language === 'en'
+                                  ? "Login blocked. Device restriction is active. You can only log in from your registered device. Please contact HR/Admin."
+                                  : "लॉगिन अवरुद्ध। डिवाइस लॉक सक्रिय है। आप केवल अपने पंजीकृत डिवाइस से लॉगिन कर सकते हैं। कृपया एचआर/एडमिन से संपर्क करें।"
+                              );
+                              return;
+                            }
+
+                            // If no device bound yet, enforce mandatory first-time verification flow
+                            if (!emp.approvedDeviceId) {
+                              setFirstLoginEmployee(emp);
+                              setIsFirstLoginVerification(true);
+                              setFirstLoginStep('select_option');
+                              setFirstLoginGeneratedOtp('');
+                              setFirstLoginEnteredOtp('');
+                              setFirstLoginAdminCode('');
+                              setLoginErr(null);
+                              return;
+                            }
+
+                            // If OTP is enabled, send OTP
+                            if (adminSettings.enablePasswordLoginOtp) {
+                              const email = emp.email || '';
+                              if (!email || !email.trim()) {
+                                setLoginErr(language === 'en'
+                                  ? 'Email address is not configured for this user. Please contact HR.'
+                                  : 'इस उपयोगकर्ता के लिए ईमेल पता कॉन्फ़िगर नहीं किया गया है। कृपया एचआर से संपर्क करें।');
+                                return;
+                              }
+                              await sendPassword2faOtp(email, emp, 'employee', emp.name);
+                            } else {
+                              const updatedEmp = updateLoggedDevicesForEmployee(emp, currentDeviceId);
+                              const updatedEmps = latestEmployees.map(e => e.id === updatedEmp.id ? updatedEmp : e);
+                              setEmployees(updatedEmps);
+                              try {
+                                await saveToFirestore({
+                                  employees: updatedEmps,
+                                  attendance,
+                                  payroll,
+                                  adminSettings,
+                                  failedLogins,
+                                  spreadsheetId,
+                                  spreadsheetLink
+                                });
+                              } catch (err) {
+                                console.warn("Failed to sync logged devices list:", err);
+                              }
+
+                              const empUser: PortalUser = {
+                                id: updatedEmp.id,
+                                name: updatedEmp.name,
+                                role: 'employee',
+                                employee: updatedEmp
+                              };
+                              setPortalUser(empUser);
+                              localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                              setLoginId('');
+                              setLoginPass('');
+                              setLoginErr(null);
+                            }
+                          } else {
+                            recordUnsuccessfulLogin(inputID, 'Incorrect Password');
+                            setLoginErr(language === 'en' ? "Incorrect Password! Standard password is your Employee ID or '123456'." : "गलत पासवर्ड! मानक पासवर्ड आपकी कर्मचारी आईडी या '123456' है।");
+                          }
+                        } else {
+                          recordUnsuccessfulLogin(inputID, 'User ID not found');
+                          setLoginErr(language === 'en' ? "User ID / Employee ID not found. Contact administration." : "उपयोगकर्ता आईडी / कर्मचारी आईडी नहीं मिली। प्रशासन से संपर्क करें।");
+                        }
+                      }
+                    }
+                  }} className="space-y-4 mt-6 animate-fadeIn">
+                    
+                    {/* User ID Field */}
+                    <div className="space-y-1.5">
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'Password' : 'पासवर्ड'}
+                        {language === 'en' ? 'User ID / Employee ID' : 'उपयोगकर्ता आईडी / कर्मचारी आईडी'}
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowForgotModal(true);
-                          setForgotStep('request');
-                          setForgotSubmitted(false);
-                          setForgotEmpId('');
-                          setForgotEmail('');
-                          setForgotMobile('');
-                          setForgotError(null);
-                        }}
-                        className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                      >
-                        {language === 'en' ? 'Forgot Password?' : 'पासवर्ड भूल गए?'}
-                      </button>
+                      <div className="relative">
+                        <LucideUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <input
+                          type="text"
+                          required
+                          value={loginId}
+                          onChange={(e) => setLoginId(e.target.value)}
+                          placeholder={language === 'en' ? 'e.g., admin or EMP001' : 'उदा., admin या EMP001'}
+                          className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+                        />
+                      </div>
                     </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        required
-                        value={loginPass}
-                        onChange={(e) => setLoginPass(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-sans"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 focus:outline-none p-1 rounded-md transition-colors cursor-pointer"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Submit Button */}
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg shadow-emerald-950/40 hover:shadow-emerald-500/10 transition-all duration-200 text-center uppercase tracking-wider active:scale-98 mt-2"
-                  >
-                    {language === 'en' ? 'Sign In to Workspace' : 'कार्यक्षेत्र में साइन इन करें'}
-                  </button>
-                </form>
+                    {/* Password Field */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                          {language === 'en' ? 'Password' : 'पासवर्ड'}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowForgotModal(true);
+                            setForgotStep('request');
+                            setForgotSubmitted(false);
+                            setForgotEmpId('');
+                            setForgotEmail('');
+                            setForgotMobile('');
+                            setForgotError(null);
+                          }}
+                          className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                        >
+                          {language === 'en' ? 'Forgot Password?' : 'पासवर्ड भूल गए?'}
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          value={loginPass}
+                          onChange={(e) => setLoginPass(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-sans"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 focus:outline-none p-1 rounded-md transition-colors cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg shadow-emerald-950/40 hover:shadow-emerald-500/10 transition-all duration-200 text-center uppercase tracking-wider active:scale-98 mt-2"
+                    >
+                      {language === 'en' ? 'Sign In to Workspace' : 'कार्यक्षेत्र में साइन इन करें'}
+                    </button>
+                  </form>
+                )
               ) : (
                 // OTP Login Form
                 <div className="mt-6 animate-fadeIn">
@@ -2597,11 +2887,28 @@ export default function App() {
                             return;
                           }
 
+                          const updatedEmp = updateLoggedDevicesForEmployee(emp, currentDeviceId);
+                          const updatedEmps = latestEmployees.map(e => e.id === updatedEmp.id ? updatedEmp : e);
+                          setEmployees(updatedEmps);
+                          try {
+                            await saveToFirestore({
+                              employees: updatedEmps,
+                              attendance,
+                              payroll,
+                              adminSettings,
+                              failedLogins,
+                              spreadsheetId,
+                              spreadsheetLink
+                            });
+                          } catch (err) {
+                            console.warn("Failed to sync logged devices list:", err);
+                          }
+
                           const empUser: PortalUser = {
-                            id: emp.id,
-                            name: emp.name,
+                            id: updatedEmp.id,
+                            name: updatedEmp.name,
                             role: 'employee',
-                            employee: emp
+                            employee: updatedEmp
                           };
                           setPortalUser(empUser);
                           localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));

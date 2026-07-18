@@ -1697,7 +1697,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                   className="fixed inset-0 z-40" 
                                   onClick={() => setActiveAccessMenuId(null)} 
                                 />
-                                <div className="absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-gray-150 z-50 p-3 text-left">
+                                <div className="absolute right-0 mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-gray-150 z-50 p-3 text-left">
                                   <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-gray-100">
                                     <span className="font-extrabold text-slate-950 text-xs truncate max-w-[150px]">{emp.name}</span>
                                     <span className="text-[10px] text-gray-400 font-mono">ID: {emp.id}</span>
@@ -1775,6 +1775,56 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                           : (language === 'en' ? 'Allow Multi-Device' : 'मल्टी-डिवाइस अनुमति दें')}
                                       </button>
                                     </div>
+
+                                    {/* Logged Devices List */}
+                                    {emp.loggedDevices && emp.loggedDevices.length > 0 && (
+                                      <div className="pt-2 border-t border-gray-150">
+                                        <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                                          {language === 'en' ? 'Logged Devices / History' : 'लॉगिन किए गए डिवाइस / इतिहास'} ({emp.loggedDevices.length})
+                                        </span>
+                                        <div className="max-h-28 overflow-y-auto space-y-1 pr-0.5 scrollbar-thin">
+                                          {emp.loggedDevices.map((d, index) => {
+                                            const isCurrentApproved = emp.approvedDeviceId === d.deviceId;
+                                            return (
+                                              <div key={index} className={`border rounded p-1.5 text-[9px] flex justify-between items-start gap-1 transition-all ${
+                                                isCurrentApproved 
+                                                  ? 'bg-emerald-50/50 border-emerald-200/60 text-emerald-950' 
+                                                  : 'bg-slate-50 border-slate-150 text-slate-800'
+                                              }`}>
+                                                <div className="min-w-0 flex-1 text-left">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="font-extrabold truncate block" title={d.browser}>{d.browser}</span>
+                                                    {isCurrentApproved && (
+                                                      <span className="text-[7px] font-black uppercase font-mono px-1 py-0.25 bg-emerald-100 text-emerald-800 rounded tracking-wide shrink-0">
+                                                        {language === 'en' ? 'Bound' : 'बाउंड'}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                  <span className="block text-slate-400 font-medium text-[8px] mt-0.5 text-left">{d.lastUsed}</span>
+                                                  <span className="block font-mono text-[7px] text-slate-400 truncate mt-0.5 text-left">{d.deviceId}</span>
+                                                </div>
+                                                <button
+                                                  onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    const updatedDevices = emp.loggedDevices?.filter(device => device.deviceId !== d.deviceId) || [];
+                                                    const updatedApprovedId = emp.approvedDeviceId === d.deviceId ? '' : emp.approvedDeviceId;
+                                                    await onUpdateEmployee({
+                                                      ...emp,
+                                                      loggedDevices: updatedDevices,
+                                                      approvedDeviceId: updatedApprovedId
+                                                    });
+                                                  }}
+                                                  className="text-rose-600 hover:text-rose-800 font-extrabold px-1.5 py-0.5 text-[8px] uppercase hover:bg-rose-50 rounded border border-rose-100 hover:border-rose-200 transition-all shrink-0 cursor-pointer"
+                                                  title={language === 'en' ? 'Remove/Logout this Device' : 'इस डिवाइस को हटाएं / लॉगआउट करें'}
+                                                >
+                                                  {language === 'en' ? 'Logout' : 'लॉगआउट'}
+                                                </button>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </>
