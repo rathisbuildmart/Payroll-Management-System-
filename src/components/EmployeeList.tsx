@@ -1209,6 +1209,63 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
 
       {activeSubTab === 'directory' ? (
         <>
+          {/* Device & Login Status Summary Stats Card */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
+              <div className="p-3 bg-emerald-50 text-[#03623c] rounded-xl">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {language === 'en' ? 'Total Employees' : 'कुल कर्मचारी'}
+                </div>
+                <div className="text-xl font-black text-slate-800">{employees.length}</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
+              <div className="p-3 bg-purple-50 text-purple-700 rounded-xl">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {language === 'en' ? 'Locked Devices' : 'लॉक्ड डिवाइस'}
+                </div>
+                <div className="text-xl font-black text-purple-700">
+                  {employees.filter(e => e.approvedDeviceId).length}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
+              <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl">
+                <Sliders className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {language === 'en' ? 'Multi-Device Allowed' : 'मल्टी-डिवाइस अनुमति'}
+                </div>
+                <div className="text-xl font-black text-indigo-700">
+                  {employees.filter(e => e.allowMultipleDevices).length}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
+              <div className="p-3 bg-rose-50 text-rose-700 rounded-xl">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {language === 'en' ? 'Pending Approval' : 'लंबित स्वीकृतियां'}
+                </div>
+                <div className="text-xl font-black text-rose-700">
+                  {employees.filter(e => e.isApproved === false).length}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Search and Filters panel */}
       <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-1 flex-col sm:flex-row gap-3">
@@ -1565,7 +1622,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     )}
                     {visibleColumns.includes('gpsAndMobile') && (
                       <td className="py-4 px-6 text-center">
-                        <div className="flex flex-col items-center gap-1">
+                        <div className="flex flex-col items-center gap-1.5">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
                             emp.enableMobileAttendance 
                               ? 'bg-emerald-100 text-emerald-800' 
@@ -1580,6 +1637,18 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                           }`}>
                             {language === 'en' ? 'GPS' : 'जीपीएस'}: {emp.enableGeofencing ? 'ENFORCED' : 'OFF'}
                           </span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
+                            emp.approvedDeviceId 
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                              : 'bg-amber-100 text-amber-800 border border-amber-200'
+                          }`}>
+                            📱 {language === 'en' ? 'Device' : 'डिवाइस'}: {emp.approvedDeviceId ? (emp.allowMultipleDevices ? (language === 'en' ? 'Multi-Device' : 'मल्टी-डिवाइस') : (language === 'en' ? 'Locked' : 'लॉक्ड')) : (language === 'en' ? 'Not Bound' : 'कोई डिवाइस नहीं')}
+                          </span>
+                          {emp.approvedDeviceId && (
+                            <span className="text-[8px] font-mono text-slate-400 max-w-[100px] truncate" title={emp.approvedDeviceId}>
+                              FP: {emp.approvedDeviceId.substring(0, 8)}...
+                            </span>
+                          )}
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
                             emp.isApproved !== false 
                               ? 'bg-[#03623c]/10 text-[#03623c]' 
