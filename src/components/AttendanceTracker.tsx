@@ -107,10 +107,12 @@ export default function AttendanceTracker({
   }, [employees]);
 
   const employeeOptions = useMemo(() => {
-    return employees.map(emp => ({
-      id: emp.id,
-      name: `${emp.name} (${emp.id})`
-    }));
+    return employees
+      .filter(emp => emp.isActive !== false)
+      .map(emp => ({
+        id: emp.id,
+        name: `${emp.name} (${emp.id})`
+      }));
   }, [employees]);
 
   const filteredActiveEmployees = useMemo(() => {

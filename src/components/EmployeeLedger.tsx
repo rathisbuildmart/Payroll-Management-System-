@@ -144,9 +144,9 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
     return employees.map(emp => ({
       id: emp.id,
       name: emp.name,
-      display: `${emp.name} (${emp.id})`
+      display: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${language === 'en' ? 'Inactive' : 'निष्क्रिय'}`
     }));
-  }, [employees]);
+  }, [employees, language]);
 
   // Bidirectional Filter Logic
   const filteredLedger = useMemo(() => {

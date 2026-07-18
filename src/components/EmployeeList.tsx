@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders, Smartphone, Key, UserCog } from 'lucide-react';
 import { Employee, AdminSettings } from '../types';
 
@@ -274,11 +274,24 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   }, [employees]);
 
   const employeeOptions = useMemo(() => {
-    return employees.map(emp => ({
-      id: emp.id,
-      name: `${emp.name} (${emp.id})`
-    }));
-  }, [employees]);
+    return employees
+      .filter(emp => {
+        if (selectedStatus === 'Active') return emp.isActive !== false;
+        if (selectedStatus === 'Inactive') return emp.isActive === false;
+        return true;
+      })
+      .map(emp => ({
+        id: emp.id,
+        name: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${language === 'en' ? 'Inactive' : 'निष्क्रिय'}`
+      }));
+  }, [employees, selectedStatus, language]);
+
+  // Reset selected employee filter if it is not present in the current options (e.g. status changed)
+  useEffect(() => {
+    if (selectedEmployeeId !== 'All' && !employeeOptions.some(opt => opt.id === selectedEmployeeId)) {
+      setSelectedEmployeeId('All');
+    }
+  }, [selectedStatus, employeeOptions, selectedEmployeeId]);
 
   // Filter & Search logic
   const filteredEmployees = useMemo(() => {

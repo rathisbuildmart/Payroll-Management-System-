@@ -321,6 +321,8 @@ export default function LeavesHolidays({
 
   // Filtered lists
   const filteredLeaveList = leaveDataList.filter(item => {
+    const emp = employees.find(e => e.id === item.id);
+    if (emp && emp.isActive === false) return false;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           item.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesDept = departmentFilter === 'All' || item.department === departmentFilter;

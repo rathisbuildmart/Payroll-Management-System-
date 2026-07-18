@@ -789,6 +789,37 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [employees, attendance, payroll, adminSettings, failedLogins, spreadsheetId, spreadsheetLink, hasLoadedFromCloud, isDataModified]);
 
+  // Periodically fetch fresh data from Firestore to keep admin/employee views in sync in real-time
+  useEffect(() => {
+    if (!hasLoadedFromCloud || isDataModified) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const result = await loadFromFirestore();
+        if (result && result.success && result.data) {
+          const globalData = result.data;
+          // Only update if something changed to avoid unnecessary re-renders
+          if (globalData.employees && JSON.stringify(employees) !== JSON.stringify(globalData.employees)) {
+            setEmployees(globalData.employees);
+          }
+          if (globalData.attendance && JSON.stringify(attendance) !== JSON.stringify(globalData.attendance)) {
+            setAttendance(globalData.attendance);
+          }
+          if (globalData.payroll && JSON.stringify(payroll) !== JSON.stringify(globalData.payroll)) {
+            setPayroll(globalData.payroll);
+          }
+          if (globalData.failedLogins && JSON.stringify(failedLogins) !== JSON.stringify(globalData.failedLogins)) {
+            setFailedLogins(globalData.failedLogins);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to auto-refresh data from Firestore:', err);
+      }
+    }, 12000); // Check every 12 seconds
+
+    return () => clearInterval(interval);
+  }, [hasLoadedFromCloud, isDataModified, employees, attendance, payroll, failedLogins]);
+
   const handleSaveSettings = async (updated: AdminSettings) => {
     setAdminSettings(updated);
     setIsDataModified(true);
@@ -1033,7 +1064,7 @@ export default function App() {
     });
   };
 
-  const recordUnsuccessfulLogin = (enteredId: string, reason: 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password' | 'Account pending approval' | 'Device lock active') => {
+  const recordUnsuccessfulLogin = async (enteredId: string, reason: 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password' | 'Account pending approval' | 'Device lock active') => {
     const newAttempt: FailedLoginAttempt = {
       id: `fail-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       enteredId,
@@ -1041,8 +1072,24 @@ export default function App() {
       reason,
       browserInfo: typeof navigator !== 'undefined' ? navigator.userAgent : undefined
     };
-    setFailedLogins(prev => [newAttempt, ...(prev || [])]);
+    const updatedFailures = [newAttempt, ...(failedLogins || [])];
+    setFailedLogins(updatedFailures);
     setIsDataModified(true);
+
+    // Sync to Firestore immediately so that admin sees the device approval alert instantly
+    try {
+      await saveToFirestore({
+        employees,
+        attendance,
+        payroll,
+        adminSettings,
+        failedLogins: updatedFailures,
+        spreadsheetId,
+        spreadsheetLink
+      });
+    } catch (err) {
+      console.warn("Immediate failed login sync failed:", err);
+    }
   };
 
   const handleClearFailedLogins = () => {
@@ -1788,13 +1835,25 @@ export default function App() {
               </div>
 
               {loginMethod === 'password' ? (
-                <form onSubmit={(e) => {
+                <form onSubmit={async (e) => {
                   e.preventDefault();
                   const inputID = loginId.trim();
                   const inputPass = loginPass;
                   if (!inputID || !inputPass) {
                     setLoginErr(language === 'en' ? 'Please fill in all fields.' : 'कृपया सभी फ़ील्ड भरें।');
                     return;
+                  }
+
+                  // Load latest employees list from Firestore to verify correct and updated device lock and multi-device status
+                  let latestEmployees = employees;
+                  try {
+                    const result = await loadFromFirestore();
+                    if (result && result.success && result.data && result.data.employees) {
+                      latestEmployees = result.data.employees;
+                      setEmployees(latestEmployees);
+                    }
+                  } catch (err) {
+                    console.warn("Failed to retrieve latest employees for login check:", err);
                   }
 
                   const adminUsername = adminSettings.adminUsername || 'admin';
@@ -1841,7 +1900,7 @@ export default function App() {
                         setLoginErr(language === 'en' ? 'Incorrect Password.' : 'गलत पासवर्ड।');
                       }
                     } else {
-                      const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
+                      const emp = latestEmployees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
                       if (emp) {
                         const targetPass = (emp.password || '').trim();
                         const isCorrectPass = targetPass 
@@ -2067,11 +2126,23 @@ export default function App() {
                       </button>
                     </form>
                   ) : (
-                    <form onSubmit={(e) => {
+                    <form onSubmit={async (e) => {
                       e.preventDefault();
                       setLoginErr(null);
                       if (loginEnteredOtp.trim() === loginGeneratedOtp) {
-                        const emp = employees.find(e => e.id.trim().toLowerCase() === loginId.trim().toLowerCase());
+                        // Load latest employees list from Firestore to verify correct and updated device lock and multi-device status
+                        let latestEmployees = employees;
+                        try {
+                          const result = await loadFromFirestore();
+                          if (result && result.success && result.data && result.data.employees) {
+                            latestEmployees = result.data.employees;
+                            setEmployees(latestEmployees);
+                          }
+                        } catch (err) {
+                          console.warn("Failed to retrieve latest employees for OTP login check:", err);
+                        }
+
+                        const emp = latestEmployees.find(e => e.id.trim().toLowerCase() === loginId.trim().toLowerCase());
                         if (emp) {
                           // 1. Approval Check
                           if (emp.isApproved === false) {
@@ -2947,7 +3018,7 @@ export default function App() {
 
                     {/* SUB-MENU: Only when notices_support and showExpanded */}
                     {showExpanded && (
-                      <div className="w-full flex flex-col gap-1.5 pl-4 ml-4.5 border-l border-emerald-500/20 mt-1.5 mb-1.5 animate-fadeIn">
+                      <div className={`w-full flex-col gap-1.5 pl-4 ml-4.5 border-l border-emerald-500/20 mt-1.5 mb-1.5 animate-fadeIn ${isActive ? 'flex' : 'hidden group-hover:flex'}`}>
                         {/* Sub-item: Manage Announcements */}
                         <button
                           onClick={() => {

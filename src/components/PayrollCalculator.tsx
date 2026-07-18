@@ -140,9 +140,9 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   const employeeOptions = useMemo(() => {
     return employees.map(emp => ({
       id: emp.id,
-      name: `${emp.name} (${emp.id})`
+      name: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${language === 'en' ? 'Inactive' : 'निष्क्रिय'}`
     }));
-  }, [employees]);
+  }, [employees, language]);
 
   // Compute filtered payroll list
   const filteredPayroll = useMemo(() => {
@@ -1844,7 +1844,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                     className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white cursor-pointer"
                   >
                     <option value="">-- चुनें (Choose Employee) --</option>
-                    {employees.map(emp => (
+                    {employees.filter(emp => emp.isActive !== false).map(emp => (
                       <option key={emp.id} value={emp.id}>
                         {emp.name} ({emp.id}) - {emp.designation}
                       </option>

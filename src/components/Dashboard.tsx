@@ -130,9 +130,9 @@ export default function Dashboard({
   const employeeOptions = useMemo(() => {
     return employees.map(emp => ({
       id: emp.id,
-      name: `${emp.name} (${emp.id})`
+      name: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${language === 'en' ? 'Inactive' : 'निष्क्रिय'}`
     }));
-  }, [employees]);
+  }, [employees, language]);
 
   // Dynamic filtered datasets based on Month + Department + Branch + Employee filters
   const filteredEmployees = useMemo(() => {
