@@ -784,7 +784,7 @@ export default function EmployeePortal({
             <User className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{t.profile}</span>
           </button>
-          {adminSettings.enableMobileAttendance !== false && employee.enableMobileAttendance === true && (
+          {adminSettings.enableMobileAttendance !== false && employee.enableMobileAttendance !== false && (
             <button
               onClick={() => {
                 setActiveTab('self_attendance');
@@ -867,7 +867,7 @@ export default function EmployeePortal({
       <div className="space-y-6">
 
         {/* SELF ATTENDANCE (MOBILE PUNCH) TAB */}
-        {activeTab === 'self_attendance' && adminSettings.enableMobileAttendance === true && employee.enableMobileAttendance === true && (() => {
+        {activeTab === 'self_attendance' && adminSettings.enableMobileAttendance !== false && employee.enableMobileAttendance !== false && (() => {
           const todayStr = new Date().toLocaleDateString('en-CA');
           const todayRecord = attendanceRecords.find(r => r.employeeId === employee.id && r.date === todayStr);
           const checkResult = getOutletCheckResult();

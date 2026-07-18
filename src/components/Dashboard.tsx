@@ -4,10 +4,10 @@ import {
   Users, Calendar, CreditCard, CheckCircle, TrendingUp, Briefcase, 
   Sparkles, Filter, ArrowRight, DollarSign, Activity, FileSpreadsheet, 
   Clock, AlertTriangle, ChevronRight, PieChart as PieIcon, Award,
-  Bell, KeyRound, LifeBuoy, CheckCircle2
+  Bell, KeyRound, LifeBuoy, CheckCircle2, Lock, Unlock, UserCheck, UserX
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Employee, Attendance, PayrollRecord } from '../types';
+import { Employee, Attendance, PayrollRecord, FailedLoginAttempt } from '../types';
 
 interface DashboardProps {
   employees: Employee[];
@@ -18,6 +18,8 @@ interface DashboardProps {
   passwordRequests?: any[];
   hrTickets?: any[];
   onNavigateNoticeSubTab?: (subTab: 'passwords' | 'tickets' | 'notices') => void;
+  failedLogins?: FailedLoginAttempt[];
+  onUpdateEmployee?: (updated: Employee) => Promise<void> | void;
 }
 
 export default function Dashboard({ 
@@ -28,7 +30,9 @@ export default function Dashboard({
   onNavigate,
   passwordRequests = [],
   hrTickets = [],
-  onNavigateNoticeSubTab
+  onNavigateNoticeSubTab,
+  failedLogins = [],
+  onUpdateEmployee
 }: DashboardProps) {
   // Format current month string (YYYY-MM) in local timezone to avoid offset issues
   const currentMonthStr = useMemo(() => {
@@ -60,7 +64,31 @@ export default function Dashboard({
     return (hrTickets || []).filter((r: any) => r.status === 'Pending');
   }, [hrTickets]);
 
-  const totalPending = pendingPasswordReqs.length + pendingHrTkts.length;
+  const deviceLockAlerts = useMemo(() => {
+    const alerts: { logId: string; employee: Employee; timestamp: string }[] = [];
+    const handledEmployeeIds = new Set<string>();
+
+    (failedLogins || []).forEach(log => {
+      if (log.reason === 'Device lock active') {
+        const emp = employees.find(e => e.id.toLowerCase() === log.enteredId.toLowerCase());
+        if (emp && emp.approvedDeviceId && !emp.allowMultipleDevices && !handledEmployeeIds.has(emp.id)) {
+          alerts.push({
+            logId: log.id,
+            employee: emp,
+            timestamp: log.timestamp
+          });
+          handledEmployeeIds.add(emp.id);
+        }
+      }
+    });
+    return alerts;
+  }, [failedLogins, employees]);
+
+  const pendingApprovalAlerts = useMemo(() => {
+    return employees.filter(emp => emp.isApproved === false);
+  }, [employees]);
+
+  const totalPending = pendingPasswordReqs.length + pendingHrTkts.length + deviceLockAlerts.length + pendingApprovalAlerts.length;
 
   // List of unique months available in system
   const monthOptions = useMemo(() => {
@@ -456,8 +484,8 @@ export default function Dashboard({
                 </div>
                 <p className="text-[11px] text-slate-500 font-semibold leading-none mt-0.5 hidden md:block">
                   {language === 'en' 
-                    ? `There are unresolved employee login password requests and HR Helpdesk support tickets awaiting your action.`
-                    : `आपके एक्शन की प्रतीक्षा कर रहे कर्मचारियों के पासवर्ड रीसेट अनुरोध और एचआर सहायता टिकट लंबित हैं।`}
+                    ? `There are unresolved employee login password requests, HR support tickets, device locks, or approvals awaiting action.`
+                    : `आपके एक्शन की प्रतीक्षा कर रहे पासवर्ड रीसेट अनुरोध, सहायता टिकट, डिवाइस लॉक या लंबित अनुमतियां हैं।`}
                 </p>
               </div>
             </div>
@@ -483,6 +511,109 @@ export default function Dashboard({
               )}
             </div>
           </div>
+
+          {/* INLINE LIST FOR CRITICAL DEVICE LOCKS & APPROVALS */}
+          {(deviceLockAlerts.length > 0 || pendingApprovalAlerts.length > 0) && (
+            <div className="mt-3.5 pt-3 border-t border-amber-200/60 space-y-2.5">
+              {/* Device Lock Alerts */}
+              {deviceLockAlerts.map(({ logId, employee, timestamp }) => (
+                <div 
+                  key={logId} 
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-white/70 hover:bg-white border border-amber-200/50 rounded-lg transition-all"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div className="p-1.5 bg-rose-50 text-rose-600 rounded-md mt-0.5 shrink-0">
+                      <Lock className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-black text-slate-800">{employee.name}</span>
+                        <span className="text-[9px] font-black font-mono bg-rose-100 text-rose-700 px-1.5 py-0.25 rounded">
+                          {employee.id}
+                        </span>
+                        <span className="text-[10px] font-bold text-rose-600">
+                          {language === 'en' ? 'Blocked on Other Device' : 'अन्य डिवाइस पर ब्लॉक हुआ'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                        {language === 'en'
+                          ? `Tried logging in from another device/browser on ${new Date(timestamp).toLocaleString()}`
+                          : `दूसरे डिवाइस/ब्राउज़र से ${new Date(timestamp).toLocaleString()} को लॉगिन का प्रयास किया`}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={async () => {
+                        if (onUpdateEmployee) {
+                          await onUpdateEmployee({ ...employee, approvedDeviceId: '' });
+                        }
+                      }}
+                      className="bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black px-2.5 py-1.5 rounded-md transition-all shadow-3xs flex items-center gap-1 cursor-pointer"
+                    >
+                      <Unlock className="w-3 h-3" />
+                      <span>{language === 'en' ? 'Reset Device Lock' : 'डिवाइस लॉक खोलें'}</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (onUpdateEmployee) {
+                          await onUpdateEmployee({ ...employee, allowMultipleDevices: true });
+                        }
+                      }}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black px-2.5 py-1.5 rounded-md transition-all shadow-3xs flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>📱 {language === 'en' ? 'Allow Multi-Device' : 'मल्टी-डिवाइस अनुमति दें'}</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Pending Approval Alerts */}
+              {pendingApprovalAlerts.map((employee) => (
+                <div 
+                  key={employee.id} 
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-white/70 hover:bg-white border border-amber-200/50 rounded-lg transition-all"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md mt-0.5 shrink-0">
+                      <UserCheck className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-black text-slate-800">{employee.name}</span>
+                        <span className="text-[9px] font-black font-mono bg-blue-100 text-blue-700 px-1.5 py-0.25 rounded">
+                          {employee.id}
+                        </span>
+                        <span className="text-[10px] font-bold text-blue-600">
+                          {language === 'en' ? 'Pending HR Approval' : 'एचआर स्वीकृति लंबित'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                        {language === 'en'
+                          ? `Registered account is pending active status approval`
+                          : `पंजीकृत खाता सक्रिय स्थिति स्वीकृति के लिए लंबित है`}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={async () => {
+                        if (onUpdateEmployee) {
+                          await onUpdateEmployee({ ...employee, isApproved: true });
+                        }
+                      }}
+                      className="bg-[#03623c] hover:bg-[#02492d] text-white text-[10px] font-black px-2.5 py-1.5 rounded-md transition-all shadow-3xs flex items-center gap-1 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>{language === 'en' ? 'Approve & Activate' : 'स्वीकृत और सक्रिय करें'}</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

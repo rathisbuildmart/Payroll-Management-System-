@@ -3642,6 +3642,8 @@ export default function App() {
                     setCurrentTab('notices_support');
                     setActiveNoticeSubTab(subTab);
                   }}
+                  failedLogins={failedLogins}
+                  onUpdateEmployee={handleUpdateEmployee}
                 />
               )}
               {currentTab === 'employees' && (
