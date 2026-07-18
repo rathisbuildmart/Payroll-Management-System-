@@ -31,7 +31,9 @@ import {
   KeyRound,
   X,
   CheckCircle2,
-  Menu
+  Menu,
+  Mail,
+  ChevronRight
 } from 'lucide-react';
 import { initAuth, googleSignIn, googleSignInRedirect, logout } from './services/auth';
 import { 
@@ -457,6 +459,15 @@ export default function App() {
   const [loginEnteredOtp, setLoginEnteredOtp] = useState('');
   const [isSendingLoginOtp, setIsSendingLoginOtp] = useState(false);
   const [loginOtpEmail, setLoginOtpEmail] = useState('');
+
+  // First-Time Login Security Verification States
+  const [isFirstLoginVerification, setIsFirstLoginVerification] = useState<boolean>(false);
+  const [firstLoginEmployee, setFirstLoginEmployee] = useState<Employee | null>(null);
+  const [firstLoginStep, setFirstLoginStep] = useState<'select_option' | 'email_otp' | 'admin_approval'>('select_option');
+  const [firstLoginGeneratedOtp, setFirstLoginGeneratedOtp] = useState<string>('');
+  const [firstLoginEnteredOtp, setFirstLoginEnteredOtp] = useState<string>('');
+  const [firstLoginAdminCode, setFirstLoginAdminCode] = useState<string>('');
+  const [firstLoginSendingOtp, setFirstLoginSendingOtp] = useState<boolean>(false);
 
   const [announcements, setAnnouncements] = useState<any[]>(() => {
     const saved = localStorage.getItem('payroll_announcements');
@@ -1800,39 +1811,441 @@ export default function App() {
                 </div>
               )}
 
-              {/* Login Method Toggle Tabs */}
-              <div className="flex border-b border-slate-800/80 mt-6 font-mono text-[10px] font-black uppercase tracking-wider">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginMethod('password');
-                    setLoginErr(null);
-                  }}
-                  className={`flex-1 pb-3 text-center border-b-2 cursor-pointer transition-all ${
-                    loginMethod === 'password'
-                      ? 'border-emerald-500 text-white font-extrabold'
-                      : 'border-transparent text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  🔑 {language === 'en' ? 'Password Login' : 'पासवर्ड लॉगिन'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginMethod('otp');
-                    setLoginErr(null);
-                    setLoginOtpStep('request_otp');
-                    setLoginEnteredOtp('');
-                  }}
-                  className={`flex-1 pb-3 text-center border-b-2 cursor-pointer transition-all ${
-                    loginMethod === 'otp'
-                      ? 'border-emerald-500 text-white font-extrabold'
-                      : 'border-transparent text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  📨 {language === 'en' ? 'Email OTP Login' : 'ईमेल ओटीपी लॉगिन'}
-                </button>
-              </div>
+              {/* First-Time Login Security Verification vs Standard Forms */}
+              {isFirstLoginVerification && firstLoginEmployee ? (
+                <div className="space-y-5 mt-6 animate-fadeIn text-white">
+                  <div className="bg-slate-900 border border-slate-800 p-4.5 rounded-xl text-center space-y-2">
+                    <div className="inline-flex p-2 bg-emerald-500/10 text-emerald-400 rounded-full">
+                      <Lock className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider font-mono">
+                      {language === 'en' ? 'First-Time Login Security Setup' : 'फर्स्ट-टाइम लॉगिन सुरक्षा सेटअप'}
+                    </h4>
+                    <p className="text-[11px] text-slate-400 leading-normal font-semibold">
+                      {language === 'en'
+                        ? 'For your security, you must bind your device on your first login. Please choose one verification method below.'
+                        : 'आपकी सुरक्षा के लिए, आपको पहले लॉगिन पर अपना डिवाइस बाइंड करना होगा। कृपया नीचे से कोई एक सत्यापन तरीका चुनें।'}
+                    </p>
+                  </div>
+
+                  {firstLoginStep === 'select_option' && (
+                    <div className="space-y-3 animate-fadeIn">
+                      {/* Option 1: Email OTP */}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setLoginErr(null);
+                          if (!firstLoginEmployee.email || !firstLoginEmployee.email.trim()) {
+                            setLoginErr(language === 'en'
+                              ? 'No email address registered. Please use HR/Admin approval.'
+                              : 'कोई ईमेल पता पंजीकृत नहीं है। कृपया एचआर/एडमिन स्वीकृति का उपयोग करें।');
+                            return;
+                          }
+
+                          const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                          setFirstLoginGeneratedOtp(otp);
+                          setFirstLoginSendingOtp(true);
+
+                          try {
+                            const res = await fetch('/api/send-otp', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                email: firstLoginEmployee.email.trim(),
+                                otp,
+                                empName: firstLoginEmployee.name,
+                                purpose: 'login',
+                                language,
+                                smtpSettings: {
+                                  host: adminSettings.smtpHost,
+                                  port: adminSettings.smtpPort,
+                                  username: adminSettings.smtpUsername,
+                                  password: adminSettings.smtpPassword,
+                                  senderName: adminSettings.senderName,
+                                  senderEmail: adminSettings.senderEmail
+                                }
+                              })
+                            });
+                            const data = await res.json();
+                            setFirstLoginSendingOtp(false);
+                            if (data.success) {
+                              setFirstLoginStep('email_otp');
+                              if (data.method === 'SIMULATION') {
+                                setLastSentEmail(data.debugPayload);
+                                setShowEmailViewer(true);
+                              }
+                            } else {
+                              setLoginErr(data.error || 'Failed to dispatch verification OTP.');
+                            }
+                          } catch (err) {
+                            setFirstLoginSendingOtp(false);
+                            setLoginErr(language === 'en' ? 'Network error sending OTP.' : 'ओटीपी भेजने में नेटवर्क त्रुटि।');
+                          }
+                        }}
+                        disabled={firstLoginSendingOtp}
+                        className="w-full text-left p-4.5 bg-slate-905 hover:bg-slate-800 border border-slate-800 rounded-xl cursor-pointer transition-all flex items-center justify-between group disabled:opacity-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-lg group-hover:bg-emerald-500/20 transition-all">
+                            <Mail className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="block text-xs font-black text-white font-mono uppercase tracking-wider">
+                              {language === 'en' ? 'Option 1: Email OTP' : 'विकल्प 1: ईमेल ओटीपी'}
+                            </span>
+                            <span className="block text-[10px] text-slate-400 font-semibold mt-0.5">
+                              {language === 'en' 
+                                ? `Send code to ${firstLoginEmployee.email ? firstLoginEmployee.email.replace(/(.{3})(.*)(@.*)/, "$1***$3") : 'registered email'}`
+                                : `कोड भेजें: ${firstLoginEmployee.email ? firstLoginEmployee.email.replace(/(.{3})(.*)(@.*)/, "$1***$3") : 'पंजीकृत ईमेल पर'}`}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                      </button>
+
+                      {/* Option 2: HR/Admin Approval */}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setLoginErr(null);
+                          let code = firstLoginEmployee.pendingDeviceApprovalCode || '';
+                          if (!code) {
+                            code = Math.floor(100000 + Math.random() * 900000).toString();
+                          }
+                          const updated = {
+                            ...firstLoginEmployee,
+                            pendingDeviceApprovalCode: code,
+                            pendingDeviceApprovalOtp: firstLoginEmployee.pendingDeviceApprovalOtp || ''
+                          };
+                          
+                          setFirstLoginEmployee(updated);
+                          setFirstLoginStep('admin_approval');
+
+                          // Sync to server immediately so the Admin sees it
+                          try {
+                            const updatedEmps = employees.map(e => e.id === updated.id ? updated : e);
+                            setEmployees(updatedEmps);
+                            await saveToFirestore({
+                              employees: updatedEmps,
+                              attendance,
+                              payroll,
+                              adminSettings,
+                              failedLogins,
+                              spreadsheetId,
+                              spreadsheetLink
+                            });
+                          } catch (err) {
+                            console.warn("Failed to sync pending code to Firestore:", err);
+                          }
+                        }}
+                        className="w-full text-left p-4.5 bg-slate-905 hover:bg-slate-800 border border-slate-800 rounded-xl cursor-pointer transition-all flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-lg group-hover:bg-indigo-500/20 transition-all">
+                            <Users className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="block text-xs font-black text-white font-mono uppercase tracking-wider">
+                              {language === 'en' ? 'Option 2: HR/Admin Approval' : 'विकल्प 2: एचआर/एडमिन मंजूरी'}
+                            </span>
+                            <span className="block text-[10px] text-slate-400 font-semibold mt-0.5">
+                              {language === 'en'
+                                ? 'Generate request code to share with HR/Admin'
+                                : 'एचआर/एडमिन के साथ साझा करने के लिए अनुरोध कोड बनाएं'}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsFirstLoginVerification(false);
+                          setFirstLoginEmployee(null);
+                          setLoginErr(null);
+                        }}
+                        className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 mt-2 py-2 cursor-pointer transition-colors"
+                      >
+                        {language === 'en' ? 'Cancel & Return to Login' : 'रद्द करें और लॉगिन पर वापस जाएं'}
+                      </button>
+                    </div>
+                  )}
+
+                  {firstLoginStep === 'email_otp' && (
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      setLoginErr(null);
+                      if (firstLoginEnteredOtp.trim() === firstLoginGeneratedOtp) {
+                        const currentDeviceId = getDeviceFingerprint();
+                        const updatedEmp = {
+                          ...firstLoginEmployee,
+                          approvedDeviceId: currentDeviceId
+                        };
+
+                        // Sync updated employee to database
+                        const updatedEmps = employees.map(emp => emp.id === updatedEmp.id ? updatedEmp : emp);
+                        setEmployees(updatedEmps);
+                        try {
+                          await saveToFirestore({
+                            employees: updatedEmps,
+                            attendance,
+                            payroll,
+                            adminSettings,
+                            failedLogins,
+                            spreadsheetId,
+                            spreadsheetLink
+                          });
+                        } catch (err) {
+                          console.warn("Failed to sync approved employee to Firestore:", err);
+                        }
+
+                        // Success Login
+                        const empUser: PortalUser = {
+                          id: updatedEmp.id,
+                          name: updatedEmp.name,
+                          role: 'employee',
+                          employee: updatedEmp
+                        };
+                        setPortalUser(empUser);
+                        localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                        setIsFirstLoginVerification(false);
+                        setFirstLoginEmployee(null);
+                        setLoginErr(null);
+                      } else {
+                        setLoginErr(language === 'en' ? 'Invalid OTP. Please try again.' : 'अमान्य ओटीपी। कृपया पुनः प्रयास करें।');
+                      }
+                    }} className="space-y-4 animate-fadeIn">
+                      <div className="bg-emerald-950/20 text-emerald-300 border border-emerald-900/30 p-3.5 rounded-xl text-[11px] font-semibold leading-normal">
+                        📧 {language === 'en' 
+                          ? `A security OTP has been sent to ${firstLoginEmployee.email?.replace(/(.{3})(.*)(@.*)/, "$1***$3")}. Please enter the code below.`
+                          : `एक सुरक्षा ओटीपी ${firstLoginEmployee.email?.replace(/(.{3})(.*)(@.*)/, "$1***$3")} पर भेजा गया है। कृपया नीचे कोड दर्ज करें।`}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                          {language === 'en' ? '6-Digit Verification OTP' : '6-अंकीय सत्यापन ओटीपी'}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={6}
+                          value={firstLoginEnteredOtp}
+                          onChange={(e) => setFirstLoginEnteredOtp(e.target.value)}
+                          placeholder="e.g. 123456"
+                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
+                      >
+                        {language === 'en' ? 'Verify & Sign In' : 'सत्यापित करें और साइन इन करें'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFirstLoginStep('select_option');
+                          setLoginErr(null);
+                        }}
+                        className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 transition-colors py-1 cursor-pointer"
+                      >
+                        {language === 'en' ? 'Back' : 'पीछे'}
+                      </button>
+                    </form>
+                  )}
+
+                  {firstLoginStep === 'admin_approval' && (
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      setLoginErr(null);
+
+                      // Load latest employees list from Firestore to verify any changes
+                      let latestEmployees = employees;
+                      try {
+                        const result = await loadFromFirestore();
+                        if (result && result.success && result.data && result.data.employees) {
+                          latestEmployees = result.data.employees;
+                          setEmployees(latestEmployees);
+                        }
+                      } catch (err) {
+                        console.warn("Failed to retrieve latest employees:", err);
+                      }
+
+                      const currentEmp = latestEmployees.find(emp => emp.id === firstLoginEmployee.id);
+                      if (!currentEmp) {
+                        setLoginErr(language === 'en' ? 'Employee not found.' : 'कर्मचारी नहीं मिला।');
+                        return;
+                      }
+
+                      const currentDeviceId = getDeviceFingerprint();
+
+                      // Auto login if already approved by Admin directly on their dashboard
+                      const isAlreadyApproved = currentEmp.approvedDeviceId === currentDeviceId;
+                      const enteredOtpMatches = firstLoginAdminCode.trim() && currentEmp.pendingDeviceApprovalOtp && (firstLoginAdminCode.trim() === currentEmp.pendingDeviceApprovalOtp.trim());
+
+                      if (isAlreadyApproved || enteredOtpMatches) {
+                        const updatedEmp = {
+                          ...currentEmp,
+                          approvedDeviceId: currentDeviceId,
+                          pendingDeviceApprovalCode: '',
+                          pendingDeviceApprovalOtp: ''
+                        };
+
+                        const updatedEmps = latestEmployees.map(emp => emp.id === updatedEmp.id ? updatedEmp : emp);
+                        setEmployees(updatedEmps);
+                        try {
+                          await saveToFirestore({
+                            employees: updatedEmps,
+                            attendance,
+                            payroll,
+                            adminSettings,
+                            failedLogins,
+                            spreadsheetId,
+                            spreadsheetLink
+                          });
+                        } catch (err) {
+                          console.warn("Failed to sync approved employee to Firestore:", err);
+                        }
+
+                        const empUser: PortalUser = {
+                          id: updatedEmp.id,
+                          name: updatedEmp.name,
+                          role: 'employee',
+                          employee: updatedEmp
+                        };
+                        setPortalUser(empUser);
+                        localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                        setIsFirstLoginVerification(false);
+                        setFirstLoginEmployee(null);
+                        setLoginErr(null);
+                      } else {
+                        setLoginErr(language === 'en' 
+                          ? 'Invalid Admin Approval OTP code. Please ask Admin/HR to generate the OTP, or wait for them to click Approve on their dashboard.' 
+                          : 'अमान्य एडमिन स्वीकृति ओटीपी कोड। कृपया एडमिन/एचआर से ओटीपी जनरेट करने के लिए कहें, या उनके डैशबोर्ड पर मंजूर करें पर क्लिक करने की प्रतीक्षा करें।');
+                      }
+                    }} className="space-y-4 animate-fadeIn">
+                      <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3.5">
+                        <div className="text-center">
+                          <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                            {language === 'en' ? 'Your Request Share Code' : 'आपका अनुरोध शेयर कोड'}
+                          </span>
+                          <span className="block text-2xl font-black text-emerald-400 font-mono tracking-wider mt-1 bg-slate-950 py-2.5 px-4 rounded-lg inline-block border border-slate-800">
+                            {firstLoginEmployee.pendingDeviceApprovalCode}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-semibold leading-relaxed text-center">
+                          {language === 'en'
+                            ? 'Provide this code to HR/Admin. Once they approve your request, they will share an OTP with you or approve it directly.'
+                            : 'एचआर/एडमिन को यह कोड प्रदान करें। एक बार जब वे आपके अनुरोध को मंजूरी दे देंगे, तो वे आपके साथ एक ओटीपी साझा करेंगे या सीधे मंजूर करेंगे।'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono flex justify-between items-center">
+                          <span>{language === 'en' ? '6-Digit Admin Approval OTP' : '6-अंकीय एडमिन स्वीकृति ओटीपी'}</span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              // Reload latest status from DB
+                              try {
+                                const result = await loadFromFirestore();
+                                if (result && result.success && result.data && result.data.employees) {
+                                  const latestEmps = result.data.employees;
+                                  setEmployees(latestEmps);
+                                  const match = latestEmps.find(e => e.id === firstLoginEmployee.id);
+                                  if (match && match.approvedDeviceId === getDeviceFingerprint()) {
+                                    // Already approved directly by admin!
+                                    const empUser: PortalUser = {
+                                      id: match.id,
+                                      name: match.name,
+                                      role: 'employee',
+                                      employee: match
+                                    };
+                                    setPortalUser(empUser);
+                                    localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
+                                    setIsFirstLoginVerification(false);
+                                    setFirstLoginEmployee(null);
+                                    setLoginErr(null);
+                                  }
+                                }
+                              } catch (e) {
+                                console.warn("Auto-check failed:", e);
+                              }
+                            }}
+                            className="text-[9px] text-emerald-400 uppercase font-black tracking-widest font-mono hover:text-emerald-300 transition-colors"
+                          >
+                            🔄 {language === 'en' ? 'Check Status' : 'स्थिति जांचें'}
+                          </button>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={6}
+                          value={firstLoginAdminCode}
+                          onChange={(e) => setFirstLoginAdminCode(e.target.value)}
+                          placeholder="e.g. 123456"
+                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
+                      >
+                        {language === 'en' ? 'Verify Approval & Sign In' : 'मंजूरी सत्यापित करें और साइन इन करें'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFirstLoginStep('select_option');
+                          setLoginErr(null);
+                        }}
+                        className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 transition-colors py-1 cursor-pointer"
+                      >
+                        {language === 'en' ? 'Back' : 'पीछे'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Login Method Toggle Tabs */}
+                  <div className="flex border-b border-slate-800/80 mt-6 font-mono text-[10px] font-black uppercase tracking-wider">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginMethod('password');
+                        setLoginErr(null);
+                      }}
+                      className={`flex-1 pb-3 text-center border-b-2 cursor-pointer transition-all ${
+                        loginMethod === 'password'
+                          ? 'border-emerald-500 text-white font-extrabold'
+                          : 'border-transparent text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      🔑 {language === 'en' ? 'Password Login' : 'पासवर्ड लॉगिन'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginMethod('otp');
+                        setLoginErr(null);
+                        setLoginOtpStep('request_otp');
+                        setLoginEnteredOtp('');
+                      }}
+                      className={`flex-1 pb-3 text-center border-b-2 cursor-pointer transition-all ${
+                        loginMethod === 'otp'
+                          ? 'border-emerald-500 text-white font-extrabold'
+                          : 'border-transparent text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      📨 {language === 'en' ? 'Email OTP Login' : 'ईमेल ओटीपी लॉगिन'}
+                    </button>
+                  </div>
 
               {loginMethod === 'password' ? (
                 <form onSubmit={async (e) => {
@@ -1931,18 +2344,23 @@ export default function App() {
                             return;
                           }
 
-                          // Save updated device registration if none registered yet
-                          let updatedEmp = { ...emp };
+                          // If no device bound yet, enforce mandatory first-time verification flow
                           if (!emp.approvedDeviceId) {
-                            updatedEmp.approvedDeviceId = currentDeviceId;
-                            handleUpdateEmployee(updatedEmp);
+                            setFirstLoginEmployee(emp);
+                            setIsFirstLoginVerification(true);
+                            setFirstLoginStep('select_option');
+                            setFirstLoginGeneratedOtp('');
+                            setFirstLoginEnteredOtp('');
+                            setFirstLoginAdminCode('');
+                            setLoginErr(null);
+                            return;
                           }
 
                           const empUser: PortalUser = {
                             id: emp.id,
                             name: emp.name,
                             role: 'employee',
-                            employee: updatedEmp
+                            employee: emp
                           };
                           setPortalUser(empUser);
                           localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
@@ -2167,18 +2585,23 @@ export default function App() {
                             return;
                           }
 
-                          // Save updated device registration if none registered yet
-                          let updatedEmp = { ...emp };
+                          // If no device bound yet, enforce mandatory first-time verification flow
                           if (!emp.approvedDeviceId) {
-                            updatedEmp.approvedDeviceId = currentDeviceId;
-                            handleUpdateEmployee(updatedEmp);
+                            setFirstLoginEmployee(emp);
+                            setIsFirstLoginVerification(true);
+                            setFirstLoginStep('select_option');
+                            setFirstLoginGeneratedOtp('');
+                            setFirstLoginEnteredOtp('');
+                            setFirstLoginAdminCode('');
+                            setLoginErr(null);
+                            return;
                           }
 
                           const empUser: PortalUser = {
                             id: emp.id,
                             name: emp.name,
                             role: 'employee',
-                            employee: updatedEmp
+                            employee: emp
                           };
                           setPortalUser(empUser);
                           localStorage.setItem('payroll_portal_user', JSON.stringify(empUser));
@@ -2235,6 +2658,8 @@ export default function App() {
                     </form>
                   )}
                 </div>
+              )}
+                </>
               )}
 
               {/* Help & FAQ Accordion Section */}

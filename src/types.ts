@@ -94,6 +94,8 @@ export interface Employee {
   isApproved?: boolean;
   approvedDeviceId?: string;
   allowMultipleDevices?: boolean;
+  pendingDeviceApprovalCode?: string;
+  pendingDeviceApprovalOtp?: string;
 }
 
 export interface SalaryIncrement {
