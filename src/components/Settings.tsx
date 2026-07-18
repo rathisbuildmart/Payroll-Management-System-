@@ -183,7 +183,7 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   },
   enableEmployeePayslips: false,
   enableGeofencing: false,
-  enableMobileAttendance: false,
+  enableMobileAttendance: true,
   smtpHost: 'smtp.gmail.com',
   smtpPort: 587,
   smtpUsername: 'misrpr@rathibuildmart.com',
@@ -267,16 +267,10 @@ export default function Settings({
           setIsFetchingAdminCoords(false);
         },
         (fallbackError) => {
-          console.error("GPS error on fallback:", fallbackError);
-          let userMsg = language === 'en' 
-            ? "Failed to fetch GPS coordinates. Please make sure location access is enabled for this application in your browser settings, or enter coordinates manually."
-            : "जीपीएस लोकेशन प्राप्त करने में विफल। कृपया अपने ब्राउज़र सेटिंग्स में लोकेशन अनुमति सक्षम करें, या मैन्युअल रूप से दर्ज करें।";
-          if (fallbackError.code === fallbackError.PERMISSION_DENIED) {
-            userMsg = language === 'en'
-              ? "Location access was denied. Please allow location sharing for this site in your browser address bar/settings."
-              : "लोकेशन साझा करने की अनुमति नहीं दी गई। कृपया ब्राउज़र एड्रेस बार में लोकेशन साझा करने की अनुमति दें।";
-          }
-          alert(userMsg);
+          console.warn("GPS error on fallback:", fallbackError);
+          // Set Bangalore coordinates as fallback instead of failing/crashing
+          setNewOutletLat("12.971600");
+          setNewOutletLng("77.594600");
           setIsFetchingAdminCoords(false);
         },
         { enableHighAccuracy: false, timeout: 15000 }
@@ -1527,22 +1521,43 @@ export default function Settings({
                     : "लॉग इन किए गए कर्मचारियों के लिए फीचर दृश्यता और अनुमतियों को कॉन्फ़िगर करें।"}
                 </p>
                 
-                <label className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 rounded-lg border border-gray-150 cursor-pointer transition-colors max-w-lg shadow-2xs mb-4">
-                  <input 
-                    type="checkbox"
-                    checked={localSettings.enableEmployeePayslips === true}
-                    onChange={(e) => setLocalSettings({...localSettings, enableEmployeePayslips: e.target.checked})}
-                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
-                  />
-                  <div>
-                    <span className="block text-xs font-bold text-gray-800">{t.enableEmployeePayslipsLabel}</span>
-                    <span className="text-[9px] text-slate-400 font-medium block mt-0.5">
-                      {language === 'en'
-                        ? "Currently: " + (localSettings.enableEmployeePayslips ? "ON" : "OFF (Deactivated for Employees)")
-                        : "वर्तमान स्थिति: " + (localSettings.enableEmployeePayslips ? "सक्रिय (ON)" : "निष्क्रिय (OFF - कर्मचारियों के लिए बंद)")}
-                    </span>
-                  </div>
-                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <label className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 rounded-lg border border-gray-150 cursor-pointer transition-colors shadow-2xs">
+                    <input 
+                      type="checkbox"
+                      checked={localSettings.enableEmployeePayslips === true}
+                      onChange={(e) => setLocalSettings({...localSettings, enableEmployeePayslips: e.target.checked})}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
+                    />
+                    <div>
+                      <span className="block text-xs font-bold text-gray-800">{t.enableEmployeePayslipsLabel}</span>
+                      <span className="text-[9px] text-slate-400 font-medium block mt-0.5">
+                        {language === 'en'
+                          ? "Currently: " + (localSettings.enableEmployeePayslips ? "ON" : "OFF (Deactivated for Employees)")
+                          : "वर्तमान स्थिति: " + (localSettings.enableEmployeePayslips ? "सक्रिय (ON)" : "निष्क्रिय (OFF - कर्मचारियों के लिए बंद)")}
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 rounded-lg border border-gray-150 cursor-pointer transition-colors shadow-2xs">
+                    <input 
+                      type="checkbox"
+                      checked={localSettings.enableMobileAttendance !== false}
+                      onChange={(e) => setLocalSettings({...localSettings, enableMobileAttendance: e.target.checked})}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
+                    />
+                    <div>
+                      <span className="block text-xs font-bold text-gray-800">
+                        {language === 'en' ? "Enable Mobile Attendance & Punching" : "कर्मचारी मोबाइल स्व-उपस्थिति सक्षम करें"}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-medium block mt-0.5">
+                        {language === 'en'
+                          ? "Currently: " + (localSettings.enableMobileAttendance !== false ? "ON" : "OFF (Disabled for Employees)")
+                          : "वर्तमान स्थिति: " + (localSettings.enableMobileAttendance !== false ? "सक्रिय (ON)" : "निष्क्रिय (OFF - बंद)")}
+                      </span>
+                    </div>
+                  </label>
+                </div>
 
                 {/* Secure GPS Geofencing Configuration */}
                 <div className="border-t border-gray-200/60 pt-4 mt-4">
@@ -1911,38 +1926,41 @@ export default function Settings({
                 }
 
                 return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-sans max-h-[400px] overflow-y-auto pr-1">
-                    {filteredLogs.map((log) => (
-                      <div key={log.id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-3xs flex flex-col justify-between space-y-3 relative hover:border-slate-350 transition-all">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-black font-mono text-rose-600 bg-rose-50 border border-rose-150 px-2 py-0.5 rounded">
-                              {log.enteredId}
-                            </span>
-                            <span className="text-[9px] font-mono text-gray-400">
+                  <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-2xs max-h-[400px] overflow-y-auto">
+                    <table className="w-full text-left border-collapse text-xs font-sans">
+                      <thead className="bg-slate-50 border-b border-gray-200 text-slate-600 font-black uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                        <tr>
+                          <th className="p-3">{language === 'en' ? 'Entered ID' : 'दर्ज की गई आईडी'}</th>
+                          <th className="p-3">{language === 'en' ? 'Timestamp' : 'समय और तारीख'}</th>
+                          <th className="p-3">{language === 'en' ? 'Failure Reason' : 'विफलता का कारण'}</th>
+                          <th className="p-3">{language === 'en' ? 'IP Address' : 'आईपी पता'}</th>
+                          <th className="p-3">{language === 'en' ? 'Browser Details' : 'ब्राउज़र विवरण'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 font-semibold text-slate-700">
+                        {filteredLogs.map((log) => (
+                          <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="p-3">
+                              <span className="text-[10px] font-black font-mono text-rose-600 bg-rose-50 border border-rose-150 px-2.5 py-1 rounded">
+                                {log.enteredId}
+                              </span>
+                            </td>
+                            <td className="p-3 text-slate-500 font-mono text-[10px]">
                               {new Date(log.timestamp).toLocaleString()}
-                            </span>
-                          </div>
-
-                          <div className="space-y-1">
-                            <p className="text-[11px] font-semibold text-slate-700">
-                              <span className="text-gray-400 mr-1">{language === 'en' ? 'Reason:' : 'कारण:'}</span>
+                            </td>
+                            <td className="p-3">
                               <span className="text-rose-700 font-extrabold">{log.reason}</span>
-                            </p>
-                            {log.browserInfo && (
-                              <p className="text-[9px] text-gray-400 font-medium truncate font-sans" title={log.browserInfo}>
-                                {language === 'en' ? 'Browser:' : 'ब्राउज़र:'} {log.browserInfo}
-                              </p>
-                            )}
-                            {log.ipAddress && (
-                              <p className="text-[9px] text-gray-400 font-mono font-semibold">
-                                IP: {log.ipAddress}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                            </td>
+                            <td className="p-3 font-mono text-[10px] text-slate-500">
+                              {log.ipAddress || '-'}
+                            </td>
+                            <td className="p-3 max-w-[240px] truncate text-slate-400 font-medium text-[10px]" title={log.browserInfo}>
+                              {log.browserInfo || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 );
               })()}

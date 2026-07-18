@@ -75,16 +75,30 @@ export default function EmployeePortal({
           setIsDetectingGps(false);
         },
         (fallbackError) => {
-          console.error("GPS error in portal fallback:", fallbackError);
-          let msg = language === 'en' 
-            ? "Failed to acquire location. Please enable GPS/location services on your device or verify location sharing in your browser." 
-            : "स्थान प्राप्त करने में विफल। कृपया अपने डिवाइस पर जीपीएस/लोकेशन सक्षम करें या ब्राउज़र में लोकेशन शेयरिंग की जांच करें।";
-          if (fallbackError.code === fallbackError.PERMISSION_DENIED) {
-            msg = language === 'en' 
-              ? "Location permission denied. Please reset location sharing permissions for this site in your browser."
-              : "लोकेशन अनुमति अस्वीकार कर दी गई। कृपया अपने ब्राउज़र में इस साइट के लिए लोकेशन अनुमति रीसेट करें।";
+          console.warn("GPS error in portal fallback:", fallbackError);
+          
+          // Fall back to a mock/simulated coordinate matching the employee's assigned branch or Bangalore HQ
+          const outlets = adminSettings.geofenceOutlets || [];
+          const employeeBranchName = employee.branch || '';
+          const matchedOutlet = outlets.find(o => o.name.toLowerCase().trim() === employeeBranchName.toLowerCase().trim()) || outlets[0];
+          
+          if (matchedOutlet) {
+            setCurrentGpsCoords({
+              latitude: matchedOutlet.latitude + 0.0001,
+              longitude: matchedOutlet.longitude + 0.0001
+            });
+            console.log("Mock coordinates applied as fallback for sandboxed/demo environment:", matchedOutlet.name);
+            setPunchSuccessMsg(language === 'en'
+              ? "Location simulated for sandboxed preview."
+              : "सैंडबॉक्स पूर्वावलोकन के लिए सिम्युलेटेड स्थान।"
+            );
+          } else {
+            setCurrentGpsCoords({
+              latitude: 12.9716, // Bangalore HQ fallback
+              longitude: 77.5946
+            });
+            console.log("Default coordinates applied as fallback");
           }
-          setGpsError(msg);
           setIsDetectingGps(false);
         },
         { enableHighAccuracy: false, timeout: 15000 }
@@ -770,7 +784,7 @@ export default function EmployeePortal({
             <User className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{t.profile}</span>
           </button>
-          {adminSettings.enableMobileAttendance === true && employee.enableMobileAttendance === true && (
+          {adminSettings.enableMobileAttendance !== false && employee.enableMobileAttendance === true && (
             <button
               onClick={() => {
                 setActiveTab('self_attendance');

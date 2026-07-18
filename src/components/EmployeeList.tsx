@@ -887,7 +887,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       isConveyanceApplicable: true,
       isPaidLeaveApplicable: true,
       enableGeofencing: false,
-      enableMobileAttendance: false,
+      enableMobileAttendance: true,
       isApproved: false,
       allowMultipleDevices: false,
       approvedDeviceId: '',

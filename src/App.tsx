@@ -259,6 +259,7 @@ export default function App() {
         hourlyRate: 150,
         paymentMethod: 'Bank Transfer',
         isActive: true,
+        enableMobileAttendance: true,
       },
       {
         id: 'EMP002',
@@ -272,6 +273,7 @@ export default function App() {
         hourlyRate: 120,
         paymentMethod: 'Bank Transfer',
         isActive: true,
+        enableMobileAttendance: true,
       },
       {
         id: 'EMP003',
@@ -285,6 +287,7 @@ export default function App() {
         hourlyRate: 100,
         paymentMethod: 'Cash',
         isActive: true,
+        enableMobileAttendance: true,
       },
       {
         id: 'EMP004',
@@ -298,7 +301,8 @@ export default function App() {
         hourlyRate: 105,
         paymentMethod: 'Bank Transfer',
         isActive: true,
-        password: '123456'
+        password: '123456',
+        enableMobileAttendance: true,
       }
     ];
 
