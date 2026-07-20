@@ -22,10 +22,20 @@ async function startServer() {
 
   // Nodemailer transporter helper
   const getTransporter = (smtpSettings?: SmtpSettings) => {
-    const host = (smtpSettings?.host && smtpSettings.host.trim()) || process.env.SMTP_HOST;
+    let host = (smtpSettings?.host && smtpSettings.host.trim()) || process.env.SMTP_HOST;
     const port = Number(smtpSettings?.port || process.env.SMTP_PORT || 587);
     const user = (smtpSettings?.username && smtpSettings.username.trim()) || process.env.SMTP_USER;
     const pass = (smtpSettings?.password && smtpSettings.password.trim()) || process.env.SMTP_PASS;
+
+    // Auto-correct common host typos like smpt/stmp to smtp
+    if (host) {
+      if (host.toLowerCase().includes('smpt')) {
+        host = host.replace(/smpt/gi, 'smtp');
+      }
+      if (host.toLowerCase().includes('stmp')) {
+        host = host.replace(/stmp/gi, 'smtp');
+      }
+    }
 
     if (!host || !user || !pass) {
       return null;
@@ -39,6 +49,9 @@ async function startServer() {
         user,
         pass,
       },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
     });
   };
 
@@ -66,10 +79,20 @@ async function startServer() {
       return res.status(400).json({ success: false, error: 'Recipient email is required.' });
     }
 
-    const host = smtpHost && smtpHost.trim();
+    let host = smtpHost && smtpHost.trim();
     const port = Number(smtpPort || 587);
     const user = smtpUsername && smtpUsername.trim();
     const pass = smtpPassword && smtpPassword.trim();
+
+    // Auto-correct common host typos like smpt/stmp to smtp
+    if (host) {
+      if (host.toLowerCase().includes('smpt')) {
+        host = host.replace(/smpt/gi, 'smtp');
+      }
+      if (host.toLowerCase().includes('stmp')) {
+        host = host.replace(/stmp/gi, 'smtp');
+      }
+    }
 
     if (!host || !user || !pass) {
       return res.status(400).json({ 
@@ -142,6 +165,9 @@ async function startServer() {
           user,
           pass,
         },
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 5000,
       });
 
       const fromAddress = senderEmail && senderEmail.trim()
@@ -160,7 +186,7 @@ async function startServer() {
       return res.json({ success: true, message: 'Test email dispatched successfully.' });
     } catch (error: any) {
       console.error('[SMTP Test Error] Failed to dispatch test email:', error);
-      return res.status(500).json({ success: false, error: error.message || 'Failed to dispatch test email over specified SMTP configuration.' });
+      return res.json({ success: false, error: error.message || 'Failed to dispatch test email over specified SMTP configuration.' });
     }
   });
 
@@ -258,7 +284,31 @@ async function startServer() {
       }
     } catch (error: any) {
       console.error('[SMTP Error] Failed to send OTP email:', error);
-      return res.status(500).json({ success: false, error: error.message || 'SMTP Server failed to dispatch email.' });
+      let errMsg = error.message || 'SMTP Server failed to dispatch email.';
+      const host = (smtpSettings?.host && smtpSettings.host.trim()) || process.env.SMTP_HOST || '';
+      const port = Number(smtpSettings?.port || process.env.SMTP_PORT || 587);
+      
+      if (errMsg.includes('Application-specific password required') || errMsg.includes('5.7.9') || errMsg.includes('InvalidSecondFactor')) {
+        errMsg = "Gmail SMTP Security Policy: An App Password is required because 2-Step Verification is enabled on your Google Account. Please go to your Google Account -> Security -> App Passwords, generate a password, and use that 16-character code as your SMTP Password in Settings.";
+      } else if (errMsg.includes('ENOTFOUND')) {
+        errMsg = `DNS Resolution failed for host '${host}'. Please verify that the SMTP Host address is correct (e.g., smtp.gmail.com) and that the server has an active internet connection.`;
+      } else if (errMsg.includes('ETIMEOUT') || errMsg.includes('Connection timeout')) {
+        errMsg = `Connection timed out while connecting to ${host}:${port}. Please verify that the port is correct and not blocked by the network or firewall.`;
+      } else if (errMsg.includes('ECONNREFUSED')) {
+        errMsg = `Connection was refused by ${host}:${port}. Please double-check the SMTP Host and Port.`;
+      }
+
+      return res.json({ 
+        success: false, 
+        smtpError: true,
+        error: errMsg,
+        debugPayload: {
+          to: email,
+          subject,
+          otp,
+          html: htmlContent
+        }
+      });
     }
   });
 
@@ -372,7 +422,7 @@ async function startServer() {
       }
     } catch (error: any) {
       console.error('[SMTP Error] Failed to send welcome email:', error);
-      return res.status(500).json({ success: false, error: error.message || 'SMTP Server failed to dispatch welcome email.' });
+      return res.json({ success: false, error: error.message || 'SMTP Server failed to dispatch welcome email.' });
     }
   });
 

@@ -2777,7 +2777,16 @@ export default function Settings({
                     type="text"
                     value={localSettings.smtpHost || ''}
                     placeholder="e.g. smtp.gmail.com"
-                    onChange={(e) => setLocalSettings({ ...localSettings, smtpHost: e.target.value })}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (val.toLowerCase().includes('smpt')) {
+                        val = val.replace(/smpt/gi, 'smtp');
+                      }
+                      if (val.toLowerCase().includes('stmp')) {
+                        val = val.replace(/stmp/gi, 'smtp');
+                      }
+                      setLocalSettings({ ...localSettings, smtpHost: val });
+                    }}
                     className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
                   />
                 </div>

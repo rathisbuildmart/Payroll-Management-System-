@@ -503,6 +503,7 @@ export default function App() {
   // OTP Reset and OTP Login States
   const [lastSentEmail, setLastSentEmail] = useState<any>(null);
   const [showEmailViewer, setShowEmailViewer] = useState(false);
+  const [fallbackOtpPayload, setFallbackOtpPayload] = useState<any | null>(null);
   
   // Forgot Password Self-Service Flow States
   const [forgotStep, setForgotStep] = useState<'request' | 'verify_otp' | 'new_password'>('request');
@@ -1155,7 +1156,16 @@ export default function App() {
           }
         })
       });
-      const data = await res.json();
+      
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        data = { success: false, error: text || `Server error ${res.status}` };
+      }
+
       setIsSendingPasswordLoginOtp(false);
       if (data.success) {
         setPasswordLoginOtpStep('enter_otp');
@@ -1165,10 +1175,14 @@ export default function App() {
         }
       } else {
         setLoginErr(data.error || 'Failed to dispatch login 2FA OTP.');
+        if (data.smtpError && data.debugPayload) {
+          setFallbackOtpPayload(data.debugPayload);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error('[2FA Login OTP Send Error]', err);
       setIsSendingPasswordLoginOtp(false);
-      setLoginErr(language === 'en' ? 'Network error sending 2FA OTP.' : '2FA ओटीपी भेजने में नेटवर्क त्रुटि।');
+      setLoginErr(language === 'en' ? `Network error sending 2FA OTP: ${err.message || err}` : `2FA ओटीपी भेजने में नेटवर्क त्रुटि: ${err.message || err}`);
     }
   };
 
@@ -1918,9 +1932,39 @@ export default function App() {
 
               {/* Error Alert Box */}
               {loginErr && (
-                <div className="bg-rose-500/10 text-rose-300 border border-rose-500/20 p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 mt-5">
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5 animate-bounce" />
-                  <span className="leading-normal">{loginErr}</span>
+                <div className="bg-rose-500/10 text-rose-300 border border-rose-500/20 p-3.5 rounded-xl text-xs font-semibold flex flex-col gap-2.5 mt-5">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5 animate-bounce" />
+                    <span className="leading-normal">{loginErr}</span>
+                  </div>
+                  {fallbackOtpPayload && (
+                    <div className="pt-2 border-t border-rose-500/10 flex flex-col gap-2">
+                      <p className="text-[10px] text-slate-300 font-medium">
+                        {language === 'en' 
+                          ? 'SMTP Dispatch failed. You can bypass this using the Developer Fallback Sandbox:'
+                          : 'SMTP प्रेषण विफल रहा। आप डेवलपर फ़ॉलबैक सैंडबॉक्स का उपयोग करके इसे बायपास कर सकते हैं:'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLastSentEmail(fallbackOtpPayload);
+                          setShowEmailViewer(true);
+                          setFallbackOtpPayload(null);
+                          setLoginErr(null);
+                          if (isFirstLoginVerification) {
+                            setFirstLoginStep('email_otp');
+                          } else if (loginMethod === 'otp') {
+                            setLoginOtpStep('enter_otp');
+                          } else {
+                            setPasswordLoginOtpStep('enter_otp');
+                          }
+                        }}
+                        className="self-start text-[10px] px-3 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-lg cursor-pointer font-bold uppercase tracking-wider transition-all"
+                      >
+                        {language === 'en' ? 'Bypass & View OTP in Sandbox' : 'बायपास करें और सैंडबॉक्स में ओटीपी देखें'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1979,7 +2023,16 @@ export default function App() {
                                 }
                               })
                             });
-                            const data = await res.json();
+                            
+                            let data;
+                            const contentType = res.headers.get('content-type');
+                            if (contentType && contentType.includes('application/json')) {
+                              data = await res.json();
+                            } else {
+                              const text = await res.text();
+                              data = { success: false, error: text || `Server error ${res.status}` };
+                            }
+
                             setFirstLoginSendingOtp(false);
                             if (data.success) {
                               setFirstLoginStep('email_otp');
@@ -1989,10 +2042,14 @@ export default function App() {
                               }
                             } else {
                               setLoginErr(data.error || 'Failed to dispatch verification OTP.');
+                              if (data.smtpError && data.debugPayload) {
+                                setFallbackOtpPayload(data.debugPayload);
+                              }
                             }
-                          } catch (err) {
+                          } catch (err: any) {
+                            console.error('[First Login Security OTP Send Error]', err);
                             setFirstLoginSendingOtp(false);
-                            setLoginErr(language === 'en' ? 'Network error sending OTP.' : 'ओटीपी भेजने में नेटवर्क त्रुटि।');
+                            setLoginErr(language === 'en' ? `Network error sending OTP: ${err.message || err}` : `ओटीपी भेजने में नेटवर्क त्रुटि: ${err.message || err}`);
                           }
                         }}
                         disabled={firstLoginSendingOtp}
@@ -2768,42 +2825,57 @@ export default function App() {
                       setLoginOtpEmail(emp.email.trim());
                       setIsSendingLoginOtp(true);
 
-                      fetch('/api/send-otp', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          email: emp.email.trim(),
-                          otp,
-                          empName: emp.name,
-                          purpose: 'login',
-                          language,
-                          smtpSettings: {
-                            host: adminSettings.smtpHost,
-                            port: adminSettings.smtpPort,
-                            username: adminSettings.smtpUsername,
-                            password: adminSettings.smtpPassword,
-                            senderName: adminSettings.senderName,
-                            senderEmail: adminSettings.senderEmail
+                      const triggerSendOtp = async () => {
+                        try {
+                          const res = await fetch('/api/send-otp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              email: emp.email.trim(),
+                              otp,
+                              empName: emp.name,
+                              purpose: 'login',
+                              language,
+                              smtpSettings: {
+                                host: adminSettings.smtpHost,
+                                port: adminSettings.smtpPort,
+                                username: adminSettings.smtpUsername,
+                                password: adminSettings.smtpPassword,
+                                senderName: adminSettings.senderName,
+                                senderEmail: adminSettings.senderEmail
+                              }
+                            })
+                          });
+                          
+                          let data;
+                          const contentType = res.headers.get('content-type');
+                          if (contentType && contentType.includes('application/json')) {
+                            data = await res.json();
+                          } else {
+                            const text = await res.text();
+                            data = { success: false, error: text || `Server error ${res.status}` };
                           }
-                        })
-                      })
-                      .then(res => res.json())
-                      .then(data => {
-                        setIsSendingLoginOtp(false);
-                        if (data.success) {
-                          setLoginOtpStep('enter_otp');
-                          if (data.method === 'SIMULATION') {
-                            setLastSentEmail(data.debugPayload);
-                            setShowEmailViewer(true);
+
+                          setIsSendingLoginOtp(false);
+                          if (data.success) {
+                            setLoginOtpStep('enter_otp');
+                            if (data.method === 'SIMULATION') {
+                              setLastSentEmail(data.debugPayload);
+                              setShowEmailViewer(true);
+                            }
+                          } else {
+                            setLoginErr(data.error || 'Failed to dispatch login OTP.');
+                            if (data.smtpError && data.debugPayload) {
+                              setFallbackOtpPayload(data.debugPayload);
+                            }
                           }
-                        } else {
-                          setLoginErr(data.error || 'Failed to dispatch login OTP.');
+                        } catch (err: any) {
+                          console.error('[Standard Login OTP Send Error]', err);
+                          setIsSendingLoginOtp(false);
+                          setLoginErr(language === 'en' ? `Network error sending OTP: ${err.message || err}` : `ओटीपी भेजने में नेटवर्क त्रुटि: ${err.message || err}`);
                         }
-                      })
-                      .catch(err => {
-                        setIsSendingLoginOtp(false);
-                        setLoginErr(language === 'en' ? 'Network error sending OTP.' : 'ओटीपी भेजने में नेटवर्क त्रुटि।');
-                      });
+                      };
+                      triggerSendOtp();
                     }} className="space-y-4">
                       
                       <div className="space-y-1.5">
@@ -3095,9 +3167,33 @@ export default function App() {
                   </div>
 
                   {forgotError && (
-                    <div className="bg-rose-500/10 text-rose-300 border border-rose-500/20 p-3 rounded-xl text-[11px] font-semibold flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                      <span>{forgotError}</span>
+                    <div className="bg-rose-500/10 text-rose-300 border border-rose-500/20 p-3 rounded-xl text-[11px] font-semibold flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>{forgotError}</span>
+                      </div>
+                      {fallbackOtpPayload && (
+                        <div className="pt-2 border-t border-rose-500/10 flex flex-col gap-1.5">
+                          <p className="text-[9px] text-slate-300 font-medium">
+                            {language === 'en' 
+                              ? 'SMTP Dispatch failed. You can bypass this using the Developer Fallback Sandbox:'
+                              : 'SMTP प्रेषण विफल रहा। आप डेवलपर फ़ॉलबैक सैंडबॉक्स का उपयोग करके इसे बायपास कर सकते हैं:'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLastSentEmail(fallbackOtpPayload);
+                              setShowEmailViewer(true);
+                              setFallbackOtpPayload(null);
+                              setForgotError(null);
+                              setForgotStep('verify_otp');
+                            }}
+                            className="self-start text-[9px] px-2.5 py-0.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-lg cursor-pointer font-bold uppercase tracking-wider transition-all"
+                          >
+                            {language === 'en' ? 'Bypass & View OTP' : 'बायपास करें और ओटीपी देखें'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -3125,42 +3221,57 @@ export default function App() {
                       setForgotGeneratedOtp(otp);
                       setIsSendingForgotOtp(true);
 
-                      fetch('/api/send-otp', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          email: forgotEmail.trim(),
-                          otp,
-                          empName: targetEmp.name,
-                          purpose: 'forgot_password',
-                          language,
-                          smtpSettings: {
-                            host: adminSettings.smtpHost,
-                            port: adminSettings.smtpPort,
-                            username: adminSettings.smtpUsername,
-                            password: adminSettings.smtpPassword,
-                            senderName: adminSettings.senderName,
-                            senderEmail: adminSettings.senderEmail
+                      const triggerForgotSendOtp = async () => {
+                        try {
+                          const res = await fetch('/api/send-otp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              email: forgotEmail.trim(),
+                              otp,
+                              empName: targetEmp.name,
+                              purpose: 'forgot_password',
+                              language,
+                              smtpSettings: {
+                                host: adminSettings.smtpHost,
+                                port: adminSettings.smtpPort,
+                                username: adminSettings.smtpUsername,
+                                password: adminSettings.smtpPassword,
+                                senderName: adminSettings.senderName,
+                                senderEmail: adminSettings.senderEmail
+                              }
+                            })
+                          });
+                          
+                          let data;
+                          const contentType = res.headers.get('content-type');
+                          if (contentType && contentType.includes('application/json')) {
+                            data = await res.json();
+                          } else {
+                            const text = await res.text();
+                            data = { success: false, error: text || `Server error ${res.status}` };
                           }
-                        })
-                      })
-                      .then(res => res.json())
-                      .then(data => {
-                        setIsSendingForgotOtp(false);
-                        if (data.success) {
-                          setForgotStep('verify_otp');
-                          if (data.method === 'SIMULATION') {
-                            setLastSentEmail(data.debugPayload);
-                            setShowEmailViewer(true);
+
+                          setIsSendingForgotOtp(false);
+                          if (data.success) {
+                            setForgotStep('verify_otp');
+                            if (data.method === 'SIMULATION') {
+                              setLastSentEmail(data.debugPayload);
+                              setShowEmailViewer(true);
+                            }
+                          } else {
+                            setForgotError(data.error || 'Failed to dispatch OTP. Please check SMTP settings.');
+                            if (data.smtpError && data.debugPayload) {
+                              setFallbackOtpPayload(data.debugPayload);
+                            }
                           }
-                        } else {
-                          setForgotError(data.error || 'Failed to dispatch OTP. Please check SMTP settings.');
+                        } catch (err: any) {
+                          console.error('[Forgot Password OTP Send Error]', err);
+                          setIsSendingForgotOtp(false);
+                          setForgotError(language === 'en' ? `Network error while sending OTP: ${err.message || err}` : `ओटीपी भेजने के दौरान नेटवर्क त्रुटि: ${err.message || err}`);
                         }
-                      })
-                      .catch(err => {
-                        setIsSendingForgotOtp(false);
-                        setForgotError(language === 'en' ? 'Network error while sending OTP.' : 'ओटीपी भेजने के दौरान नेटवर्क त्रुटि।');
-                      });
+                      };
+                      triggerForgotSendOtp();
                     }} className="space-y-4">
                       <p className="text-[11px] text-slate-400 font-semibold leading-normal">
                         {language === 'en' 
