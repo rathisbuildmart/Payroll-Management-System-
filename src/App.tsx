@@ -1158,12 +1158,15 @@ export default function App() {
       });
       
       let data;
-      const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
+      try {
         data = await res.json();
-      } else {
-        const text = await res.text();
-        data = { success: false, error: text || `Server error ${res.status}` };
+      } catch (err) {
+        try {
+          const text = await res.text();
+          data = { success: false, error: text || `Server error ${res.status}` };
+        } catch (e2) {
+          data = { success: false, error: `Server error ${res.status}` };
+        }
       }
 
       setIsSendingPasswordLoginOtp(false);
@@ -2025,12 +2028,15 @@ export default function App() {
                             });
                             
                             let data;
-                            const contentType = res.headers.get('content-type');
-                            if (contentType && contentType.includes('application/json')) {
+                            try {
                               data = await res.json();
-                            } else {
-                              const text = await res.text();
-                              data = { success: false, error: text || `Server error ${res.status}` };
+                            } catch (err) {
+                              try {
+                                const text = await res.text();
+                                data = { success: false, error: text || `Server error ${res.status}` };
+                              } catch (e2) {
+                                data = { success: false, error: `Server error ${res.status}` };
+                              }
                             }
 
                             setFirstLoginSendingOtp(false);
@@ -2848,12 +2854,15 @@ export default function App() {
                           });
                           
                           let data;
-                          const contentType = res.headers.get('content-type');
-                          if (contentType && contentType.includes('application/json')) {
+                          try {
                             data = await res.json();
-                          } else {
-                            const text = await res.text();
-                            data = { success: false, error: text || `Server error ${res.status}` };
+                          } catch (err) {
+                            try {
+                              const text = await res.text();
+                              data = { success: false, error: text || `Server error ${res.status}` };
+                            } catch (e2) {
+                              data = { success: false, error: `Server error ${res.status}` };
+                            }
                           }
 
                           setIsSendingLoginOtp(false);
@@ -3244,12 +3253,15 @@ export default function App() {
                           });
                           
                           let data;
-                          const contentType = res.headers.get('content-type');
-                          if (contentType && contentType.includes('application/json')) {
+                          try {
                             data = await res.json();
-                          } else {
-                            const text = await res.text();
-                            data = { success: false, error: text || `Server error ${res.status}` };
+                          } catch (err) {
+                            try {
+                              const text = await res.text();
+                              data = { success: false, error: text || `Server error ${res.status}` };
+                            } catch (e2) {
+                              data = { success: false, error: `Server error ${res.status}` };
+                            }
                           }
 
                           setIsSendingForgotOtp(false);
