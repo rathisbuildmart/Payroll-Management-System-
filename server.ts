@@ -426,6 +426,129 @@ async function startServer() {
     }
   });
 
+  // 3. Send Leave Update Endpoint
+  app.post('/api/send-leave-update', async (req, res) => {
+    const { email, empName, leaveType, startDate, endDate, status, approvedBy, remarks, language, smtpSettings } = req.body;
+
+    if (!email || !empName || !leaveType || !startDate || !status) {
+      return res.status(400).json({ success: false, error: 'Email, Employee Name, Leave Type, Start Date and Status are required.' });
+    }
+
+    const isEn = language !== 'hi';
+    const isApproved = status.toLowerCase() === 'approved';
+
+    const subject = isEn 
+      ? `[Rathi Build Mart] Leave Application ${status}: ${leaveType}`
+      : `[राठी बिल्डमार्ट] छुट्टी आवेदन ${isApproved ? 'मंजूर' : 'अस्वीकृत'}: ${leaveType}`;
+
+    const titleText = isEn
+      ? `Leave Application ${status}`
+      : `छुट्टी आवेदन ${isApproved ? 'मंजूर' : 'अस्वीकृत'}`;
+
+    const greetingText = isEn
+      ? `Hello ${empName},`
+      : `नमस्कार ${empName},`;
+
+    const bodyText = isEn
+      ? `Your leave application for <strong>${leaveType}</strong> from <strong>${startDate}</strong> to <strong>${endDate || startDate}</strong> has been <strong>${status.toLowerCase()}</strong> by ${approvedBy || 'HR Administration'}.`
+      : `आपका <strong>${leaveType}</strong> के लिए छुट्टी का आवेदन जो कि <strong>${startDate}</strong> से <strong>${endDate || startDate}</strong> तक के लिए था, उसे ${approvedBy || 'HR Administration'} द्वारा <strong>${isApproved ? 'मंजूर' : 'अस्वीकृत'}</strong> कर दिया गया है।`;
+
+    const statusLabel = isEn ? 'Application Status:' : 'आवेदन की स्थिति:';
+    const leaveTypeLabel = isEn ? 'Leave / Request Type:' : 'अवकाश का प्रकार:';
+    const durationLabel = isEn ? 'Period:' : 'अवधि / तिथि:';
+    const remarksLabel = isEn ? 'Approver Remarks:' : 'रिमार्क्स (टिप्पणी):';
+
+    const headerGradient = isApproved 
+      ? 'linear-gradient(135deg, #065f46 0%, #047857 100%)' // Emerald
+      : 'linear-gradient(135deg, #991b1b 0%, #b91c1c 100%)'; // Crimson Red
+
+    const statusBadgeColor = isApproved ? '#059669' : '#dc2626';
+
+    const htmlContent = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 10px; text-align: center;">
+        <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; text-align: left;">
+          <div style="background: ${headerGradient}; padding: 30px 25px; text-align: center; color: #ffffff;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;">Rathi Build Mart</h2>
+            <p style="margin: 5px 0 0 0; font-size: 11px; opacity: 0.9; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Leave & Attendance Updates</p>
+          </div>
+          <div style="padding: 30px 25px;">
+            <p style="font-size: 15px; color: ${statusBadgeColor}; font-weight: 800; margin-top: 0; text-transform: uppercase; letter-spacing: 0.5px;">${titleText}</p>
+            <p style="font-size: 14px; color: #1e293b; font-weight: 700;">${greetingText}</p>
+            <p style="font-size: 13px; color: #475569; line-height: 1.6; font-weight: 500;">${bodyText}</p>
+            
+            <div style="background-color: #f8fafc; border-radius: 12px; padding: 22px; margin: 25px 0; border: 1px solid #e2e8f0;">
+              <span style="font-size: 10px; color: ${statusBadgeColor}; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">APPLICATION DETAILS</span>
+              
+              <table style="width: 100%; font-size: 13px; color: #334155; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 6px 0; font-weight: 700; width: 45%; color: #64748b;">${statusLabel}</td>
+                  <td style="padding: 6px 0; font-weight: 800; color: ${statusBadgeColor}; font-size: 14px; text-transform: uppercase;">${status}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-weight: 700; color: #64748b;">${leaveTypeLabel}</td>
+                  <td style="padding: 6px 0; font-weight: 800; color: #1e293b;">${leaveType}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-weight: 700; color: #64748b;">${durationLabel}</td>
+                  <td style="padding: 6px 0; font-weight: 800; color: #1e293b; font-family: monospace;">${startDate} ${endDate && endDate !== startDate ? `to ${endDate}` : ''}</td>
+                </tr>
+                ${remarks ? `
+                <tr>
+                  <td style="padding: 6px 0; font-weight: 700; color: #64748b; vertical-align: top;">${remarksLabel}</td>
+                  <td style="padding: 6px 0; font-weight: 600; color: #475569; italic; font-size: 12px;">"${remarks}"</td>
+                </tr>
+                ` : ''}
+              </table>
+            </div>
+          </div>
+          <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #f1f5f9; font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+            © ${new Date().getFullYear()} Rathi Build Mart • HR & Attendance Systems
+          </div>
+        </div>
+      </div>
+    `;
+
+    const textContent = `${subject}\n\nHello ${empName},\n\n${bodyText}\n\nStatus: ${status}\nLeave Type: ${leaveType}\nPeriod: ${startDate} to ${endDate || startDate}\nRemarks: ${remarks || 'None'}`;
+
+    try {
+      const transporter = getTransporter(smtpSettings);
+      if (transporter) {
+        let fromAddress = process.env.SMTP_FROM || '"Rathi Build Mart" <noreply@rathibuildmart.com>';
+        if (smtpSettings?.senderEmail && smtpSettings.senderEmail.trim()) {
+          const senderNameAlias = (smtpSettings.senderName && smtpSettings.senderName.trim()) || 'Rathi Build Mart';
+          fromAddress = `"${senderNameAlias}" <${smtpSettings.senderEmail.trim()}>`;
+        } else if (process.env.SMTP_USER) {
+          fromAddress = `"Rathi Build Mart" <${process.env.SMTP_USER}>`;
+        }
+
+        await transporter.sendMail({
+          from: fromAddress,
+          to: email,
+          subject,
+          text: textContent,
+          html: htmlContent,
+        });
+        console.log(`[SMTP] Leave update email successfully sent to ${email}`);
+        return res.json({ success: true, method: 'SMTP', message: 'Leave update email sent successfully via real SMTP.' });
+      } else {
+        console.log(`[SIMULATION] No SMTP configuration found. Leave update email logged for ${email}`);
+        return res.json({ 
+          success: true, 
+          method: 'SIMULATION', 
+          message: 'Running in simulation mode (no SMTP configured). Email logged on server.',
+          debugPayload: {
+            to: email,
+            subject,
+            html: htmlContent
+          }
+        });
+      }
+    } catch (error: any) {
+      console.error('[SMTP Error] Failed to send leave update email:', error);
+      return res.json({ success: false, error: error.message || 'SMTP Server failed to dispatch leave update email.' });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

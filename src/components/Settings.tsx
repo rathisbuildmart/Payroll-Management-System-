@@ -146,6 +146,12 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   enableProfessionalTax: true,
   enablePaidLeaveCalculation: true,
   paidLeaveStartAfterMonths: 0,
+  hrContactEmail: 'centraldata@rathibuildmart.com',
+  hrContactPhone: '+91 91111 22222',
+  hrContactManager: 'Rathi Build Mart Directors & IT Desk',
+  rulesShiftTiming: '09:30 AM - 06:30 PM',
+  rulesHalfDaySlot: 'Before 01:30 PM',
+  rulesLatePunchGrace: '09:45 AM',
   roleAccounts: [
     {
       id: 'acc-1',
@@ -1115,6 +1121,81 @@ export default function Settings({
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-400 font-medium">Use these credentials on the portal login screen to sign in as the System Administrator.</p>
+              </div>
+
+              {/* Login Screen Portal Info Customization */}
+              <div className="border-t border-dashed border-gray-200 pt-4 mt-4 space-y-4">
+                <h4 className="text-xs font-black text-[#03623c] uppercase tracking-wider flex items-center gap-1.5">
+                  <Megaphone className="w-3.5 h-3.5" />
+                  Login Info Desk Settings (लॉगिन पेज हेल्पडेस्क और नियम)
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Managed By / Provider (प्रबंधनकर्ता)</label>
+                    <input 
+                      type="text" 
+                      value={localSettings.hrContactManager || ''}
+                      onChange={(e) => setLocalSettings({...localSettings, hrContactManager: e.target.value})}
+                      placeholder="e.g. Directors & IT Desk"
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Helpdesk Email (एचआर ईमेल)</label>
+                    <input 
+                      type="email" 
+                      value={localSettings.hrContactEmail || ''}
+                      onChange={(e) => setLocalSettings({...localSettings, hrContactEmail: e.target.value})}
+                      placeholder="e.g. hr@rathibuildmart.com"
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Helpdesk Phone (एचआर फोन नंबर)</label>
+                    <input 
+                      type="text" 
+                      value={localSettings.hrContactPhone || ''}
+                      onChange={(e) => setLocalSettings({...localSettings, hrContactPhone: e.target.value})}
+                      placeholder="e.g. +91 91111 22222"
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Standard Shift (मानक पाली समय)</label>
+                    <input 
+                      type="text" 
+                      value={localSettings.rulesShiftTiming || ''}
+                      onChange={(e) => setLocalSettings({...localSettings, rulesShiftTiming: e.target.value})}
+                      placeholder="e.g. 09:30 AM - 06:30 PM"
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Half-Day Limit (हाफ-डे सीमा समय)</label>
+                    <input 
+                      type="text" 
+                      value={localSettings.rulesHalfDaySlot || ''}
+                      onChange={(e) => setLocalSettings({...localSettings, rulesHalfDaySlot: e.target.value})}
+                      placeholder="e.g. Before 01:30 PM"
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Late Mark Grace (लेट मार्क छूट समय)</label>
+                    <input 
+                      type="text" 
+                      value={localSettings.rulesLatePunchGrace || ''}
+                      onChange={(e) => setLocalSettings({...localSettings, rulesLatePunchGrace: e.target.value})}
+                      placeholder="e.g. 09:45 AM"
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-400 font-medium">These details appear dynamically on the portal login screen notices under "HR & Mgmt" and "Timings" tabs.</p>
               </div>
             </div>
           )}

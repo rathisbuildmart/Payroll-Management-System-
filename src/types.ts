@@ -192,6 +192,13 @@ export interface AdminSettings {
   senderName?: string;
   senderEmail?: string;
   enablePasswordLoginOtp?: boolean;
+  // Dynamic HR & Timings settings for Login subtabs
+  hrContactEmail?: string;
+  hrContactPhone?: string;
+  hrContactManager?: string;
+  rulesShiftTiming?: string;
+  rulesHalfDaySlot?: string;
+  rulesLatePunchGrace?: string;
 }
 
 export interface Attendance {
@@ -281,6 +288,21 @@ export interface AuditLog {
   fieldChanged: string;
   oldValue: string;
   newValue: string;
+  remarks?: string;
+}
+
+export interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  leaveType: 'Vacation' | 'Sick' | 'Casual' | 'Half Day (Before Lunch)' | 'Half Day (After Lunch)' | 'Late Coming' | 'Early Going';
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  durationDays: number;
+  reason: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  appliedOn: string; // YYYY-MM-DD
+  approvedBy?: string;
   remarks?: string;
 }
 

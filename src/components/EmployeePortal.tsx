@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { 
   User, Calendar, CreditCard, Check, Printer, FileText, AlertCircle, 
   TrendingUp, Users, ShieldCheck, Building, Sparkles, MapPin, Briefcase, Phone, Mail, FileCheck, DollarSign,
-  CalendarDays, Plus, Locate
+  CalendarDays, Plus, Locate, ChevronLeft
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { Employee, Attendance, PayrollRecord, AdminSettings } from '../types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, LeaveRequest } from '../types';
 import LeavesHolidays from './LeavesHolidays';
 import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
 import MonthlyCalendarReport from './MonthlyCalendarReport';
@@ -17,6 +17,8 @@ interface EmployeePortalProps {
   language: 'en' | 'hi';
   adminSettings: AdminSettings;
   onUpdateAttendanceRecords?: (records: Attendance[]) => Promise<void>;
+  leaveRequests?: LeaveRequest[];
+  onAddLeaveRequest?: (req: LeaveRequest) => void;
 }
 
 export default function EmployeePortal({ 
@@ -25,12 +27,15 @@ export default function EmployeePortal({
   payrollRecords, 
   language, 
   adminSettings,
-  onUpdateAttendanceRecords
+  onUpdateAttendanceRecords,
+  leaveRequests = [],
+  onAddLeaveRequest
 }: EmployeePortalProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'attendance' | 'payslips' | 'exceptions' | 'leaves' | 'calendar' | 'self_attendance'>('profile');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'attendance' | 'payslips' | 'exceptions' | 'leaves' | 'calendar' | 'self_attendance'>('dashboard');
   const [attendanceYear, setAttendanceYear] = useState<string>(new Date().getFullYear().toString());
   const [attendanceMonth, setAttendanceMonth] = useState<string>(String(new Date().getMonth() + 1).padStart(2, '0'));
   const [activePayslip, setActivePayslip] = useState<any | null>(null);
+  const [showMoreSheet, setShowMoreSheet] = useState(false);
 
   // Self Attendance & GPS Geofencing States
   const [currentGpsCoords, setCurrentGpsCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -387,6 +392,7 @@ export default function EmployeePortal({
 
   const t = {
     en: {
+      dashboard: language === 'en' ? "Home Dashboard" : "होम डैशबोर्ड",
       profile: language === 'en' ? "My Profile" : "मेरी प्रोफ़ाइल",
       attendance: language === 'en' ? "Attendance Log" : "उपस्थिति लॉग",
       payslips: language === 'en' ? "My Salary Slips" : "मेरी सैलरी स्लिप",
@@ -739,43 +745,77 @@ export default function EmployeePortal({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="employee-portal-container space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden box-border">
       
+      {/* Mobile-only compact back button & header */}
+      {activeTab !== 'dashboard' && (
+        <div className="md:hidden sticky top-0 z-40 flex items-center justify-between bg-slate-900/95 backdrop-blur-md text-white p-3 rounded-xl border border-slate-800 shadow-md mb-2">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className="flex items-center gap-1 text-xs font-black text-emerald-400 hover:text-emerald-300 bg-slate-800/80 px-2 py-1.5 rounded-lg border border-slate-700/50 cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4 shrink-0" />
+            <span>{language === 'en' ? "Back" : "पीछे"}</span>
+          </button>
+          <span className="text-xs font-black uppercase tracking-wider text-slate-100 truncate pr-4">
+            {activeTab === 'profile' && t.profile}
+            {activeTab === 'self_attendance' && (language === 'en' ? "Punch" : "पंच")}
+            {activeTab === 'attendance' && t.attendance}
+            {activeTab === 'calendar' && t.calendar}
+            {activeTab === 'exceptions' && t.exceptions}
+            {activeTab === 'payslips' && t.payslips}
+            {activeTab === 'leaves' && t.leaves}
+          </span>
+          <div className="w-8"></div>
+        </div>
+      )}
+
       {/* 2026 Premium Employee Header banner */}
-      <div className="relative bg-slate-900 overflow-hidden rounded-2xl p-6 md:p-8 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className={`employee-banner-card relative bg-slate-900 overflow-hidden rounded-2xl p-4 sm:p-6 md:p-8 text-white border border-slate-800 shadow-xl flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 ${activeTab === 'dashboard' ? 'flex' : 'hidden md:flex'}`}>
         <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
         <div className="absolute bottom-0 left-10 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
 
-        <div className="flex items-center gap-5 relative z-10">
+        <div className="flex items-center gap-3 sm:gap-5 relative z-10 w-full md:w-auto">
           {employee.photoUrl ? (
             <img 
               src={employee.photoUrl} 
               alt={employee.name} 
-              className="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-cover border-2 border-emerald-500/30 shadow-md"
+              className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-2xl object-cover border border-emerald-500/30 shadow-md shrink-0"
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-tr from-emerald-600 to-indigo-600 text-white font-black text-2xl flex items-center justify-center border-2 border-emerald-500/30">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-tr from-emerald-600 to-indigo-600 text-white font-black text-lg sm:text-2xl flex items-center justify-center border border-emerald-500/30 shrink-0">
               {employee.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
             </div>
           )}
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest">
-              <ShieldCheck className="w-3 h-3" />
+          <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+            <div className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] font-extrabold uppercase tracking-widest">
+              <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
               <span>Employee Access Portal</span>
             </div>
-            <h1 className="text-2xl font-black tracking-tight">{employee.name}</h1>
-            <p className="text-xs text-slate-400 font-bold font-mono">
+            <h1 className="text-base sm:text-xl md:text-2xl font-black tracking-tight truncate">{employee.name}</h1>
+            <p className="text-[10px] sm:text-xs text-slate-400 font-bold font-mono truncate">
               ID: {employee.id} <span className="text-slate-600">•</span> {employee.designation} <span className="text-slate-600">•</span> {employee.department}
             </p>
           </div>
         </div>
 
-        {/* Portal Quick Action Navigation */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 relative z-10 w-full md:w-auto justify-center md:justify-end">
+        {/* Portal Quick Action Navigation (Hidden on mobile, beautiful row on desktop) */}
+        <div className="hidden md:flex flex-wrap gap-2 relative z-10 w-full md:w-auto justify-center md:justify-end">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`h-11 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
+              activeTab === 'dashboard' 
+                ? 'bg-emerald-600 text-white shadow-md' 
+                : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+            <span className="truncate">{t.dashboard}</span>
+          </button>
           <button
             onClick={() => setActiveTab('profile')}
-            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
+            className={`h-11 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
               activeTab === 'profile' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
@@ -790,7 +830,7 @@ export default function EmployeePortal({
                 setActiveTab('self_attendance');
                 detectGpsAndVerifyOutlet();
               }}
-              className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
+              className={`h-11 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
                 activeTab === 'self_attendance' 
                   ? 'bg-emerald-600 text-white shadow-md' 
                   : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
@@ -802,7 +842,7 @@ export default function EmployeePortal({
           )}
           <button
             onClick={() => setActiveTab('attendance')}
-            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
+            className={`h-11 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
               activeTab === 'attendance' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
@@ -813,7 +853,7 @@ export default function EmployeePortal({
           </button>
           <button
             onClick={() => setActiveTab('calendar')}
-            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
+            className={`h-11 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
               activeTab === 'calendar' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
@@ -824,7 +864,7 @@ export default function EmployeePortal({
           </button>
           <button
             onClick={() => setActiveTab('exceptions')}
-            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer w-full sm:w-auto ${
+            className={`h-11 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer w-full sm:w-auto ${
               activeTab === 'exceptions' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
@@ -839,7 +879,7 @@ export default function EmployeePortal({
           {adminSettings.enableEmployeePayslips === true && (
             <button
               onClick={() => setActiveTab('payslips')}
-              className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
+              className={`h-11 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
                 activeTab === 'payslips' 
                   ? 'bg-emerald-600 text-white shadow-md' 
                   : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
@@ -851,7 +891,7 @@ export default function EmployeePortal({
           )}
           <button
             onClick={() => setActiveTab('leaves')}
-            className={`px-3 py-2.5 sm:px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
+            className={`h-11 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 cursor-pointer w-full sm:w-auto ${
               activeTab === 'leaves' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/50'
@@ -865,6 +905,508 @@ export default function EmployeePortal({
 
       {/* Main Container */}
       <div className="space-y-6">
+
+        {/* DASHBOARD TAB */}
+        {activeTab === 'dashboard' && (() => {
+          const todayStr = new Date().toLocaleDateString('en-CA');
+          const todayRecord = attendanceRecords.find(r => r.employeeId === employee.id && r.date === todayStr);
+          const checkResult = getOutletCheckResult();
+          
+          // Let's find latest 3 attendance logs
+          const recentLogs = [...attendanceRecords]
+            .filter(r => r.employeeId === employee.id)
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(0, 3);
+
+          // Let's get the latest payslip if any
+          const latestPayslip = empPayslips[0];
+
+          return (
+            <div className="space-y-6 animate-fade-in" id="employee-home-dashboard">
+              {/* Dynamic Welcome greeting widget */}
+              <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-indigo-500/10 border border-slate-200/50 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1 text-center sm:text-left">
+                  <h2 className="text-base sm:text-lg font-black text-slate-800 flex items-center justify-center sm:justify-start gap-1.5">
+                    <span>
+                      {language === 'en' 
+                        ? `Welcome back, ${employee.name.split(' ')[0]}!` 
+                        : `सुस्वागतम, ${employee.name.split(' ')[0]}!`}
+                    </span>
+                    <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-semibold max-w-xl">
+                    {language === 'en' 
+                      ? "Keep track of your monthly attendance logs, apply for roster leaves, download payroll salary certificates, and punch shift times securely."
+                      : "अपनी मासिक उपस्थिति दर्ज करें, छुट्टी के लिए आवेदन करें, सैलरी स्लिप प्राप्त करें और अपने शिफ्ट के समय को आसानी से ट्रैक करें।"}
+                  </p>
+                </div>
+                <div className="bg-white border border-slate-200/70 shadow-xxs rounded-xl px-4 py-2 text-center shrink-0 min-w-[150px]">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{language === 'en' ? "Today's Status" : "आज की स्थिति"}</span>
+                  <p className="text-xs font-black font-mono text-slate-800 mt-0.5">
+                    {todayRecord ? (
+                      <span className="text-emerald-700 font-extrabold">{language === 'en' ? "Punched In Today" : "आज उपस्थिति दर्ज है"}</span>
+                    ) : (
+                      <span className="text-rose-600 font-extrabold">{language === 'en' ? "Pending Punch" : "पंच लंबित है"}</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Top Row: Quick Attendance Punch Widget & Live Clock */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* 1. Live Attendance Punch card (Direct access, highly smooth workflow!) */}
+                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-emerald-50 rounded-xl text-emerald-700 shrink-0">
+                        <MapPin className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                          {language === 'en' ? "Quick Self Attendance Lock" : "तुरंत स्वयं उपस्थिति लॉक"}
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-bold">
+                          {language === 'en' ? "GPS Geofencing Active Detection" : "जीपीएस स्थान सत्यापन आधारित सीधा पंच"}
+                        </p>
+                      </div>
+                    </div>
+                    {/* Live Clock inside direct punch */}
+                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+                      <div className="text-right font-mono text-xs font-black text-slate-700 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">
+                        {currentTime}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={detectGpsAndVerifyOutlet}
+                        disabled={isDetectingGps}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 text-[10px] font-extrabold rounded-lg border border-slate-200 flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Locate className={`w-3 h-3 ${isDetectingGps ? 'animate-spin' : ''}`} />
+                        <span>{language === 'en' ? "GPS" : "लोकेशन"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Geofence Status Subcard */}
+                  {adminSettings.enableMobileAttendance !== false && employee.enableMobileAttendance !== false ? (
+                    <div className="space-y-3">
+                      {/* Gps Info Display */}
+                      {gpsError ? (
+                        <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-800 font-semibold flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <span>{gpsError}</span>
+                        </div>
+                      ) : !currentGpsCoords ? (
+                        <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center space-y-2.5">
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            {language === 'en' 
+                              ? "We need your physical location coordinates to verify you are currently at your branch premises before submitting your attendance."
+                              : "उपस्थिति दर्ज करने से पहले यह सत्यापित करने के लिए कि आप अभी अपनी आवंटित शाखा में हैं, हमें आपकी भौगोलिक स्थिति (GPS) की आवश्यकता है।"}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={detectGpsAndVerifyOutlet}
+                            className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+                          >
+                            {language === 'en' ? "Detect Location & Unlock Punch" : "लोकेशन प्राप्त कर पंच अनलॉक करें"}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {checkResult.isAllowed ? (
+                            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-2.5">
+                              <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                              <div className="text-[11px] text-emerald-800">
+                                <span className="font-bold block">
+                                  {language === 'en' ? "Geofence Verification Successful" : "जियोफेंस स्थान सत्यापित!"}
+                                </span>
+                                <span className="text-[10px] text-emerald-600 font-medium block mt-0.5">
+                                  {checkResult.isBypassed
+                                    ? (language === 'en' ? "GPS checks bypassed by Admin. Location recording enabled." : "जीपीएस चेक एडमिन द्वारा बायपास है। स्थान रिकॉर्ड किया जा रहा है।")
+                                    : (language === 'en'
+                                      ? `You are inside "${checkResult.nearestOutlet?.name || 'Verified branch'}" boundary (${checkResult.distanceMeters.toFixed(1)}m away).`
+                                      : `आप अपनी आवंटित शाखा "${checkResult.nearestOutlet?.name || 'सुरक्षित शाखा'}" के भीतर हैं (दूरी ${checkResult.distanceMeters.toFixed(1)}मी)।`
+                                    )}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5">
+                              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                              <div className="text-[11px] text-rose-800">
+                                <span className="font-bold block">
+                                  {language === 'en' ? "Geofence Verification Failed!" : "जियोफेंस स्थान सत्यापन विफल!"}
+                                </span>
+                                <span className="text-[10px] text-rose-600 font-medium leading-normal block mt-0.5">
+                                  {language === 'en'
+                                    ? `Your assigned branch "${checkResult.nearestOutlet?.name || 'Registered Branch'}" is ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(1) + 'km' : checkResult.distanceMeters.toFixed(0) + 'm'} away (Permitted radius is ${checkResult.requiredRadius}m).`
+                                    : `आपकी आवंटित शाखा "${checkResult.nearestOutlet?.name || 'सुरक्षित शाखा'}" आपसे ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(1) + 'किमी' : checkResult.distanceMeters.toFixed(0) + 'मी'} दूर है (अनुमत सीमा ${checkResult.requiredRadius}मी)।`}
+                                </span>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <button
+                                    type="button"
+                                    onClick={detectGpsAndVerifyOutlet}
+                                    className="px-2.5 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-900 text-[10px] font-black rounded border border-rose-200 cursor-pointer"
+                                  >
+                                    {language === 'en' ? "Re-Check GPS" : "लोकेशन पुनः जाचें"}
+                                  </button>
+                                  <span className="text-[9px] text-rose-500 font-bold">{language === 'en' ? "* Please come inside the branch to mark attendance." : "* कृपया उपस्थिति दर्ज करने के लिए परिसर के भीतर आएं।"}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Success / Error Messages */}
+                      {punchSuccessMsg && (
+                        <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px] font-bold">
+                          {punchSuccessMsg}
+                        </div>
+                      )}
+                      {punchErrorMsg && (
+                        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[11px] font-bold">
+                          {punchErrorMsg}
+                        </div>
+                      )}
+
+                      {/* Remarks Input */}
+                      {(!todayRecord || !todayRecord.checkOut) && currentGpsCoords && checkResult.isAllowed && (
+                        <div className="pt-1">
+                          <input 
+                            type="text"
+                            value={punchRemarks}
+                            onChange={(e) => setPunchRemarks(e.target.value)}
+                            placeholder={language === 'en' ? "Activity notes / remarks (optional)..." : "कार्य विवरण / रिमार्क्स (वैकल्पिक)..."}
+                            className="w-full border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-slate-50"
+                          />
+                        </div>
+                      )}
+
+                      {/* Punch Action buttons */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        {/* In button */}
+                        {todayRecord && todayRecord.checkIn ? (
+                          <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between">
+                            <div>
+                              <span className="block text-[9px] font-bold text-slate-400 uppercase">{language === 'en' ? "Punched In At" : "आगमन समय"}</span>
+                              <span className="text-sm font-black font-mono text-emerald-700">{todayRecord.checkIn}</span>
+                            </div>
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-250">
+                              {todayRecord.punchInOutlet || (language === 'en' ? "Branch" : "शाखा")}
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handlePunchIn}
+                            disabled={isSubmittingPunch || !currentGpsCoords || !checkResult.isAllowed}
+                            className="py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors border border-emerald-500/20 shadow-sm"
+                          >
+                            <Check className="w-4 h-4 shrink-0" />
+                            <span>{language === 'en' ? "Punch In (आगमन दर्ज करें)" : "आगमन (Punch In)"}</span>
+                          </button>
+                        )}
+
+                        {/* Out button */}
+                        {todayRecord && todayRecord.checkOut ? (
+                          <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between">
+                            <div>
+                              <span className="block text-[9px] font-bold text-slate-400 uppercase">{language === 'en' ? "Punched Out At" : "प्रस्थान समय"}</span>
+                              <span className="text-sm font-black font-mono text-slate-600">{todayRecord.checkOut}</span>
+                            </div>
+                            <span className="text-[10px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded border border-slate-250">
+                              {todayRecord.punchOutOutlet || (language === 'en' ? "Branch" : "शाखा")}
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handlePunchOut}
+                            disabled={isSubmittingPunch || !currentGpsCoords || !checkResult.isAllowed || !todayRecord || !todayRecord.checkIn}
+                            className="py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-slate-900 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm"
+                          >
+                            <Locate className="w-4 h-4 shrink-0" />
+                            <span>{language === 'en' ? "Punch Out (प्रस्थान दर्ज करें)" : "प्रस्थान (Punch Out)"}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-amber-50 border border-amber-150 rounded-xl text-center">
+                      <p className="text-xs text-amber-800 font-bold">
+                        {language === 'en'
+                          ? "Mobile GPS attendance is currently disabled by Admin or for your profile."
+                          : "जीपीएस आधारित मोबाइल उपस्थिति व्यवस्था वर्तमान में एडमिन द्वारा आपके लिए बंद है।"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Shift Info / Branch Desk Quick Card */}
+                <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-md flex flex-col justify-between border border-slate-800 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                      <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{language === 'en' ? "Shift & Premises info" : "शिफ्ट और परिसर विवरण"}</h4>
+                      <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-black px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                        {employee.employmentType || (language === 'en' ? "Permanent" : "स्थायी")}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3.5 pt-1">
+                      <div>
+                        <span className="block text-[10px] text-slate-400 font-semibold">{language === 'en' ? "Assigned Workstation" : "आवंटित शाखा कार्यालय"}</span>
+                        <span className="text-xs font-extrabold text-slate-100 flex items-center gap-1.5 mt-0.5">
+                          <Building className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span>{employee.branch || (language === 'en' ? "Not Assigned" : "आवंटित नहीं")}</span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-slate-400 font-semibold">{language === 'en' ? "Scheduled Timing" : "ड्यूटी शिफ्ट समय"}</span>
+                        <span className="text-xs font-extrabold text-slate-100 flex items-center gap-1.5 mt-0.5">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span>{employee.workTiming || "09:00 AM - 06:00 PM"}</span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-slate-400 font-semibold">{language === 'en' ? "Reporting To" : "रिपोर्टिंग मैनेजर"}</span>
+                        <span className="text-xs font-extrabold text-slate-100 flex items-center gap-1.5 mt-0.5">
+                          <User className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span>{employee.reportingTo || "Mr. Rathi (MD / HR)"}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-slate-800 text-[10px] text-indigo-200/80 font-medium">
+                    {language === 'en'
+                      ? "Contact HR department if workstation branch or roster shift hours require correction."
+                      : "यदि आवंटित शाखा या ड्यूटी समय में सुधार की आवश्यकता है तो कृपया तुरंत HR से संपर्क करें।"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bento Grid: Quick Monthly Stats Widget & Bento Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-xs flex flex-col justify-between hover:border-emerald-200 transition-colors">
+                  <div className="flex justify-between items-start">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.presentDays}</span>
+                    <span className="p-1 bg-emerald-50 text-emerald-700 rounded-lg"><Check className="w-3.5 h-3.5" /></span>
+                  </div>
+                  <p className="text-3xl font-black text-emerald-600 font-mono mt-2">{daysPresent}</p>
+                  <span className="text-[9px] text-slate-400 font-bold mt-1">{language === 'en' ? 'Present this month' : 'इस महीने उपस्थित'}</span>
+                </div>
+
+                <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-xs flex flex-col justify-between hover:border-amber-200 transition-colors">
+                  <div className="flex justify-between items-start">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.halfDays}</span>
+                    <span className="p-1 bg-amber-50 text-amber-600 rounded-lg"><AlertCircle className="w-3.5 h-3.5" /></span>
+                  </div>
+                  <p className="text-3xl font-black text-amber-500 font-mono mt-2">{daysHalfDay}</p>
+                  <span className="text-[9px] text-slate-400 font-bold mt-1">{language === 'en' ? 'Half-day records' : 'हाफ-डे उपस्थिति'}</span>
+                </div>
+
+                <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-xs flex flex-col justify-between hover:border-indigo-200 transition-colors">
+                  <div className="flex justify-between items-start">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.overtimeHrs}</span>
+                    <span className="p-1 bg-indigo-50 text-indigo-700 rounded-lg"><TrendingUp className="w-3.5 h-3.5" /></span>
+                  </div>
+                  <p className="text-3xl font-black text-indigo-600 font-mono mt-2">{overtimeHoursTotal} <span className="text-xs font-bold font-sans">hrs</span></p>
+                  <span className="text-[9px] text-slate-400 font-bold mt-1">{language === 'en' ? 'Overtime approved' : 'मंजूर ओवरटाइम घंटे'}</span>
+                </div>
+
+                <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-xs flex flex-col justify-between hover:border-rose-200 transition-colors">
+                  <div className="flex justify-between items-start">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.absentDays}</span>
+                    <span className="p-1 bg-rose-50 text-rose-600 rounded-lg"><AlertCircle className="w-3.5 h-3.5" /></span>
+                  </div>
+                  <p className="text-3xl font-black text-rose-500 font-mono mt-2">{daysAbsent}</p>
+                  <span className="text-[9px] text-slate-400 font-bold mt-1">{language === 'en' ? 'Unmarked / Absent' : 'अनुपस्थित दिवस'}</span>
+                </div>
+              </div>
+
+              {/* Grid 3: Quick Action Launchpad & Recent Log Activity */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Quick Actions Panel */}
+                <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm space-y-4 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                      <Sparkles className="w-4 h-4 text-emerald-600" />
+                      <span>{language === 'en' ? "Quick Access Launchpad" : "क्विक एक्सेस लॉन्चपैड"}</span>
+                    </h3>
+
+                    <div className="grid grid-cols-1 gap-2 pt-3">
+                      {/* Action 1: Raise Missed Punch */}
+                      <button
+                        onClick={() => {
+                          setRaiseDate(new Date().toISOString().split('T')[0]);
+                          setRaiseCheckIn(adminSettings?.defaultCheckIn || '09:00');
+                          setRaiseCheckOut(adminSettings?.defaultCheckOut || '18:00');
+                          setRaiseRemarks('');
+                          setTicketError('');
+                          setTicketSuccess('');
+                          setShowRaiseModal(true);
+                        }}
+                        className="p-3 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-150 rounded-xl text-left text-xs font-bold text-slate-700 transition-all flex items-center gap-2.5 cursor-pointer group"
+                      >
+                        <div className="p-1.5 bg-white border border-slate-200 text-slate-500 group-hover:border-emerald-200 group-hover:text-emerald-700 rounded-lg shrink-0">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="block font-black text-slate-800 group-hover:text-emerald-900">{language === 'en' ? "Raise Missed Punch Ticket" : "मिस पंच रिक्वेस्ट दर्ज करें"}</span>
+                          <span className="text-[9px] text-slate-400 group-hover:text-emerald-650 font-bold">{language === 'en' ? "Forgot to punch arrival/departure" : "आगमन या प्रस्थान पंच भूल जाने पर"}</span>
+                        </div>
+                      </button>
+
+                      {/* Action 2: Apply for Leave */}
+                      <button
+                        onClick={() => setActiveTab('leaves')}
+                        className="p-3 bg-slate-50 hover:bg-blue-50 hover:text-blue-900 border border-slate-150 rounded-xl text-left text-xs font-bold text-slate-700 transition-all flex items-center gap-2.5 cursor-pointer group"
+                      >
+                        <div className="p-1.5 bg-white border border-slate-200 text-slate-500 group-hover:border-blue-200 group-hover:text-blue-700 rounded-lg shrink-0">
+                          <CalendarDays className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="block font-black text-slate-800 group-hover:text-blue-900">{language === 'en' ? "Request Casual/Sick Leave" : "छुट्टी (Leave) के लिए आवेदन करें"}</span>
+                          <span className="text-[9px] text-slate-400 group-hover:text-blue-655 font-bold">{language === 'en' ? "Submit leave request to HR/Manager" : "बीमारी या निजी काम की छुट्टी"}</span>
+                        </div>
+                      </button>
+
+                      {/* Action 3: Download Last Payslip */}
+                      {latestPayslip ? (
+                        <button
+                          onClick={() => downloadPayslipPDF(latestPayslip, employee)}
+                          className="p-3 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-900 border border-slate-150 rounded-xl text-left text-xs font-bold text-slate-700 transition-all flex items-center gap-2.5 cursor-pointer group"
+                        >
+                          <div className="p-1.5 bg-white border border-slate-200 text-slate-500 group-hover:border-indigo-200 group-hover:text-indigo-700 rounded-lg shrink-0">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="block font-black text-slate-800 group-hover:text-indigo-900">
+                              {language === 'en' ? `Get ${latestPayslip.monthYear} Payslip PDF` : `${latestPayslip.monthYear} सैलरी स्लिप डाउनलोड`}
+                            </span>
+                            <span className="text-[9px] text-slate-400 group-hover:text-indigo-650 font-bold">
+                              ₹{latestPayslip.netSalary !== undefined ? latestPayslip.netSalary.toLocaleString('en-IN') : latestPayslip.totalSalary.toLocaleString('en-IN')} payout • {latestPayslip.paymentStatus}
+                            </span>
+                          </div>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setActiveTab('payslips')}
+                          className="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-150 rounded-xl text-left text-xs font-bold text-slate-400 transition-all flex items-center gap-2.5 cursor-not-allowed"
+                          disabled
+                        >
+                          <div className="p-1.5 bg-white border border-slate-200 text-slate-300 rounded-lg shrink-0">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="block font-black text-slate-400">{language === 'en' ? "Payslips Unavailable" : "सैलरी स्लिप अनुपलब्ध"}</span>
+                            <span className="text-[9px] text-slate-400 font-bold">{language === 'en' ? "No payslips disbursed yet" : "अभी कोई सैलरी स्लिप जारी नहीं हुई"}</span>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 text-[10px] text-slate-400 font-semibold leading-relaxed">
+                    {language === 'en' 
+                      ? "* Your direct clock-ins sync instantly to the cloud database and reflect on administrative panels in real time."
+                      : "* आपका पंच डाटा तुरंत क्लाउड डेटाबेस में सुरक्षित रूप से दर्ज होकर एडमिन को दिखाई देता है।"}
+                  </div>
+                </div>
+
+                {/* Recent Attendance Stream & Pending Tickets */}
+                <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm space-y-4 lg:col-span-2">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                    <span>{language === 'en' ? "Recent Activity Stream" : "हालिया गतिविधि स्ट्रीम"}</span>
+                  </h3>
+
+                  {recentLogs.length > 0 ? (
+                    <div className="space-y-3">
+                      {recentLogs.map((log) => {
+                        const isLate = isAttendanceLate(log, employee.workTiming, adminSettings?.defaultCheckIn || '09:00');
+                        const isException = log.status === 'Miss Punch' || log.status === 'Half Day';
+                        const approvalStatus = log.approvalStatus || 'Pending';
+
+                        return (
+                          <div key={log.date} className="p-3.5 bg-slate-50 hover:bg-slate-100/50 rounded-xl border border-slate-150 transition-colors flex justify-between items-center gap-3">
+                            <div className="space-y-1">
+                              <span className="font-mono font-black text-slate-900 text-xs">{log.date}</span>
+                              <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                                <span className="font-mono bg-white border border-slate-150 px-1.5 py-0.5 rounded text-[9.5px]">In: {log.checkIn || '--:--'}</span>
+                                <span className="font-mono bg-white border border-slate-150 px-1.5 py-0.5 rounded text-[9.5px]">Out: {log.checkOut || '--:--'}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {/* Status badge */}
+                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                                log.status === 'Present' 
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                  : log.status === 'Half Day' 
+                                    ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                    : log.status === 'Leave' 
+                                      ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                      : 'bg-rose-50 text-rose-700 border-rose-100'
+                              }`}>
+                                {log.status}
+                              </span>
+
+                              {/* Exceptions or special warnings */}
+                              {isLate && (
+                                <span className="text-[9px] bg-rose-50 text-rose-600 border border-rose-150 px-1.5 py-0.5 rounded font-black uppercase">
+                                  {language === 'en' ? 'Late' : 'देरी'}
+                                </span>
+                              )}
+
+                              {isException && (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase border ${
+                                  approvalStatus === 'Approved' 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                    : approvalStatus === 'Rejected' 
+                                      ? 'bg-red-50 text-red-700 border-red-100' 
+                                      : 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse'
+                                }`}>
+                                  {approvalStatus}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-slate-400 space-y-1">
+                      <AlertCircle className="w-8 h-8 mx-auto text-slate-200" />
+                      <p className="text-xs font-bold">{t.noAttendance}</p>
+                    </div>
+                  )}
+
+                  {/* Pending Leave Requests or Holiday Highlight snippet */}
+                  <div className="bg-slate-50/70 border border-slate-150 p-3.5 rounded-xl flex items-center justify-between text-xs font-medium">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-emerald-600" />
+                      <span className="font-extrabold text-slate-700">
+                        {language === 'en' ? "Leaves & Holidays Overview" : "अवकाश एवं छुट्टियों का संक्षिप्त विवरण"}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('leaves')}
+                      className="text-[11px] font-black text-emerald-700 hover:text-emerald-800 cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span>{language === 'en' ? "Open Roster" : "कैलेंडर खोलें"}</span>
+                      <span>&rarr;</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* SELF ATTENDANCE (MOBILE PUNCH) TAB */}
         {activeTab === 'self_attendance' && adminSettings.enableMobileAttendance !== false && employee.enableMobileAttendance !== false && (() => {
@@ -1948,6 +2490,9 @@ export default function EmployeePortal({
               language={language}
               isEmployeeView={true}
               employeeId={employee.id}
+              leaveRequests={leaveRequests}
+              onAddLeaveRequest={onAddLeaveRequest}
+              adminSettings={adminSettings}
             />
           </div>
         )}
@@ -2193,6 +2738,200 @@ export default function EmployeePortal({
               >
                 <span>{t.closeSlip}</span>
               </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-only Premium Bottom Navigation Bar (App-like experience) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 text-white border-t border-slate-900 shadow-[0_-8px_24px_rgba(0,0,0,0.2)] px-4 py-1 z-45 flex items-center justify-between h-16 no-print">
+        <button
+          onClick={() => {
+            setActiveTab('dashboard');
+            setShowMoreSheet(false);
+          }}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1 flex-1 cursor-pointer transition-colors ${
+            activeTab === 'dashboard' ? 'text-emerald-400 font-extrabold' : 'text-slate-400 font-semibold'
+          }`}
+        >
+          <Sparkles className="w-5 h-5 shrink-0" />
+          <span className="text-[9px] tracking-tight">{language === 'en' ? 'Home' : 'मुख्य'}</span>
+        </button>
+
+        {adminSettings.enableMobileAttendance !== false && employee.enableMobileAttendance !== false ? (
+          <button
+            onClick={() => {
+              setActiveTab('self_attendance');
+              setShowMoreSheet(false);
+              detectGpsAndVerifyOutlet();
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 flex-1 cursor-pointer transition-colors ${
+              activeTab === 'self_attendance' ? 'text-emerald-400 font-extrabold' : 'text-slate-400 font-semibold'
+            }`}
+          >
+            <Locate className="w-5 h-5 shrink-0" />
+            <span className="text-[9px] tracking-tight">{language === 'en' ? 'Punch' : 'पंच'}</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              setActiveTab('attendance');
+              setShowMoreSheet(false);
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 flex-1 cursor-pointer transition-colors ${
+              activeTab === 'attendance' ? 'text-emerald-400 font-extrabold' : 'text-slate-400 font-semibold'
+            }`}
+          >
+            <Calendar className="w-5 h-5 shrink-0" />
+            <span className="text-[9px] tracking-tight">{language === 'en' ? 'Logs' : 'लॉग्स'}</span>
+          </button>
+        )}
+
+        <button
+          onClick={() => {
+            setActiveTab('calendar');
+            setShowMoreSheet(false);
+          }}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1 flex-1 cursor-pointer transition-colors ${
+            activeTab === 'calendar' ? 'text-emerald-400 font-extrabold' : 'text-slate-400 font-semibold'
+          }`}
+        >
+          <CalendarDays className="w-5 h-5 shrink-0" />
+          <span className="text-[9px] tracking-tight">{language === 'en' ? 'Calendar' : 'कैलेंडर'}</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('leaves');
+            setShowMoreSheet(false);
+          }}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1 flex-1 cursor-pointer transition-colors ${
+            activeTab === 'leaves' ? 'text-emerald-400 font-extrabold' : 'text-slate-400 font-semibold'
+          }`}
+        >
+          <Check className="w-5 h-5 shrink-0" />
+          <span className="text-[9px] tracking-tight">{language === 'en' ? 'Leaves' : 'अवकाश'}</span>
+        </button>
+
+        <button
+          onClick={() => setShowMoreSheet(true)}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1 flex-1 cursor-pointer transition-colors ${
+            showMoreSheet || (['profile', 'exceptions', 'payslips', 'attendance'].includes(activeTab) && activeTab !== 'self_attendance')
+              ? 'text-emerald-400 font-extrabold' 
+              : 'text-slate-400 font-semibold'
+          }`}
+        >
+          <Briefcase className="w-5 h-5 shrink-0" />
+          <span className="text-[9px] tracking-tight">{language === 'en' ? 'More' : 'अधिक'}</span>
+        </button>
+      </div>
+
+      {/* Slide-Up Bottom Sheet Overlay for 'More' Menu */}
+      {showMoreSheet && (
+        <div className="md:hidden fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-48 flex flex-col justify-end no-print">
+          {/* Tap-outside backdrop dismiss click */}
+          <div className="flex-1" onClick={() => setShowMoreSheet(false)}></div>
+          
+          {/* Sheet Container */}
+          <div className="bg-white rounded-t-2xl border-t border-slate-200 p-4 pb-8 space-y-4 shadow-2xl max-w-full animate-slide-up no-print">
+            
+            {/* Grabber handle */}
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-1"></div>
+            
+            {/* Sheet Title */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                {language === 'en' ? "Workspace Shortcuts" : "कार्यक्षेत्र शॉर्टकट"}
+              </h3>
+              <button 
+                onClick={() => setShowMoreSheet(false)}
+                className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Grid of Shortcuts */}
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                onClick={() => {
+                  setActiveTab('profile');
+                  setShowMoreSheet(false);
+                }}
+                className={`flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl border transition-all text-center ${
+                  activeTab === 'profile' 
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-extrabold' 
+                    : 'bg-slate-50 border-slate-100 text-slate-600 font-semibold hover:bg-slate-100'
+                }`}
+              >
+                <User className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span className="text-[10px] leading-tight break-words w-full">{t.profile}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('exceptions');
+                  setShowMoreSheet(false);
+                }}
+                className={`flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl border transition-all text-center relative ${
+                  activeTab === 'exceptions' 
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-extrabold' 
+                    : 'bg-slate-50 border-slate-100 text-slate-600 font-semibold hover:bg-slate-100'
+                }`}
+              >
+                {attendanceRecords.filter(r => r.employeeId === employee.id && (r.status === 'Miss Punch' || r.status === 'Half Day') && (r.approvalStatus || 'Pending') === 'Pending').length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                )}
+                <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+                <span className="text-[10px] leading-tight break-words w-full">{t.exceptions}</span>
+              </button>
+
+              {adminSettings.enableEmployeePayslips === true && (
+                <button
+                  onClick={() => {
+                    setActiveTab('payslips');
+                    setShowMoreSheet(false);
+                  }}
+                  className={`flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl border transition-all text-center ${
+                    activeTab === 'payslips' 
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-extrabold' 
+                      : 'bg-slate-50 border-slate-100 text-slate-600 font-semibold hover:bg-slate-100'
+                  }`}
+                >
+                  <CreditCard className="w-5 h-5 text-indigo-500 shrink-0" />
+                  <span className="text-[10px] leading-tight break-words w-full">{t.payslips}</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setActiveTab('attendance');
+                  setShowMoreSheet(false);
+                }}
+                className={`flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl border transition-all text-center ${
+                  activeTab === 'attendance' 
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-extrabold' 
+                    : 'bg-slate-50 border-slate-100 text-slate-600 font-semibold hover:bg-slate-100'
+                }`}
+              >
+                <Calendar className="w-5 h-5 text-blue-500 shrink-0" />
+                <span className="text-[10px] leading-tight break-words w-full">{t.attendance}</span>
+              </button>
+
+              {/* Identity block */}
+              <div className="col-span-3 bg-slate-50 rounded-xl p-3 text-left border border-slate-100 flex items-center justify-between">
+                <div>
+                  <h4 className="text-[11px] font-black text-slate-800">{employee.name}</h4>
+                  <p className="text-[9px] font-mono font-bold text-slate-400 uppercase mt-0.5">{employee.designation} • {employee.id}</p>
+                </div>
+                <div className="text-right">
+                  <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[8px] font-extrabold uppercase">
+                    ACTIVE
+                  </span>
+                </div>
+              </div>
+
             </div>
 
           </div>

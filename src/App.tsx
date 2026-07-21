@@ -33,7 +33,9 @@ import {
   CheckCircle2,
   Menu,
   Mail,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  UserCheck
 } from 'lucide-react';
 import { initAuth, googleSignIn, googleSignInRedirect, logout } from './services/auth';
 import { 
@@ -50,7 +52,7 @@ import {
   fetchAdminSettings,
   saveAdminSettings
 } from './services/sheets';
-import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog } from './types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog, LeaveRequest } from './types';
 import { saveToFirestore, loadFromFirestore } from './services/firestore';
 
 // Unique device fingerprint generator for browser lock
@@ -519,6 +521,8 @@ export default function App() {
   const [loginEnteredOtp, setLoginEnteredOtp] = useState('');
   const [isSendingLoginOtp, setIsSendingLoginOtp] = useState(false);
   const [loginOtpEmail, setLoginOtpEmail] = useState('');
+  const [loginMobileTab, setLoginMobileTab] = useState<'signin' | 'info'>('signin');
+  const [infoSubTab, setInfoSubTab] = useState<'notices' | 'hr' | 'rules'>('notices');
 
   // Password 2FA OTP States
   const [passwordLoginOtpStep, setPasswordLoginOtpStep] = useState<'password' | 'enter_otp'>('password');
@@ -610,6 +614,49 @@ export default function App() {
     localStorage.setItem('payroll_hr_tickets', JSON.stringify(hrTickets));
   }, [hrTickets]);
 
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => {
+    const saved = localStorage.getItem('payroll_leave_requests');
+    if (saved) {
+      try {
+        return JSON.parse(saved) as LeaveRequest[];
+      } catch (e) {
+        console.error("Error parsing leave requests", e);
+      }
+    }
+    return [
+      {
+        id: 'LRQ-1001',
+        employeeId: 'EMP001',
+        employeeName: 'Rohan Sharma',
+        leaveType: 'Vacation',
+        startDate: '2026-07-22',
+        endDate: '2026-07-24',
+        durationDays: 3,
+        reason: 'Going to native village for a family ritual.',
+        status: 'Pending',
+        appliedOn: '2026-07-18'
+      },
+      {
+        id: 'LRQ-1002',
+        employeeId: 'EMP003',
+        employeeName: 'Sunita Verma',
+        leaveType: 'Sick',
+        startDate: '2026-07-19',
+        endDate: '2026-07-19',
+        durationDays: 1,
+        reason: 'High fever and cold. Doctor advised complete bed rest.',
+        status: 'Approved',
+        appliedOn: '2026-07-18',
+        approvedBy: 'Admin',
+        remarks: 'Get well soon. Approved.'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('payroll_leave_requests', JSON.stringify(leaveRequests));
+  }, [leaveRequests]);
+
   const [passwordRequests, setPasswordRequests] = useState<any[]>(() => {
     const saved = localStorage.getItem('payroll_password_requests');
     return saved ? JSON.parse(saved) : [
@@ -644,6 +691,25 @@ export default function App() {
     // Automatic redirect is disabled to ensure maximum stability and offline-first usage.
     // The admin can manually click "Authorize Google Sheets" when ready.
   }, []);
+
+  // Manage login-page-active class on body/html/root to allow scrolling on mobile when logged out
+  useEffect(() => {
+    const rootEl = document.getElementById('root');
+    if (!portalUser) {
+      document.documentElement.classList.add('login-page-active');
+      document.body.classList.add('login-page-active');
+      rootEl?.classList.add('login-page-active');
+    } else {
+      document.documentElement.classList.remove('login-page-active');
+      document.body.classList.remove('login-page-active');
+      rootEl?.classList.remove('login-page-active');
+    }
+    return () => {
+      document.documentElement.classList.remove('login-page-active');
+      document.body.classList.remove('login-page-active');
+      rootEl?.classList.remove('login-page-active');
+    };
+  }, [portalUser]);
 
   // Sync state changes to local storage caches automatically
   useEffect(() => {
@@ -1418,6 +1484,144 @@ export default function App() {
     }
   };
 
+  const handleAddLeaveRequest = (newRequest: LeaveRequest) => {
+    setLeaveRequests(prev => {
+      const updated = [newRequest, ...prev];
+      localStorage.setItem('payroll_leave_requests', JSON.stringify(updated));
+      return updated;
+    });
+    setIsDataModified(true);
+    addSyncLog('Apply for Leave', 'success', `Leave request ${newRequest.id} submitted for ${newRequest.employeeName}.`);
+  };
+
+  const handleUpdateLeaveRequestStatus = async (id: string, status: 'Approved' | 'Rejected', remarks?: string) => {
+    let affectedReq: LeaveRequest | undefined;
+    
+    setLeaveRequests(prev => {
+      const updated = prev.map(req => {
+        if (req.id === id) {
+          affectedReq = {
+            ...req,
+            status,
+            remarks: remarks || '',
+            approvedBy: portalUser?.name || 'Administrator'
+          };
+          return affectedReq;
+        }
+        return req;
+      });
+      localStorage.setItem('payroll_leave_requests', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (affectedReq) {
+      setIsDataModified(true);
+      addSyncLog('Process Leave Request', 'success', `Leave request ${id} has been ${status.toLowerCase()}.`);
+
+      // If approved, insert or update the corresponding days in the attendance state
+      if (status === 'Approved') {
+        const empId = affectedReq.employeeId;
+        const start = new Date(affectedReq.startDate);
+        const end = new Date(affectedReq.endDate);
+        const lType = affectedReq.leaveType;
+
+        // Generate all dates in range
+        const dates: string[] = [];
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          dates.push(d.toISOString().split('T')[0]);
+        }
+
+        setAttendance(prev => {
+          const updated = [...prev];
+          dates.forEach(dStr => {
+            const idx = updated.findIndex(r => r.employeeId === empId && r.date === dStr);
+            let attStatus: 'Present' | 'Absent' | 'Half Day' | 'Leave' | 'Miss Punch' = 'Leave';
+            let checkIn = '';
+            let checkOut = '';
+
+            if (lType === 'Half Day (Before Lunch)') {
+              attStatus = 'Half Day';
+              checkIn = '13:30';
+              checkOut = '18:30';
+            } else if (lType === 'Half Day (After Lunch)') {
+              attStatus = 'Half Day';
+              checkIn = '09:00';
+              checkOut = '13:30';
+            } else if (lType === 'Late Coming') {
+              attStatus = 'Present';
+              checkIn = '10:30'; // Late marking
+              checkOut = '18:30';
+            } else if (lType === 'Early Going') {
+              attStatus = 'Present';
+              checkIn = '09:00';
+              checkOut = '16:00'; // Early departure
+            }
+
+            if (idx >= 0) {
+              updated[idx] = {
+                ...updated[idx],
+                status: attStatus,
+                checkIn: checkIn || updated[idx].checkIn || '',
+                checkOut: checkOut || updated[idx].checkOut || '',
+                remarks: `${lType} Approved: ${affectedReq?.reason || ''}`
+              };
+            } else {
+              updated.push({
+                date: dStr,
+                employeeId: empId,
+                status: attStatus,
+                checkIn,
+                checkOut,
+                overtimeHours: 0,
+                remarks: `${lType} Approved: ${affectedReq?.reason || ''}`,
+                approvalStatus: 'Approved'
+              });
+            }
+          });
+          localStorage.setItem('cached_attendance', JSON.stringify(updated));
+          return updated;
+        });
+      }
+
+      // Trigger outbound SMTP/simulation email to the employee
+      const emp = employees.find(e => e.id === affectedReq?.employeeId);
+      if (emp && emp.email && emp.email.trim()) {
+        try {
+          const res = await fetch('/api/send-leave-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: emp.email.trim(),
+              empName: emp.name,
+              leaveType: affectedReq.leaveType,
+              startDate: affectedReq.startDate,
+              endDate: affectedReq.endDate,
+              status: affectedReq.status,
+              approvedBy: affectedReq.approvedBy,
+              remarks: affectedReq.remarks,
+              language,
+              smtpSettings: {
+                host: adminSettings.smtpHost,
+                port: adminSettings.smtpPort,
+                username: adminSettings.smtpUsername,
+                password: adminSettings.smtpPassword,
+                senderName: adminSettings.senderName,
+                senderEmail: adminSettings.senderEmail
+              }
+            })
+          });
+          const data = await res.json();
+          if (data.success && data.method === 'SIMULATION') {
+            setLastSentEmail(data.debugPayload);
+            setShowEmailViewer(true);
+          }
+        } catch (e) {
+          console.error("Failed to dispatch leave update email", e);
+        }
+      }
+    }
+  };
+
   // Callback functions for syncing mutations
   const handleAddEmployee = async (newEmp: Employee) => {
     // Dispatch Welcome Email Notification
@@ -1765,10 +1969,61 @@ export default function App() {
     });
 
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:grid lg:grid-cols-12 font-sans relative overflow-hidden selection:bg-emerald-500/30 selection:text-emerald-100">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:grid lg:grid-cols-12 font-sans relative overflow-y-auto lg:overflow-hidden selection:bg-emerald-500/30 selection:text-emerald-100 login-screen">
         
-        {/* Top-Right Language Switcher (Visible on all screens) */}
-        <div className="absolute top-4 right-4 z-50">
+        {/* Mobile View Header & Tab Switcher (Visible on mobile/tablet only, hidden on desktop) */}
+        <div className="lg:hidden flex flex-col gap-1 p-1.5 bg-slate-950/95 border-b border-slate-800/80 sticky top-0 z-40 backdrop-blur-md">
+          <div className="flex items-center justify-between w-full px-1">
+            <div className="flex items-center gap-1.5">
+              <img 
+                src={getDirectImageUrl(adminSettings.companyLogo)} 
+                alt="Logo" 
+                className="w-5 h-5 rounded object-cover shadow-md ring-1 ring-emerald-400/25"
+                referrerPolicy="no-referrer"
+              />
+              <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-100 font-display">
+                {adminSettings.companyName || 'Rathi Build Mart'}
+              </span>
+            </div>
+
+            {/* Compact Language Toggle */}
+            <button
+              onClick={toggleLanguage}
+              className="px-1.5 py-0.5 rounded text-[8px] font-black bg-slate-900 border border-slate-800 text-slate-200 transition-all duration-150 cursor-pointer shrink-0"
+            >
+              🌐 {language === 'en' ? 'हिन्दी' : 'EN'}
+            </button>
+          </div>
+
+          {/* Main Switcher */}
+          <div className="flex bg-slate-900 border border-slate-800 rounded p-0.5 w-full">
+            <button
+              type="button"
+              onClick={() => setLoginMobileTab('signin')}
+              className={`flex-1 text-center py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                loginMobileTab === 'signin'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              🔑 {language === 'en' ? 'Sign In' : 'लॉगिन'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMobileTab('info')}
+              className={`flex-1 text-center py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                loginMobileTab === 'info'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              📢 {language === 'en' ? 'Notices & Info' : 'सूचना और जानकारी'}
+            </button>
+          </div>
+        </div>
+
+        {/* Top-Right Language Switcher (Visible on desktop/large screens only) */}
+        <div className="hidden lg:block absolute top-4 right-4 z-50">
           <button
             onClick={toggleLanguage}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-slate-900/80 backdrop-blur-md hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-all duration-150 cursor-pointer shadow-md active:scale-95"
@@ -1779,7 +2034,9 @@ export default function App() {
         </div>
 
         {/* LEFT PANEL - Beautiful Brand Showcase (5 Columns) */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-8 md:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-800/80 shrink-0 min-h-[340px] lg:min-h-screen">
+        <div className={`lg:col-span-5 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-4 pb-12 md:p-12 lg:p-16 flex flex-col justify-between relative overflow-y-auto lg:overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-800/80 shrink-0 min-h-[340px] lg:min-h-screen ${
+          loginMobileTab === 'info' ? 'flex' : 'hidden lg:flex'
+        }`}>
           {/* Subtle Glowing Background Accents */}
           <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
           <div className="absolute top-1/2 -right-40 w-80 h-80 rounded-full bg-indigo-500/5 blur-3xl pointer-events-none" />
@@ -1803,111 +2060,249 @@ export default function App() {
           </div>
 
           {/* Middle Content - Display Header / Stats */}
-          <div className="my-auto py-8 lg:py-0 relative z-10 max-w-sm">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-4 uppercase tracking-wider">
+          <div className="my-auto py-3 md:py-8 lg:py-0 relative z-10 max-w-sm">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-2 uppercase tracking-wider">
               <Sparkles className="w-3 h-3 animate-pulse" />
               {language === 'en' ? 'SaaS Level Security' : 'SaaS स्तर की सुरक्षा'}
             </span>
-            <h2 className="text-3xl lg:text-4xl font-black text-white font-display tracking-tight leading-tight">
+            <h2 className="text-xl md:text-2xl lg:text-4xl font-black text-white font-display tracking-tight leading-tight">
               {language === 'en' 
                 ? 'Modern payroll & attendance workspace.' 
                 : 'आधुनिक वेतन और उपस्थिति कार्यक्षेत्र।'}
             </h2>
-            <p className="mt-3 text-xs text-slate-400 leading-relaxed font-semibold">
+            <p className="mt-2 text-[10.5px] md:text-xs text-slate-400 leading-relaxed font-semibold">
               {language === 'en'
                 ? 'Empowering employees with self-service receipt printing, real-time leaves requests, and secure administrator portal ledger reviews.'
                 : 'कर्मचारियों को वेतन पर्ची मुद्रण, वास्तविक समय छुट्टी अनुरोधों और सुरक्षित प्रशासनिक पोर्टल बहीखाता समीक्षाओं के साथ सशक्त बनाना।'}
             </p>
-
+ 
             {/* Quick Live stats cards */}
-            <div className="grid grid-cols-2 gap-3 mt-8">
-              <div className="bg-slate-900/60 backdrop-blur-xs border border-slate-800/80 p-3.5 rounded-xl">
-                <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">
+            <div className="grid grid-cols-2 gap-2 mt-4 md:mt-8">
+              <div className="bg-slate-900/60 backdrop-blur-xs border border-slate-800/80 p-2.5 rounded-lg">
+                <span className="text-[8px] font-black uppercase tracking-wider text-slate-500 block">
                   {language === 'en' ? 'Active Roster' : 'सक्रिय कर्मचारी'}
                 </span>
-                <span className="text-sm font-black text-white font-mono block mt-1">
+                <span className="text-xs font-black text-white font-mono block mt-0.5">
                   {employees.length} {language === 'en' ? 'Staff' : 'कर्मचारी'}
                 </span>
               </div>
-              <div className="bg-slate-900/60 backdrop-blur-xs border border-slate-800/80 p-3.5 rounded-xl">
-                <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">
+              <div className="bg-slate-900/60 backdrop-blur-xs border border-slate-800/80 p-2.5 rounded-lg">
+                <span className="text-[8px] font-black uppercase tracking-wider text-slate-500 block">
                   {language === 'en' ? 'System Status' : 'सिस्टम की स्थिति'}
                 </span>
-                <span className="inline-flex items-center gap-1 text-xs font-black text-emerald-400 mt-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="inline-flex items-center gap-1 text-[10.5px] font-black text-emerald-400 mt-1">
+                  <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
                   {language === 'en' ? 'Operational' : 'सक्रिय है'}
                 </span>
               </div>
             </div>
-
-            {/* Notice & Announcement Board */}
-            <div className="mt-6 border-t border-slate-800/60 pt-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  <Megaphone className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                  {language === 'en' ? 'Notice Board & Circulars' : 'सूचना पट्ट और परिपत्र'}
-                </span>
-                <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
-                  {announcements.length} {language === 'en' ? 'Active' : 'सक्रिय'}
-                </span>
+ 
+            {/* Notice & Announcement Board with Sub-tabs */}
+            <div className="mt-4 border-t border-slate-800/40 pt-3.5 md:mt-6 md:pt-5 space-y-3">
+              {/* Info Sub-tabs switcher */}
+              <div className="flex bg-slate-950/60 border border-slate-850/80 rounded-lg p-0.5 w-full">
+                <button
+                  type="button"
+                  onClick={() => setInfoSubTab('notices')}
+                  className={`flex-1 text-center py-1 rounded text-[8px] md:text-[9.5px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                    infoSubTab === 'notices'
+                      ? 'bg-slate-850 text-emerald-400 shadow-sm border border-slate-800/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  📢 {language === 'en' ? 'Notices' : 'सूचनाएँ'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInfoSubTab('hr')}
+                  className={`flex-1 text-center py-1 rounded text-[8px] md:text-[9.5px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                    infoSubTab === 'hr'
+                      ? 'bg-slate-850 text-emerald-400 shadow-sm border border-slate-800/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  👤 {language === 'en' ? 'HR & Mgmt' : 'एचआर व प्रबंधन'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInfoSubTab('rules')}
+                  className={`flex-1 text-center py-1 rounded text-[8px] md:text-[9.5px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                    infoSubTab === 'rules'
+                      ? 'bg-slate-850 text-emerald-400 shadow-sm border border-slate-800/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  ⏱️ {language === 'en' ? 'Timings' : 'समय नियम'}
+                </button>
               </div>
 
-              <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1 select-none custom-scrollbar">
-                {announcements.length === 0 ? (
-                  <p className="text-[10px] text-slate-500 italic">
-                    {language === 'en' ? 'No recent company announcements.' : 'कोई हालिया कंपनी घोषणाएं नहीं हैं।'}
-                  </p>
-                ) : (
-                  announcements.map((ann) => {
-                    let badgeBg = 'bg-slate-900 border-slate-800 text-slate-400';
-                    if (ann.badge === 'Critical') badgeBg = 'bg-rose-950/40 border-rose-900/30 text-rose-400';
-                    if (ann.badge === 'Holiday') badgeBg = 'bg-amber-950/40 border-amber-900/30 text-amber-400';
-                    if (ann.badge === 'Policy') badgeBg = 'bg-sky-950/40 border-sky-900/30 text-sky-400';
-                    
-                    return (
-                      <div key={ann.id} className="bg-slate-900/40 hover:bg-slate-900/70 border border-slate-800/80 p-3 rounded-xl transition-all">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-xs font-bold text-slate-200 line-clamp-1">
-                            {language === 'en' ? ann.title : ann.titleHi}
-                          </h4>
-                          <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${badgeBg} shrink-0`}>
-                            {language === 'en' ? ann.badge : ann.badgeHi}
-                          </span>
+              {/* Sub-tab content - Announcements */}
+              {infoSubTab === 'notices' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                      <Megaphone className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                      {language === 'en' ? 'Notice Board & Circulars' : 'सूचना पट्ट और परिपत्र'}
+                    </span>
+                    <span className="text-[7.5px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      {announcements.length} {language === 'en' ? 'Active' : 'सक्रिय'}
+                    </span>
+                  </div>
+ 
+                  <div className="space-y-2 max-h-[150px] md:max-h-[130px] overflow-y-auto pr-1 select-none custom-scrollbar">
+                    {announcements.length === 0 ? (
+                      <p className="text-[10px] text-slate-500 italic">
+                        {language === 'en' ? 'No recent company announcements.' : 'कोई हालिया कंपनी घोषणाएं नहीं हैं।'}
+                      </p>
+                    ) : (
+                      announcements.map((ann) => {
+                        let badgeBg = 'bg-slate-900 border-slate-800 text-slate-400';
+                        if (ann.badge === 'Critical') badgeBg = 'bg-rose-950/40 border-rose-900/30 text-rose-400';
+                        if (ann.badge === 'Holiday') badgeBg = 'bg-amber-950/40 border-amber-900/30 text-amber-400';
+                        if (ann.badge === 'Policy') badgeBg = 'bg-sky-950/40 border-sky-900/30 text-sky-400';
+                        
+                        return (
+                          <div key={ann.id} className="bg-slate-900/40 hover:bg-slate-900/70 border border-slate-800/80 p-2.5 rounded-lg transition-all">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="text-[11px] font-bold text-slate-200 line-clamp-1">
+                                {language === 'en' ? ann.title : ann.titleHi}
+                              </h4>
+                              <span className={`text-[7.5px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${badgeBg} shrink-0`}>
+                                {language === 'en' ? ann.badge : ann.badgeHi}
+                              </span>
+                            </div>
+                            <p className="text-[9.5px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
+                              {language === 'en' ? ann.content : ann.contentHi}
+                            </p>
+                            <div className="flex justify-between items-center mt-1 pt-1 border-t border-slate-800/40">
+                              <span className="text-[8px] font-mono text-slate-500">{ann.date}</span>
+                              <span className="text-[7.5px] text-slate-500 italic">HR Department</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-tab content - HR & Management Detail */}
+              {infoSubTab === 'hr' && (
+                <div className="space-y-2">
+                  <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    <UserCheck className="w-3.5 h-3.5 text-teal-400" />
+                    {language === 'en' ? 'Management & HR Helpline' : 'प्रबंधन एवं एचआर हेल्पलाइन'}
+                  </span>
+                  <div className="bg-slate-900/40 border border-slate-800/80 p-2.5 rounded-lg space-y-2 max-h-[150px] md:max-h-[130px] overflow-y-auto custom-scrollbar">
+                    {/* Managed By Info */}
+                    <div>
+                      <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-500 block">
+                        {language === 'en' ? 'Managed By' : 'प्रबंधनकर्ता'}
+                      </span>
+                      <p className="text-[10px] font-bold text-slate-200 mt-0.5">
+                        {adminSettings.hrContactManager || 'Rathi Build Mart Directors & IT Desk'}
+                      </p>
+                      <p className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                        {language === 'en' 
+                          ? `This software is managed by ${adminSettings.companyName || 'Rathi Build Mart'} Head Office to process automatic paychecks and logs.` 
+                          : `स्वचालित वेतन पर्ची और लॉग संसाधित करने के लिए ${adminSettings.companyName || 'मुख्य कार्यालय'} द्वारा प्रबंधित।`}
+                      </p>
+                    </div>
+
+                    {/* HR Contact Detail */}
+                    <div className="border-t border-slate-800/50 pt-2">
+                      <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-500 block">
+                        {language === 'en' ? 'HR Help Desk' : 'सहायता डेस्क'}
+                      </span>
+                      <div className="mt-1 space-y-1 text-[9px] text-slate-300 font-semibold font-mono">
+                        <div className="flex items-center gap-1">
+                          <span className="text-emerald-400">📧</span>
+                          <span className="break-all">{adminSettings.hrContactEmail || 'centraldata@rathibuildmart.com'}</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
-                          {language === 'en' ? ann.content : ann.contentHi}
-                        </p>
-                        <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-800/40">
-                          <span className="text-[9px] font-mono text-slate-500">{ann.date}</span>
-                          <span className="text-[8px] text-slate-500 italic">HR Department</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-emerald-400">📞</span>
+                          <span>{adminSettings.hrContactPhone || '+91 91111 22222'}</span>
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-tab content - Attendance Timings & Rules */}
+              {infoSubTab === 'rules' && (
+                <div className="space-y-2">
+                  <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    {language === 'en' ? 'Attendance Policies & Shifts' : 'उपस्थिति और समय नियम'}
+                  </span>
+                  <div className="bg-slate-900/40 border border-slate-800/80 p-2.5 rounded-lg space-y-2 max-h-[150px] md:max-h-[130px] overflow-y-auto custom-scrollbar">
+                    {/* Timings */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[9.5px]">
+                        <span className="text-slate-400 font-bold">{language === 'en' ? 'Standard Shift' : 'मानक पाली'}</span>
+                        <span className="text-emerald-400 font-mono font-black">{adminSettings.rulesShiftTiming || '09:30 AM - 06:30 PM'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[9.5px]">
+                        <span className="text-slate-400 font-bold">{language === 'en' ? 'Half-Day Slot' : 'हाफ-डे स्लॉट'}</span>
+                        <span className="text-amber-400 font-mono font-black">
+                          {language === 'en' 
+                            ? (adminSettings.rulesHalfDaySlot || 'Before 01:30 PM')
+                            : (adminSettings.rulesHalfDaySlot === 'Before 01:30 PM' || !adminSettings.rulesHalfDaySlot ? 'दोपहर 01:30 से पूर्व' : adminSettings.rulesHalfDaySlot)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Rule points */}
+                    <div className="border-t border-slate-800/50 pt-2 space-y-1">
+                      <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-500 block">
+                        {language === 'en' ? 'Crucial Punch Policies' : 'पंच नीतियां'}
+                      </span>
+                      <ul className="list-disc pl-3 text-[9px] text-slate-400 space-y-0.5 font-semibold">
+                        <li>
+                          {language === 'en' 
+                            ? `Clock in by ${adminSettings.rulesLatePunchGrace || '09:45 AM'} to avoid auto late flag.` 
+                            : `ऑटो लेट मार्क से बचने के लिए सुबह ${adminSettings.rulesLatePunchGrace || '09:45 AM'} से पहले पंच करें।`}
+                        </li>
+                        <li>
+                          {language === 'en' 
+                            ? 'Every 3 late punches will mark a automatic half-day.' 
+                            : 'प्रत्येक 3 लेट पंच होने पर स्वचालित रूप से आधा दिन काटा जाएगा।'}
+                        </li>
+                        <li>
+                          {language === 'en' 
+                            ? `Check out after ${adminSettings.rulesShiftTiming?.split('-')?.[1]?.trim() || '06:30 PM'} to complete the standard day roster.` 
+                            : `शिफ्ट पूर्ण करने के लिए शाम ${adminSettings.rulesShiftTiming?.split('-')?.[1]?.trim() || '06:30 PM'} के बाद ही पंच-आउट करें।`}
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
+ 
           {/* Bottom Live Workspace Clock */}
-          <div className="relative z-10 border-t border-slate-800/60 pt-6 mt-6 lg:mt-0">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block mb-1.5">
+          <div className="relative z-10 border-t border-slate-800/60 pt-3.5 mt-4 md:pt-6 md:mt-6 lg:mt-0 pb-12 lg:pb-0">
+            <span className="text-[8px] font-black uppercase tracking-wider text-slate-500 block mb-1">
               {language === 'en' ? 'System Reference Time' : 'सिस्टम संदर्भ समय'}
             </span>
-            <div className="flex items-center gap-3">
-              <div className="bg-slate-900 border border-slate-800 px-3.5 py-2 rounded-xl font-mono text-xs font-bold text-emerald-400 tracking-wider shadow-sm flex items-center justify-center min-w-[110px]">
+            <div className="flex items-center gap-2">
+              <div className="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg font-mono text-[10.5px] font-bold text-emerald-400 tracking-wider shadow-sm flex items-center justify-center min-w-[95px]">
                 {formattedTime}
               </div>
-              <div className="text-[10px] text-slate-400 font-bold leading-normal">
+              <div className="text-[9px] text-slate-400 font-bold leading-tight">
                 <span className="block">{formattedDate}</span>
-                <span className="text-slate-500 text-[9px] font-semibold">UTC-07:00 • {language === 'en' ? 'Secure Connection' : 'सुरक्षित कनेक्शन'}</span>
+                <span className="text-slate-500 text-[8px] font-semibold">UTC-07:00 • {language === 'en' ? 'Secure Connection' : 'सुरक्षित कनेक्शन'}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* RIGHT PANEL - Secure Sign In Card (7 Columns) */}
-        <div className="lg:col-span-7 bg-slate-900 p-6 md:p-12 lg:p-16 flex flex-col justify-center items-center relative min-h-[500px]">
+        <div className={`lg:col-span-7 bg-slate-900 p-6 md:p-12 lg:p-16 flex flex-col justify-center items-center relative min-h-[500px] ${
+          loginMobileTab === 'signin' ? 'flex' : 'hidden lg:flex'
+        }`}>
           {/* Abstract background grids */}
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
           
@@ -3628,46 +4023,44 @@ export default function App() {
   // 3. Render Employee Portal if user is logged in as employee
   if (portalUser?.role === 'employee') {
     return (
-      <div className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans">
+      <div className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans max-w-full overflow-x-hidden">
         {/* Portal Header */}
-        <header className="bg-slate-950 text-white border-b border-slate-900 py-3 px-4 md:py-4 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md relative no-print shrink-0">
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-start">
-            <div className="flex items-center gap-2.5">
-              <img 
-                src={getDirectImageUrl(adminSettings.companyLogo)} 
-                alt="Logo" 
-                className="w-8 h-8 rounded-lg object-cover" 
-                referrerPolicy="no-referrer"
-              />
-              <div className="max-w-[180px] sm:max-w-none">
-                <h1 className="text-xs sm:text-sm font-black uppercase tracking-widest truncate">{adminSettings.companyName || 'Rathi Build Mart'}</h1>
-                <p className="text-[8px] sm:text-[9px] font-mono font-bold text-emerald-400 tracking-wider">Employee Workspace Portal</p>
-              </div>
+        <header className="bg-slate-950 text-white border-b border-slate-900 py-2.5 px-3 md:py-4 md:px-8 flex flex-row items-center justify-between gap-2 shadow-md relative no-print shrink-0">
+          <div className="flex items-center gap-2">
+            <img 
+              src={getDirectImageUrl(adminSettings.companyLogo)} 
+              alt="Logo" 
+              className="w-7 h-7 md:w-8 md:h-8 rounded-lg object-cover" 
+              referrerPolicy="no-referrer"
+            />
+            <div className="min-w-0">
+              <h1 className="text-[10px] md:text-sm font-black uppercase tracking-widest truncate">{adminSettings.companyName || 'Rathi Build Mart'}</h1>
+              <p className="text-[7px] md:text-[9px] font-mono font-bold text-emerald-400 tracking-wider">Employee Workspace Portal</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto border-t border-slate-900/50 sm:border-t-0 pt-2 sm:pt-0">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Connection Status Indicator */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-slate-800">
-              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
+            <div className="flex items-center gap-1 px-1.5 py-1 md:px-2.5 md:py-1.5 rounded-lg text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-slate-900 border border-slate-800">
+              <span className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
               <span className={isOnline ? 'text-green-400 font-sans' : 'text-amber-400 font-sans'}>
-                {isOnline ? (language === 'en' ? 'Connected' : 'कनेक्टेड') : (language === 'en' ? 'Offline' : 'ऑफ़लाइन')}
+                {isOnline ? 'CONNECTED' : 'OFFLINE'}
               </span>
             </div>
 
             {/* Logout Button */}
             <button
               onClick={handlePortalLogout}
-              className="bg-rose-600/10 hover:bg-rose-600 hover:text-white border border-rose-600/20 text-rose-400 text-xs font-bold px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 transition-all"
+              className="bg-rose-600/10 hover:bg-rose-600 hover:text-white border border-rose-600/20 text-rose-400 text-[10px] md:text-xs font-bold px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg cursor-pointer flex items-center gap-1 transition-all"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className="w-3 h-3 md:w-3.5 md:h-3.5" />
               <span>{language === 'en' ? 'Sign Out' : 'लॉग आउट'}</span>
             </button>
           </div>
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 w-full">
+        <main className="flex-1 overflow-y-auto p-3 md:p-6 w-full max-w-full overflow-x-hidden box-border">
           <EmployeePortal 
             employee={portalUser.employee!}
             attendanceRecords={attendance}
@@ -3675,6 +4068,8 @@ export default function App() {
             language={language}
             adminSettings={adminSettings}
             onUpdateAttendanceRecords={handleUpdateAttendanceRecords}
+            leaveRequests={leaveRequests}
+            onAddLeaveRequest={handleAddLeaveRequest}
           />
         </main>
 
@@ -4570,6 +4965,8 @@ export default function App() {
                   }}
                   failedLogins={failedLogins}
                   onUpdateEmployee={handleUpdateEmployee}
+                  leaveRequests={leaveRequests}
+                  onUpdateLeaveRequestStatus={handleUpdateLeaveRequestStatus}
                 />
               )}
               {currentTab === 'employees' && (
@@ -4615,6 +5012,9 @@ export default function App() {
                   adminSettings={adminSettings}
                   onUpdateSettings={handleSaveSettings}
                   portalUser={portalUser}
+                  leaveRequests={leaveRequests}
+                  onAddLeaveRequest={handleAddLeaveRequest}
+                  onUpdateLeaveRequestStatus={handleUpdateLeaveRequestStatus}
                 />
               )}
               {currentTab === 'ledger' && (

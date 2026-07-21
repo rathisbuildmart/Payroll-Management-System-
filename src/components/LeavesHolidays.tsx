@@ -4,7 +4,7 @@ import {
   Info, AlertCircle, Plus, CalendarDays, Clock, User, Download, Palmtree,
   Edit2, Trash2, X, Save
 } from 'lucide-react';
-import { Employee, Attendance, AdminSettings, Holiday } from '../types';
+import { Employee, Attendance, AdminSettings, Holiday, LeaveRequest } from '../types';
 
 interface LeavesHolidaysProps {
   employees: Employee[];
@@ -15,6 +15,9 @@ interface LeavesHolidaysProps {
   adminSettings?: AdminSettings;
   onUpdateSettings?: (updated: AdminSettings) => Promise<void> | void;
   portalUser?: any;
+  leaveRequests?: LeaveRequest[];
+  onAddLeaveRequest?: (req: LeaveRequest) => void;
+  onUpdateLeaveRequestStatus?: (id: string, status: 'Approved' | 'Rejected', remarks?: string) => Promise<void> | void;
 }
 
 // Current year helper
@@ -121,7 +124,10 @@ export default function LeavesHolidays({
   employeeId,
   adminSettings,
   onUpdateSettings,
-  portalUser
+  portalUser,
+  leaveRequests = [],
+  onAddLeaveRequest,
+  onUpdateLeaveRequestStatus
 }: LeavesHolidaysProps) {
   const hasPermission = (action: 'view' | 'add' | 'edit' | 'delete') => {
     if (!portalUser) return true;
@@ -131,9 +137,95 @@ export default function LeavesHolidays({
     return permissions.includes(`leaves:${action}`);
   };
 
-  const [subTab, setSubTab] = useState<'balance' | 'calendar'>('balance');
+  const [subTab, setSubTab] = useState<'balance' | 'requests' | 'calendar'>('balance');
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All');
+
+  // Leave Request Form States
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [applyLeaveType, setApplyLeaveType] = useState<'Vacation' | 'Sick' | 'Casual' | 'Half Day (Before Lunch)' | 'Half Day (After Lunch)' | 'Late Coming' | 'Early Going'>('Vacation');
+  const [applyStartDate, setApplyStartDate] = useState('');
+  const [applyEndDate, setApplyEndDate] = useState('');
+  const [applyReason, setApplyReason] = useState('');
+  const [applyEmployeeId, setApplyEmployeeId] = useState(employeeId || '');
+
+  // Admin Approval State
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const [approvalAction, setApprovalAction] = useState<'Approved' | 'Rejected' | null>(null);
+  const [approvalRemarks, setApprovalRemarks] = useState('');
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+
+  // Leaves Filter States
+  const [filterLeaveStatus, setFilterLeaveStatus] = useState<string>('All');
+  const [filterLeaveType, setFilterLeaveType] = useState<string>('All');
+
+  const getCalculatedDuration = (): number => {
+    if (applyLeaveType.startsWith('Half Day')) return 0.5;
+    if (applyLeaveType === 'Late Coming' || applyLeaveType === 'Early Going') return 0; // exceptions
+    if (!applyStartDate) return 0;
+    if (!applyEndDate) return 1;
+    
+    const start = new Date(applyStartDate);
+    const end = new Date(applyEndDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 1;
+    if (end < start) return 1;
+    
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+  };
+
+  const handleApplyLeaveSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onAddLeaveRequest) return;
+    
+    const targetEmpId = isEmployeeView ? (employeeId || '') : applyEmployeeId;
+    const emp = employees.find(emp => emp.id === targetEmpId);
+    if (!emp) {
+      alert(language === 'en' ? 'Employee not found!' : 'कर्मचारी नहीं मिला!');
+      return;
+    }
+    
+    const duration = getCalculatedDuration();
+    const newReq: LeaveRequest = {
+      id: `LRQ-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      employeeId: targetEmpId,
+      employeeName: emp.name,
+      leaveType: applyLeaveType,
+      startDate: applyStartDate,
+      endDate: applyLeaveType.startsWith('Half Day') || applyLeaveType === 'Late Coming' || applyLeaveType === 'Early Going' ? applyStartDate : applyEndDate || applyStartDate,
+      durationDays: duration,
+      reason: applyReason,
+      status: 'Pending',
+      appliedOn: new Date().toISOString().substring(0, 10)
+    };
+    
+    onAddLeaveRequest(newReq);
+    setIsLeaveModalOpen(false);
+    
+    // Reset form
+    setApplyReason('');
+    setApplyStartDate('');
+    setApplyEndDate('');
+    setApplyLeaveType('Vacation');
+  };
+
+  const handleOpenApprovalModal = (reqId: string, action: 'Approved' | 'Rejected') => {
+    setProcessingRequestId(reqId);
+    setApprovalAction(action);
+    setApprovalRemarks('');
+    setIsApprovalModalOpen(true);
+  };
+
+  const handleConfirmApproval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!processingRequestId || !approvalAction || !onUpdateLeaveRequestStatus) return;
+    
+    await onUpdateLeaveRequestStatus(processingRequestId, approvalAction, approvalRemarks);
+    setIsApprovalModalOpen(false);
+    setProcessingRequestId(null);
+    setApprovalAction(null);
+  };
 
   // Custom Holidays list state synced with Admin Settings / Google Sheets / localStorage
   const [holidays, setHolidays] = useState<Holiday[]>(() => {
@@ -402,37 +494,48 @@ export default function LeavesHolidays({
   }[language];
 
   return (
-    <div className="space-y-6" id="leaves-holidays-component">
+    <div className="space-y-4 sm:space-y-6" id="leaves-holidays-component">
       {/* Tab Selectors */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xxs">
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 sm:gap-4 bg-white p-2 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xxs">
+        <div className="grid grid-cols-3 sm:flex gap-1 sm:gap-2 w-full sm:w-auto">
           <button
             onClick={() => setSubTab('balance')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-1.5 py-2 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer w-full ${
               subTab === 'balance' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
             }`}
           >
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span>{t.leavesBalance}</span>
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-center truncate w-full sm:w-auto">{language === 'en' ? 'Balance' : 'शेष'}</span>
+          </button>
+          <button
+            onClick={() => setSubTab('requests')}
+            className={`px-1.5 py-2 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer w-full ${
+              subTab === 'requests' 
+                ? 'bg-emerald-600 text-white shadow-md' 
+                : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-center truncate w-full sm:w-auto">{language === 'en' ? 'Workflow' : 'आवेदन'}</span>
           </button>
           <button
             onClick={() => setSubTab('calendar')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-1.5 py-2 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer w-full ${
               subTab === 'calendar' 
                 ? 'bg-emerald-600 text-white shadow-md' 
                 : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
             }`}
           >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>{t.holidayCalendar}</span>
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-center truncate w-full sm:w-auto">{language === 'en' ? 'Holidays' : 'अवकाश'}</span>
           </button>
         </div>
-
-        <div className="text-[11px] font-bold text-slate-500 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-          <Info className="w-3.5 h-3.5 text-emerald-600" />
-          <span>{language === 'en' ? "1 Day Paid Leave Added Automatically Each Month" : "प्रति माह 1 दिन सवेतन अवकाश स्वतः जुड़ता है"}</span>
+ 
+        <div className="text-[9.5px] sm:text-[11px] font-bold text-slate-500 bg-emerald-50 border border-emerald-100 px-2 py-1.5 rounded-lg flex items-center justify-center sm:justify-start gap-1 w-full sm:w-auto">
+          <Info className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600 shrink-0" />
+          <span className="text-center sm:text-left">{language === 'en' ? "1 Paid Leave Added Automatically Each Month" : "प्रति माह 1 दिन सवेतन अवकाश जुड़ता है"}</span>
         </div>
       </div>
 
@@ -610,6 +713,370 @@ export default function LeavesHolidays({
                 <span>{t.note3}</span>
               </li>
             </ul>
+          </div>
+        </div>
+      )}
+
+      {/* LEAVE REQUESTS / APPLICATIONS TAB */}
+      {subTab === 'requests' && (
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-emerald-600" />
+                  <span>{language === 'en' ? 'Leave Applications & Workflow' : 'छुट्टी के आवेदन और कार्यप्रवाह'}</span>
+                </h3>
+                <p className="text-[11px] font-bold text-slate-400 mt-0.5">
+                  {isEmployeeView 
+                    ? (language === 'en' ? 'Apply and monitor your leave status below.' : 'नीचे अपनी छुट्टी का स्टेटस सबमिट और ट्रैक करें।')
+                    : (language === 'en' ? 'Review, approve or reject staff leave applications.' : 'कर्मचारियों की छुट्टी के आवेदनों की समीक्षा और निर्णय लें।')}
+                </p>
+              </div>
+
+              {/* Apply Leave Button */}
+              {onAddLeaveRequest && (
+                <button
+                  onClick={() => {
+                    setIsLeaveModalOpen(true);
+                    setApplyStartDate(new Date().toISOString().split('T')[0]);
+                    setApplyEndDate(new Date().toISOString().split('T')[0]);
+                    setApplyReason('');
+                    setApplyLeaveType('Vacation');
+                    if (!isEmployeeView) {
+                      setApplyEmployeeId(employees[0]?.id || '');
+                    }
+                  }}
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer transform hover:scale-[1.01]"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{language === 'en' ? 'Apply for Leave' : 'छुट्टी के लिए आवेदन'}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Search by Name (Admins Only) */}
+              {!isEmployeeView ? (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    {language === 'en' ? 'Search Employee' : 'कर्मचारी खोजें'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 pointer-events-none">
+                      <Search className="w-3.5 h-3.5" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder={language === 'en' ? 'Name or ID...' : 'नाम या आईडी...'}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white font-semibold"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <span className="text-[11px] font-bold text-slate-500">
+                    {language === 'en' ? 'Showing your personal leave records' : 'आपके व्यक्तिगत अवकाश रिकॉर्ड दिखाए जा रहे हैं'}
+                  </span>
+                </div>
+              )}
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                  {language === 'en' ? 'Status' : 'स्थिति'}
+                </label>
+                <select
+                  value={filterLeaveStatus}
+                  onChange={(e) => setFilterLeaveStatus(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none bg-white cursor-pointer"
+                >
+                  <option value="All">{language === 'en' ? 'All Statuses' : 'सभी स्थितियां'}</option>
+                  <option value="Pending">{language === 'en' ? 'Pending' : 'लंबित'}</option>
+                  <option value="Approved">{language === 'en' ? 'Approved' : 'स्वीकृत'}</option>
+                  <option value="Rejected">{language === 'en' ? 'Rejected' : 'अस्वीकृत'}</option>
+                </select>
+              </div>
+
+              {/* Type Filter */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                  {language === 'en' ? 'Leave/Exception Type' : 'अवकाश का प्रकार'}
+                </label>
+                <select
+                  value={filterLeaveType}
+                  onChange={(e) => setFilterLeaveType(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none bg-white cursor-pointer"
+                >
+                  <option value="All">{language === 'en' ? 'All Types' : 'सभी प्रकार'}</option>
+                  <option value="Vacation">{language === 'en' ? 'Vacation' : 'वार्षिक छुट्टी (Vacation)'}</option>
+                  <option value="Sick">{language === 'en' ? 'Sick' : 'बीमारी छुट्टी (Sick)'}</option>
+                  <option value="Casual">{language === 'en' ? 'Casual' : 'आकस्मिक छुट्टी (Casual)'}</option>
+                  <option value="Half Day (Before Lunch)">{language === 'en' ? 'Half Day (Before Lunch)' : 'आधा दिन (लंच से पहले)'}</option>
+                  <option value="Half Day (After Lunch)">{language === 'en' ? 'Half Day (After Lunch)' : 'आधा दिन (लंच के बाद)'}</option>
+                  <option value="Late Coming">{language === 'en' ? 'Late Coming' : 'देर से आना (Late Coming)'}</option>
+                  <option value="Early Going">{language === 'en' ? 'Early Going' : 'जल्दी जाना (Early Going)'}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* List Table container */}
+            <div className="space-y-3">
+              {/* Desktop Table View (Hidden on Mobile) */}
+              <div className="hidden md:block overflow-x-auto border border-slate-150 rounded-xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                      {!isEmployeeView && <th className="py-3 px-4">{language === 'en' ? 'Employee' : 'कर्मचारी'}</th>}
+                      <th className="py-3 px-4">{language === 'en' ? 'Type' : 'प्रकार'}</th>
+                      <th className="py-3 px-4">{language === 'en' ? 'Duration / Dates' : 'अवधि / तिथियां'}</th>
+                      <th className="py-3 px-4">{language === 'en' ? 'Reason' : 'कारण'}</th>
+                      <th className="py-3 px-4 text-center">{language === 'en' ? 'Status' : 'स्थिति'}</th>
+                      <th className="py-3 px-4 text-center">{language === 'en' ? 'Details / Actions' : 'कार्रवाई / टिप्पणी'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {(() => {
+                      const filtered = leaveRequests.filter(req => {
+                        if (isEmployeeView && req.employeeId.toLowerCase() !== (employeeId || '').toLowerCase()) {
+                          return false;
+                        }
+                        if (!isEmployeeView && searchQuery) {
+                          const nameMatch = req.employeeName.toLowerCase().includes(searchQuery.toLowerCase());
+                          const idMatch = req.employeeId.toLowerCase().includes(searchQuery.toLowerCase());
+                          if (!nameMatch && !idMatch) return false;
+                        }
+                        if (filterLeaveStatus !== 'All' && req.status !== filterLeaveStatus) return false;
+                        if (filterLeaveType !== 'All' && req.leaveType !== filterLeaveType) return false;
+                        return true;
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={isEmployeeView ? 5 : 6} className="py-12 text-center text-slate-400 font-bold">
+                              {language === 'en' ? 'No leave requests found matching filters.' : 'फ़िल्टर के अनुकूल कोई छुट्टी आवेदन नहीं मिला।'}
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return filtered.map(req => {
+                        const isPending = req.status === 'Pending';
+                        const isApproved = req.status === 'Approved';
+                        const isRejected = req.status === 'Rejected';
+
+                        return (
+                          <tr key={req.id} className="hover:bg-slate-50/40 transition-colors">
+                            {!isEmployeeView && (
+                              <td className="py-3.5 px-4">
+                                <div className="font-bold text-slate-900">{req.employeeName}</div>
+                                <div className="text-[10px] text-slate-400 font-mono font-bold uppercase">{req.employeeId}</div>
+                              </td>
+                            )}
+                            <td className="py-3.5 px-4">
+                              <span className="font-extrabold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[10px] uppercase">
+                                {req.leaveType}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-mono text-slate-700 font-bold">
+                                {req.startDate} {req.endDate && req.endDate !== req.startDate ? ` to ${req.endDate}` : ''}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-bold mt-0.5">
+                                {req.durationDays} {req.durationDays === 1 ? (language === 'en' ? 'Day' : 'दिन') : (language === 'en' ? 'Days' : 'दिन')}
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-600 max-w-xs truncate" title={req.reason}>
+                              {req.reason}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${
+                                isApproved 
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                                  : isRejected 
+                                    ? 'bg-rose-100 text-rose-800 border border-rose-200' 
+                                    : 'bg-amber-100 text-amber-800 border border-amber-200'
+                              }`}>
+                                {isApproved && <CheckCircle className="w-3 h-3 text-emerald-600" />}
+                                <span>
+                                  {req.status === 'Pending' 
+                                    ? (language === 'en' ? 'Pending' : 'लंबित') 
+                                    : req.status === 'Approved'
+                                      ? (language === 'en' ? 'Approved' : 'स्वीकृत')
+                                      : (language === 'en' ? 'Rejected' : 'अस्वीकृत')}
+                                </span>
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              {isPending && !isEmployeeView ? (
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenApprovalModal(req.id, 'Approved')}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] rounded-lg transition-all shadow-3xs cursor-pointer"
+                                  >
+                                    {language === 'en' ? 'Approve' : 'मंजूर'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenApprovalModal(req.id, 'Rejected')}
+                                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[10px] rounded-lg transition-all shadow-3xs cursor-pointer"
+                                  >
+                                    {language === 'en' ? 'Reject' : 'अस्वीकार'}
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="text-left max-w-xs text-[10px] leading-relaxed text-slate-500 font-medium">
+                                  {req.approvedBy && (
+                                    <div>
+                                      <span className="font-extrabold text-slate-600">{language === 'en' ? 'Processed by:' : 'द्वारा प्रोसेस:'} </span>
+                                      {req.approvedBy}
+                                    </div>
+                                  )}
+                                  {req.remarks && (
+                                    <div className="italic mt-0.5">
+                                      <span className="font-extrabold text-slate-600">{language === 'en' ? 'Remarks:' : 'टिप्पणी:'} </span>
+                                      "{req.remarks}"
+                                    </div>
+                                  )}
+                                  {!req.approvedBy && !req.remarks && (
+                                    <span className="text-slate-400">-</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card List View (Visible on Mobile only - Dense, compact, zero-scroll) */}
+              <div className="md:hidden space-y-1.5">
+                {(() => {
+                  const filtered = leaveRequests.filter(req => {
+                    if (isEmployeeView && req.employeeId.toLowerCase() !== (employeeId || '').toLowerCase()) {
+                      return false;
+                    }
+                    if (!isEmployeeView && searchQuery) {
+                      const nameMatch = req.employeeName.toLowerCase().includes(searchQuery.toLowerCase());
+                      const idMatch = req.employeeId.toLowerCase().includes(searchQuery.toLowerCase());
+                      if (!nameMatch && !idMatch) return false;
+                    }
+                    if (filterLeaveStatus !== 'All' && req.status !== filterLeaveStatus) return false;
+                    if (filterLeaveType !== 'All' && req.leaveType !== filterLeaveType) return false;
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-8 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                        {language === 'en' ? 'No leave requests found.' : 'कोई छुट्टी आवेदन नहीं मिला।'}
+                      </div>
+                    );
+                  }
+
+                  return filtered.map(req => {
+                    const isPending = req.status === 'Pending';
+                    const isApproved = req.status === 'Approved';
+                    const isRejected = req.status === 'Rejected';
+
+                    return (
+                      <div 
+                        key={req.id} 
+                        className="bg-slate-50/70 hover:bg-slate-50 border border-slate-150 rounded-lg p-2 flex flex-col gap-1 text-[10px] leading-tight transition-all"
+                      >
+                        {/* Row 1: Type Badge & Status badge */}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-extrabold text-slate-800 bg-slate-200 px-1.5 py-0.5 rounded text-[8.5px] uppercase tracking-wider">
+                            {req.leaveType}
+                          </span>
+                          
+                          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+                            isApproved 
+                              ? 'bg-emerald-100 text-emerald-800' 
+                              : isRejected 
+                                ? 'bg-rose-100 text-rose-800' 
+                                : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {isApproved && <CheckCircle className="w-2.5 h-2.5 text-emerald-600" />}
+                            <span>
+                              {req.status === 'Pending' 
+                                ? (language === 'en' ? 'Pending' : 'लंबित') 
+                                : req.status === 'Approved'
+                                  ? (language === 'en' ? 'Approved' : 'स्वीकृत')
+                                  : (language === 'en' ? 'Rejected' : 'अस्वीकृत')}
+                            </span>
+                          </span>
+                        </div>
+
+                        {/* Row 2: Dates & Duration */}
+                        <div className="flex items-center justify-between gap-1 font-mono text-slate-700 font-bold mt-0.5">
+                          <span>{req.startDate} {req.endDate && req.endDate !== req.startDate ? ` → ${req.endDate}` : ''}</span>
+                          <span className="text-slate-400 font-sans text-[9px] font-black uppercase">
+                            {req.durationDays} {req.durationDays === 1 ? (language === 'en' ? 'Day' : 'दिन') : (language === 'en' ? 'Days' : 'दिन')}
+                          </span>
+                        </div>
+
+                        {/* Row 3: Employee Name & ID (Admins Only) */}
+                        {!isEmployeeView && (
+                          <div className="font-extrabold text-slate-900 border-t border-slate-200/50 pt-1 mt-0.5">
+                            {req.employeeName} <span className="text-slate-400 font-mono text-[8.5px] uppercase">({req.employeeId})</span>
+                          </div>
+                        )}
+
+                        {/* Row 4: Reason */}
+                        <div className="text-slate-600 font-bold break-words pr-2 mt-0.5">
+                          <span className="text-slate-400 font-black uppercase text-[8px] mr-1">{language === 'en' ? 'Reason:' : 'कारण:'}</span>
+                          {req.reason}
+                        </div>
+
+                        {/* Row 5: Actions or Remarks */}
+                        {isPending && !isEmployeeView ? (
+                          <div className="flex items-center gap-1.5 mt-1 border-t border-slate-200/50 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenApprovalModal(req.id, 'Approved')}
+                              className="flex-1 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[9px] rounded-md transition-all text-center cursor-pointer"
+                            >
+                              {language === 'en' ? 'Approve' : 'मंजूर'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenApprovalModal(req.id, 'Rejected')}
+                              className="flex-1 py-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[9px] rounded-md transition-all text-center cursor-pointer"
+                            >
+                              {language === 'en' ? 'Reject' : 'अस्वीकार'}
+                            </button>
+                          </div>
+                        ) : (
+                          (req.approvedBy || req.remarks) && (
+                            <div className="text-[8.5px] text-slate-500 font-bold border-t border-slate-200/50 pt-1 mt-0.5 leading-tight">
+                              {req.approvedBy && (
+                                <div>
+                                  <span className="text-slate-400 font-black uppercase text-[7.5px]">{language === 'en' ? 'By:' : 'द्वारा:'}</span> {req.approvedBy}
+                                </div>
+                              )}
+                              {req.remarks && (
+                                <div className="italic mt-0.5">
+                                  <span className="text-slate-400 font-black uppercase text-[7.5px] not-italic">{language === 'en' ? 'Remarks:' : 'टिप्पणी:'}</span> "{req.remarks}"
+                                </div>
+                              )}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1017,6 +1484,222 @@ export default function LeavesHolidays({
                 >
                   <Save className="w-4 h-4 text-amber-500" />
                   {language === 'en' ? 'Save Holiday' : 'अवकाश सुरक्षित करें'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* NEW LEAVE APPLICATION MODAL */}
+      {isLeaveModalOpen && (
+        <div className="fixed inset-0 z-55 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in duration-200">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-emerald-500" />
+                <h3 className="text-sm font-black uppercase tracking-wider font-mono">
+                  {language === 'en' ? 'Apply for Leave' : 'छुट्टी के लिए आवेदन'}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setIsLeaveModalOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleApplyLeaveSubmit} className="p-6 space-y-4 font-sans text-xs">
+              {/* Employee Selector (Admins only) */}
+              {!isEmployeeView ? (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    {language === 'en' ? 'Apply For Employee *' : 'कर्मचारी का चयन करें *'}
+                  </label>
+                  <select
+                    required
+                    value={applyEmployeeId}
+                    onChange={(e) => setApplyEmployeeId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                  >
+                    {employees.filter(emp => emp.isActive !== false).map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    {language === 'en' ? 'Applying As' : 'आवेदन करने वाले'}
+                  </label>
+                  <div className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-700">
+                    {employees.find(emp => emp.id.toLowerCase() === (employeeId || '').toLowerCase())?.name || employeeId}
+                  </div>
+                </div>
+              )}
+
+              {/* Leave Type Selector */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                  {language === 'en' ? 'Leave / Exception Type *' : 'छुट्टी / अपवाद का प्रकार *'}
+                </label>
+                <select
+                  value={applyLeaveType}
+                  onChange={(e) => setApplyLeaveType(e.target.value as any)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                >
+                  <option value="Vacation">{language === 'en' ? 'Vacation' : 'वार्षिक छुट्टी (Vacation)'}</option>
+                  <option value="Sick">{language === 'en' ? 'Sick' : 'बीमारी छुट्टी (Sick)'}</option>
+                  <option value="Casual">{language === 'en' ? 'Casual' : 'आकस्मिक छुट्टी (Casual)'}</option>
+                  <option value="Half Day (Before Lunch)">{language === 'en' ? 'Half Day (Before Lunch)' : 'आधा दिन (लंच से पहले)'}</option>
+                  <option value="Half Day (After Lunch)">{language === 'en' ? 'Half Day (After Lunch)' : 'आधा दिन (लंच के बाद)'}</option>
+                  <option value="Late Coming">{language === 'en' ? 'Late Coming Permission' : 'देर से आने की अनुमति'}</option>
+                  <option value="Early Going">{language === 'en' ? 'Early Going Permission' : 'जल्दी जाने की अनुमति'}</option>
+                </select>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    {language === 'en' ? 'Start Date *' : 'प्रारंभ तिथि *'}
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={applyStartDate}
+                    onChange={(e) => setApplyStartDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                    {language === 'en' ? 'End Date *' : 'अंतिम तिथि *'}
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    disabled={applyLeaveType.startsWith('Half Day') || applyLeaveType === 'Late Coming' || applyLeaveType === 'Early Going'}
+                    value={applyLeaveType.startsWith('Half Day') || applyLeaveType === 'Late Coming' || applyLeaveType === 'Early Going' ? applyStartDate : applyEndDate}
+                    onChange={(e) => setApplyEndDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                </div>
+              </div>
+
+              {/* Reason / Remarks */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                  {language === 'en' ? 'Reason for Leave *' : 'अवकाश का कारण *'}
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={applyReason}
+                  onChange={(e) => setApplyReason(e.target.value)}
+                  placeholder={language === 'en' ? 'e.g. Family function / Not feeling well...' : 'जैसे: पारिवारिक समारोह / तबीयत ठीक नहीं है...'}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                />
+              </div>
+
+              {/* Duration Preview */}
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-emerald-900 font-extrabold flex justify-between items-center">
+                <span>{language === 'en' ? 'Estimated Duration:' : 'अनुमानित अवधि:'}</span>
+                <span className="text-sm font-black text-emerald-700 bg-emerald-100/50 px-2.5 py-0.5 rounded-lg">
+                  {getCalculatedDuration()} {getCalculatedDuration() === 1 ? (language === 'en' ? 'Day' : 'दिन') : (language === 'en' ? 'Days' : 'दिन')}
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsLeaveModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-lg transition-colors cursor-pointer"
+                >
+                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg shadow-sm transition-all cursor-pointer"
+                >
+                  <Save className="w-4 h-4 text-emerald-200" />
+                  {language === 'en' ? 'Submit Application' : 'आवेदन सबमिट करें'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN PROCESS APPROVAL MODAL */}
+      {isApprovalModalOpen && (
+        <div className="fixed inset-0 z-55 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-sm w-full overflow-hidden animate-in fade-in duration-200">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-500" />
+                <h3 className="text-sm font-black uppercase tracking-wider font-mono">
+                  {language === 'en' ? 'Review Application' : 'आवेदन की समीक्षा'}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setIsApprovalModalOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmApproval} className="p-6 space-y-4 font-sans text-xs">
+              <div className="text-slate-700 text-center font-bold text-sm">
+                {approvalAction === 'Approved' ? (
+                  <span className="text-emerald-700">
+                    {language === 'en' ? 'Are you sure you want to APPROVE this leave request?' : 'क्या आप वाकई इस छुट्टी को मंजूर करना चाहते हैं?'}
+                  </span>
+                ) : (
+                  <span className="text-rose-700">
+                    {language === 'en' ? 'Are you sure you want to REJECT this leave request?' : 'क्या आप वाकई इस छुट्टी को अस्वीकृत करना चाहते हैं?'}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                  {language === 'en' ? 'Remarks / Reason (Optional)' : 'टिप्पणी / कारण (वैकल्पिक)'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={approvalRemarks}
+                  onChange={(e) => setApprovalRemarks(e.target.value)}
+                  placeholder={language === 'en' ? 'e.g. Approved. Please handover your work.' : 'जैसे: स्वीकृत। कृपया अपना काम हैंडओवर करें।'}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
+                />
+                <p className="text-[10px] text-slate-400 mt-1 font-bold">
+                  {language === 'en' ? '* This remark will be sent in the email notification to the employee.' : '* यह टिप्पणी कर्मचारी को ईमेल नोटिफिकेशन में भेजी जाएगी।'}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsApprovalModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-lg transition-colors cursor-pointer"
+                >
+                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                </button>
+                <button
+                  type="submit"
+                  className={`flex items-center gap-1.5 px-5 py-2 text-white font-extrabold rounded-lg shadow-sm transition-all cursor-pointer ${
+                    approvalAction === 'Approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                  }`}
+                >
+                  <Save className="w-4 h-4 text-white/80" />
+                  {language === 'en' ? 'Confirm Decision' : 'निर्णय सुरक्षित करें'}
                 </button>
               </div>
             </form>
