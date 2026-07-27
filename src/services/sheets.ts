@@ -718,7 +718,7 @@ export async function savePayrollHistory(spreadsheetId: string, payroll: Payroll
  * Saves Admin Settings back to the Settings sheet
  */
 export async function saveAdminSettings(spreadsheetId: string, settings: AdminSettings, token: string): Promise<void> {
-  const range = 'Settings!A1:B35';
+  const range = 'Settings!A1:B100';
   const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:clear`;
   await fetch(clearUrl, {
     method: 'POST',
@@ -752,7 +752,32 @@ export async function saveAdminSettings(spreadsheetId: string, settings: AdminSe
     ['enableConveyance', settings.enableConveyance !== false ? 'TRUE' : 'FALSE'],
     ['enableProfessionalTax', settings.enableProfessionalTax !== false ? 'TRUE' : 'FALSE'],
     ['enablePaidLeaveCalculation', settings.enablePaidLeaveCalculation !== false ? 'TRUE' : 'FALSE'],
-    ['paidLeaveStartAfterMonths', settings.paidLeaveStartAfterMonths || 0]
+    ['paidLeaveStartAfterMonths', settings.paidLeaveStartAfterMonths || 0],
+    ['rulesShiftTiming', settings.rulesShiftTiming || ''],
+    ['rulesHalfDaySlot', settings.rulesHalfDaySlot || ''],
+    ['rulesLatePunchGrace', settings.rulesLatePunchGrace || ''],
+    ['hrContactEmail', settings.hrContactEmail || ''],
+    ['hrContactPhone', settings.hrContactPhone || ''],
+    ['hrContactManager', settings.hrContactManager || ''],
+    ['roleAccounts', JSON.stringify(settings.roleAccounts || [])],
+    ['rolePermissions', JSON.stringify(settings.rolePermissions || {})],
+    ['enableEmployeePayslips', settings.enableEmployeePayslips ? 'TRUE' : 'FALSE'],
+    ['enableGeofencing', settings.enableGeofencing ? 'TRUE' : 'FALSE'],
+    ['enableMobileAttendance', settings.enableMobileAttendance !== false ? 'TRUE' : 'FALSE'],
+    ['enablePasswordLoginOtp', settings.enablePasswordLoginOtp ? 'TRUE' : 'FALSE'],
+    ['geofenceOutlets', JSON.stringify(settings.geofenceOutlets || [])],
+    ['smtpHost', settings.smtpHost || ''],
+    ['smtpPort', settings.smtpPort || 587],
+    ['smtpUsername', settings.smtpUsername || ''],
+    ['smtpPassword', settings.smtpPassword || ''],
+    ['senderName', settings.senderName || ''],
+    ['senderEmail', settings.senderEmail || ''],
+    ['enableWhatsappAutomation', settings.enableWhatsappAutomation !== false ? 'TRUE' : 'FALSE'],
+    ['whatsappUsername', settings.whatsappUsername || ''],
+    ['whatsappPassword', settings.whatsappPassword || ''],
+    ['whatsappSenderNo', settings.whatsappSenderNo || ''],
+    ['whatsappTemplates', JSON.stringify(settings.whatsappTemplates || {})],
+    ['emailTemplates', JSON.stringify(settings.emailTemplates || {})]
   ];
 
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Settings!A1:B${values.length}?valueInputOption=USER_ENTERED`;
@@ -776,7 +801,7 @@ export async function saveAdminSettings(spreadsheetId: string, settings: AdminSe
  * Reads Admin Settings from the Settings sheet
  */
 export async function fetchAdminSettings(spreadsheetId: string, token: string): Promise<AdminSettings | null> {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Settings!A1:B35`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Settings!A1:B100`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -794,6 +819,18 @@ export async function fetchAdminSettings(spreadsheetId: string, token: string): 
   const settings: any = {};
   const dataRows = rows.slice(1);
 
+  const numericFields = ['defaultOvertimeRate', 'pfContributionRate', 'esicContributionRate', 'paidLeaveStartAfterMonths', 'smtpPort'];
+  const booleanFields = [
+    'enableHra', 'enableDa', 'enableConveyance', 'enableProfessionalTax', 
+    'enablePaidLeaveCalculation', 'enableEmployeePayslips', 'enableGeofencing', 
+    'enableMobileAttendance', 'enablePasswordLoginOtp', 'enableWhatsappAutomation'
+  ];
+  const jsonFields = [
+    'departments', 'branches', 'costCenters', 'employeeGroups',
+    'workTimings', 'weeklyOffProfiles', 'leaveTypes', 'fields', 'holidays',
+    'roleAccounts', 'rolePermissions', 'geofenceOutlets', 'whatsappTemplates', 'emailTemplates'
+  ];
+
   dataRows.forEach((row: any[]) => {
     if (row.length < 2) return;
     const key = String(row[0]).trim();
@@ -801,33 +838,21 @@ export async function fetchAdminSettings(spreadsheetId: string, token: string): 
 
     if (!key) return;
 
-    const numericFields = ['defaultOvertimeRate', 'pfContributionRate', 'esicContributionRate', 'paidLeaveStartAfterMonths'];
-    const booleanFields = ['enableHra', 'enableDa', 'enableConveyance', 'enableProfessionalTax', 'enablePaidLeaveCalculation'];
-    const arrayFields = [
-      'departments', 'branches', 'costCenters', 'employeeGroups',
-      'workTimings', 'weeklyOffProfiles', 'leaveTypes'
-    ];
-
     if (numericFields.includes(key)) {
-      settings[key] = Number(val) || 0;
+      settings[key] = Number(val) || (key === 'smtpPort' ? 587 : 0);
     } else if (booleanFields.includes(key)) {
       settings[key] = val === 'TRUE' || val === 'true' || val === '1';
-    } else if (arrayFields.includes(key)) {
+    } else if (jsonFields.includes(key)) {
       try {
-        if (val.startsWith('[') && val.endsWith(']')) {
+        if (val.startsWith('{') || val.startsWith('[')) {
           settings[key] = JSON.parse(val);
-        } else {
-          // Robust comma fallback for manual typing in sheets
+        } else if (['departments', 'branches', 'costCenters', 'employeeGroups', 'workTimings', 'weeklyOffProfiles', 'leaveTypes'].includes(key)) {
           settings[key] = val.split(',').map(s => s.trim()).filter(Boolean);
         }
       } catch (e) {
-        settings[key] = val.split(',').map(s => s.trim()).filter(Boolean);
-      }
-    } else if (key === 'fields' || key === 'holidays') {
-      try {
-        settings[key] = JSON.parse(val);
-      } catch (e) {
-        console.error(`Failed to parse ${key} configuration:`, e);
+        if (['departments', 'branches', 'costCenters', 'employeeGroups', 'workTimings', 'weeklyOffProfiles', 'leaveTypes'].includes(key)) {
+          settings[key] = val.split(',').map(s => s.trim()).filter(Boolean);
+        }
       }
     } else {
       settings[key] = val;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings as SettingsIcon, 
   Building, 
@@ -238,6 +238,10 @@ export default function Settings({
 }: SettingsProps) {
   const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'roles_permissions' | 'audit_logs' | 'email_smtp' | 'whatsapp_auto'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
+
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
   
   // WhatsApp test states
   const [waTestMobile, setWaTestMobile] = useState(() => settings.whatsappSenderNo || '8518880943');

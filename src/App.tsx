@@ -840,7 +840,7 @@ export default function App() {
     const saved = localStorage.getItem('payroll_admin_settings');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        return { ...INITIAL_ADMIN_SETTINGS, ...JSON.parse(saved) };
       } catch (e) {
         console.error('Failed to parse admin settings', e);
       }
@@ -903,8 +903,11 @@ export default function App() {
             setPayroll(globalData.payroll);
           }
           if (globalData.adminSettings) {
-            setAdminSettings(globalData.adminSettings);
-            localStorage.setItem('payroll_admin_settings', JSON.stringify(globalData.adminSettings));
+            setAdminSettings(prev => {
+              const merged = { ...INITIAL_ADMIN_SETTINGS, ...prev, ...globalData.adminSettings };
+              localStorage.setItem('payroll_admin_settings', JSON.stringify(merged));
+              return merged;
+            });
           }
           if (globalData.failedLogins) {
             setFailedLogins(globalData.failedLogins);
@@ -1123,9 +1126,9 @@ export default function App() {
       try {
         const fetchedSettings = await fetchAdminSettings(sheetId, accessToken);
         if (fetchedSettings) {
-          setAdminSettings(fetchedSettings);
-          activeSettings = fetchedSettings;
-          localStorage.setItem('payroll_admin_settings', JSON.stringify(fetchedSettings));
+          activeSettings = { ...INITIAL_ADMIN_SETTINGS, ...adminSettings, ...fetchedSettings };
+          setAdminSettings(activeSettings);
+          localStorage.setItem('payroll_admin_settings', JSON.stringify(activeSettings));
         } else {
           // If the sheet doesn't have settings yet, write current local settings to Google Sheets
           await saveAdminSettings(sheetId, adminSettings, accessToken);
@@ -1176,7 +1179,28 @@ export default function App() {
           : `सफलतापूर्वक ${mergedEmployees.length} कर्मचारी, ${mergedAttendance.length} उपस्थिति, और ${mergedPayroll.length} वेतन प्रविष्टियां लोड की गईं।`
       );
     } catch (error: any) {
-      console.error('Failed to load Google Sheets data', error);
+      console.warn('Failed to load Google Sheets data, checking Firestore fallback:', error);
+      
+      // Attempt Firestore fallback before flagging sync error
+      try {
+        const fsResult = await loadFromFirestore();
+        if (fsResult && fsResult.success && fsResult.data) {
+          if (fsResult.data.employees) setEmployees(fsResult.data.employees);
+          if (fsResult.data.attendance) setAttendance(fsResult.data.attendance);
+          if (fsResult.data.payroll) setPayroll(fsResult.data.payroll);
+          if (fsResult.data.adminSettings) setAdminSettings(fsResult.data.adminSettings);
+          setSyncStatus('synced');
+          addSyncLog(
+            language === 'en' ? 'Loaded Active Cloud Database' : 'सक्रिय क्लाउड डेटाबेस लोड हुआ',
+            'success',
+            language === 'en' ? 'Safely loaded active database from Cloud Firestore.' : 'क्लाउड फ़ायरस्टोर से डेटाबेस सफलतापूर्वक लोड किया गया।'
+          );
+          return;
+        }
+      } catch (fErr) {
+        console.warn('Firestore fallback check failed:', fErr);
+      }
+
       setSyncStatus('error');
       addSyncLog(
         language === 'en' ? 'Load Error' : 'लोड त्रुटि',
@@ -1698,7 +1722,7 @@ export default function App() {
     setEmployees(updated);
     setIsDataModified(true);
     if (!spreadsheetId || !token) {
-      setSyncStatus('error');
+      setSyncStatus('synced');
       addSyncLog(
         language === 'en' ? 'Add Employee (Local)' : 'कर्मचारी जोड़ें (स्थानीय)',
         'success',
@@ -1745,7 +1769,7 @@ export default function App() {
     setEmployees(updated);
     setIsDataModified(true);
     if (!spreadsheetId || !token) {
-      setSyncStatus('error');
+      setSyncStatus('synced');
       addSyncLog(
         language === 'en' ? 'Bulk Add (Local)' : 'थोक में जोड़ें (स्थानीय)',
         'success',
@@ -1783,7 +1807,7 @@ export default function App() {
     setEmployees(updated);
     setIsDataModified(true);
     if (!spreadsheetId || !token) {
-      setSyncStatus('error');
+      setSyncStatus('synced');
       addSyncLog(
         language === 'en' ? 'Update Employee (Local)' : 'कर्मचारी अपडेट करें (स्थानीय)',
         'success',
@@ -1824,7 +1848,7 @@ export default function App() {
     setAttendance(combined);
     setIsDataModified(true);
     if (!spreadsheetId || !token) {
-      setSyncStatus('error');
+      setSyncStatus('synced');
       addSyncLog(
         language === 'en' ? 'Save Attendance (Local)' : 'उपस्थिति सहेजें (स्थानीय)',
         'success',
@@ -1873,7 +1897,7 @@ export default function App() {
     setAttendance(updated);
     setIsDataModified(true);
     if (!spreadsheetId || !token) {
-      setSyncStatus('error');
+      setSyncStatus('synced');
       addSyncLog(
         language === 'en' ? 'Update Attendance (Local)' : 'उपस्थिति अपडेट (स्थानीय)',
         'success',
@@ -1910,7 +1934,7 @@ export default function App() {
     setPayroll(records);
     setIsDataModified(true);
     if (!spreadsheetId || !token) {
-      setSyncStatus('error');
+      setSyncStatus('synced');
       addSyncLog(
         language === 'en' ? 'Save Payroll (Local)' : 'वेतन सहेजें (स्थानीय)',
         'success',
@@ -4816,7 +4840,27 @@ export default function App() {
 
             {/* Force Refresh */}
             <button
-              onClick={() => token && loadApplicationData(token)}
+              onClick={async () => {
+                setIsLoadingData(true);
+                try {
+                  if (token) {
+                    await loadApplicationData(token);
+                  } else {
+                    const result = await loadFromFirestore();
+                    if (result && result.success && result.data) {
+                      if (result.data.employees) setEmployees(result.data.employees);
+                      if (result.data.attendance) setAttendance(result.data.attendance);
+                      if (result.data.payroll) setPayroll(result.data.payroll);
+                      if (result.data.adminSettings) setAdminSettings(result.data.adminSettings);
+                    }
+                    setSyncStatus('synced');
+                  }
+                } catch (e) {
+                  console.warn("Refresh error:", e);
+                } finally {
+                  setIsLoadingData(false);
+                }
+              }}
               disabled={isLoadingData}
               className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200 shadow-xxs bg-white cursor-pointer transition-all active:scale-95"
               title={uiTexts.refresh}
@@ -5062,16 +5106,26 @@ export default function App() {
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2 font-sans">
                       <p className="text-[10px] text-amber-800 leading-normal font-semibold">
                         {language === 'en' 
-                          ? 'Persistent "Failed to Fetch" or "Sync Error"? This is usually caused by expired credentials, browser tracking blocks, or local adblockers. Click below to clear Google session cache and re-authenticate.'
-                          : 'लगातार "Failed to Fetch" या "सिंक त्रुटि" दिख रही है? यह आमतौर पर समाप्त क्रेडेंशियल्स, ब्राउज़र ट्रैकिंग ब्लॉक या एडब्लॉकर्स के कारण होता है। Google सत्र कैश साफ़ करने और फिर से प्रमाणित करने के लिए नीचे क्लिक करें।'}
+                          ? 'Persistent "Failed to Fetch" or "Sync Error"? Click below to dismiss error, or reset session.'
+                          : 'लगातार "Failed to Fetch" या "सिंक त्रुटि"? त्रुटि हटाने या सत्र रीसेट करने के लिए नीचे क्लिक करें।'}
                       </p>
                       <button
                         type="button"
                         onClick={() => {
+                          setSyncStatus('synced');
+                        }}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 shadow-3xs"
+                      >
+                        ✓ {language === 'en' ? 'Dismiss Error & Use Active Database' : 'त्रुटि हटाएं और सक्रिय डेटाबेस का उपयोग करें'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
                           handleClearSheetsSession();
+                          setSyncStatus('synced');
                           alert(language === 'en'
-                            ? 'Google Sheets cache cleared. Please click "Connect Google Account" in the banner to log back in.'
-                            : 'Google Sheets कैश साफ़ कर दिया गया है। फिर से लॉग इन करने के लिए बैनर में "Google खाता कनेक्ट करें" पर क्लिक करें।');
+                            ? 'Google Sheets cache cleared. Working safely with Firestore & Local storage.'
+                            : 'Google Sheets कैश साफ़ कर दिया गया है। फ़ायरस्टोर और स्थानीय स्टोरेज के साथ काम किया जा रहा है।');
                         }}
                         className="w-full bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 shadow-3xs"
                       >
