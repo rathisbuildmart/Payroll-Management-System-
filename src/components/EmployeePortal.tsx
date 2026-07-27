@@ -5,7 +5,7 @@ import {
   CalendarDays, Plus, Locate, ChevronLeft
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { Employee, Attendance, PayrollRecord, AdminSettings, LeaveRequest } from '../types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, LeaveRequest, getCurrentBasicSalary } from '../types';
 import LeavesHolidays from './LeavesHolidays';
 import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
 import MonthlyCalendarReport from './MonthlyCalendarReport';
@@ -1809,7 +1809,7 @@ export default function EmployeePortal({
                 <div className="space-y-2.5 text-xs font-semibold text-slate-700">
                   <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
                     <span className="text-slate-500 font-bold">{t.basicSalary}</span>
-                    <span className="font-mono text-slate-950 font-extrabold text-sm">₹{employee.basicSalary.toLocaleString('en-IN')}</span>
+                    <span className="font-mono text-slate-950 font-extrabold text-sm">₹{getCurrentBasicSalary(employee).toLocaleString('en-IN')}</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
                     <span className="text-slate-500 font-bold">{t.allowances}</span>

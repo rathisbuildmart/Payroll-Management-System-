@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, CreditCard, Check, Printer, FileText, DollarSign, Calculator, AlertCircle, Save, TrendingUp, Users, ArrowUpRight, ShieldCheck, ArrowDownRight, Landmark, Building, Sparkles, Filter, ChevronLeft, ChevronRight, RefreshCcw, FileDown, PlusCircle, Trash2, HelpCircle, Info, MessageSquare } from 'lucide-react';
+import { Calendar, CreditCard, Check, Printer, FileText, DollarSign, Calculator, AlertCircle, Save, TrendingUp, Users, ArrowUpRight, ShieldCheck, ArrowDownRight, Landmark, Building, Sparkles, Filter, ChevronLeft, ChevronRight, RefreshCcw, FileDown, PlusCircle, Trash2, HelpCircle, Info, MessageSquare, ChevronDown, Banknote, FileSpreadsheet, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { Employee, Attendance, PayrollRecord, OneTimeDeduction, AdminSettings } from '../types';
+import { Employee, Attendance, PayrollRecord, OneTimeDeduction, AdminSettings, getCurrentBasicSalary } from '../types';
 import { WhatsAppModal } from './WhatsAppModal';
 
 interface PayrollCalculatorProps {
@@ -125,6 +125,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('All');
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState<'All' | 'Bank Transfer' | 'Cash' | 'Cheque'>('All');
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -159,9 +160,43 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       const matchesBranch = selectedBranch === 'All' || emp.branch === selectedBranch;
       const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
       const matchesEmployee = selectedEmployeeId === 'All' || emp.id === selectedEmployeeId;
-      return matchesBranch && matchesDept && matchesEmployee;
+      const empMode = emp.paymentMethod || 'Bank Transfer';
+      const matchesPaymentMode = selectedPaymentMode === 'All' || empMode === selectedPaymentMode;
+      return matchesBranch && matchesDept && matchesEmployee && matchesPaymentMode;
     });
-  }, [localPayroll, employees, selectedBranch, selectedDept, selectedEmployeeId]);
+  }, [localPayroll, employees, selectedBranch, selectedDept, selectedEmployeeId, selectedPaymentMode]);
+
+  // Calculate payment mode breakdown statistics
+  const paymentSummary = useMemo(() => {
+    let bankTotal = 0, bankCount = 0;
+    let cashTotal = 0, cashCount = 0;
+    let chequeTotal = 0, chequeCount = 0;
+
+    filteredPayroll.forEach(rec => {
+      const emp = employees.find(e => e.id === rec.employeeId);
+      const mode = emp?.paymentMethod || 'Bank Transfer';
+      const amt = rec.netSalary !== undefined ? rec.netSalary : (rec.totalSalary || 0);
+
+      if (mode === 'Cash') {
+        cashTotal += amt;
+        cashCount += 1;
+      } else if (mode === 'Cheque') {
+        chequeTotal += amt;
+        chequeCount += 1;
+      } else {
+        bankTotal += amt;
+        bankCount += 1;
+      }
+    });
+
+    return {
+      bankTotal, bankCount,
+      cashTotal, cashCount,
+      chequeTotal, chequeCount,
+      grandTotal: bankTotal + cashTotal + chequeTotal,
+      totalCount: filteredPayroll.length
+    };
+  }, [filteredPayroll, employees]);
 
   const paginatedPayroll = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -200,7 +235,8 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     const actualPaidLeaves = isEligibleForPaidLeave ? daysLeave : 0;
     const workedDaysVal = daysPresent + (0.5 * daysHalfDay) + actualPaidLeaves;
     const earnedRatio = Math.min(1, workedDaysVal / workingDays);
-    const earnedBasic = Math.round(emp.basicSalary * (workedDaysVal === 0 ? 0 : earnedRatio));
+    const currentEmpBasic = getCurrentBasicSalary(emp);
+    const earnedBasic = Math.round(currentEmpBasic * (workedDaysVal === 0 ? 0 : earnedRatio));
 
     // Overtime
     const overtimeHoursTotal = empAtt.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
@@ -208,13 +244,13 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
     // Base default structures from employee profile or Indian standards (conditional on adminSettings and employee-specific toggles)
     const defaultHra = (adminSettings?.enableHra !== false && emp.isHraApplicable !== false)
-      ? (emp.hra !== undefined && emp.hra > 0 ? emp.hra : Math.round(emp.basicSalary * 0.40))
+      ? (emp.hra !== undefined && emp.hra > 0 ? emp.hra : Math.round(currentEmpBasic * 0.40))
       : 0;
     const defaultDa = (adminSettings?.enableDa !== false && emp.isDaApplicable !== false)
-      ? (emp.da !== undefined && emp.da > 0 ? emp.da : Math.round(emp.basicSalary * 0.10))
+      ? (emp.da !== undefined && emp.da > 0 ? emp.da : Math.round(currentEmpBasic * 0.10))
       : 0;
     const defaultConveyance = (adminSettings?.enableConveyance !== false && emp.isConveyanceApplicable !== false)
-      ? (emp.conveyanceAllowance !== undefined && emp.conveyanceAllowance > 0 ? emp.conveyanceAllowance : (emp.basicSalary > 25000 ? 1600 : 800))
+      ? (emp.conveyanceAllowance !== undefined && emp.conveyanceAllowance > 0 ? emp.conveyanceAllowance : (currentEmpBasic > 25000 ? 1600 : 800))
       : 0;
     const defaultAdvanceDeduction = emp.advanceSalaryDeduction !== undefined && emp.advanceSalaryDeduction > 0 ? Math.min(emp.advanceSalaryBalance || 0, emp.advanceSalaryDeduction) : 0;
 
@@ -291,7 +327,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     return {
       monthYear: selectedMonthYear,
       employeeId: emp.id,
-      basicSalary: emp.basicSalary,
+      basicSalary: getCurrentBasicSalary(emp),
       allowances: standardAllowancesTotal + customAllowancesTotal + festivalBonus + performanceIncentive + leaveAdjustment + oneTimeRefundAmount,
       deductions: totalDeductions,
       overtimePay,
@@ -515,12 +551,41 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     doc.save(`Payslip_${emp?.name?.replace(/\s+/g, '_') || 'Employee'}_${record.monthYear}.pdf`);
   };
 
-  // 2. Bank Bulk Upload CSV Format Generator (HDFC, SBI, ICICI)
+  // Helper: Convert Amount Number to Words in Indian English
+  const numberToWordsINR = (num: number): string => {
+    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    const strNum = Math.floor(Math.abs(num)).toString();
+    if (strNum.length > 9) return `Rs. ${num.toLocaleString('en-IN')}`;
+    const n = ('000000000' + strNum).slice(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+    if (!n) return `Rs. ${num.toLocaleString('en-IN')}`;
+    let str = '';
+    str += (Number(n[1]) !== 0) ? (a[Number(n[1])] || b[Number(n[1][0])] + ' ' + a[Number(n[1][1])]) + 'Lakh ' : '';
+    str += (Number(n[2]) !== 0) ? (a[Number(n[2])] || b[Number(n[2][0])] + ' ' + a[Number(n[2][1])]) + 'Thousand ' : '';
+    str += (Number(n[3]) !== 0) ? (a[Number(n[3])] || b[Number(n[3][0])] + ' ' + a[Number(n[3][1])]) + 'Hundred ' : '';
+    str += (Number(n[4]) !== 0) ? ((str !== '') ? 'and ' : '') + (a[Number(n[4])] || b[Number(n[4][0])] + ' ' + a[Number(n[4][1])]) : '';
+    str += (Number(n[5]) !== 0) ? ((str !== '') ? 'and ' : '') + (a[Number(n[5])] || b[Number(n[5][0])] + ' ' + a[Number(n[5][1])]) : '';
+    return str.trim() ? str.trim() + ' Rupees Only' : 'Zero Rupees';
+  };
+
+  // 2. Bank Bulk Upload CSV Format Generator (HDFC, SBI, ICICI) - Exports ONLY Bank Transfer Employees
   const handleBankExport = (bank: 'SBI' | 'HDFC' | 'ICICI') => {
     let headers: string[] = [];
     let rows: string[][] = [];
     
-    localPayroll.forEach((rec, idx) => {
+    const bankRecords = localPayroll.filter(rec => {
+      const emp = employees.find(e => e.id === rec.employeeId);
+      const mode = emp?.paymentMethod || 'Bank Transfer';
+      return mode === 'Bank Transfer';
+    });
+
+    if (bankRecords.length === 0) {
+      alert(language === 'en' ? 'No Bank Transfer mode employees found in current payroll.' : 'वर्तमान पेरोल में कोई बैंक ट्रांसफ़र मोड वाला कर्मचारी नहीं मिला।');
+      return;
+    }
+
+    bankRecords.forEach((rec, idx) => {
       const emp = employees.find(e => e.id === rec.employeeId);
       const accNo = emp?.bankAccountNo || '';
       const name = emp?.bankAccountHolderName || emp?.name || 'Unknown';
@@ -583,6 +648,242 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // 3. Cash Disbursal Advice Report Generator (.csv) - Exports ONLY Cash Payment Employees
+  const handleCashExport = () => {
+    const cashRecords = localPayroll.filter(rec => {
+      const emp = employees.find(e => e.id === rec.employeeId);
+      return emp?.paymentMethod === 'Cash';
+    });
+
+    if (cashRecords.length === 0) {
+      alert(language === 'en' ? 'No Cash payment mode employees found in current payroll.' : 'वर्तमान पेरोल में कोई नकद भुगतान वाला कर्मचारी नहीं मिला।');
+      return;
+    }
+
+    const headers = ['S.No', 'Employee ID', 'Employee Name', 'Department', 'Designation', 'Mobile No', 'Basic Salary (INR)', 'Allowances (INR)', 'Deductions (INR)', 'Overtime Pay (INR)', 'Net Cash Payable (INR)', 'Payment Status', 'Cash Received Signature'];
+    const rows: string[][] = [];
+
+    cashRecords.forEach((rec, idx) => {
+      const emp = employees.find(e => e.id === rec.employeeId);
+      const amount = rec.netSalary !== undefined ? rec.netSalary : rec.totalSalary;
+      rows.push([
+        String(idx + 1),
+        `"${rec.employeeId}"`,
+        `"${emp?.name || ''}"`,
+        `"${emp?.department || ''}"`,
+        `"${emp?.designation || ''}"`,
+        `"${emp?.mobileNo || emp?.personalMobileNo || ''}"`,
+        String(rec.basicSalary || 0),
+        String(rec.allowances || 0),
+        String(rec.deductions || 0),
+        String(rec.overtimePay || 0),
+        String(amount),
+        `"${rec.paymentStatus}"`,
+        '""'
+      ]);
+    });
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Cash_Salary_Disbursal_Report_${selectedMonthYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 4. Combined Master Payroll Sheet Generator (.csv) - Exports ALL Modes (Bank + Cash + Cheque)
+  const handleCombinedExport = () => {
+    if (localPayroll.length === 0) {
+      alert(language === 'en' ? 'No payroll records available to export.' : 'निर्यात करने के लिए कोई पेरोल रिकॉर्ड उपलब्ध नहीं है।');
+      return;
+    }
+
+    const headers = [
+      'S.No', 
+      'Employee ID', 
+      'Employee Name', 
+      'Department', 
+      'Designation', 
+      'Payment Method', 
+      'Bank Account No', 
+      'IFSC Code', 
+      'Basic Salary (INR)', 
+      'Allowances (INR)', 
+      'Deductions (INR)', 
+      'Overtime Pay (INR)', 
+      'Net Salary Payable (INR)', 
+      'Payment Status', 
+      'Payment Date'
+    ];
+
+    const rows: string[][] = [];
+
+    localPayroll.forEach((rec, idx) => {
+      const emp = employees.find(e => e.id === rec.employeeId);
+      const mode = emp?.paymentMethod || 'Bank Transfer';
+      const amount = rec.netSalary !== undefined ? rec.netSalary : rec.totalSalary;
+      rows.push([
+        String(idx + 1),
+        `"${rec.employeeId}"`,
+        `"${emp?.name || ''}"`,
+        `"${emp?.department || ''}"`,
+        `"${emp?.designation || ''}"`,
+        `"${mode}"`,
+        `"${emp?.bankAccountNo || '-'}"`,
+        `"${emp?.ifscCode || '-'}"`,
+        String(rec.basicSalary || 0),
+        String(rec.allowances || 0),
+        String(rec.deductions || 0),
+        String(rec.overtimePay || 0),
+        String(amount),
+        `"${rec.paymentStatus}"`,
+        `"${rec.paymentDate || 'Pending'}"`
+      ]);
+    });
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Combined_Payroll_Master_Report_${selectedMonthYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 5. PDF Cash Disbursal Payment Voucher Generator
+  const handleCashVoucherPDF = (singleRec?: PayrollRecord) => {
+    const recordsToPrint = singleRec 
+      ? [singleRec] 
+      : localPayroll.filter(rec => {
+          const emp = employees.find(e => e.id === rec.employeeId);
+          return emp?.paymentMethod === 'Cash';
+        });
+
+    if (recordsToPrint.length === 0) {
+      alert(language === 'en' ? 'No cash payment mode records found.' : 'कोई नकद भुगतान मोड वाला रिकॉर्ड नहीं मिला।');
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    recordsToPrint.forEach((rec, idx) => {
+      if (idx > 0) doc.addPage();
+      const emp = employees.find(e => e.id === rec.employeeId);
+      const amount = rec.netSalary !== undefined ? rec.netSalary : rec.totalSalary;
+
+      // Header Banner
+      doc.setFillColor(3, 98, 60);
+      doc.rect(10, 10, 190, 22, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('RATHI BUILD MART - CASH PAYMENT VOUCHER', 105, 19, { align: 'center' });
+      doc.setFontSize(9);
+      doc.setFont('Helvetica', 'normal');
+      doc.text(`Voucher Ref: CASH-PAY-${selectedMonthYear}-${rec.employeeId}`, 105, 26, { align: 'center' });
+
+      let startY = 40;
+
+      // Voucher details box
+      doc.setDrawColor(203, 213, 225);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(10, startY, 190, 36, 2, 2, 'FD');
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(10);
+      doc.setFont('Helvetica', 'bold');
+      doc.text(`Employee Name: ${emp?.name || 'N/A'}`, 15, startY + 8);
+      doc.text(`Employee ID: ${rec.employeeId}`, 120, startY + 8);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`Department: ${emp?.department || 'N/A'}`, 15, startY + 16);
+      doc.text(`Designation: ${emp?.designation || 'N/A'}`, 120, startY + 16);
+      doc.text(`Payroll Month: ${selectedMonthYear}`, 15, startY + 24);
+      doc.text(`Payment Mode: CASH DISBURSAL`, 120, startY + 24);
+      doc.text(`Mobile: ${emp?.mobileNo || emp?.personalMobileNo || 'N/A'}`, 15, startY + 32);
+      doc.text(`Disbursal Date: ${rec.paymentDate || new Date().toISOString().split('T')[0]}`, 120, startY + 32);
+
+      startY += 44;
+
+      // Salary components box
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(10, startY, 190, 40, 2, 2, 'FD');
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.text('PAYROLL COMPUTATION BREAKDOWN', 15, startY + 8);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`Basic Pay: Rs. ${(rec.basicSalary || 0).toLocaleString('en-IN')}`, 15, startY + 16);
+      doc.text(`Allowances & Bonus: Rs. ${(rec.allowances || 0).toLocaleString('en-IN')}`, 15, startY + 23);
+      doc.text(`Overtime Pay: Rs. ${(rec.overtimePay || 0).toLocaleString('en-IN')}`, 15, startY + 30);
+
+      doc.text(`Deductions / Advances: Rs. ${(rec.deductions || 0).toLocaleString('en-IN')}`, 110, startY + 16);
+      doc.text(`Payment Status: ${rec.paymentStatus}`, 110, startY + 23);
+
+      startY += 48;
+
+      // Net Amount Disbursed Highlight Box
+      doc.setFillColor(236, 253, 245);
+      doc.setDrawColor(16, 185, 129);
+      doc.roundedRect(10, startY, 190, 18, 2, 2, 'FD');
+
+      doc.setTextColor(6, 78, 59);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text(`TOTAL NET CASH DISBURSED: Rs. ${amount.toLocaleString('en-IN')} /-`, 15, startY + 8);
+      doc.setFontSize(9);
+      doc.setFont('Helvetica', 'normal');
+      doc.text(`Amount in Words: ${numberToWordsINR(amount)}`, 15, startY + 14);
+
+      startY += 26;
+
+      // Denomination Memo Box
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(10, startY, 190, 28, 2, 2, 'FD');
+      doc.setTextColor(30, 41, 59);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text('CASH CURRENCY DENOMINATION MEMO (FOR OFFICE USE)', 15, startY + 6);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('Rs. 500 x ______ = ______    |    Rs. 200 x ______ = ______    |    Rs. 100 x ______ = ______', 15, startY + 13);
+      doc.text('Rs. 50   x ______ = ______    |    Rs. 20   x ______ = ______    |    Coins / Change  = ______', 15, startY + 20);
+
+      startY += 38;
+
+      // Signature section
+      doc.setDrawColor(148, 163, 184);
+      doc.line(15, startY + 20, 75, startY + 20);
+      doc.line(130, startY + 20, 185, startY + 20);
+
+      doc.setFontSize(8.5);
+      doc.setFont('Helvetica', 'bold');
+      doc.text('Employee Signature (Cash Received)', 18, startY + 25);
+      doc.text('Cashier / Authorized Signatory', 133, startY + 25);
+
+      doc.setFontSize(7.5);
+      doc.setFont('Helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text('I hereby acknowledge receipt of the above net salary amount in cash in full and final settlement for the month.', 15, startY + 32);
+    });
+
+    doc.save(`Cash_Payment_Vouchers_${selectedMonthYear}.pdf`);
   };
 
   // 3. Historical Annual Financial Summary Data Loader
@@ -1464,33 +1765,89 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             <span>{language === 'en' ? 'Annual Analytics' : 'वार्षिक विश्लेषण'}</span>
           </button>
 
+          {/* Export Dropdown with Bank + Cash + Combined options */}
           <div className="relative group">
             <button className="px-4 py-2.5 border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all hover:shadow-2xs active:scale-98">
               <Landmark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <span>{language === 'en' ? 'Export Bank File 🏦' : 'बैंक फ़ाइल निर्यात'}</span>
+              <span>{language === 'en' ? 'Export Payroll Reports 📊' : 'पेरोल एवं बैंक रिपोर्ट निर्यात'}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-indigo-500" />
             </button>
-            <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-lg shadow-lg py-1.5 z-20 hidden group-hover:block hover:block">
-              <button 
-                onClick={() => handleBankExport('SBI')} 
-                className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-100 font-semibold flex items-center gap-2"
-              >
-                <Building className="w-3.5 h-3.5 text-blue-600" />
-                <span>SBI Bulk Upload</span>
-              </button>
-              <button 
-                onClick={() => handleBankExport('HDFC')} 
-                className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-100 font-semibold flex items-center gap-2"
-              >
-                <Building className="w-3.5 h-3.5 text-indigo-600" />
-                <span>HDFC Bank Format</span>
-              </button>
-              <button 
-                onClick={() => handleBankExport('ICICI')} 
-                className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-100 font-semibold flex items-center gap-2"
-              >
-                <Building className="w-3.5 h-3.5 text-orange-600" />
-                <span>ICICI Bulk Format</span>
-              </button>
+            <div className="absolute right-0 mt-1 w-64 bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-xl shadow-xl py-2 z-30 hidden group-hover:block hover:block divide-y divide-slate-100 dark:divide-[#1e3a2f]">
+              
+              {/* Section 1: Combined Master Sheet */}
+              <div className="px-1 py-1">
+                <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 font-mono">
+                  {language === 'en' ? 'Combined Master Export' : 'संयुक्त मास्टर रिपोर्ट'}
+                </div>
+                <button 
+                  onClick={handleCombinedExport}
+                  className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-[#183328] rounded-lg font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div>
+                    <div>{language === 'en' ? 'All Modes Master Sheet (.csv)' : 'सभी मोड मास्टर शीट (.csv)'}</div>
+                    <div className="text-[10px] text-slate-400 font-normal">Bank + Cash + Cheque Records</div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Section 2: Cash Disbursal Reports */}
+              <div className="px-1 py-1">
+                <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-600 font-mono flex items-center gap-1">
+                  <Banknote className="w-3.5 h-3.5" />
+                  <span>{language === 'en' ? 'Cash Disbursal Reports' : 'नकद भुगतान रिपोर्ट'}</span>
+                </div>
+                <button 
+                  onClick={handleCashExport}
+                  className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div>
+                    <div>{language === 'en' ? 'Cash Disbursal Advice (.csv)' : 'नकद भुगतान सूची (.csv)'}</div>
+                    <div className="text-[10px] text-slate-400 font-normal">With Signature & Net Pay Columns</div>
+                  </div>
+                </button>
+                <button 
+                  onClick={() => handleCashVoucherPDF()}
+                  className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-amber-600 shrink-0" />
+                  <div>
+                    <div>{language === 'en' ? 'Cash Payment Vouchers (.pdf)' : 'नकद भुगतान रसीद/वाउचर (.pdf)'}</div>
+                    <div className="text-[10px] text-slate-400 font-normal">Printable Cash Receipt Slips</div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Section 3: Bank Bulk Transfer Files */}
+              <div className="px-1 py-1">
+                <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 font-mono flex items-center gap-1">
+                  <Landmark className="w-3.5 h-3.5" />
+                  <span>{language === 'en' ? 'Bank Transfer Files' : 'बैंक ट्रांसफ़र फ़ाइलें'}</span>
+                </div>
+                <button 
+                  onClick={() => handleBankExport('SBI')} 
+                  className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
+                >
+                  <Building className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>SBI Bulk Salary Upload (.csv)</span>
+                </button>
+                <button 
+                  onClick={() => handleBankExport('HDFC')} 
+                  className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
+                >
+                  <Building className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>HDFC Bank Bulk Format (.csv)</span>
+                </button>
+                <button 
+                  onClick={() => handleBankExport('ICICI')} 
+                  className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
+                >
+                  <Building className="w-4 h-4 text-orange-600 shrink-0" />
+                  <span>ICICI Corporate Format (.csv)</span>
+                </button>
+              </div>
+
             </div>
           </div>
 
@@ -1515,6 +1872,84 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             <Check className="w-4 h-4 text-emerald-600" />
             <span>{confirmPayAll ? (language === 'en' ? 'Click to Confirm All' : 'सभी की पुष्टि करें') : t.markAllPaid}</span>
           </button>
+        </div>
+      </div>
+
+      {/* Payment Summary Breakdown Cards Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+        {/* Bank Total */}
+        <div className="bg-white dark:bg-[#11221b] p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-900/40 shadow-2xs flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider font-mono flex items-center gap-1">
+              <Landmark className="w-3 h-3" />
+              <span>{language === 'en' ? 'Bank Transfer' : 'बैंक ट्रांसफ़र'}</span>
+            </div>
+            <div className="text-base font-extrabold text-slate-900 dark:text-slate-100 mt-0.5 font-mono">
+              ₹{paymentSummary.bankTotal.toLocaleString('en-IN')}
+            </div>
+            <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
+              {paymentSummary.bankCount} {language === 'en' ? 'Employees' : 'कर्मचारी'}
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+            <Building className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Cash Total */}
+        <div className="bg-white dark:bg-[#11221b] p-3.5 rounded-xl border border-amber-100 dark:border-amber-900/40 shadow-2xs flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider font-mono flex items-center gap-1">
+              <Banknote className="w-3 h-3" />
+              <span>{language === 'en' ? 'Cash Payout' : 'नकद भुगतान'}</span>
+            </div>
+            <div className="text-base font-extrabold text-slate-900 dark:text-slate-100 mt-0.5 font-mono">
+              ₹{paymentSummary.cashTotal.toLocaleString('en-IN')}
+            </div>
+            <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
+              {paymentSummary.cashCount} {language === 'en' ? 'Employees' : 'कर्मचारी'}
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <DollarSign className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Cheque Total */}
+        <div className="bg-white dark:bg-[#11221b] p-3.5 rounded-xl border border-purple-100 dark:border-purple-900/40 shadow-2xs flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-extrabold text-purple-600 dark:text-purple-400 uppercase tracking-wider font-mono flex items-center gap-1">
+              <CreditCard className="w-3 h-3" />
+              <span>{language === 'en' ? 'Cheque Payout' : 'चेक भुगतान'}</span>
+            </div>
+            <div className="text-base font-extrabold text-slate-900 dark:text-slate-100 mt-0.5 font-mono">
+              ₹{paymentSummary.chequeTotal.toLocaleString('en-IN')}
+            </div>
+            <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
+              {paymentSummary.chequeCount} {language === 'en' ? 'Employees' : 'कर्मचारी'}
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+            <FileText className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Grand Total */}
+        <div className="bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-extrabold text-emerald-200 uppercase tracking-wider font-mono">
+              {language === 'en' ? 'Total Payroll' : 'कुल पेरोल'}
+            </div>
+            <div className="text-base font-extrabold mt-0.5 font-mono">
+              ₹{paymentSummary.grandTotal.toLocaleString('en-IN')}
+            </div>
+            <div className="text-[10px] text-emerald-200/80 font-semibold mt-0.5">
+              {paymentSummary.totalCount} {language === 'en' ? 'Total Disbursed' : 'कुल कर्मचारी'}
+            </div>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center shrink-0">
+            <Calculator className="w-4 h-4" />
+          </div>
         </div>
       </div>
 
@@ -1567,6 +2002,21 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             ))}
           </select>
         </div>
+
+        {/* Payment Mode Filter */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase font-mono">Payment Mode:</span>
+          <select
+            value={selectedPaymentMode}
+            onChange={(e) => { setSelectedPaymentMode(e.target.value as any); setCurrentPage(1); }}
+            className="bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-xs font-bold text-slate-800 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer"
+          >
+            <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Modes (सब)' : 'सभी माध्यम'}</option>
+            <option value="Bank Transfer" className="dark:bg-[#11221b]">🏦 Bank Transfer</option>
+            <option value="Cash" className="dark:bg-[#11221b]">💵 Cash Mode</option>
+            <option value="Cheque" className="dark:bg-[#11221b]">📝 Cheque Mode</option>
+          </select>
+        </div>
       </div>
 
       {/* Main List Box with exquisite, clean modern table design */}
@@ -1616,10 +2066,20 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                           )}
                           <div className="space-y-0.5">
                             <div className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug">{emp?.name || 'Unknown'}</div>
-                            <div className="text-[10px] text-slate-400 font-semibold font-mono flex items-center gap-1.5">
+                            <div className="text-[10px] text-slate-400 font-semibold font-mono flex items-center gap-1.5 flex-wrap">
                               <span>{rec.employeeId}</span>
                               <span className="text-slate-200 dark:text-slate-600">•</span>
                               <span className="bg-slate-100 dark:bg-[#0b1812] px-1.5 py-0.2 rounded-sm text-[9px] font-sans text-slate-500 dark:text-slate-400 font-bold">{emp?.designation}</span>
+                              <span className="text-slate-200 dark:text-slate-600">•</span>
+                              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold flex items-center gap-1 border ${
+                                emp?.paymentMethod === 'Cash' 
+                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/80' 
+                                  : emp?.paymentMethod === 'Cheque'
+                                  ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800/80'
+                                  : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/80'
+                              }`}>
+                                {emp?.paymentMethod === 'Cash' ? '💵 Cash' : emp?.paymentMethod === 'Cheque' ? '📝 Cheque' : '🏦 Bank'}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1665,30 +2125,68 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                         </span>
                       </td>
 
-                      {/* Micro glowing badge for status */}
+                      {/* Micro glowing badge for payment mode & status */}
                       <td className="py-4 px-6 text-center">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border transition-all duration-300 ${
-                          rec.paymentStatus === 'Paid' 
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 shadow-[0_2px_10px_rgba(16,185,129,0.06)]' 
-                            : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 animate-pulse shadow-[0_2px_10px_rgba(245,158,11,0.06)]'
-                        }`}>
-                          {rec.paymentStatus === 'Paid' ? (
-                            <>
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"></span>
-                              <span>{t.paid}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                              <span>{t.pending}</span>
-                            </>
-                          )}
-                        </span>
+                        <div className="flex flex-col items-center gap-1.5">
+                          {/* Payment Mode Selector Dropdown */}
+                          <select
+                            value={emp?.paymentMethod || 'Bank Transfer'}
+                            onChange={(e) => {
+                              const newMode = e.target.value as 'Bank Transfer' | 'Cash' | 'Cheque';
+                              if (emp && onUpdateEmployees) {
+                                onUpdateEmployees([{ ...emp, paymentMethod: newMode }]);
+                              }
+                            }}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border focus:outline-none cursor-pointer transition-all ${
+                              emp?.paymentMethod === 'Cash'
+                                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                                : emp?.paymentMethod === 'Cheque'
+                                ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700'
+                                : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                            }`}
+                            title="Click to change Payment Mode"
+                          >
+                            <option value="Bank Transfer" className="bg-white dark:bg-[#11221b] text-slate-800 dark:text-slate-200">🏦 Bank Transfer</option>
+                            <option value="Cash" className="bg-white dark:bg-[#11221b] text-slate-800 dark:text-slate-200">💵 Cash</option>
+                            <option value="Cheque" className="bg-white dark:bg-[#11221b] text-slate-800 dark:text-slate-200">📝 Cheque</option>
+                          </select>
+
+                          {/* Status Badge */}
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border transition-all duration-300 ${
+                            rec.paymentStatus === 'Paid' 
+                              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 shadow-[0_2px_10px_rgba(16,185,129,0.06)]' 
+                              : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 animate-pulse shadow-[0_2px_10px_rgba(245,158,11,0.06)]'
+                          }`}>
+                            {rec.paymentStatus === 'Paid' ? (
+                              <>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"></span>
+                                <span>{t.paid}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                <span>{t.pending}</span>
+                              </>
+                            )}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Responsive row actions */}
                       <td className="py-4 px-6 text-right">
                         <div className="flex justify-end items-center gap-2">
+                          
+                          {/* Cash Payment Voucher button if mode is Cash */}
+                          {emp?.paymentMethod === 'Cash' && (
+                            <button
+                              onClick={() => handleCashVoucherPDF(rec)}
+                              className="bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all hover:shadow-3xs active:scale-97"
+                              title="Print Cash Payment Receipt Voucher"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Voucher</span>
+                            </button>
+                          )}
                           
                           {/* Adjustments on-the-fly */}
                           <button

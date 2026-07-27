@@ -497,12 +497,22 @@ export default function App() {
     setIsDataModified(true);
   };
 
-  // Portal login states
-  const [loginId, setLoginId] = useState('');
+  // Portal login & enhanced login UX states
+  const [rememberMe, setRememberMe] = useState<boolean>(() => {
+    return localStorage.getItem('payroll_remember_me') === 'true';
+  });
+  const [loginId, setLoginId] = useState<string>(() => {
+    if (localStorage.getItem('payroll_remember_me') === 'true') {
+      return localStorage.getItem('payroll_remembered_login_id') || '';
+    }
+    return '';
+  });
   const [loginPass, setLoginPass] = useState('');
   const [loginErr, setLoginErr] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showLoginHelp, setShowLoginHelp] = useState(false);
+  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
+  const [showLoginNotice, setShowLoginNotice] = useState(true);
 
   // Corporate notices & support gateway states
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -1283,6 +1293,11 @@ export default function App() {
       onConfirm: () => {
         setPortalUser(null);
         localStorage.removeItem('payroll_portal_user');
+        if (localStorage.getItem('payroll_remember_me') === 'true') {
+          setLoginId(localStorage.getItem('payroll_remembered_login_id') || '');
+        } else {
+          setLoginId('');
+        }
         setCurrentTab('dashboard');
         setConfirmDialog(null);
       }
@@ -1377,6 +1392,11 @@ export default function App() {
       onConfirm: async () => {
         setPortalUser(null);
         localStorage.removeItem('payroll_portal_user');
+        if (localStorage.getItem('payroll_remember_me') === 'true') {
+          setLoginId(localStorage.getItem('payroll_remembered_login_id') || '');
+        } else {
+          setLoginId('');
+        }
         setCurrentTab('dashboard');
         setConfirmDialog(null);
 
@@ -1973,13 +1993,15 @@ export default function App() {
 
   // 2. Render Custom Login Screen if not authenticated via Portal
   if (!portalUser) {
-    const formattedTime = liveTime.toLocaleTimeString(undefined, { 
+    const formattedTime = liveTime.toLocaleTimeString('en-US', { 
+      timeZone: 'Asia/Kolkata',
       hour: '2-digit', 
       minute: '2-digit', 
       second: '2-digit',
       hour12: true 
     });
-    const formattedDate = liveTime.toLocaleDateString(undefined, { 
+    const formattedDate = liveTime.toLocaleDateString('en-US', { 
+      timeZone: 'Asia/Kolkata',
       weekday: 'long', 
       year: 'numeric', 
       month: 'long', 
@@ -2101,7 +2123,7 @@ export default function App() {
                   {language === 'en' ? 'Active Roster' : 'सक्रिय कर्मचारी'}
                 </span>
                 <span className="text-xs font-black text-white font-mono block mt-0.5">
-                  {employees.length} {language === 'en' ? 'Staff' : 'कर्मचारी'}
+                  {employees.filter(e => e.isActive !== false).length} {language === 'en' ? 'Staff' : 'कर्मचारी'}
                 </span>
               </div>
               <div className="bg-slate-900/60 backdrop-blur-xs border border-slate-800/80 p-2.5 rounded-lg">
@@ -2311,7 +2333,7 @@ export default function App() {
               </div>
               <div className="text-[9px] text-slate-400 font-bold leading-tight">
                 <span className="block">{formattedDate}</span>
-                <span className="text-slate-500 text-[8px] font-semibold">UTC-07:00 • {language === 'en' ? 'Secure Connection' : 'सुरक्षित कनेक्शन'}</span>
+                <span className="text-slate-500 text-[8px] font-semibold">IST (UTC+05:30) • {language === 'en' ? 'Secure Connection' : 'सुरक्षित कनेक्शन'}</span>
               </div>
             </div>
           </div>
@@ -2345,6 +2367,42 @@ export default function App() {
                     : 'कार्यक्षेत्र में प्रवेश करने के लिए अपनी कर्मचारी आईडी या एडमिनिस्ट्रेटर क्रेडेंशियल दर्ज करें।'}
                 </p>
               </div>
+
+              {/* Login Screen Announcement / Notice Banner */}
+              {showLoginNotice && (
+                <div className="mt-4 bg-gradient-to-r from-emerald-950/80 via-slate-900 to-indigo-950/80 border border-emerald-500/30 rounded-xl p-3.5 shadow-md relative group animate-fadeIn">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg shrink-0 mt-0.5 border border-emerald-500/30">
+                        <Megaphone className="w-4 h-4 animate-bounce" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 font-mono">
+                            {language === 'en' ? 'Portal Notice & Operational Update' : 'पोर्टल सूचना एवं संचालन अपडेट'}
+                          </span>
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        </div>
+                        <p className="text-[11px] font-semibold text-slate-200 leading-snug">
+                          {adminSettings.noticeMessage || (
+                            language === 'en'
+                              ? '📢 Monthly Payroll & Attendance logs updated for current cycle. Sign in using your Employee ID or request Email OTP.'
+                              : '📢 वर्तमान चक्र के लिए मासिक पेरोल और उपस्थिति लॉग अपडेट किए गए। अपनी कर्मचारी आईडी या ईमेल ओटीपी से साइन इन करें।'
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginNotice(false)}
+                      className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/60 transition-colors cursor-pointer shrink-0"
+                      title="Dismiss Announcement"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Error Alert Box */}
               {loginErr && (
@@ -2977,6 +3035,14 @@ export default function App() {
                       return;
                     }
 
+                    if (rememberMe) {
+                      localStorage.setItem('payroll_remember_me', 'true');
+                      localStorage.setItem('payroll_remembered_login_id', inputID);
+                    } else {
+                      localStorage.removeItem('payroll_remember_me');
+                      localStorage.removeItem('payroll_remembered_login_id');
+                    }
+
                     // Load latest employees list from Firestore to verify correct and updated device lock and multi-device status
                     let latestEmployees = employees;
                     try {
@@ -3190,6 +3256,17 @@ export default function App() {
                           type={showPassword ? "text" : "password"}
                           required
                           value={loginPass}
+                          onKeyDown={(e) => {
+                            if (e.getModifierState) {
+                              setIsCapsLockOn(e.getModifierState('CapsLock'));
+                            }
+                          }}
+                          onKeyUp={(e) => {
+                            if (e.getModifierState) {
+                              setIsCapsLockOn(e.getModifierState('CapsLock'));
+                            }
+                          }}
+                          onBlur={() => setIsCapsLockOn(false)}
                           onChange={(e) => setLoginPass(e.target.value)}
                           placeholder="••••••••"
                           className="w-full border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-sans"
@@ -3202,6 +3279,44 @@ export default function App() {
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
+
+                      {/* Caps Lock Alert Indicator */}
+                      {isCapsLockOn && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/90 border border-amber-600/70 text-amber-300 text-[10px] font-bold font-mono animate-pulse shadow-sm mt-1">
+                          <span className="text-xs font-black">⇪</span>
+                          <span>{language === 'en' ? 'CAPS LOCK IS ON' : 'कैप्स लॉक चालू है'}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Remember Me / Save Login ID Checkbox */}
+                    <div className="flex items-center justify-between pt-0.5">
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-slate-300 hover:text-white transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setRememberMe(checked);
+                            if (checked && loginId.trim()) {
+                              localStorage.setItem('payroll_remember_me', 'true');
+                              localStorage.setItem('payroll_remembered_login_id', loginId.trim());
+                            } else if (!checked) {
+                              localStorage.removeItem('payroll_remember_me');
+                              localStorage.removeItem('payroll_remembered_login_id');
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 cursor-pointer accent-emerald-500"
+                        />
+                        <span className="text-[10px] font-bold text-slate-300">
+                          {language === 'en' ? 'Remember Me / Save Login ID' : 'मुझे याद रखें (लॉगिन आईडी सहेजें)'}
+                        </span>
+                      </label>
+                      {rememberMe && loginId.trim() && (
+                        <span className="text-[9px] font-mono text-emerald-400 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-900/50">
+                          ✓ Saved
+                        </span>
+                      )}
                     </div>
 
                     {/* Submit Button */}
@@ -3516,6 +3631,48 @@ export default function App() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Live System Security & Sync Status Badge */}
+              <div className="mt-5 pt-4 border-t border-slate-800/80 space-y-2.5">
+                <div className="flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-slate-400 font-bold uppercase tracking-wider">
+                    {language === 'en' ? 'Live Gateway Security:' : 'लाइव गेटवे सुरक्षा:'}
+                  </span>
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 font-black">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>{language === 'en' ? '🟢 Operational' : '🟢 कार्यशील'}</span>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[9.5px] font-semibold">
+                  <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg flex items-center gap-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <div>
+                      <span className="block text-slate-200 font-bold leading-none">
+                        {language === 'en' ? '2FA & Device Guard' : '2FA और डिवाइस लॉक'}
+                      </span>
+                      <span className="text-[8.5px] text-emerald-400/90 font-mono">
+                        {adminSettings.enablePasswordLoginOtp ? 'Strict 2FA Active' : 'AES-256 Protected'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-lg flex items-center gap-2">
+                    <Database className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <div>
+                      <span className="block text-slate-200 font-bold leading-none">
+                        {language === 'en' ? 'Google Sheets Sync' : 'गूगल शीट्स सिंक'}
+                      </span>
+                      <span className="text-[8.5px] text-indigo-300/90 font-mono">
+                        {spreadsheetId ? 'Cloud Live Synced' : 'Auto-Sync Ready'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
             </div>

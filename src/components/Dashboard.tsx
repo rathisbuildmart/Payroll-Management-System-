@@ -7,7 +7,7 @@ import {
   Bell, KeyRound, LifeBuoy, CheckCircle2, Lock, Unlock, UserCheck, UserX, X
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Employee, Attendance, PayrollRecord, FailedLoginAttempt, LeaveRequest } from '../types';
+import { Employee, Attendance, PayrollRecord, FailedLoginAttempt, LeaveRequest, getCurrentBasicSalary } from '../types';
 
 interface DashboardProps {
   employees: Employee[];
@@ -299,7 +299,7 @@ export default function Dashboard({
         deptMap[dept] = { count: 0, salary: 0, active: 0 };
       }
       deptMap[dept].count += 1;
-      const basicSal = Number(emp.basicSalary);
+      const basicSal = getCurrentBasicSalary(emp);
       deptMap[dept].salary += isNaN(basicSal) ? 0 : basicSal;
       if (emp.isActive) {
         deptMap[dept].active += 1;

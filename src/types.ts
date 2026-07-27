@@ -112,6 +112,22 @@ export interface SalaryIncrement {
   remarks?: string;
 }
 
+export const getCurrentBasicSalary = (emp: Employee | null | undefined): number => {
+  if (!emp) return 0;
+  if (emp.increments && emp.increments.length > 0) {
+    const sorted = [...emp.increments].sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return (Number(b.id) || 0) - (Number(a.id) || 0);
+    });
+    const latest = sorted[0];
+    if (latest && typeof latest.newSalary === 'number' && latest.newSalary > 0) {
+      return Math.max(emp.basicSalary || 0, latest.newSalary);
+    }
+  }
+  return emp.basicSalary || 0;
+};
+
 export interface FieldSetting {
   id: keyof Employee;
   label: string;

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders, Smartphone, Key, UserCog } from 'lucide-react';
-import { Employee, AdminSettings } from '../types';
+import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders, Smartphone, Key, UserCog, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Employee, AdminSettings, getCurrentBasicSalary } from '../types';
 
 interface EmployeeListProps {
   employees: Employee[];
@@ -28,6 +28,25 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   const [isSaving, setIsSaving] = useState(false);
   const [resetQuickSearchId, setResetQuickSearchId] = useState('');
   const [activeAccessMenuId, setActiveAccessMenuId] = useState<string | null>(null);
+
+  // Sorting state for table
+  const [sortField, setSortField] = useState<'id' | 'name' | 'department' | 'joiningDate' | 'basicSalary' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (field: 'id' | 'name' | 'department' | 'joiningDate' | 'basicSalary') => {
+    if (sortField === field) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else {
+        setSortField(null);
+        setSortDirection('asc');
+      }
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
 
   const hasPermission = (action: 'view' | 'add' | 'edit' | 'delete') => {
     if (!portalUser) return true;
@@ -293,11 +312,17 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     }
   }, [selectedStatus, employeeOptions, selectedEmployeeId]);
 
-  // Filter & Search logic
+  // Filter & Search & Sorting logic
   const filteredEmployees = useMemo(() => {
-    return employees.filter(emp => {
-      const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            emp.id.toLowerCase().includes(searchTerm.toLowerCase());
+    let result = employees.filter(emp => {
+      const term = searchTerm.toLowerCase().trim();
+      const matchesSearch = !term || 
+                            emp.name.toLowerCase().includes(term) || 
+                            emp.id.toLowerCase().includes(term) ||
+                            (emp.department && emp.department.toLowerCase().includes(term)) ||
+                            (emp.designation && emp.designation.toLowerCase().includes(term)) ||
+                            (emp.email && emp.email.toLowerCase().includes(term)) ||
+                            (emp.mobileNo && emp.mobileNo.includes(term));
       const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
       const matchesBranch = selectedBranch === 'All' || emp.branch === selectedBranch;
       const matchesEmployee = selectedEmployeeId === 'All' || emp.id === selectedEmployeeId;
@@ -306,7 +331,40 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                             (selectedStatus === 'Inactive' && !emp.isActive);
       return matchesSearch && matchesDept && matchesBranch && matchesEmployee && matchesStatus;
     });
-  }, [employees, searchTerm, selectedDept, selectedBranch, selectedEmployeeId, selectedStatus]);
+
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        let valA: any = '';
+        let valB: any = '';
+
+        if (sortField === 'id') {
+          valA = a.id || '';
+          valB = b.id || '';
+        } else if (sortField === 'name') {
+          valA = a.name || '';
+          valB = b.name || '';
+        } else if (sortField === 'department') {
+          valA = a.department || '';
+          valB = b.department || '';
+        } else if (sortField === 'joiningDate') {
+          valA = a.joiningDate || '';
+          valB = b.joiningDate || '';
+        } else if (sortField === 'basicSalary') {
+          valA = getCurrentBasicSalary(a);
+          valB = getCurrentBasicSalary(b);
+        }
+
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          return sortDirection === 'asc' ? valA - valB : valB - valA;
+        } else {
+          const comp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+          return sortDirection === 'asc' ? comp : -comp;
+        }
+      });
+    }
+
+    return result;
+  }, [employees, searchTerm, selectedDept, selectedBranch, selectedEmployeeId, selectedStatus, sortField, sortDirection]);
 
   // Paginated Sliced list
   const paginatedEmployees = useMemo(() => {
@@ -968,7 +1026,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       department: emp.department,
       designation: emp.designation,
       joiningDate: emp.joiningDate,
-      basicSalary: emp.basicSalary,
+      basicSalary: getCurrentBasicSalary(emp),
       allowances: emp.allowances,
       deductions: emp.deductions,
       hourlyRate: emp.hourlyRate,
@@ -1101,11 +1159,12 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     if (!selectedEmployeeForIncrement) return;
     setIsSavingIncrement(true);
     try {
+      const currentSalary = getCurrentBasicSalary(selectedEmployeeForIncrement);
       const newIncrement = {
         id: Date.now().toString(),
         date: incDate,
         amount: Number(incAmount),
-        previousSalary: selectedEmployeeForIncrement.basicSalary,
+        previousSalary: currentSalary,
         newSalary: Number(incNewSalary),
         remarks: incRemarks
       };
@@ -1289,12 +1348,28 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
             </span>
             <input
               type="text"
-              placeholder={t.searchPlaceholder}
+              placeholder={language === 'en' ? "Search by Name, ID, Department, Designation or Phone..." : "नाम, आईडी, विभाग, पद या फोन से खोजें..."}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm"
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-10 pr-9 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm"
               id="emp-search"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Department Filter */}
@@ -1475,11 +1550,96 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {visibleColumns.includes('id') && <th className="py-4 px-6">{t.colId}</th>}
-                  {visibleColumns.includes('name') && <th className="py-4 px-6">{t.colName}</th>}
-                  {visibleColumns.includes('role') && <th className="py-4 px-6">{t.colRole}</th>}
-                  {visibleColumns.includes('joiningDate') && <th className="py-4 px-6">{t.colJoining}</th>}
-                  {visibleColumns.includes('salary') && <th className="py-4 px-6">{t.colSalary}</th>}
+                  {visibleColumns.includes('id') && (
+                    <th 
+                      onClick={() => handleSort('id')}
+                      className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
+                      title={language === 'en' ? 'Click to sort by Employee ID' : 'कर्मचारी आईडी से सॉर्ट करें'}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>{t.colId}</span>
+                        <span className={`transition-all ${sortField === 'id' ? 'text-[#03623c] font-bold' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                          {sortField === 'id' ? (
+                            sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ArrowUpDown className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+                          )}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.includes('name') && (
+                    <th 
+                      onClick={() => handleSort('name')}
+                      className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
+                      title={language === 'en' ? 'Click to sort by Name' : 'नाम से सॉर्ट करें'}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>{t.colName}</span>
+                        <span className={`transition-all ${sortField === 'name' ? 'text-[#03623c] font-bold' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                          {sortField === 'name' ? (
+                            sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ArrowUpDown className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+                          )}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.includes('role') && (
+                    <th 
+                      onClick={() => handleSort('department')}
+                      className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
+                      title={language === 'en' ? 'Click to sort by Department' : 'विभाग से सॉर्ट करें'}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>{t.colRole}</span>
+                        <span className={`transition-all ${sortField === 'department' ? 'text-[#03623c] font-bold' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                          {sortField === 'department' ? (
+                            sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ArrowUpDown className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+                          )}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.includes('joiningDate') && (
+                    <th 
+                      onClick={() => handleSort('joiningDate')}
+                      className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
+                      title={language === 'en' ? 'Click to sort by Joining Date' : 'ज्वाइनिंग तिथि से सॉर्ट करें'}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>{t.colJoining}</span>
+                        <span className={`transition-all ${sortField === 'joiningDate' ? 'text-[#03623c] font-bold' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                          {sortField === 'joiningDate' ? (
+                            sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ArrowUpDown className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+                          )}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.includes('salary') && (
+                    <th 
+                      onClick={() => handleSort('basicSalary')}
+                      className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
+                      title={language === 'en' ? 'Click to sort by Monthly Salary' : 'मासिक वेतन से सॉर्ट करें'}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>{t.colSalary}</span>
+                        <span className={`transition-all ${sortField === 'basicSalary' ? 'text-[#03623c] font-bold' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                          {sortField === 'basicSalary' ? (
+                            sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ArrowUpDown className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+                          )}
+                        </span>
+                      </div>
+                    </th>
+                  )}
                   {visibleColumns.includes('paymentMethod') && <th className="py-4 px-6">{t.colPayment}</th>}
                   {visibleColumns.includes('status') && <th className="py-4 px-6 text-center">{t.colStatus}</th>}
                   
@@ -1541,7 +1701,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     )}
                     {visibleColumns.includes('salary') && (
                       <td className="py-4 px-6">
-                        <div className="font-semibold text-gray-800">₹{emp.basicSalary.toLocaleString('en-IN')}</div>
+                        <div className="font-semibold text-gray-800">₹{getCurrentBasicSalary(emp).toLocaleString('en-IN')}</div>
                         <div className="text-xxs text-gray-400">₹{emp.allowances} (Allowance) / -₹{emp.deductions} (Deduct)</div>
                       </td>
                     )}
@@ -2639,7 +2799,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                             </span>
                           </td>
                           <td className="py-4 px-6 font-mono font-extrabold text-gray-900 text-sm">
-                            ₹{emp.basicSalary.toLocaleString('en-IN')}
+                            ₹{getCurrentBasicSalary(emp).toLocaleString('en-IN')}
                           </td>
                           <td className="py-4 px-6 text-center font-mono text-gray-500 font-bold">
                             {lastInc ? lastInc.date : '—'}
@@ -2670,8 +2830,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                 <button
                                   onClick={() => {
                                     setSelectedEmployeeForIncrement(emp);
+                                    const currentSal = getCurrentBasicSalary(emp);
                                     setIncAmount(0);
-                                    setIncNewSalary(emp.basicSalary);
+                                    setIncNewSalary(currentSal);
                                     setIncDate(new Date().toISOString().split('T')[0]);
                                   }}
                                   className="bg-[#03623c]/10 hover:bg-[#03623c]/20 text-[#03623c] border border-[#03623c]/20 px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-all active:scale-97 shadow-xxs"
@@ -2773,7 +2934,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                   <input
                     type="text"
                     disabled
-                    value={`₹${selectedEmployeeForIncrement.basicSalary.toLocaleString('en-IN')}`}
+                    value={`₹${getCurrentBasicSalary(selectedEmployeeForIncrement).toLocaleString('en-IN')}`}
                     className="w-full px-3 py-2 border border-gray-150 bg-gray-50 rounded-xl mt-1 font-mono font-bold text-gray-600"
                   />
                 </div>
@@ -2788,7 +2949,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       setIncAmount(val);
-                      setIncNewSalary(selectedEmployeeForIncrement.basicSalary + val);
+                      setIncNewSalary(getCurrentBasicSalary(selectedEmployeeForIncrement) + val);
                     }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-mono font-bold text-gray-900"
                   />
@@ -2893,7 +3054,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                 {selectedEmployeeForHistory.name} <span className="font-mono text-xs text-gray-400">({selectedEmployeeForHistory.id})</span>
               </p>
               <p className="text-[11px] text-gray-500 font-medium mt-0.5">{selectedEmployeeForHistory.designation} &bull; {selectedEmployeeForHistory.department}</p>
-              <p className="text-[11px] text-[#03623c] font-black mt-1 uppercase">Current Basic Salary: ₹{selectedEmployeeForHistory.basicSalary.toLocaleString('en-IN')}</p>
+              <p className="text-[11px] text-[#03623c] font-black mt-1 uppercase">Current Basic Salary: ₹{getCurrentBasicSalary(selectedEmployeeForHistory).toLocaleString('en-IN')}</p>
             </div>
 
             <div className="overflow-y-auto pr-2 py-2 flex-1 scrollbar-thin">
