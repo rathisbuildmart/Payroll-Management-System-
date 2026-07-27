@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, Check, Save, UserCheck, UserX, AlertTriangle, Clock, RefreshCw, 
   ListCollapse, ThumbsUp, ThumbsDown, CheckCircle, XCircle, AlertCircle, FileSpreadsheet, List,
-  Filter, Building, Users, ChevronLeft, ChevronRight, History
+  Filter, Building, Users, ChevronLeft, ChevronRight, History, Flame, MessageSquare
 } from 'lucide-react';
 import { Employee, Attendance, AdminSettings, AuditLog } from '../types';
 import { 
@@ -14,6 +14,8 @@ import {
 } from '../utils/shift';
 import PunchImportModal from './PunchImportModal';
 import MonthlyCalendarReport from './MonthlyCalendarReport';
+import AttendanceHeatmap from './AttendanceHeatmap';
+import { WhatsAppModal } from './WhatsAppModal';
 
 interface AttendanceTrackerProps {
   employees: Employee[];
@@ -46,7 +48,7 @@ export default function AttendanceTracker({
     return permissions.includes(`attendance:${action}`);
   };
 
-  const [activeTab, setActiveTab] = useState<'daily' | 'misspunch' | 'halfday' | 'calendar'>('daily');
+  const [activeTab, setActiveTab] = useState<'daily' | 'misspunch' | 'halfday' | 'calendar' | 'heatmap'>('daily');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [localRecords, setLocalRecords] = useState<{ [empId: string]: Attendance }>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -55,6 +57,12 @@ export default function AttendanceTracker({
   // States for approvals
   const [pendingChanges, setPendingChanges] = useState<Attendance[]>([]);
   const [isSavingApprovals, setIsSavingApprovals] = useState(false);
+
+  // WhatsApp modal state
+  const [waModalOpen, setWaModalOpen] = useState(false);
+  const [waRecipient, setWaRecipient] = useState<{ name: string; mobileNo?: string; email?: string }>({ name: '' });
+  const [waCategory, setWaCategory] = useState<'missPunch' | 'lateWarning' | 'customNotice'>('missPunch');
+  const [waVars, setWaVars] = useState<Record<string, string | number | undefined>>({});
 
   const handlePunchImportComplete = async (importedRecords: Attendance[]) => {
     if (onUpdateAttendanceRecords) {
@@ -162,6 +170,7 @@ export default function AttendanceTracker({
       subTabMissPunch: "Miss Punch Approvals",
       subTabHalfDay: "Half Day Register",
       subTabCalendar: "Monthly Calendar Report",
+      subTabHeatmap: "Attendance Heatmap",
       approvalStatus: "Approval Status",
       action: "Action",
       approved: "Approved",
@@ -200,6 +209,7 @@ export default function AttendanceTracker({
       subTabMissPunch: "मिस पंच मंजूरी",
       subTabHalfDay: "हाफ डे रजिस्टर",
       subTabCalendar: "मासिक कैलेंडर रिपोर्ट",
+      subTabHeatmap: "उपस्थिति हीटमैप",
       approvalStatus: "मंजूरी की स्थिति",
       action: "कार्रवाई",
       approved: "मंजूर किया",
@@ -442,11 +452,11 @@ export default function AttendanceTracker({
 
   // Handling Miss Punch and Half Day Approvals
   const missPunchLogs = attendanceRecords
-    .filter(r => r.status === 'Miss Punch')
+    .filter(r => r.status === 'Miss Punch' || (r.approvalStatus && r.approvalStatus !== 'Pending' && (r.remarks?.toLowerCase().includes('miss punch') || r.remarks?.toLowerCase().includes('mispunch'))))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const halfDayLogs = attendanceRecords
-    .filter(r => r.status === 'Half Day')
+    .filter(r => r.status === 'Half Day' || (r.approvalStatus && r.approvalStatus !== 'Pending' && r.remarks?.toLowerCase().includes('half day')))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const handleApprovalChange = (record: Attendance, field: 'approvalStatus' | 'checkIn' | 'checkOut' | 'remarks' | 'status', value: any) => {
@@ -467,14 +477,21 @@ export default function AttendanceTracker({
         ? { ...prev[existsIdx], [field]: value } 
         : { ...record, [field]: value };
 
-      // If approved, let's automatically add default times if they are empty
+      // If approved, automatically add default times if empty and convert status to Present for Miss Punch
       if (field === 'approvalStatus' && value === 'Approved') {
-        if (updatedRecord.status === 'Miss Punch') {
+        if (updatedRecord.status === 'Miss Punch' || record.status === 'Miss Punch') {
           const emp = employees.find(e => e.id === record.employeeId);
           const timings = getShiftTimings(emp?.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
           if (!updatedRecord.checkIn || updatedRecord.checkIn === '') updatedRecord.checkIn = timings.checkIn;
           if (!updatedRecord.checkOut || updatedRecord.checkOut === '') updatedRecord.checkOut = timings.checkOut;
-          // Toggling to Present once approved is standard, or keeping it Miss Punch but marked approved
+          updatedRecord.status = 'Present';
+          if (!updatedRecord.remarks || updatedRecord.remarks === 'On-time') {
+            updatedRecord.remarks = 'Miss Punch Approved';
+          }
+        }
+      } else if (field === 'approvalStatus' && (value === 'Pending' || value === 'Rejected')) {
+        if (updatedRecord.status === 'Present' && (record.status === 'Miss Punch' || updatedRecord.remarks?.toLowerCase().includes('miss punch'))) {
+          updatedRecord.status = 'Miss Punch';
         }
       }
 
@@ -606,23 +623,23 @@ export default function AttendanceTracker({
         </div>
 
         {/* Navigation Tabs segment */}
-        <div className="inline-flex p-1 bg-gray-100 rounded-xl gap-1 border border-gray-200/50">
+        <div className="inline-flex p-1 bg-gray-100 rounded-xl gap-1 border border-gray-200/50 max-w-full overflow-x-auto no-scrollbar shrink-0">
           <button
             onClick={() => { setActiveTab('daily'); setPendingChanges([]); }}
-            className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+            className={`px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg cursor-pointer transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'daily' 
-                ? 'bg-white text-gray-800 shadow-xs border border-gray-200/20' 
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-white dark:bg-[#11221b] text-gray-800 dark:text-slate-100 shadow-xs border border-gray-200/20 dark:border-[#1e3a2f]' 
+                : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200'
             }`}
           >
             {t.subTabDaily}
           </button>
           <button
             onClick={() => { setActiveTab('misspunch'); setPendingChanges([]); }}
-            className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+            className={`px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === 'misspunch' 
-                ? 'bg-white text-gray-800 shadow-xs border border-gray-200/20' 
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-white dark:bg-[#11221b] text-gray-800 dark:text-slate-100 shadow-xs border border-gray-200/20 dark:border-[#1e3a2f]' 
+                : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200'
             }`}
           >
             <span>{t.subTabMissPunch}</span>
@@ -634,10 +651,10 @@ export default function AttendanceTracker({
           </button>
           <button
             onClick={() => { setActiveTab('halfday'); setPendingChanges([]); }}
-            className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 ${
+            className={`px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === 'halfday' 
-                ? 'bg-white text-gray-800 shadow-xs border border-gray-200/20' 
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-white dark:bg-[#11221b] text-gray-800 dark:text-slate-100 shadow-xs border border-gray-200/20 dark:border-[#1e3a2f]' 
+                : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200'
             }`}
           >
             <span>{t.subTabHalfDay}</span>
@@ -649,13 +666,24 @@ export default function AttendanceTracker({
           </button>
           <button
             onClick={() => { setActiveTab('calendar'); setPendingChanges([]); }}
-            className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+            className={`px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg cursor-pointer transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'calendar' 
-                ? 'bg-white text-gray-800 shadow-xs border border-gray-200/20' 
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-white dark:bg-[#11221b] text-gray-800 dark:text-slate-100 shadow-xs border border-gray-200/20 dark:border-[#1e3a2f]' 
+                : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200'
             }`}
           >
             {t.subTabCalendar}
+          </button>
+          <button
+            onClick={() => { setActiveTab('heatmap'); setPendingChanges([]); }}
+            className={`px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+              activeTab === 'heatmap' 
+                ? 'bg-white dark:bg-[#11221b] text-gray-800 dark:text-slate-100 shadow-xs border border-gray-200/20 dark:border-[#1e3a2f]' 
+                : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 text-amber-500" />
+            <span>{(t as any).subTabHeatmap || 'Attendance Heatmap'}</span>
           </button>
         </div>
       </div>
@@ -663,16 +691,16 @@ export default function AttendanceTracker({
       {/* DAILY ATTENDANCE REGISTER */}
       {activeTab === 'daily' && (
         <div className="space-y-6">
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="bg-white dark:bg-[#11221b] p-5 rounded-2xl border border-gray-100 dark:border-[#1e3a2f] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-gray-500" />
+              <Calendar className="w-5 h-5 text-gray-500 dark:text-slate-400" />
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">{t.selectDate}</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">{t.selectDate}</label>
                 <input
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#03623c] bg-white cursor-pointer text-gray-800"
+                  className="border border-gray-200 dark:border-[#1e3a2f] rounded-xl px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#03623c] bg-white dark:bg-[#0b1812] cursor-pointer text-gray-800 dark:text-slate-100"
                   id="attendance-date"
                 />
               </div>
@@ -682,7 +710,7 @@ export default function AttendanceTracker({
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setIsImportModalOpen(true)}
-                  className="px-4 py-2 border border-[#03623c]/20 bg-[#03623c]/5 text-[#03623c] hover:bg-[#03623c]/10 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer hover:shadow-3xs"
+                  className="px-4 py-2 border border-[#03623c]/20 bg-[#03623c]/5 dark:bg-emerald-950/60 text-[#03623c] dark:text-emerald-400 hover:bg-[#03623c]/10 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer hover:shadow-3xs"
                   id="bulk-import-punch"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
@@ -690,7 +718,7 @@ export default function AttendanceTracker({
                 </button>
                 <button
                   onClick={() => markBulkStatus('Present')}
-                  className="px-4 py-2 border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-4 py-2 border border-green-200 dark:border-emerald-800 bg-green-50 dark:bg-emerald-950/60 text-green-700 dark:text-emerald-300 hover:bg-green-100 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
                   id="bulk-present"
                 >
                   <UserCheck className="w-4 h-4" />
@@ -698,7 +726,7 @@ export default function AttendanceTracker({
                 </button>
                 <button
                   onClick={() => markBulkStatus('Absent')}
-                  className="px-4 py-2 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-4 py-2 border border-red-200 dark:border-rose-900/60 bg-red-50 dark:bg-rose-950/60 text-red-700 dark:text-rose-300 hover:bg-red-100 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
                   id="bulk-absent"
                 >
                   <UserX className="w-4 h-4" />
@@ -709,63 +737,63 @@ export default function AttendanceTracker({
           </div>
 
           {/* Robust Filters segment */}
-          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-wrap items-center gap-4">
+          <div className="bg-white dark:bg-[#11221b] p-4 rounded-2xl border border-gray-100 dark:border-[#1e3a2f] shadow-xs flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-1.5">
-              <Filter className="w-4 h-4 text-[#03623c]" />
-              <span className="text-xs font-bold text-gray-800 uppercase tracking-wider font-mono">Filters:</span>
+              <Filter className="w-4 h-4 text-[#03623c] dark:text-emerald-400" />
+              <span className="text-xs font-bold text-gray-800 dark:text-slate-200 uppercase tracking-wider font-mono">Filters:</span>
             </div>
 
             {/* Department Filter */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-extrabold text-gray-500 uppercase font-mono">Dept:</span>
+              <span className="text-[10px] font-extrabold text-gray-500 dark:text-slate-400 uppercase font-mono">Dept:</span>
               <select
                 value={selectedDept}
                 onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
-                className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer"
+                className="bg-gray-50 dark:bg-[#0b1812] border border-gray-200 dark:border-[#1e3a2f] text-xs font-semibold text-gray-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer"
               >
                 {departmentOptions.map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
+                  <option key={dept} value={dept} className="dark:bg-[#11221b]">{dept}</option>
                 ))}
               </select>
             </div>
 
             {/* Branch Filter */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-extrabold text-gray-500 uppercase font-mono">Branch:</span>
+              <span className="text-[10px] font-extrabold text-gray-500 dark:text-slate-400 uppercase font-mono">Branch:</span>
               <select
                 value={selectedBranch}
                 onChange={(e) => { setSelectedBranch(e.target.value); setCurrentPage(1); }}
-                className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer"
+                className="bg-gray-50 dark:bg-[#0b1812] border border-gray-200 dark:border-[#1e3a2f] text-xs font-semibold text-gray-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer"
               >
                 {branchOptions.map(branch => (
-                  <option key={branch} value={branch}>{branch}</option>
+                  <option key={branch} value={branch} className="dark:bg-[#11221b]">{branch}</option>
                 ))}
               </select>
             </div>
 
             {/* Employee ID Filter */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-extrabold text-gray-500 uppercase font-mono">Employee:</span>
+              <span className="text-[10px] font-extrabold text-gray-500 dark:text-slate-400 uppercase font-mono">Employee:</span>
               <select
                 value={selectedEmployeeId}
                 onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
-                className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer max-w-[150px]"
+                className="bg-gray-50 dark:bg-[#0b1812] border border-gray-200 dark:border-[#1e3a2f] text-xs font-semibold text-gray-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer max-w-[150px]"
               >
-                <option value="All">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+                <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
                 {employeeOptions.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  <option key={emp.id} value={emp.id} className="dark:bg-[#11221b]">{emp.name}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+          <div className="bg-white dark:bg-[#11221b] rounded-2xl border border-gray-100 dark:border-[#1e3a2f] shadow-xs overflow-hidden">
             {filteredActiveEmployees.length > 0 ? (
               <>
                 <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <tr className="bg-gray-50 dark:bg-[#0c1a14] border-b border-gray-100 dark:border-[#1e3a2f] text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
                       <th className="py-4 px-6 min-w-[200px]">{t.colEmp}</th>
                       <th className="py-4 px-6 text-center min-w-[280px]">{t.colStatus}</th>
                       <th className="py-4 px-6 text-center min-w-[180px]">{t.colTiming}</th>
@@ -774,7 +802,7 @@ export default function AttendanceTracker({
                       <th className="py-4 px-6 text-center min-w-[90px]">{language === 'en' ? 'History' : 'इतिहास'}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 text-sm">
+                  <tbody className="divide-y divide-gray-100 dark:divide-[#1e3a2f] text-sm">
                     {paginatedActiveEmployees.map((emp) => {
                       const timings = getShiftTimings(emp.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
                       const record = localRecords[emp.id] || {
@@ -791,26 +819,26 @@ export default function AttendanceTracker({
                       const isEarly = isAttendanceEarlyGoing(record, emp.workTiming, adminSettings?.defaultCheckOut || '18:00');
 
                       return (
-                        <tr key={emp.id} className="hover:bg-gray-50/30 transition-colors">
-                          <td className="py-4 px-6">
+                        <tr key={emp.id} className="hover:bg-gray-50/30 dark:hover:bg-[#162e24] transition-colors">
+                          <td className="py-3 sm:py-4 px-2.5 sm:px-6">
                             <div>
-                              <div className="font-semibold text-gray-900">{emp.name}</div>
-                              <div className="text-xs font-mono text-gray-400 font-medium">{emp.id} · {emp.designation}</div>
+                              <div className="font-semibold text-gray-900 dark:text-slate-100 text-xs sm:text-sm">{emp.name}</div>
+                              <div className="text-[10px] sm:text-xs font-mono text-gray-400 dark:text-slate-400 font-medium">{emp.id} · {emp.designation}</div>
                             </div>
                           </td>
 
-                          <td className="py-4 px-6 text-center">
+                          <td className="py-3 sm:py-4 px-1.5 sm:px-6 text-center">
                             {record.status === 'Miss Punch' ? (
-                              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 bg-amber-50/70 border border-amber-200 p-1.5 rounded-xl">
-                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-amber-800 uppercase tracking-wider animate-pulse">
+                              <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 p-1 sm:p-1.5 rounded-xl">
+                                <div className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-extrabold text-amber-800 dark:text-amber-300 uppercase tracking-wider animate-pulse whitespace-nowrap">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                                   <span>{language === 'en' ? 'Miss Punch' : 'मिस पंच'}</span>
                                 </div>
-                                <div className="flex gap-1.5">
+                                <div className="flex gap-1">
                                   <button
                                     type="button"
                                     onClick={() => handleStatusChange(emp.id, 'Present')}
-                                    className="px-2.5 py-1 bg-[#03623c] hover:bg-[#024d2e] text-white font-extrabold text-[10px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer shadow-3xs"
+                                    className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-[#03623c] hover:bg-[#024d2e] text-white font-extrabold text-[9px] sm:text-[10px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer shadow-3xs whitespace-nowrap"
                                   >
                                     <Check className="w-3 h-3" />
                                     <span>{language === 'en' ? 'Approve' : 'मंजूर करें'}</span>
@@ -818,21 +846,21 @@ export default function AttendanceTracker({
                                   <button
                                     type="button"
                                     onClick={() => handleStatusChange(emp.id, 'Absent')}
-                                    className="px-2 py-1 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 text-gray-500 hover:text-red-600 font-bold text-[10px] rounded-lg transition-colors cursor-pointer"
+                                    className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-white dark:bg-[#0b1812] hover:bg-red-50 dark:hover:bg-rose-950/50 border border-gray-200 dark:border-[#1e3a2f] text-gray-500 dark:text-slate-300 hover:text-red-600 font-bold text-[9px] sm:text-[10px] rounded-lg transition-colors cursor-pointer whitespace-nowrap"
                                   >
                                     {language === 'en' ? 'Absent' : 'अनुपस्थित'}
                                   </button>
                                 </div>
                               </div>
                             ) : (
-                              <div className="inline-flex p-1 bg-gray-100 rounded-xl gap-1">
+                              <div className="inline-flex p-0.5 sm:p-1 bg-gray-100 dark:bg-[#0b1812] rounded-xl gap-0.5 sm:gap-1 max-w-full overflow-x-auto shrink-0 border border-transparent dark:border-[#1e3a2f]">
                                 <button
                                   type="button"
                                   onClick={() => handleStatusChange(emp.id, 'Present')}
-                                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                                  className={`px-1.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                                     record.status === 'Present' 
                                       ? 'bg-[#03623c] text-white shadow-xs' 
-                                      : 'text-gray-600 hover:text-gray-900'
+                                      : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                   }`}
                                 >
                                   {t.present}
@@ -840,10 +868,10 @@ export default function AttendanceTracker({
                                 <button
                                   type="button"
                                   onClick={() => handleStatusChange(emp.id, 'Half Day')}
-                                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                                  className={`px-1.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                                     record.status === 'Half Day' 
                                       ? 'bg-amber-500 text-white shadow-xs' 
-                                      : 'text-gray-600 hover:text-gray-900'
+                                      : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                   }`}
                                 >
                                   {t.halfDay}
@@ -851,10 +879,10 @@ export default function AttendanceTracker({
                                 <button
                                   type="button"
                                   onClick={() => handleStatusChange(emp.id, 'Absent')}
-                                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                                  className={`px-1.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                                     record.status === 'Absent' 
                                       ? 'bg-red-600 text-white shadow-xs' 
-                                      : 'text-gray-600 hover:text-gray-900'
+                                      : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                   }`}
                                 >
                                   {t.absent}
@@ -862,10 +890,10 @@ export default function AttendanceTracker({
                                 <button
                                   type="button"
                                   onClick={() => handleStatusChange(emp.id, 'Leave')}
-                                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                                  className={`px-1.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                                     record.status === 'Leave' 
                                       ? 'bg-teal-600 text-white shadow-xs' 
-                                      : 'text-gray-600 hover:text-gray-900'
+                                      : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                   }`}
                                 >
                                   {t.leave}
@@ -873,7 +901,7 @@ export default function AttendanceTracker({
                                 <button
                                   type="button"
                                   onClick={() => handleStatusChange(emp.id, 'Miss Punch')}
-                                  className="px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+                                  className="px-1.5 sm:px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 hover:bg-amber-100"
                                 >
                                   {language === 'en' ? 'Miss Punch' : 'मिस पंच'}
                                 </button>
@@ -881,47 +909,47 @@ export default function AttendanceTracker({
                             )}
                           </td>
 
-                          <td className="py-4 px-6 text-center">
+                          <td className="py-3 sm:py-4 px-2 sm:px-6 text-center">
                             {record.status === 'Present' || record.status === 'Half Day' || record.status === 'Miss Punch' ? (
-                              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                                <div className="flex flex-col items-start gap-1">
+                              <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3">
+                                <div className="flex flex-col items-start gap-0.5 sm:gap-1">
                                   <div className="flex items-center gap-1">
-                                    <span className="text-xxs text-gray-400 font-bold uppercase">{t.checkIn}</span>
+                                    <span className="text-[9px] sm:text-xxs text-gray-400 dark:text-slate-400 font-bold uppercase">{t.checkIn}</span>
                                     <input
                                       type="time"
                                       value={record.checkIn}
                                       onChange={(e) => handleTimeChange(emp.id, 'checkIn', e.target.value)}
-                                      className={`border rounded-lg px-1.5 py-1 text-xs font-semibold text-gray-700 bg-white focus:outline-none focus:ring-1 ${
+                                      className={`border rounded-lg px-1 sm:px-1.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-semibold text-gray-700 dark:text-slate-100 bg-white dark:bg-[#0b1812] focus:outline-none focus:ring-1 ${
                                         isLate 
-                                          ? 'border-rose-300 focus:ring-rose-500 bg-rose-50/20' 
-                                          : 'border-gray-200 focus:ring-[#03623c]'
+                                          ? 'border-rose-300 dark:border-rose-800 focus:ring-rose-500 bg-rose-50/20' 
+                                          : 'border-gray-200 dark:border-[#1e3a2f] focus:ring-[#03623c]'
                                       }`}
                                     />
                                   </div>
                                   {isLate && (
-                                    <span className="text-[10px] text-rose-600 font-black flex items-center gap-1 pl-10" title="Late Arrival">
+                                    <span className="text-[9px] sm:text-[10px] text-rose-600 dark:text-rose-400 font-black flex items-center gap-1 pl-2 sm:pl-10" title="Late Arrival">
                                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
                                       <span>{language === 'en' ? 'Late' : 'देरी'}</span>
                                     </span>
                                   )}
                                 </div>
 
-                                <div className="flex flex-col items-start gap-1">
+                                <div className="flex flex-col items-start gap-0.5 sm:gap-1">
                                   <div className="flex items-center gap-1">
-                                    <span className="text-xxs text-gray-400 font-bold uppercase">{t.checkOut}</span>
+                                    <span className="text-[9px] sm:text-xxs text-gray-400 dark:text-slate-400 font-bold uppercase">{t.checkOut}</span>
                                     <input
                                       type="time"
                                       value={record.checkOut}
                                       onChange={(e) => handleTimeChange(emp.id, 'checkOut', e.target.value)}
-                                      className={`border rounded-lg px-1.5 py-1 text-xs font-semibold text-gray-700 bg-white focus:outline-none focus:ring-1 ${
+                                      className={`border rounded-lg px-1 sm:px-1.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-semibold text-gray-700 dark:text-slate-100 bg-white dark:bg-[#0b1812] focus:outline-none focus:ring-1 ${
                                         isEarly 
-                                          ? 'border-amber-300 focus:ring-amber-500 bg-amber-50/20' 
-                                          : 'border-gray-200 focus:ring-[#03623c]'
+                                          ? 'border-amber-300 dark:border-amber-800 focus:ring-amber-500 bg-amber-50/20' 
+                                          : 'border-gray-200 dark:border-[#1e3a2f] focus:ring-[#03623c]'
                                       }`}
                                     />
                                   </div>
                                   {isEarly && (
-                                    <span className="text-[10px] text-amber-600 font-black flex items-center gap-1 pl-11" title="Early Departure">
+                                    <span className="text-[9px] sm:text-[10px] text-amber-600 dark:text-amber-400 font-black flex items-center gap-1 pl-2 sm:pl-11" title="Early Departure">
                                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
                                       <span>{language === 'en' ? 'Early' : 'जल्दी'}</span>
                                     </span>
@@ -929,11 +957,11 @@ export default function AttendanceTracker({
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-gray-400 text-xs">—</span>
+                              <span className="text-gray-400 dark:text-slate-500 text-xs">—</span>
                             )}
                           </td>
 
-                          <td className="py-4 px-6 text-center">
+                          <td className="py-3 sm:py-4 px-2 sm:px-6 text-center">
                             {record.status === 'Present' || record.status === 'Half Day' || record.status === 'Miss Punch' ? (
                               <div className="inline-flex items-center gap-1">
                                 <input
@@ -943,12 +971,12 @@ export default function AttendanceTracker({
                                   value={record.overtimeHours || ''}
                                   placeholder="0"
                                   onChange={(e) => handleNumericChange(emp.id, Number(e.target.value))}
-                                  className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs text-center font-semibold text-gray-700 bg-white focus:outline-none"
+                                  className="w-16 border border-gray-200 dark:border-[#1e3a2f] rounded-lg px-2 py-1 text-xs text-center font-semibold text-gray-700 dark:text-slate-100 bg-white dark:bg-[#0b1812] focus:outline-none"
                                 />
-                                <span className="text-xxs text-gray-400 font-medium">h</span>
+                                <span className="text-xxs text-gray-400 dark:text-slate-400 font-medium">h</span>
                               </div>
                             ) : (
-                              <span className="text-gray-400 text-xs">—</span>
+                              <span className="text-gray-400 dark:text-slate-500 text-xs">—</span>
                             )}
                           </td>
 
@@ -958,24 +986,50 @@ export default function AttendanceTracker({
                               value={record.remarks}
                               onChange={(e) => handleRemarksChange(emp.id, e.target.value)}
                               placeholder="e.g. Medical emergency, Late entry"
-                              className="w-full border border-gray-200 rounded-lg px-3 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#03623c]"
+                              className="w-full border border-gray-200 dark:border-[#1e3a2f] rounded-lg px-3 py-1 text-xs text-gray-700 dark:text-slate-100 bg-white dark:bg-[#0b1812] focus:outline-none focus:ring-1 focus:ring-[#03623c]"
                             />
                           </td>
                           <td className="py-4 px-6 text-center">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setHistoryModalEmpId(emp.id);
-                                setHistoryModalDate(selectedDate);
-                                setHistoryModalEmpName(emp.name);
-                                setHistoryModalOpen(true);
-                              }}
-                              className="p-1 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-emerald-700 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold"
-                              title={language === 'en' ? 'View change history' : 'बदलाव इतिहास देखें'}
-                            >
-                              <History className="w-3.5 h-3.5 text-slate-500" />
-                              <span>{language === 'en' ? 'History' : 'इतिहास'}</span>
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setHistoryModalEmpId(emp.id);
+                                  setHistoryModalDate(selectedDate);
+                                  setHistoryModalEmpName(emp.name);
+                                  setHistoryModalOpen(true);
+                                }}
+                                className="p-1 px-2 bg-slate-50 dark:bg-[#0b1812] hover:bg-slate-100 dark:hover:bg-[#162e24] border border-slate-200 dark:border-[#1e3a2f] text-slate-700 dark:text-slate-200 hover:text-emerald-700 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold"
+                                title={language === 'en' ? 'View change history' : 'बदलाव इतिहास देखें'}
+                              >
+                                <History className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                                <span>{language === 'en' ? 'History' : 'इतिहास'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWaRecipient({
+                                    name: emp.name,
+                                    mobileNo: emp.mobileNo || emp.personalMobileNo,
+                                    email: emp.email || emp.personalEmail
+                                  });
+                                  if (record.status === 'Miss Punch') {
+                                    setWaCategory('missPunch');
+                                    setWaVars({ DATE: selectedDate });
+                                  } else {
+                                    setWaCategory('lateWarning');
+                                    setWaVars({ DATE: selectedDate, CHECK_IN: record.checkIn || '10:15 AM' });
+                                  }
+                                  setWaModalOpen(true);
+                                }}
+                                className="p-1 px-2 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold"
+                                title="Send WhatsApp Alert"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                <span>WhatsApp</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -985,13 +1039,13 @@ export default function AttendanceTracker({
               </div>
 
               {/* Entries control & Pagination */}
-              <div className="bg-gray-50 border-t border-gray-100 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+              <div className="bg-gray-50 dark:bg-[#0c1a14] border-t border-gray-100 dark:border-[#1e3a2f] px-6 py-4 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-700">Show Entries:</span>
+                  <span className="text-xs font-bold text-gray-700 dark:text-slate-300">Show Entries:</span>
                   <select
                     value={pageSize}
                     onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                    className="bg-white border border-gray-200 text-xs font-semibold text-gray-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] cursor-pointer"
+                    className="bg-white dark:bg-[#0b1812] border border-gray-200 dark:border-[#1e3a2f] text-xs font-semibold text-gray-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] cursor-pointer"
                   >
                     <option value={10}>10</option>
                     <option value={25}>25</option>
@@ -1000,26 +1054,26 @@ export default function AttendanceTracker({
                   </select>
                 </div>
 
-                <div className="text-xs text-gray-500 font-medium">
-                  Showing <span className="font-bold text-slate-800">{filteredActiveEmployees.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, filteredActiveEmployees.length)}</span> of <span className="font-bold text-slate-800">{filteredActiveEmployees.length}</span> entries
+                <div className="text-xs text-gray-500 dark:text-slate-400 font-medium">
+                  Showing <span className="font-bold text-slate-800 dark:text-slate-100">{filteredActiveEmployees.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800 dark:text-slate-100">{Math.min(currentPage * pageSize, filteredActiveEmployees.length)}</span> of <span className="font-bold text-slate-800 dark:text-slate-100">{filteredActiveEmployees.length}</span> entries
                 </div>
 
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0b1812] border border-gray-200 dark:border-[#1e3a2f] rounded-lg hover:bg-gray-50 dark:hover:bg-[#162e24] disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" />
                     Previous
                   </button>
-                  <span className="text-xs font-bold text-gray-800 font-mono">
+                  <span className="text-xs font-bold text-gray-800 dark:text-slate-200 font-mono">
                     Page {currentPage} of {totalPages}
                   </span>
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0b1812] border border-gray-200 dark:border-[#1e3a2f] rounded-lg hover:bg-gray-50 dark:hover:bg-[#162e24] disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
                   >
                     Next
                     <ChevronRight className="w-4 h-4" />
@@ -1475,6 +1529,16 @@ export default function AttendanceTracker({
         />
       )}
 
+      {/* HEATMAP VIEW */}
+      {activeTab === 'heatmap' && (
+        <AttendanceHeatmap
+          employees={employees}
+          attendanceRecords={attendanceRecords}
+          adminSettings={adminSettings}
+          language={language}
+        />
+      )}
+
       {/* Biometric Punch Import Modal */}
       <PunchImportModal
         isOpen={isImportModalOpen}
@@ -1609,6 +1673,18 @@ export default function AttendanceTracker({
             </div>
           </div>
         </div>
+      )}
+
+      {/* WhatsApp Modal Dispatcher */}
+      {adminSettings && (
+        <WhatsAppModal
+          isOpen={waModalOpen}
+          onClose={() => setWaModalOpen(false)}
+          settings={adminSettings}
+          recipient={waRecipient}
+          defaultCategory={waCategory}
+          variables={waVars}
+        />
       )}
 
     </div>

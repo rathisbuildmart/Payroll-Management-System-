@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, CreditCard, Check, Printer, FileText, DollarSign, Calculator, AlertCircle, Save, TrendingUp, Users, ArrowUpRight, ShieldCheck, ArrowDownRight, Landmark, Building, Sparkles, Filter, ChevronLeft, ChevronRight, RefreshCcw, FileDown, PlusCircle, Trash2, HelpCircle, Info } from 'lucide-react';
+import { Calendar, CreditCard, Check, Printer, FileText, DollarSign, Calculator, AlertCircle, Save, TrendingUp, Users, ArrowUpRight, ShieldCheck, ArrowDownRight, Landmark, Building, Sparkles, Filter, ChevronLeft, ChevronRight, RefreshCcw, FileDown, PlusCircle, Trash2, HelpCircle, Info, MessageSquare } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Employee, Attendance, PayrollRecord, OneTimeDeduction, AdminSettings } from '../types';
+import { WhatsAppModal } from './WhatsAppModal';
 
 interface PayrollCalculatorProps {
   employees: Employee[];
@@ -53,6 +54,12 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'ledger' | 'refunds'>('ledger');
+
+  // WhatsApp & Email modal state
+  const [waModalOpen, setWaModalOpen] = useState(false);
+  const [waRecipient, setWaRecipient] = useState<{ name: string; mobileNo?: string; email?: string }>({ name: '' });
+  const [waCategory, setWaCategory] = useState<'payslip' | 'salaryDisbursed' | 'customNotice'>('payslip');
+  const [waVars, setWaVars] = useState<Record<string, string | number | undefined>>({});
 
   // One-time deductions list and their monthly refund tracking
   const [oneTimeDeductions, setOneTimeDeductions] = useState<OneTimeDeduction[]>(() => {
@@ -170,10 +177,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   const calculateSingleEmployeePayroll = (emp: Employee, overrideRecord?: Partial<PayrollRecord>): PayrollRecord => {
     const empAtt = attendanceRecords.filter(r => r.employeeId === emp.id && r.date.startsWith(selectedMonthYear));
     
-    const daysPresent = empAtt.filter(r => r.status === 'Present').length;
+    const daysPresent = empAtt.filter(r => r.status === 'Present' || (r.status === 'Miss Punch' && r.approvalStatus === 'Approved')).length;
     const daysHalfDay = empAtt.filter(r => r.status === 'Half Day').length;
     const daysLeave = empAtt.filter(r => r.status === 'Leave').length; // Paid Leave
-    const daysMissPunch = empAtt.filter(r => r.status === 'Miss Punch').length;
+    const daysMissPunch = empAtt.filter(r => r.status === 'Miss Punch' && r.approvalStatus !== 'Approved').length;
     
     // Compute pro-rated earned basic (Miss punches or pending aren't fully counted unless approved, keeping simple)
     // Check if Paid Leave is applicable for this employee based on Policy & service tenure at payroll month
@@ -372,7 +379,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
     // Attendance Overview
     const empAtt = attendanceRecords.filter(r => r.employeeId === record.employeeId && r.date.startsWith(selectedMonthYear));
-    const daysPresent = empAtt.filter(r => r.status === 'Present').length;
+    const daysPresent = empAtt.filter(r => r.status === 'Present' || (r.status === 'Miss Punch' && r.approvalStatus === 'Approved')).length;
     const daysHalfDay = empAtt.filter(r => r.status === 'Half Day').length;
     const daysLeave = empAtt.filter(r => r.status === 'Leave').length;
     const daysAbsent = empAtt.filter(r => r.status === 'Absent').length;
@@ -1169,85 +1176,85 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   return (
     <div className="space-y-6">
       
-      {/* 2026 Premium Bento Stat Grid - Enhanced high contrast with beautiful modern glowing highlights */}
+      {/* 2026 Premium Bento Stat Grid - Enhanced high contrast with dark mode support */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
         {/* KPI Card 1: Total Net Payroll */}
-        <div className="relative overflow-hidden bg-white/95 border border-slate-200/90 p-5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all duration-300 hover:shadow-[0_12px_30px_rgba(3,98,60,0.06)] hover:border-[#03623c]/20 group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#03623c]/5 rounded-full blur-2xl -mr-8 -mt-8 transition-all duration-500 group-hover:bg-[#03623c]/10"></div>
+        <div className="relative overflow-hidden bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] p-5 rounded-xl shadow-xs transition-all duration-300 hover:shadow-md hover:border-[#03623c]/40 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#03623c]/5 dark:bg-emerald-500/10 rounded-full blur-2xl -mr-8 -mt-8 transition-all duration-500 group-hover:bg-[#03623c]/10"></div>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{statsTranslations.totalNetSalary}</span>
-            <span className="p-2 rounded-lg bg-emerald-50/70 text-[#03623c] shrink-0 border border-emerald-100/50">
+            <span className="text-[11px] font-black text-slate-800 dark:text-slate-300 uppercase tracking-widest">{statsTranslations.totalNetSalary}</span>
+            <span className="p-2 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/60 text-[#03623c] dark:text-emerald-400 shrink-0 border border-emerald-100/50 dark:border-emerald-800/50">
               <TrendingUp className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-extrabold text-slate-900 font-display tracking-tight leading-none">
+            <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-display tracking-tight leading-none">
               ₹{totalNetSalary.toLocaleString('en-IN')}
             </h3>
-            <div className="flex items-center gap-1.5 mt-2.5 text-xs font-extrabold text-slate-800">
-              <Users className="w-3.5 h-3.5 text-[#03623c]" />
-              <span>{totalEmployeesCount} <span className="text-slate-700 font-bold">{statsTranslations.activeEmployees}</span></span>
+            <div className="flex items-center gap-1.5 mt-2.5 text-xs font-extrabold text-slate-800 dark:text-slate-300">
+              <Users className="w-3.5 h-3.5 text-[#03623c] dark:text-emerald-400" />
+              <span>{totalEmployeesCount} <span className="text-slate-700 dark:text-slate-400 font-bold">{statsTranslations.activeEmployees}</span></span>
             </div>
           </div>
         </div>
 
         {/* KPI Card 2: Paid Disbursed */}
-        <div className="relative overflow-hidden bg-white/95 border border-slate-200/90 p-5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all duration-300 hover:shadow-[0_12px_30px_rgba(16,185,129,0.06)] hover:border-emerald-200 group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl -mr-8 -mt-8 transition-all duration-500 group-hover:bg-emerald-500/10"></div>
+        <div className="relative overflow-hidden bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] p-5 rounded-xl shadow-xs transition-all duration-300 hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-700 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-2xl -mr-8 -mt-8 transition-all duration-500 group-hover:bg-emerald-500/10"></div>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{statsTranslations.totalPaid}</span>
-            <span className="p-2 rounded-lg bg-emerald-50/70 text-emerald-600 shrink-0 border border-emerald-100/50">
+            <span className="text-[11px] font-black text-slate-800 dark:text-slate-300 uppercase tracking-widest">{statsTranslations.totalPaid}</span>
+            <span className="p-2 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-100/50 dark:border-emerald-800/50">
               <Check className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-extrabold text-slate-900 font-display tracking-tight leading-none">
+            <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-display tracking-tight leading-none">
               ₹{totalPaid.toLocaleString('en-IN')}
             </h3>
-            <div className="flex items-center gap-1.5 mt-2.5 text-xs font-extrabold text-slate-800">
+            <div className="flex items-center gap-1.5 mt-2.5 text-xs font-extrabold text-slate-800 dark:text-slate-300">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
-              <span>{paidCount} <span className="text-slate-700 font-bold">{statsTranslations.paidText}</span></span>
+              <span>{paidCount} <span className="text-slate-700 dark:text-slate-400 font-bold">{statsTranslations.paidText}</span></span>
             </div>
           </div>
         </div>
 
         {/* KPI Card 3: Pending Outstanding */}
-        <div className="relative overflow-hidden bg-white/95 border border-slate-200/90 p-5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all duration-300 hover:shadow-[0_12px_30px_rgba(245,158,11,0.06)] hover:border-amber-200 group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl -mr-8 -mt-8 transition-all duration-500 group-hover:bg-amber-500/10"></div>
+        <div className="relative overflow-hidden bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] p-5 rounded-xl shadow-xs transition-all duration-300 hover:shadow-md hover:border-amber-200 dark:hover:border-amber-700 group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 dark:bg-amber-500/10 rounded-full blur-2xl -mr-8 -mt-8 transition-all duration-500 group-hover:bg-amber-500/10"></div>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{statsTranslations.totalPending}</span>
-            <span className="p-2 rounded-lg bg-amber-50/70 text-amber-600 shrink-0 border border-amber-100/50">
+            <span className="text-[11px] font-black text-slate-800 dark:text-slate-300 uppercase tracking-widest">{statsTranslations.totalPending}</span>
+            <span className="p-2 rounded-lg bg-amber-50/70 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 shrink-0 border border-amber-100/50 dark:border-amber-800/50">
               <CreditCard className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-extrabold text-slate-900 font-display tracking-tight leading-none">
+            <h3 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 font-display tracking-tight leading-none">
               ₹{totalPending.toLocaleString('en-IN')}
             </h3>
-            <div className="flex items-center gap-1.5 mt-2.5 text-xs font-extrabold text-slate-800">
+            <div className="flex items-center gap-1.5 mt-2.5 text-xs font-extrabold text-slate-800 dark:text-slate-300">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-              <span>{pendingCount} <span className="text-slate-700 font-bold">{statsTranslations.pendingText}</span></span>
+              <span>{pendingCount} <span className="text-slate-700 dark:text-slate-400 font-bold">{statsTranslations.pendingText}</span></span>
             </div>
           </div>
         </div>
 
         {/* KPI Card 4: Disbursal Meter */}
-        <div className="relative overflow-hidden bg-white/95 border border-slate-200/90 p-5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all duration-300 hover:shadow-[0_12px_30px_rgba(3,98,60,0.06)] hover:border-[#03623c]/20">
+        <div className="relative overflow-hidden bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] p-5 rounded-xl shadow-xs transition-all duration-300 hover:shadow-md hover:border-[#03623c]/20">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest">{statsTranslations.disbursalCompletion}</span>
-            <span className="text-xs font-extrabold text-[#03623c] font-mono bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">{completionPercentage}%</span>
+            <span className="text-[11px] font-black text-slate-800 dark:text-slate-300 uppercase tracking-widest">{statsTranslations.disbursalCompletion}</span>
+            <span className="text-xs font-extrabold text-[#03623c] dark:text-emerald-400 font-mono bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-100/50 dark:border-emerald-800/50">{completionPercentage}%</span>
           </div>
           <div className="mt-5">
-            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200/40 p-[2px]">
+            <div className="w-full bg-slate-100 dark:bg-slate-800/80 rounded-full h-2.5 overflow-hidden border border-slate-200/40 dark:border-slate-700/50 p-[2px]">
               <div 
                 className="bg-gradient-to-r from-emerald-500 via-[#03623c] to-[#024d2e] h-1.5 rounded-full transition-all duration-500 shadow-3xs" 
                 style={{ width: `${completionPercentage}%` }}
               ></div>
             </div>
-            <div className="flex justify-between items-center mt-3 text-xs font-extrabold text-slate-800">
+            <div className="flex justify-between items-center mt-3 text-xs font-extrabold text-slate-800 dark:text-slate-200">
               <span>{paidCount} {statsTranslations.of} {totalEmployeesCount} {statsTranslations.slips}</span>
-              <span className="font-mono text-[10px] text-slate-600">{completionPercentage}% Completed</span>
+              <span className="font-mono text-[10px] text-slate-600 dark:text-slate-400">{completionPercentage}% Completed</span>
             </div>
           </div>
         </div>
@@ -1255,27 +1262,27 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       </div>
 
       {/* Premium sub-tab switcher */}
-      <div className="flex border-b border-slate-200 bg-white rounded-t-xl overflow-hidden mt-6 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
+      <div className="flex border-b border-slate-200 dark:border-[#1e3a2f] bg-white dark:bg-[#11221b] rounded-t-xl overflow-hidden mt-6 shadow-xs">
         <button
           onClick={() => setActiveSubTab('ledger')}
           className={`flex-1 py-3.5 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer flex items-center justify-center gap-2 ${
             activeSubTab === 'ledger'
-              ? 'border-[#03623c] text-[#03623c] bg-slate-50/50'
-              : 'border-transparent text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50/20'
+              ? 'border-[#03623c] dark:border-emerald-400 text-[#03623c] dark:text-emerald-400 bg-slate-50/50 dark:bg-emerald-950/30'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 bg-white dark:bg-[#11221b]'
           }`}
         >
-          <Check className="w-4 h-4 text-[#03623c]" />
+          <Check className="w-4 h-4 text-[#03623c] dark:text-emerald-400" />
           <span>Monthly Payroll Ledger (मासिक पेरोल सूची)</span>
         </button>
         <button
           onClick={() => setActiveSubTab('refunds')}
           className={`flex-1 py-3.5 text-xs font-black uppercase tracking-widest border-b-2 transition-all cursor-pointer flex items-center justify-center gap-2 ${
             activeSubTab === 'refunds'
-              ? 'border-[#03623c] text-[#03623c] bg-slate-50/50'
-              : 'border-transparent text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50/20'
+              ? 'border-[#03623c] dark:border-emerald-400 text-[#03623c] dark:text-emerald-400 bg-slate-50/50 dark:bg-emerald-950/30'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 bg-white dark:bg-[#11221b]'
           }`}
         >
-          <RefreshCcw className="w-4 h-4 text-indigo-600" />
+          <RefreshCcw className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           <span>One-Time Deductions & Refunds Report (कटौती एवं रिफंड)</span>
         </button>
       </div>
@@ -1284,10 +1291,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
         <>
           {/* Dynamic Annual Analytics Dashboard Panel */}
       {showAnalytics && (
-        <div className="bg-slate-900 text-slate-100 p-6 rounded-xl border border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-300">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-4 mb-6">
+        <div className="bg-white dark:bg-[#11221b] text-slate-900 dark:text-slate-100 p-6 rounded-xl border border-slate-200 dark:border-[#1e3a2f] shadow-md transition-all duration-300">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 mb-6">
             <div>
-              <h3 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
                 <span>Annual Financial Summary & Statutory Ledger (वार्षिक वित्तीय सारांश)</span>
               </h3>
@@ -1380,7 +1387,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       )}
 
       {/* Modern High-End Selector & Controls Dock */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.02)] flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+      <div className="bg-white dark:bg-[#11221b] p-5 rounded-xl border border-slate-200 dark:border-[#1e3a2f] shadow-xs flex flex-col lg:flex-row lg:items-end justify-between gap-5">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 flex-1 max-w-3xl">
           
           {/* Year selector */}
@@ -1390,7 +1397,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full appearance-none border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white shadow-2xs text-slate-800 transition-all cursor-pointer"
+                className="w-full appearance-none border border-slate-200 dark:border-[#1e3a2f] rounded-lg pl-3 pr-8 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white dark:bg-[#0b1812] shadow-2xs text-slate-800 dark:text-slate-100 transition-all cursor-pointer"
                 id="payroll-year"
               >
                 {['2025', '2026', '2027', '2028'].map(y => (
@@ -1410,7 +1417,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full appearance-none border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white shadow-2xs text-slate-800 transition-all cursor-pointer"
+                className="w-full appearance-none border border-slate-200 dark:border-[#1e3a2f] rounded-lg pl-3 pr-8 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white dark:bg-[#0b1812] shadow-2xs text-slate-800 dark:text-slate-100 transition-all cursor-pointer"
                 id="payroll-month"
               >
                 {MONTHS.map(m => (
@@ -1435,7 +1442,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 max="31"
                 value={workingDays}
                 onChange={(e) => setWorkingDays(Number(e.target.value))}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white shadow-2xs text-slate-800 transition-all"
+                className="w-full border border-slate-200 dark:border-[#1e3a2f] rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white dark:bg-[#0b1812] shadow-2xs text-slate-800 dark:text-slate-100 transition-all"
                 id="payroll-working-days"
               />
             </div>
@@ -1449,7 +1456,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             className={`px-4 py-2.5 border text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all active:scale-98 ${
               showAnalytics 
                 ? 'bg-amber-600 border-amber-600 text-white shadow-md hover:bg-amber-700' 
-                : 'border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                : 'border-slate-200 dark:border-[#1e3a2f] hover:border-slate-300 bg-slate-50 dark:bg-[#0b1812] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
             }`}
             id="toggle-analytics"
           >
@@ -1458,11 +1465,11 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           </button>
 
           <div className="relative group">
-            <button className="px-4 py-2.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all hover:shadow-2xs active:scale-98">
-              <Landmark className="w-4 h-4 text-indigo-600" />
+            <button className="px-4 py-2.5 border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all hover:shadow-2xs active:scale-98">
+              <Landmark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <span>{language === 'en' ? 'Export Bank File 🏦' : 'बैंक फ़ाइल निर्यात'}</span>
             </button>
-            <div className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1.5 z-20 hidden group-hover:block hover:block">
+            <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-lg shadow-lg py-1.5 z-20 hidden group-hover:block hover:block">
               <button 
                 onClick={() => handleBankExport('SBI')} 
                 className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-100 font-semibold flex items-center gap-2"
@@ -1512,85 +1519,85 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       </div>
 
       {/* Dynamic Filters Row */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex flex-wrap items-center gap-4">
+      <div className="bg-white dark:bg-[#11221b] p-4 rounded-xl border border-slate-200 dark:border-[#1e3a2f] shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-1.5">
-          <Filter className="w-4 h-4 text-indigo-600" />
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono">Filters:</span>
+          <Filter className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-mono">Filters:</span>
         </div>
 
         {/* Department Filter */}
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-extrabold text-slate-500 uppercase font-mono">Dept:</span>
+          <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase font-mono">Dept:</span>
           <select
             value={selectedDept}
             onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
-            className="bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer"
+            className="bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-xs font-semibold text-slate-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer"
           >
             {departmentOptions.map(dept => (
-              <option key={dept} value={dept}>{dept}</option>
+              <option key={dept} value={dept} className="dark:bg-[#11221b]">{dept}</option>
             ))}
           </select>
         </div>
 
         {/* Branch Filter */}
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-extrabold text-slate-500 uppercase font-mono">Branch:</span>
+          <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase font-mono">Branch:</span>
           <select
             value={selectedBranch}
             onChange={(e) => { setSelectedBranch(e.target.value); setCurrentPage(1); }}
-            className="bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer"
+            className="bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-xs font-semibold text-slate-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer"
           >
             {branchOptions.map(branch => (
-              <option key={branch} value={branch}>{branch}</option>
+              <option key={branch} value={branch} className="dark:bg-[#11221b]">{branch}</option>
             ))}
           </select>
         </div>
 
         {/* Employee ID Filter */}
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-extrabold text-slate-500 uppercase font-mono">Employee:</span>
+          <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase font-mono">Employee:</span>
           <select
             value={selectedEmployeeId}
             onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
-            className="bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer max-w-[150px]"
+            className="bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-xs font-semibold text-slate-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer max-w-[150px]"
           >
-            <option value="All">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+            <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
             {employeeOptions.map(emp => (
-              <option key={emp.id} value={emp.id}>{emp.name}</option>
+              <option key={emp.id} value={emp.id} className="dark:bg-[#11221b]">{emp.name}</option>
             ))}
           </select>
         </div>
       </div>
 
       {/* Main List Box with exquisite, clean modern table design */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.015)] overflow-hidden">
+      <div className="bg-white dark:bg-[#11221b] rounded-xl border border-slate-200 dark:border-[#1e3a2f] shadow-[0_8px_30px_rgba(0,0,0,0.015)] overflow-hidden">
         {filteredPayroll.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                <tr className="bg-slate-50/75 dark:bg-[#0c1a14] border-b border-slate-200 dark:border-[#1e3a2f] text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest">
                   <th className="py-4 px-6">{t.colEmp}</th>
                   <th className="py-4 px-6">{t.colAttendance}</th>
                   <th className="py-4 px-6">{t.colSalary}</th>
                   <th className="py-4 px-6">{t.colOvertime}</th>
-                  <th className="py-4 px-6 text-slate-800 font-bold">{t.colTotal}</th>
+                  <th className="py-4 px-6 text-slate-800 dark:text-slate-200 font-bold">{t.colTotal}</th>
                   <th className="py-4 px-6 text-center">{t.colStatus}</th>
                   <th className="py-4 px-6 text-right">{t.colAction}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
+              <tbody className="divide-y divide-slate-100 dark:divide-[#1e3a2f]/60 text-xs">
                 {paginatedPayroll.map((rec) => {
                   const emp = employees.find(e => e.id === rec.employeeId);
                   const empAtt = attendanceRecords.filter(r => r.employeeId === rec.employeeId && r.date.startsWith(selectedMonthYear));
                   
-                  const daysPresent = empAtt.filter(r => r.status === 'Present').length;
+                  const daysPresent = empAtt.filter(r => r.status === 'Present' || (r.status === 'Miss Punch' && r.approvalStatus === 'Approved')).length;
                   const daysHalfDay = empAtt.filter(r => r.status === 'Half Day').length;
                   const daysLeave = empAtt.filter(r => r.status === 'Leave').length;
                   const daysAbsent = empAtt.filter(r => r.status === 'Absent').length;
-                  const daysMissPunch = empAtt.filter(r => r.status === 'Miss Punch').length;
+                  const daysMissPunch = empAtt.filter(r => r.status === 'Miss Punch' && r.approvalStatus !== 'Approved').length;
 
                   return (
-                    <tr key={rec.employeeId} className="hover:bg-slate-50/60 transition-colors duration-200">
+                    <tr key={rec.employeeId} className="hover:bg-slate-50/60 dark:hover:bg-[#183328]/40 transition-colors duration-200">
                       
                       {/* Employee Cell */}
                       <td className="py-4 px-6">
@@ -1599,20 +1606,20 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                             <img 
                               src={emp.photoUrl} 
                               alt={emp.name} 
-                              className="w-9 h-9 rounded-full object-cover border border-slate-200/80 shrink-0 shadow-2xs"
+                              className="w-9 h-9 rounded-full object-cover border border-slate-200/80 dark:border-[#1e3a2f] shrink-0 shadow-2xs"
                               referrerPolicy="no-referrer"
                             />
                           ) : (
-                            <div className="w-9 h-9 rounded-full bg-indigo-50/80 text-indigo-700 flex items-center justify-center font-bold text-xs border border-indigo-100 uppercase shrink-0">
+                            <div className="w-9 h-9 rounded-full bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-xs border border-indigo-100 dark:border-indigo-800/50 uppercase shrink-0">
                               {emp?.name ? emp.name.split(' ').map(n => n[0]).join('').substring(0, 2) : 'EM'}
                             </div>
                           )}
                           <div className="space-y-0.5">
-                            <div className="font-bold text-slate-900 text-sm leading-snug">{emp?.name || 'Unknown'}</div>
+                            <div className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug">{emp?.name || 'Unknown'}</div>
                             <div className="text-[10px] text-slate-400 font-semibold font-mono flex items-center gap-1.5">
                               <span>{rec.employeeId}</span>
-                              <span className="text-slate-200">•</span>
-                              <span className="bg-slate-100 px-1.5 py-0.2 rounded-sm text-[9px] font-sans text-slate-500 font-bold">{emp?.designation}</span>
+                              <span className="text-slate-200 dark:text-slate-600">•</span>
+                              <span className="bg-slate-100 dark:bg-[#0b1812] px-1.5 py-0.2 rounded-sm text-[9px] font-sans text-slate-500 dark:text-slate-400 font-bold">{emp?.designation}</span>
                             </div>
                           </div>
                         </div>
@@ -1621,12 +1628,12 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                       {/* Attendance breakdown pills */}
                       <td className="py-4 px-6">
                         <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold font-mono">
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md shadow-3xs" title="Present Days">{daysPresent}P</span>
-                          <span className="bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-md shadow-3xs" title="Half Days">{daysHalfDay}H</span>
-                          <span className="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-md shadow-3xs" title="Paid Leaves">{daysLeave}L</span>
-                          <span className="bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-md shadow-3xs" title="Absent">{daysAbsent}A</span>
+                          <span className="bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800/50 px-2 py-0.5 rounded-md shadow-3xs" title="Present Days">{daysPresent}P</span>
+                          <span className="bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-100 dark:border-amber-800/50 px-2 py-0.5 rounded-md shadow-3xs" title="Half Days">{daysHalfDay}H</span>
+                          <span className="bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800/50 px-2 py-0.5 rounded-md shadow-3xs" title="Paid Leaves">{daysLeave}L</span>
+                          <span className="bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-100 dark:border-rose-800/50 px-2 py-0.5 rounded-md shadow-3xs" title="Absent">{daysAbsent}A</span>
                           {daysMissPunch > 0 && (
-                            <span className="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-md shadow-3xs animate-pulse font-sans font-bold flex items-center gap-1 shrink-0" title="Pending Miss Punch Approvals">
+                            <span className="bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 px-2 py-0.5 rounded-md shadow-3xs animate-pulse font-sans font-bold flex items-center gap-1 shrink-0" title="Pending Miss Punch Approvals">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                               <span>{daysMissPunch} {language === 'en' ? 'Miss Punch (Pending)' : 'लंबित मिस पंच'}</span>
                             </span>
@@ -1637,23 +1644,23 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                       {/* Pro-rated basic & allowance details */}
                       <td className="py-4 px-6">
                         <div className="space-y-0.5">
-                          <div className="font-bold text-slate-800 text-sm">₹{rec.basicSalary.toLocaleString('en-IN')}</div>
+                          <div className="font-bold text-slate-800 dark:text-slate-200 text-sm">₹{rec.basicSalary.toLocaleString('en-IN')}</div>
                           <div className="text-[10px] text-slate-400 font-semibold leading-none flex items-center gap-1">
-                            <span className="text-emerald-600">+₹{rec.allowances}</span>
+                            <span className="text-emerald-600 dark:text-emerald-400">+₹{rec.allowances}</span>
                             <span>/</span>
-                            <span className="text-rose-600">-₹{rec.deductions}</span>
+                            <span className="text-rose-600 dark:text-rose-400">-₹{rec.deductions}</span>
                           </div>
                         </div>
                       </td>
 
                       {/* Overtime display */}
                       <td className="py-4 px-6">
-                        <span className="font-bold text-slate-700 font-mono">₹{rec.overtimePay.toLocaleString('en-IN')}</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">₹{rec.overtimePay.toLocaleString('en-IN')}</span>
                       </td>
 
                       {/* Total calculated pay */}
                       <td className="py-4 px-6">
-                        <span className="font-extrabold text-slate-900 text-sm font-mono tracking-tight bg-slate-100/50 border border-slate-150 px-2.5 py-1 rounded-lg">
+                        <span className="font-extrabold text-slate-900 dark:text-slate-100 text-sm font-mono tracking-tight bg-slate-100/50 dark:bg-[#0b1812] border border-slate-150 dark:border-[#1e3a2f] px-2.5 py-1 rounded-lg">
                           ₹{rec.totalSalary.toLocaleString('en-IN')}
                         </span>
                       </td>
@@ -1662,8 +1669,8 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                       <td className="py-4 px-6 text-center">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border transition-all duration-300 ${
                           rec.paymentStatus === 'Paid' 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-[0_2px_10px_rgba(16,185,129,0.06)]' 
-                            : 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse shadow-[0_2px_10px_rgba(245,158,11,0.06)]'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 shadow-[0_2px_10px_rgba(16,185,129,0.06)]' 
+                            : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 animate-pulse shadow-[0_2px_10px_rgba(245,158,11,0.06)]'
                         }`}>
                           {rec.paymentStatus === 'Paid' ? (
                             <>
@@ -1693,7 +1700,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                               setEditingRecord(rec);
                               setIsAdjustModalOpen(true);
                             }}
-                            className="bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-250 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-3xs active:scale-97"
+                            className="bg-white dark:bg-[#0b1812] hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-slate-200 dark:border-[#1e3a2f] hover:border-amber-250 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-3xs active:scale-97"
                             title="Adjust Salary Components"
                           >
                             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -1703,12 +1710,38 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                           {/* Payslip View */}
                           <button
                             onClick={() => openPayslip(rec)}
-                            className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-3xs active:scale-97"
+                            className="bg-white dark:bg-[#0b1812] hover:bg-slate-50 dark:hover:bg-[#183328] border border-slate-200 dark:border-[#1e3a2f] text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-3xs active:scale-97"
                             id={`slip-${rec.employeeId}`}
                             title="View Slip"
                           >
                             <FileText className="w-3.5 h-3.5 text-slate-400" />
                             <span>{t.payslipBtn}</span>
+                          </button>
+
+                          {/* Send WhatsApp Payslip */}
+                          <button
+                            onClick={() => {
+                              const emp = employees.find(e => e.id === rec.employeeId);
+                              setWaRecipient({
+                                name: emp?.name || rec.employeeId,
+                                mobileNo: emp?.mobileNo || emp?.personalMobileNo,
+                                email: emp?.email || emp?.personalEmail
+                              });
+                              setWaCategory('payslip');
+                              setWaVars({
+                                MONTH: selectedMonthYear,
+                                BASIC: rec.basicSalary,
+                                NET_SALARY: rec.netSalary || rec.totalSalary,
+                                STATUS: rec.paymentStatus,
+                                PAY_DATE: rec.paymentDate || 'Pending'
+                              });
+                              setWaModalOpen(true);
+                            }}
+                            className="bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-3xs active:scale-97"
+                            title="Send WhatsApp / Email Payslip"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>WhatsApp</span>
                           </button>
 
                           {/* Pay Now Gradient */}
@@ -1735,41 +1768,41 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             </table>
 
             {/* Entries control & Pagination */}
-            <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div className="bg-slate-50 dark:bg-[#0c1a14] border-t border-slate-200 dark:border-[#1e3a2f] px-6 py-4 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-700">Show Entries:</span>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Show Entries:</span>
                 <select
                   value={pageSize}
                   onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                  className="bg-white border border-slate-250 text-xs font-semibold text-slate-700 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 cursor-pointer"
+                  className="bg-white dark:bg-[#0b1812] border border-slate-250 dark:border-[#1e3a2f] text-xs font-semibold text-slate-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 cursor-pointer"
                 >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
+                  <option value={10} className="dark:bg-[#11221b]">10</option>
+                  <option value={25} className="dark:bg-[#11221b]">25</option>
+                  <option value={50} className="dark:bg-[#11221b]">50</option>
+                  <option value={100} className="dark:bg-[#11221b]">100</option>
                 </select>
               </div>
 
-              <div className="text-xs text-slate-500 font-medium">
-                Showing <span className="font-bold text-slate-800">{filteredPayroll.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, filteredPayroll.length)}</span> of <span className="font-bold text-slate-800">{filteredPayroll.length}</span> entries
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Showing <span className="font-bold text-slate-800 dark:text-slate-200">{filteredPayroll.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800 dark:text-slate-200">{Math.min(currentPage * pageSize, filteredPayroll.length)}</span> of <span className="font-bold text-slate-800 dark:text-slate-200">{filteredPayroll.length}</span> entries
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-lg hover:bg-slate-50 dark:hover:bg-[#183328] disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   Previous
                 </button>
-                <span className="text-xs font-bold text-slate-800 font-mono">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 font-mono">
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-lg hover:bg-slate-50 dark:hover:bg-[#183328] disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
                 >
                   Next
                   <ChevronRight className="w-4 h-4" />
@@ -1778,15 +1811,15 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             </div>
           </div>
         ) : (
-          <div className="text-center py-16 text-slate-400 bg-slate-50/50">
-            <AlertCircle className="w-10 h-10 mx-auto text-slate-300 mb-3" />
-            <p className="text-xs font-bold text-slate-400 max-w-md mx-auto leading-relaxed">{t.noRecords}</p>
+          <div className="text-center py-16 text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-[#0c1a14]/50">
+            <AlertCircle className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-400 max-w-md mx-auto leading-relaxed">{t.noRecords}</p>
           </div>
         )}
 
         {/* Sync panel footer with glass reflection */}
         {filteredPayroll.length > 0 && (
-          <div className="bg-slate-50/80 border-t border-slate-150 p-5 flex justify-end">
+          <div className="bg-slate-50/80 dark:bg-[#0c1a14] border-t border-slate-150 dark:border-[#1e3a2f] p-5 flex justify-end">
             <button
               onClick={handleSavePayroll}
               disabled={isSaving}
@@ -2462,6 +2495,18 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             </form>
           </div>
         </div>
+      )}
+
+      {/* WhatsApp Automation Dispatch Modal */}
+      {adminSettings && (
+        <WhatsAppModal
+          isOpen={waModalOpen}
+          onClose={() => setWaModalOpen(false)}
+          settings={adminSettings}
+          recipient={waRecipient}
+          defaultCategory={waCategory}
+          variables={waVars}
+        />
       )}
     </div>
   );

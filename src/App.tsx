@@ -35,7 +35,9 @@ import {
   Mail,
   ChevronRight,
   Clock,
-  UserCheck
+  UserCheck,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { initAuth, googleSignIn, googleSignInRedirect, logout } from './services/auth';
 import { 
@@ -255,6 +257,22 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [hasLoadedFromCloud, setHasLoadedFromCloud] = useState<boolean>(false);
   const [isDataModified, setIsDataModified] = useState<boolean>(false);
+
+  // Theme Mode (Light / Dark) State
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('payroll_theme_mode') as 'light' | 'dark') || 'light';
+  });
+
+  useEffect(() => {
+    if (themeMode === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
+    }
+    localStorage.setItem('payroll_theme_mode', themeMode);
+  }, [themeMode]);
 
   // Sheets Metadata
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
@@ -4438,35 +4456,47 @@ export default function App() {
             </div>
           )}
 
-          {/* Theme Indicator */}
-          <div className={`flex ${showExpanded ? 'flex-row items-center justify-between w-full px-3.5 py-1.5 rounded-xl hover:bg-emerald-500/5' : 'flex-col items-center gap-1.5 py-1'}`}>
+          {/* Theme Toggle */}
+          <div 
+            onClick={() => setThemeMode(prev => prev === 'light' ? 'dark' : 'light')}
+            className={`flex cursor-pointer select-none transition-all duration-200 ${
+              showExpanded 
+                ? 'flex-row items-center justify-between w-full px-3.5 py-1.5 rounded-xl hover:bg-emerald-500/10' 
+                : 'flex-col items-center gap-1.5 py-1 px-2 rounded-xl hover:bg-emerald-500/10'
+            }`}
+            title={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            id="btn-theme-toggle"
+          >
             <div className="relative group flex items-center">
-              <span className="text-slate-400">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sun w-4 h-4">
-                  <circle cx="12" cy="12" r="4"/>
-                  <path d="M12 2v2"/>
-                  <path d="M12 20v2"/>
-                  <path d="m4.93 4.93 1.41 1.41"/>
-                  <path d="m17.66 17.66 1.41 1.41"/>
-                  <path d="M2 12h2"/>
-                  <path d="M20 12h2"/>
-                  <path d="m6.34 17.66-1.41 1.41"/>
-                  <path d="m19.07 4.93-1.41 1.41"/>
-                </svg>
+              <span className={themeMode === 'dark' ? 'text-amber-400' : 'text-emerald-400'}>
+                {themeMode === 'dark' ? (
+                  <Moon className="w-4 h-4 text-amber-300" />
+                ) : (
+                  <Sun className="w-4 h-4 text-emerald-400" />
+                )}
               </span>
               {showExpanded && (
                 <span className="text-[11px] font-bold text-slate-300 ml-3.5 whitespace-nowrap animate-fadeIn">
-                  Premium Light Mode
+                  {themeMode === 'dark' 
+                    ? (language === 'en' ? 'Dark Mode' : 'डार्क मोड') 
+                    : (language === 'en' ? 'Light Mode' : 'लाइट मोड')}
                 </span>
               )}
               {!showExpanded && (
                 <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
-                  Premium Light Mode Active
+                  {themeMode === 'dark' 
+                    ? (language === 'en' ? 'Dark Mode Active' : 'डार्क मोड सक्रिय') 
+                    : (language === 'en' ? 'Light Mode Active' : 'लाइट मोड सक्रिय')}
                 </div>
               )}
             </div>
-            <div className="w-7 h-4 bg-emerald-950 border border-emerald-900 rounded-full p-[2px] cursor-pointer flex items-center justify-start relative shadow-inner shrink-0">
-              <div className="w-3.5 h-3.5 bg-white rounded-full shadow-sm transform translate-x-2.5 transition-transform"></div>
+            
+            <div className={`w-8 h-4.5 rounded-full p-[2px] transition-all flex items-center shadow-inner shrink-0 ${
+              themeMode === 'dark' ? 'bg-amber-500/30 border border-amber-400 justify-end' : 'bg-emerald-950 border border-emerald-900 justify-start'
+            }`}>
+              <div className={`w-3.5 h-3.5 rounded-full shadow-md transform transition-all ${
+                themeMode === 'dark' ? 'bg-amber-400' : 'bg-white translate-x-2.5'
+              }`} />
             </div>
           </div>
 
@@ -4535,7 +4565,9 @@ export default function App() {
 
   // 3. Render Dashboard / Workspace after Login
   return (
-    <div className="h-screen w-screen bg-[#f1f5f9] text-[#1e293b] flex overflow-hidden font-sans">
+    <div className={`h-screen w-screen flex overflow-hidden font-sans transition-colors duration-300 ${
+      themeMode === 'dark' ? 'bg-[#0a120e] text-slate-100 dark' : 'bg-[#f1f5f9] text-[#1e293b]'
+    }`}>
       
       {/* Mobile Drawer Overlay Backdrop */}
       {isMobileMenuOpen && (
@@ -4569,7 +4601,9 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         
         {/* Compact Header */}
-        <header className="h-[52px] bg-white border-b border-[#e2e8f0] px-3 sm:px-5 flex items-center justify-between shrink-0 shadow-xxs">
+        <header className={`h-[52px] border-b px-3 sm:px-5 flex items-center justify-between shrink-0 shadow-xxs transition-colors duration-300 ${
+          themeMode === 'dark' ? 'bg-[#11221b] border-[#1e3a2f] text-slate-100' : 'bg-white border-[#e2e8f0]'
+        }`}>
           <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
             {/* Mobile Toggle Button */}
             <button

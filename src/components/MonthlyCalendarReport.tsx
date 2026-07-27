@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Calendar, User, Clock, AlertCircle, CheckCircle, 
-  XCircle, FileText, ChevronLeft, ChevronRight, HelpCircle
+  XCircle, FileText, ChevronLeft, ChevronRight, HelpCircle, Download
 } from 'lucide-react';
 import { Employee, Attendance, AdminSettings } from '../types';
 import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
@@ -126,11 +126,11 @@ export default function MonthlyCalendarReport({
   );
 
   // Stats Counters
-  const countPresent = monthlyLogs.filter(r => r.status === 'Present').length;
+  const countPresent = monthlyLogs.filter(r => r.status === 'Present' || (r.status === 'Miss Punch' && r.approvalStatus === 'Approved')).length;
   const countAbsent = monthlyLogs.filter(r => r.status === 'Absent').length;
   const countHalfDay = monthlyLogs.filter(r => r.status === 'Half Day').length;
   const countLeave = monthlyLogs.filter(r => r.status === 'Leave').length;
-  const countMissPunch = monthlyLogs.filter(r => r.status === 'Miss Punch').length;
+  const countMissPunch = monthlyLogs.filter(r => r.status === 'Miss Punch' && r.approvalStatus !== 'Approved').length;
 
   const countLate = monthlyLogs.filter(r => 
     isAttendanceLate(r, selectedEmployee?.workTiming, adminSettings?.defaultCheckIn || '09:00')
@@ -179,14 +179,50 @@ export default function MonthlyCalendarReport({
     }
   };
 
+  const handleExportCSV = () => {
+    const formattedPeriod = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+    const empName = selectedEmployee ? selectedEmployee.name : 'All_Employees';
+    const headers = ['Date', 'Employee ID', 'Employee Name', 'Status', 'In Time', 'Out Time', 'Late In', 'Early Going', 'Remarks'];
+    const rows: string[][] = [headers];
+
+    const periodRecords = attendanceRecords.filter(r => r.date && r.date.startsWith(formattedPeriod) && (!selectedEmployee || r.employeeId === selectedEmployee.id));
+
+    periodRecords.forEach(r => {
+      const emp = employeeList.find(e => e.id === r.employeeId) || selectedEmployee;
+      const late = isAttendanceLate(r, emp?.workTiming, adminSettings?.defaultCheckIn || '09:00') ? 'Yes' : 'No';
+      const early = isAttendanceEarlyGoing(r, emp?.workTiming, adminSettings?.defaultCheckOut || '18:00') ? 'Yes' : 'No';
+
+      rows.push([
+        `"${r.date}"`,
+        `"${r.employeeId}"`,
+        `"${(emp?.name || '').replace(/"/g, '""')}"`,
+        `"${r.status || ''}"`,
+        `"${r.checkIn || ''}"`,
+        `"${r.checkOut || ''}"`,
+        `"${late}"`,
+        `"${early}"`,
+        `"${(r.remarks || '').replace(/"/g, '""')}"`
+      ]);
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map(e => e.join(',')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Attendance_Report_${empName}_${formattedPeriod}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-6">
+    <div className="bg-white dark:bg-[#11221b] border border-slate-200/80 dark:border-[#1e3a2f] rounded-2xl p-6 shadow-sm space-y-6">
       
       {/* Header Info Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-[#1e3a2f]">
         <div className="space-y-1">
-          <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-            <Calendar className="w-5.5 h-5.5 text-[#03623c]" />
+          <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Calendar className="w-5.5 h-5.5 text-[#03623c] dark:text-emerald-400" />
             <span>{t.title}</span>
           </h3>
           <p className="text-xs text-slate-400 font-medium">{t.subtitle}</p>
@@ -195,15 +231,15 @@ export default function MonthlyCalendarReport({
         {/* Navigation / Selection controls */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Month Stepper */}
-          <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-3xs">
+          <div className="inline-flex items-center bg-slate-50 dark:bg-[#0c1a14] border border-slate-200 dark:border-[#1e3a2f] rounded-xl p-1 shadow-3xs">
             <button 
               onClick={handlePrevMonth}
-              className="p-1.5 hover:bg-white rounded-lg transition-colors text-slate-600 hover:text-slate-900 cursor-pointer"
+              className="p-1.5 hover:bg-white dark:hover:bg-[#183328] rounded-lg transition-colors text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
               title="Previous Month"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs font-extrabold px-3 text-slate-700 min-w-[100px] text-center">
+            <span className="text-xs font-extrabold px-3 text-slate-700 dark:text-slate-200 min-w-[100px] text-center">
               {language === 'en' 
                 ? MONTHS.find(m => m.value === selectedMonth)?.name 
                 : MONTHS.find(m => m.value === selectedMonth)?.hindi
@@ -211,7 +247,7 @@ export default function MonthlyCalendarReport({
             </span>
             <button 
               onClick={handleNextMonth}
-              className="p-1.5 hover:bg-white rounded-lg transition-colors text-slate-600 hover:text-slate-900 cursor-pointer"
+              className="p-1.5 hover:bg-white dark:hover:bg-[#183328] rounded-lg transition-colors text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
               title="Next Month"
             >
               <ChevronRight className="w-4 h-4" />
@@ -223,10 +259,10 @@ export default function MonthlyCalendarReport({
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="border border-slate-200 px-2 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#03623c]"
+              className="border border-slate-200 dark:border-[#1e3a2f] px-2 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-[#11221b] text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#03623c]"
             >
               {MONTHS.map(m => (
-                <option key={m.value} value={m.value}>
+                <option key={m.value} value={m.value} className="dark:bg-[#11221b]">
                   {language === 'en' ? m.name : m.hindi}
                 </option>
               ))}
@@ -235,26 +271,35 @@ export default function MonthlyCalendarReport({
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="border border-slate-200 px-2 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#03623c]"
+              className="border border-slate-200 dark:border-[#1e3a2f] px-2 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-[#11221b] text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#03623c]"
             >
               {YEARS.map(y => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y} className="dark:bg-[#11221b]">{y}</option>
               ))}
             </select>
+
+            <button
+              onClick={handleExportCSV}
+              className="px-3.5 py-1.5 bg-[#03623c] hover:bg-[#024a2d] text-white text-xs font-bold rounded-xl shadow-3xs transition-all flex items-center gap-1.5 cursor-pointer ml-1"
+              title="Download Monthly Attendance CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-200" />
+              <span>{language === 'en' ? 'Export CSV' : 'सीएसवी निर्यात'}</span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* Admin Specific Employee Selector */}
       {isAdmin && (
-        <div className="bg-slate-50/70 border border-slate-200/50 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-slate-50/70 dark:bg-[#0c1a14] border border-slate-200/50 dark:border-[#1e3a2f] p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#03623c] flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-[#03623c] dark:text-emerald-400 flex items-center justify-center font-bold">
               <User className="w-4 h-4" />
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.selectEmployee}</label>
-              <p className="text-xs font-extrabold text-slate-700">{selectedEmployee ? `${selectedEmployee.name} (${selectedEmployee.id})` : t.notSpecified}</p>
+              <p className="text-xs font-extrabold text-slate-700 dark:text-slate-200">{selectedEmployee ? `${selectedEmployee.name} (${selectedEmployee.id})` : t.notSpecified}</p>
             </div>
           </div>
 
@@ -262,11 +307,11 @@ export default function MonthlyCalendarReport({
             <select
               value={selectedEmpId}
               onChange={(e) => setSelectedEmpId(e.target.value)}
-              className="w-full border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#03623c] cursor-pointer"
+              className="w-full border border-slate-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-[#11221b] text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#03623c] cursor-pointer"
             >
-              <option value="">-- {t.selectEmployee} --</option>
+              <option value="" className="dark:bg-[#11221b]">-- {t.selectEmployee} --</option>
               {employeeList.map(emp => (
-                <option key={emp.id} value={emp.id}>
+                <option key={emp.id} value={emp.id} className="dark:bg-[#11221b]">
                   {emp.name} ({emp.id}) - {emp.department}
                 </option>
               ))}
@@ -280,52 +325,52 @@ export default function MonthlyCalendarReport({
           
           {/* Stats highlight blocks */}
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-3">
-            <div className="bg-emerald-50/30 border border-emerald-100 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
-              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsPresent}</span>
-              <span className="text-sm sm:text-lg font-bold sm:font-black text-emerald-700 font-mono mt-0.5 block">{countPresent}</span>
+            <div className="bg-emerald-50/30 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800/40 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
+              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 dark:text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsPresent}</span>
+              <span className="text-sm sm:text-lg font-bold sm:font-black text-emerald-700 dark:text-emerald-300 font-mono mt-0.5 block">{countPresent}</span>
             </div>
-            <div className="bg-rose-50/30 border border-rose-100 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
-              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsAbsent}</span>
-              <span className="text-sm sm:text-lg font-bold sm:font-black text-rose-600 font-mono mt-0.5 block">{countAbsent}</span>
+            <div className="bg-rose-50/30 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/40 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
+              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 dark:text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsAbsent}</span>
+              <span className="text-sm sm:text-lg font-bold sm:font-black text-rose-600 dark:text-rose-400 font-mono mt-0.5 block">{countAbsent}</span>
             </div>
-            <div className="bg-amber-50/30 border border-amber-100 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
-              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsHalfDay}</span>
-              <span className="text-sm sm:text-lg font-bold sm:font-black text-amber-600 font-mono mt-0.5 block">{countHalfDay}</span>
+            <div className="bg-amber-50/30 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/40 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
+              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 dark:text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsHalfDay}</span>
+              <span className="text-sm sm:text-lg font-bold sm:font-black text-amber-600 dark:text-amber-300 font-mono mt-0.5 block">{countHalfDay}</span>
             </div>
-            <div className="bg-blue-50/30 border border-blue-100 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
-              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsLeave}</span>
-              <span className="text-sm sm:text-lg font-bold sm:font-black text-blue-600 font-mono mt-0.5 block">{countLeave}</span>
+            <div className="bg-blue-50/30 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800/40 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
+              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 dark:text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsLeave}</span>
+              <span className="text-sm sm:text-lg font-bold sm:font-black text-blue-600 dark:text-blue-400 font-mono mt-0.5 block">{countLeave}</span>
             </div>
-            <div className="bg-slate-50 border border-slate-200/60 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
-              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsMissPunch}</span>
-              <span className="text-sm sm:text-lg font-bold sm:font-black text-slate-700 font-mono mt-0.5 block">{countMissPunch}</span>
+            <div className="bg-slate-50 dark:bg-[#0c1a14] border border-slate-200/60 dark:border-[#1e3a2f] rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
+              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 dark:text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsMissPunch}</span>
+              <span className="text-sm sm:text-lg font-bold sm:font-black text-slate-700 dark:text-slate-200 font-mono mt-0.5 block">{countMissPunch}</span>
             </div>
-            <div className="bg-orange-50/30 border border-orange-100 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
-              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-[#03623c] uppercase tracking-wider sm:tracking-widest block truncate">{t.statsLate}</span>
-              <span className="text-sm sm:text-lg font-bold sm:font-black text-orange-600 font-mono mt-0.5 block">{countLate}</span>
+            <div className="bg-orange-50/30 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800/40 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs">
+              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-[#03623c] dark:text-emerald-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsLate}</span>
+              <span className="text-sm sm:text-lg font-bold sm:font-black text-orange-600 dark:text-orange-400 font-mono mt-0.5 block">{countLate}</span>
             </div>
-            <div className="bg-pink-50/30 border border-pink-100 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs col-span-3 sm:col-span-1">
-              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsEarly}</span>
-              <span className="text-sm sm:text-lg font-bold sm:font-black text-pink-600 font-mono mt-0.5 block">{countEarly}</span>
+            <div className="bg-pink-50/30 dark:bg-pink-950/20 border border-pink-100 dark:border-pink-800/40 rounded-lg sm:rounded-xl p-1.5 sm:p-3 text-center shadow-3xs col-span-3 sm:col-span-1">
+              <span className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 dark:text-slate-400 uppercase tracking-wider sm:tracking-widest block truncate">{t.statsEarly}</span>
+              <span className="text-sm sm:text-lg font-bold sm:font-black text-pink-600 dark:text-pink-400 font-mono mt-0.5 block">{countEarly}</span>
             </div>
           </div>
 
           {/* Calendar Grid */}
-          <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs bg-slate-50/20">
-            <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
-              <span className="text-xs font-extrabold text-slate-600 uppercase tracking-widest">{t.calendarHeader}</span>
-              <span className="text-[10px] font-mono font-bold text-[#03623c] bg-[#03623c]/5 px-2 py-0.5 rounded-lg">
+          <div className="border border-slate-200 dark:border-[#1e3a2f] rounded-2xl overflow-hidden shadow-xs bg-slate-50/20 dark:bg-[#0c1a14]">
+            <div className="bg-slate-50 dark:bg-[#11221b] px-4 py-3 border-b border-slate-200 dark:border-[#1e3a2f] flex justify-between items-center">
+              <span className="text-xs font-extrabold text-slate-600 dark:text-slate-300 uppercase tracking-widest">{t.calendarHeader}</span>
+              <span className="text-[10px] font-mono font-bold text-[#03623c] dark:text-emerald-400 bg-[#03623c]/5 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-transparent dark:border-emerald-800/50">
                 {selectedEmployee.name} ({selectedEmployee.department})
               </span>
             </div>
 
             {/* Weekdays Row */}
-            <div className="grid grid-cols-7 border-b border-slate-200 text-center bg-slate-50/60">
+            <div className="grid grid-cols-7 border-b border-slate-200 dark:border-[#1e3a2f] text-center bg-slate-50/60 dark:bg-[#0c1a14]">
               {WEEKDAYS.map((day, idx) => (
                 <div 
                   key={idx} 
                   className={`py-2 text-[10px] font-extrabold uppercase tracking-widest ${
-                    idx === 0 || idx === 6 ? 'text-slate-400' : 'text-slate-500'
+                    idx === 0 || idx === 6 ? 'text-slate-400 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400'
                   }`}
                 >
                   {day}
@@ -334,11 +379,11 @@ export default function MonthlyCalendarReport({
             </div>
 
             {/* Calendar Cells */}
-            <div className="grid grid-cols-7 gap-px bg-slate-200">
+            <div className="grid grid-cols-7 gap-px bg-slate-200 dark:bg-[#1e3a2f]">
               {gridCells.map((cell, idx) => {
                 if (cell.isEmpty) {
                   return (
-                    <div key={`empty-${idx}`} className="bg-slate-50/50 min-h-[48px] sm:min-h-[90px] p-1 sm:p-2"></div>
+                    <div key={`empty-${idx}`} className="bg-slate-50/50 dark:bg-[#07150e] min-h-[48px] sm:min-h-[90px] p-1 sm:p-2"></div>
                   );
                 }
 
@@ -350,36 +395,37 @@ export default function MonthlyCalendarReport({
                 const isEarly = rec ? isAttendanceEarlyGoing(rec, selectedEmployee.workTiming, adminSettings?.defaultCheckOut || '18:00') : false;
 
                 // Cell styling based on status
-                let cellBg = 'bg-white hover:bg-slate-50/70';
+                let cellBg = 'bg-white dark:bg-[#11221b] hover:bg-slate-50/70 dark:hover:bg-[#183328]';
                 let statusLabel = '';
                 let statusColor = '';
 
                 if (rec) {
-                  switch (rec.status) {
+                  const effectiveStatus = (rec.status === 'Miss Punch' && rec.approvalStatus === 'Approved') ? 'Present' : rec.status;
+                  switch (effectiveStatus) {
                     case 'Present':
-                      cellBg = 'bg-emerald-50/15 hover:bg-emerald-50/30';
+                      cellBg = 'bg-emerald-50/15 dark:bg-emerald-950/30 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/40';
                       statusLabel = language === 'en' ? 'P' : 'उप';
-                      statusColor = 'text-emerald-700 bg-emerald-100/50 border-emerald-200';
+                      statusColor = 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/50 dark:bg-emerald-900/60 border-emerald-200 dark:border-emerald-700';
                       break;
                     case 'Absent':
-                      cellBg = 'bg-rose-50/20 hover:bg-rose-50/30';
+                      cellBg = 'bg-rose-50/20 dark:bg-rose-950/30 hover:bg-rose-50/30 dark:hover:bg-rose-900/40';
                       statusLabel = language === 'en' ? 'A' : 'अनु';
-                      statusColor = 'text-rose-600 bg-rose-100/50 border-rose-200';
+                      statusColor = 'text-rose-600 dark:text-rose-300 bg-rose-100/50 dark:bg-rose-900/60 border-rose-200 dark:border-rose-700';
                       break;
                     case 'Half Day':
-                      cellBg = 'bg-amber-50/20 hover:bg-amber-50/30';
+                      cellBg = 'bg-amber-50/20 dark:bg-amber-950/30 hover:bg-amber-50/30 dark:hover:bg-amber-900/40';
                       statusLabel = language === 'en' ? 'HD' : 'आधा';
-                      statusColor = 'text-amber-700 bg-amber-100/50 border-amber-200';
+                      statusColor = 'text-amber-700 dark:text-amber-300 bg-amber-100/50 dark:bg-amber-900/60 border-amber-200 dark:border-amber-700';
                       break;
                     case 'Leave':
-                      cellBg = 'bg-blue-50/15 hover:bg-blue-50/30';
+                      cellBg = 'bg-blue-50/15 dark:bg-blue-950/30 hover:bg-blue-50/30 dark:hover:bg-blue-900/40';
                       statusLabel = language === 'en' ? 'L' : 'छुट्टी';
-                      statusColor = 'text-blue-700 bg-blue-100/50 border-blue-200';
+                      statusColor = 'text-blue-700 dark:text-blue-300 bg-blue-100/50 dark:bg-blue-900/60 border-blue-200 dark:border-blue-700';
                       break;
                     case 'Miss Punch':
-                      cellBg = 'bg-orange-50/15 hover:bg-orange-50/30';
+                      cellBg = 'bg-orange-50/15 dark:bg-orange-950/30 hover:bg-orange-50/30 dark:hover:bg-orange-900/40';
                       statusLabel = language === 'en' ? 'MP' : 'मिस';
-                      statusColor = 'text-slate-700 bg-orange-100/50 border-orange-200 border-dashed';
+                      statusColor = 'text-slate-700 dark:text-slate-200 bg-orange-100/50 dark:bg-orange-900/60 border-orange-200 dark:border-orange-700 border-dashed';
                       break;
                   }
                 }
@@ -387,11 +433,11 @@ export default function MonthlyCalendarReport({
                 return (
                   <div 
                     key={cell.dateStr} 
-                    className={`${cellBg} min-h-[48px] sm:min-h-[95px] p-1 sm:p-2 flex flex-col justify-between transition-colors relative border-r border-b border-slate-100`}
+                    className={`${cellBg} min-h-[48px] sm:min-h-[95px] p-1 sm:p-2 flex flex-col justify-between transition-colors relative border-r border-b border-slate-100 dark:border-[#1e3a2f]/60`}
                   >
                     {/* Top row: Day Number & Status Label */}
                     <div className="flex justify-between items-start">
-                      <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 font-mono">
+                      <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 dark:text-slate-200 font-mono">
                         {cell.dayNum}
                       </span>
                       {rec && (
@@ -407,57 +453,57 @@ export default function MonthlyCalendarReport({
                         <div className="space-y-px sm:space-y-0.5">
                           {/* Desktop Timings */}
                           <div className="hidden sm:block space-y-0.5">
-                            <div className="flex items-center justify-center gap-0.5 text-[9px] font-mono font-bold text-slate-600">
+                            <div className="flex items-center justify-center gap-0.5 text-[9px] font-mono font-bold text-slate-600 dark:text-slate-300">
                               <span>In:</span>
-                              <span className={isLate ? 'text-orange-600 font-extrabold' : ''}>
+                              <span className={isLate ? 'text-orange-600 dark:text-orange-400 font-extrabold' : 'dark:text-slate-200'}>
                                 {rec.checkIn || '--:--'}
                               </span>
                             </div>
-                            <div className="flex items-center justify-center gap-0.5 text-[9px] font-mono font-bold text-slate-600">
+                            <div className="flex items-center justify-center gap-0.5 text-[9px] font-mono font-bold text-slate-600 dark:text-slate-300">
                               <span>Out:</span>
-                              <span className={isEarly ? 'text-pink-600 font-extrabold' : ''}>
+                              <span className={isEarly ? 'text-pink-600 dark:text-pink-400 font-extrabold' : 'dark:text-slate-200'}>
                                 {rec.checkOut || '--:--'}
                               </span>
                             </div>
                           </div>
                           {/* Mobile Timings */}
-                          <div className="block sm:hidden text-[7px] font-mono font-bold text-slate-600 leading-none">
-                            <div className={isLate ? 'text-orange-600 font-black' : ''}>
+                          <div className="block sm:hidden text-[7px] font-mono font-bold text-slate-600 dark:text-slate-300 leading-none">
+                            <div className={isLate ? 'text-orange-600 dark:text-orange-400 font-black' : 'dark:text-slate-200'}>
                               {rec.checkIn || '--:--'}
                             </div>
-                            <div className="text-slate-300 text-[6px] my-[1px]">↓</div>
-                            <div className={isEarly ? 'text-pink-600 font-black' : ''}>
+                            <div className="text-slate-300 dark:text-slate-600 text-[6px] my-[1px]">↓</div>
+                            <div className={isEarly ? 'text-pink-600 dark:text-pink-400 font-black' : 'dark:text-slate-200'}>
                               {rec.checkOut || '--:--'}
                             </div>
                           </div>
                         </div>
                       ) : rec && rec.status === 'Leave' ? (
-                        <span className="text-[7.5px] sm:text-[9.5px] italic font-bold sm:font-semibold text-blue-600 truncate block">
+                        <span className="text-[7.5px] sm:text-[9.5px] italic font-bold sm:font-semibold text-blue-600 dark:text-blue-400 truncate block">
                           {rec.remarks || 'Leave'}
                         </span>
                       ) : rec && rec.status === 'Absent' ? (
-                        <span className="text-[7.5px] sm:text-[9.5px] italic font-bold sm:font-semibold text-rose-500 block">
+                        <span className="text-[7.5px] sm:text-[9.5px] italic font-bold sm:font-semibold text-rose-500 dark:text-rose-400 block">
                           Absent
                         </span>
                       ) : (
-                        <span className="text-[8px] sm:text-[9px] text-slate-300 font-bold block">-</span>
+                        <span className="text-[8px] sm:text-[9px] text-slate-300 dark:text-slate-600 font-bold block">-</span>
                       )}
                     </div>
 
                     {/* Bottom row: Mini badge icons for late / early */}
                     <div className="flex flex-wrap gap-0.5 justify-center min-h-[10px] sm:min-h-[14px]">
                       {isLate && (
-                        <span className="bg-orange-50 text-orange-600 text-[7px] sm:text-[8px] font-black px-0.5 sm:px-1 rounded-sm border border-orange-200/50 scale-90 uppercase">
+                        <span className="bg-orange-50 dark:bg-orange-950/90 text-orange-600 dark:text-orange-300 text-[7px] sm:text-[8px] font-black px-0.5 sm:px-1 rounded-sm border border-orange-200/50 dark:border-orange-800 scale-90 uppercase">
                           Late
                         </span>
                       )}
                       {isEarly && (
-                        <span className="bg-pink-50 text-pink-600 text-[7px] sm:text-[8px] font-black px-0.5 sm:px-1 rounded-sm border border-pink-200/50 scale-90 uppercase">
+                        <span className="bg-pink-50 dark:bg-pink-950/90 text-pink-600 dark:text-pink-300 text-[7px] sm:text-[8px] font-black px-0.5 sm:px-1 rounded-sm border border-pink-200/50 dark:border-pink-800 scale-90 uppercase">
                           Early
                         </span>
                       )}
-                      {rec && rec.status === 'Miss Punch' && (
-                        <span className="bg-slate-100 text-slate-600 text-[7px] sm:text-[8px] font-black px-0.5 sm:px-1 rounded-sm border border-slate-200 scale-90 uppercase">
+                      {rec && rec.status === 'Miss Punch' && rec.approvalStatus !== 'Approved' && (
+                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[7px] sm:text-[8px] font-black px-0.5 sm:px-1 rounded-sm border border-slate-200 dark:border-slate-700 scale-90 uppercase">
                           Miss
                         </span>
                       )}
@@ -469,41 +515,41 @@ export default function MonthlyCalendarReport({
           </div>
 
           {/* Color Legend and Helpful guide */}
-          <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-50 dark:bg-[#0c1a14] border border-slate-200/60 dark:border-[#1e3a2f] rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h4 className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2.5 flex items-center gap-1">
-                <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
+              <h4 className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1">
+                <HelpCircle className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                 <span>{t.legendTitle}</span>
               </h4>
-              <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
+              <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded bg-emerald-100 border border-emerald-200 block"></span>
+                  <span className="w-2.5 h-2.5 rounded bg-emerald-100 dark:bg-emerald-900 border border-emerald-200 dark:border-emerald-700 block"></span>
                   <span>{t.legendPresent}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded bg-rose-100 border border-rose-200 block"></span>
+                  <span className="w-2.5 h-2.5 rounded bg-rose-100 dark:bg-rose-900 border border-rose-200 dark:border-rose-700 block"></span>
                   <span>{t.legendAbsent}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-200 block"></span>
+                  <span className="w-2.5 h-2.5 rounded bg-amber-100 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 block"></span>
                   <span>{t.legendHalfDay}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded bg-blue-100 border border-blue-200 block"></span>
+                  <span className="w-2.5 h-2.5 rounded bg-blue-100 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 block"></span>
                   <span>{t.legendLeave}</span>
                 </div>
                 <div className="flex items-center gap-2 col-span-2">
-                  <span className="w-2.5 h-2.5 rounded bg-orange-100 border border-orange-200 border-dashed block"></span>
+                  <span className="w-2.5 h-2.5 rounded bg-orange-100 dark:bg-orange-900 border border-orange-200 dark:border-orange-700 border-dashed block"></span>
                   <span>{t.legendMissPunch}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col justify-center border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 md:pl-4">
-              <div className="flex items-start gap-2 text-[11px] text-slate-500 font-semibold">
+            <div className="flex flex-col justify-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-[#1e3a2f] pt-3 md:pt-0 md:pl-4">
+              <div className="flex items-start gap-2 text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
                 <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="font-extrabold text-slate-700">{t.legendLate} / {t.legendEarly}</p>
+                  <p className="font-extrabold text-slate-700 dark:text-slate-200">{t.legendLate} / {t.legendEarly}</p>
                   <p className="leading-relaxed">
                     {language === 'en' 
                       ? "Late badge is triggered if check-in exceeds the allowed shift start grace period. Early badge is shown if checkout is before the end of the shift."

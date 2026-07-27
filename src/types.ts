@@ -192,6 +192,27 @@ export interface AdminSettings {
   senderName?: string;
   senderEmail?: string;
   enablePasswordLoginOtp?: boolean;
+  // WhatsApp & Email Automation Settings
+  whatsappUsername?: string;
+  whatsappPassword?: string;
+  whatsappSenderNo?: string;
+  enableWhatsappAutomation?: boolean;
+  whatsappTemplates?: {
+    payslip?: string;
+    missPunch?: string;
+    leaveStatus?: string;
+    lateWarning?: string;
+    salaryDisbursed?: string;
+    customNotice?: string;
+  };
+  emailTemplates?: {
+    payslipSubject?: string;
+    payslipBody?: string;
+    missPunchSubject?: string;
+    missPunchBody?: string;
+    leaveSubject?: string;
+    leaveBody?: string;
+  };
   // Dynamic HR & Timings settings for Login subtabs
   hrContactEmail?: string;
   hrContactPhone?: string;

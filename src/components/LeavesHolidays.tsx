@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Award, Sparkles, MapPin, Briefcase, FileSpreadsheet, Search, CheckCircle, 
   Info, AlertCircle, Plus, CalendarDays, Clock, User, Download, Palmtree,
-  Edit2, Trash2, X, Save
+  Edit2, Trash2, X, Save, MessageSquare
 } from 'lucide-react';
 import { Employee, Attendance, AdminSettings, Holiday, LeaveRequest } from '../types';
+import { WhatsAppModal } from './WhatsAppModal';
 
 interface LeavesHolidaysProps {
   employees: Employee[];
@@ -140,6 +141,12 @@ export default function LeavesHolidays({
   const [subTab, setSubTab] = useState<'balance' | 'requests' | 'calendar'>('balance');
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All');
+
+  // WhatsApp modal state
+  const [waModalOpen, setWaModalOpen] = useState(false);
+  const [waRecipient, setWaRecipient] = useState<{ name: string; mobileNo?: string; email?: string }>({ name: '' });
+  const [waCategory, setWaCategory] = useState<'leaveStatus' | 'customNotice'>('leaveStatus');
+  const [waVars, setWaVars] = useState<Record<string, string | number | undefined>>({});
 
   // Leave Request Form States
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
@@ -496,14 +503,14 @@ export default function LeavesHolidays({
   return (
     <div className="space-y-4 sm:space-y-6" id="leaves-holidays-component">
       {/* Tab Selectors */}
-      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 sm:gap-4 bg-white p-2 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-xxs">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 sm:gap-4 bg-white dark:bg-[#11221b] p-2 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-[#1e3a2f] shadow-xxs">
         <div className="grid grid-cols-3 sm:flex gap-1 sm:gap-2 w-full sm:w-auto">
           <button
             onClick={() => setSubTab('balance')}
             className={`px-1.5 py-2 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer w-full ${
               subTab === 'balance' 
                 ? 'bg-emerald-600 text-white shadow-md' 
-                : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+                : 'bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#162e24]'
             }`}
           >
             <CalendarDays className="w-3.5 h-3.5 shrink-0" />
@@ -514,7 +521,7 @@ export default function LeavesHolidays({
             className={`px-1.5 py-2 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer w-full ${
               subTab === 'requests' 
                 ? 'bg-emerald-600 text-white shadow-md' 
-                : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+                : 'bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#162e24]'
             }`}
           >
             <Clock className="w-3.5 h-3.5 shrink-0" />
@@ -525,7 +532,7 @@ export default function LeavesHolidays({
             className={`px-1.5 py-2 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black transition-all flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 cursor-pointer w-full ${
               subTab === 'calendar' 
                 ? 'bg-emerald-600 text-white shadow-md' 
-                : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+                : 'bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#162e24]'
             }`}
           >
             <Calendar className="w-3.5 h-3.5 shrink-0" />
@@ -533,8 +540,8 @@ export default function LeavesHolidays({
           </button>
         </div>
  
-        <div className="text-[9.5px] sm:text-[11px] font-bold text-slate-500 bg-emerald-50 border border-emerald-100 px-2 py-1.5 rounded-lg flex items-center justify-center sm:justify-start gap-1 w-full sm:w-auto">
-          <Info className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600 shrink-0" />
+        <div className="text-[9.5px] sm:text-[11px] font-bold text-slate-500 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 px-2 py-1.5 rounded-lg flex items-center justify-center sm:justify-start gap-1 w-full sm:w-auto">
+          <Info className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span className="text-center sm:text-left">{language === 'en' ? "1 Paid Leave Added Automatically Each Month" : "प्रति माह 1 दिन सवेतन अवकाश जुड़ता है"}</span>
         </div>
       </div>
@@ -544,66 +551,66 @@ export default function LeavesHolidays({
         <div className="space-y-6">
           {isEmployeeView && employeeLeaveData ? (
             /* INDIVIDUAL EMPLOYEE VIEW */
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
-              <div className="flex items-center gap-3 border-b border-slate-150 pb-4">
-                <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-xl">
+            <div className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl p-6 shadow-xs space-y-6">
+              <div className="flex items-center gap-3 border-b border-slate-150 dark:border-[#1e3a2f] pb-4">
+                <div className="bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-800">
                   <User className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-800">{employeeLeaveData.name} ({employeeLeaveData.id})</h3>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{employeeLeaveData.designation} &bull; {employeeLeaveData.department}</p>
+                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">{employeeLeaveData.name} ({employeeLeaveData.id})</h3>
+                  <p className="text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest mt-0.5">{employeeLeaveData.designation} &bull; {employeeLeaveData.department}</p>
                 </div>
               </div>
 
               {/* Bento Grid Leaves Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-2 sm:gap-4">
-                <div className="bg-slate-50 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-slate-150 shadow-xxs">
-                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider block truncate">{t.startingBal}</p>
-                  <p className="text-sm sm:text-xl font-bold sm:font-black text-slate-700 mt-1 font-mono">{employeeLeaveData.openingEL} Days</p>
+                <div className="bg-slate-50 dark:bg-[#0b1812] p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-slate-150 dark:border-[#1e3a2f] shadow-xxs">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 dark:text-slate-400 uppercase tracking-wider block truncate">{t.startingBal}</p>
+                  <p className="text-sm sm:text-xl font-bold sm:font-black text-slate-700 dark:text-slate-200 mt-1 font-mono">{employeeLeaveData.openingEL} Days</p>
                 </div>
                 
-                <div className="bg-slate-50 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-slate-150 shadow-xxs">
-                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 uppercase tracking-wider block truncate">{t.monthlyEarned}</p>
-                  <p className="text-sm sm:text-xl font-bold sm:font-black text-slate-700 mt-1 font-mono">+{employeeLeaveData.accumulatedEL} Days</p>
-                  <p className="text-[7.5px] sm:text-[9px] text-slate-400 mt-0.5 font-bold block truncate">1 Day/month</p>
+                <div className="bg-slate-50 dark:bg-[#0b1812] p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-slate-150 dark:border-[#1e3a2f] shadow-xxs">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-slate-400 dark:text-slate-400 uppercase tracking-wider block truncate">{t.monthlyEarned}</p>
+                  <p className="text-sm sm:text-xl font-bold sm:font-black text-slate-700 dark:text-slate-200 mt-1 font-mono">+{employeeLeaveData.accumulatedEL} Days</p>
+                  <p className="text-[7.5px] sm:text-[9px] text-slate-400 dark:text-slate-400 mt-0.5 font-bold block truncate">1 Day/month</p>
                 </div>
 
-                <div className="bg-blue-50/55 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-blue-100 shadow-xxs">
-                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-blue-500 uppercase tracking-wider block truncate">{t.totalAccumulated}</p>
-                  <p className="text-sm sm:text-xl font-bold sm:font-black text-blue-700 mt-1 font-mono">{employeeLeaveData.totalGrantedEL} Days</p>
+                <div className="bg-blue-50/55 dark:bg-blue-950/40 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-blue-100 dark:border-blue-900/60 shadow-xxs">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-blue-500 dark:text-blue-400 uppercase tracking-wider block truncate">{t.totalAccumulated}</p>
+                  <p className="text-sm sm:text-xl font-bold sm:font-black text-blue-700 dark:text-blue-300 mt-1 font-mono">{employeeLeaveData.totalGrantedEL} Days</p>
                 </div>
 
-                <div className="bg-rose-50/50 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-rose-100 shadow-xxs">
-                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-rose-500 uppercase tracking-wider block truncate">{t.totalUsed}</p>
-                  <p className="text-sm sm:text-xl font-bold sm:font-black text-rose-700 mt-1 font-mono">{employeeLeaveData.usedEL} Days</p>
-                  <p className="text-[7.5px] sm:text-[9px] text-slate-400 mt-0.5 font-bold block truncate">From Logs</p>
+                <div className="bg-rose-50/50 dark:bg-rose-950/40 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-rose-100 dark:border-rose-900/60 shadow-xxs">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-rose-500 dark:text-rose-400 uppercase tracking-wider block truncate">{t.totalUsed}</p>
+                  <p className="text-sm sm:text-xl font-bold sm:font-black text-rose-700 dark:text-rose-300 mt-1 font-mono">{employeeLeaveData.usedEL} Days</p>
+                  <p className="text-[7.5px] sm:text-[9px] text-slate-400 dark:text-slate-400 mt-0.5 font-bold block truncate">From Logs</p>
                 </div>
 
-                <div className="bg-emerald-50 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-emerald-150 shadow-xxs col-span-2 md:col-span-1">
-                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-emerald-600 uppercase tracking-wider block truncate">{t.availableBal}</p>
-                  <p className="text-base sm:text-2xl font-bold sm:font-black text-emerald-700 mt-1 font-mono">{employeeLeaveData.remainingEL} Days</p>
+                <div className="bg-emerald-50 dark:bg-emerald-950/60 p-2.5 sm:p-4 rounded-lg sm:rounded-xl border border-emerald-150 dark:border-emerald-800 shadow-xxs col-span-2 md:col-span-1">
+                  <p className="text-[8px] sm:text-[9px] font-extrabold sm:font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block truncate">{t.availableBal}</p>
+                  <p className="text-base sm:text-2xl font-bold sm:font-black text-emerald-700 dark:text-emerald-300 mt-1 font-mono">{employeeLeaveData.remainingEL} Days</p>
                 </div>
               </div>
 
               {/* Extra CL Display if applicable */}
               {employeeLeaveData.openingCL > 0 && (
-                <div className="bg-amber-50/40 border border-amber-100 rounded-xl p-3 flex items-center justify-between text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-amber-800">
-                    <Info className="w-4 h-4 text-amber-600" />
+                <div className="bg-amber-50/40 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/60 rounded-xl p-3 flex items-center justify-between text-xs font-semibold">
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                    <Info className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                     <span>Casual Leave (CL) Balance also available</span>
                   </div>
-                  <span className="font-mono text-amber-700 font-bold bg-amber-100/50 px-2.5 py-1 rounded-lg">{employeeLeaveData.openingCL} Days</span>
+                  <span className="font-mono text-amber-700 dark:text-amber-300 font-bold bg-amber-100/50 dark:bg-amber-900/50 px-2.5 py-1 rounded-lg">{employeeLeaveData.openingCL} Days</span>
                 </div>
               )}
             </div>
           ) : (
             /* ADMIN COMPREHENSIVE TABLE VIEW */
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+            <div className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl overflow-hidden shadow-xs">
               
               {/* Header Filters */}
-              <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row gap-3 items-center justify-between">
-                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <div className="p-4 bg-slate-50 dark:bg-[#0c1a14] border-b border-slate-200 dark:border-[#1e3a2f] flex flex-col md:flex-row gap-3 items-center justify-between">
+                <h3 className="text-xs font-extrabold text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>{t.leaveBalanceReport}</span>
                 </h3>
 
@@ -618,7 +625,7 @@ export default function LeavesHolidays({
                       placeholder={t.searchEmp}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white font-medium"
+                      className="w-full pl-9 pr-3 py-1.5 border border-slate-200 dark:border-[#1e3a2f] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 font-medium"
                     />
                   </div>
 
@@ -626,10 +633,10 @@ export default function LeavesHolidays({
                   <select
                     value={departmentFilter}
                     onChange={(e) => setDepartmentFilter(e.target.value)}
-                    className="appearance-none border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white cursor-pointer"
+                    className="appearance-none border border-slate-200 dark:border-[#1e3a2f] rounded-lg px-3 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 cursor-pointer"
                   >
                     {departments.map(d => (
-                      <option key={d} value={d}>
+                      <option key={d} value={d} className="dark:bg-[#11221b]">
                         {d === 'All' ? t.allDepts : d}
                       </option>
                     ))}
@@ -641,7 +648,7 @@ export default function LeavesHolidays({
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                    <tr className="bg-slate-100 dark:bg-[#0f2b20] border-b border-slate-200 dark:border-[#1e3a2f] text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       <th className="py-3 px-4">{t.empId}</th>
                       <th className="py-3 px-4">{t.empName}</th>
                       <th className="py-3 px-4">{t.dept}</th>
@@ -649,38 +656,38 @@ export default function LeavesHolidays({
                       <th className="py-3 px-4 text-center">{t.openingEL}</th>
                       <th className="py-3 px-4 text-center">{t.monthlyEL}</th>
                       <th className="py-3 px-4 text-center">{t.totalGranted}</th>
-                      <th className="py-3 px-4 text-center text-rose-600">{t.usedLeaves}</th>
-                      <th className="py-3 px-4 text-center text-emerald-700 bg-emerald-50/30">{t.remainingEL}</th>
+                      <th className="py-3 px-4 text-center text-rose-600 dark:text-rose-400">{t.usedLeaves}</th>
+                      <th className="py-3 px-4 text-center text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-950/40">{t.remainingEL}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
+                  <tbody className="divide-y divide-slate-100 dark:divide-[#1e3a2f] font-medium">
                     {filteredLeaveList.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-slate-400 font-bold">
+                        <td colSpan={9} className="py-12 text-center text-slate-400 dark:text-slate-500 font-bold">
                           No employees found matching the filters
                         </td>
                       </tr>
                     ) : (
                       filteredLeaveList.map(item => (
-                        <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="py-3 px-4 font-mono font-bold text-slate-800">{item.id}</td>
-                          <td className="py-3 px-4 text-slate-900 font-bold">
+                        <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-800 dark:text-slate-200">{item.id}</td>
+                          <td className="py-3 px-4 text-slate-900 dark:text-slate-100 font-bold">
                             <div>{item.name}</div>
-                            <span className="text-[10px] text-slate-400 font-medium">{item.designation}</span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{item.designation}</span>
                           </td>
-                          <td className="py-3 px-4 text-slate-600">{item.department}</td>
-                          <td className="py-3 px-4 text-center font-mono text-slate-500 text-[10px]">{item.joiningDate}</td>
-                          <td className="py-3 px-4 text-center font-mono text-slate-700">{item.openingEL}</td>
-                          <td className="py-3 px-4 text-center font-mono text-slate-600" title={`${calculateTenureMonths(item.joiningDate)} months of tenure`}>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{item.department}</td>
+                          <td className="py-3 px-4 text-center font-mono text-slate-500 dark:text-slate-400 text-[10px]">{item.joiningDate}</td>
+                          <td className="py-3 px-4 text-center font-mono text-slate-700 dark:text-slate-200">{item.openingEL}</td>
+                          <td className="py-3 px-4 text-center font-mono text-slate-600 dark:text-slate-300" title={`${calculateTenureMonths(item.joiningDate)} months of tenure`}>
                             +{item.accumulatedEL}
                           </td>
-                          <td className="py-3 px-4 text-center font-mono font-extrabold text-blue-600 bg-blue-50/10">
+                          <td className="py-3 px-4 text-center font-mono font-extrabold text-blue-600 dark:text-blue-400 bg-blue-50/10 dark:bg-blue-950/30">
                             {item.totalGrantedEL}
                           </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-rose-600">
+                          <td className="py-3 px-4 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
                             {item.usedEL}
                           </td>
-                          <td className="py-3 px-4 text-center font-mono font-black text-emerald-700 bg-emerald-50/30">
+                          <td className="py-3 px-4 text-center font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-950/40">
                             {item.remainingEL}
                           </td>
                         </tr>
@@ -693,13 +700,13 @@ export default function LeavesHolidays({
           )}
 
           {/* POLICY NOTE CARD (Matching Uploaded Image rules) */}
-          <div className="bg-slate-900 text-slate-200 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 relative overflow-hidden">
+          <div className="bg-emerald-950/5 dark:bg-[#11221b] text-slate-800 dark:text-slate-200 border border-emerald-200/80 dark:border-[#1e3a2f] rounded-2xl p-5 shadow-xs space-y-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            <h4 className="text-xs font-extrabold text-[#10b981] uppercase tracking-widest flex items-center gap-2">
+            <h4 className="text-xs font-extrabold text-[#03623c] dark:text-[#10b981] uppercase tracking-widest flex items-center gap-2">
               <Award className="w-4 h-4" />
               <span>{t.notes}</span>
             </h4>
-            <ul className="space-y-2 text-xs font-bold text-slate-300">
+            <ul className="space-y-2 text-xs font-bold text-slate-700 dark:text-slate-300">
               <li className="flex items-start gap-2.5">
                 <span className="text-[#10b981] mt-0.5">•</span>
                 <span>{t.note1}</span>
@@ -720,14 +727,14 @@ export default function LeavesHolidays({
       {/* LEAVE REQUESTS / APPLICATIONS TAB */}
       {subTab === 'requests' && (
         <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+          <div className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl p-6 shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>{language === 'en' ? 'Leave Applications & Workflow' : 'छुट्टी के आवेदन और कार्यप्रवाह'}</span>
                 </h3>
-                <p className="text-[11px] font-bold text-slate-400 mt-0.5">
+                <p className="text-[11px] font-bold text-slate-400 dark:text-slate-400 mt-0.5">
                   {isEmployeeView 
                     ? (language === 'en' ? 'Apply and monitor your leave status below.' : 'नीचे अपनी छुट्टी का स्टेटस सबमिट और ट्रैक करें।')
                     : (language === 'en' ? 'Review, approve or reject staff leave applications.' : 'कर्मचारियों की छुट्टी के आवेदनों की समीक्षा और निर्णय लें।')}
@@ -756,11 +763,11 @@ export default function LeavesHolidays({
             </div>
 
             {/* Filters */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-slate-50 dark:bg-[#0c1a14] p-4 rounded-xl border border-slate-150 dark:border-[#1e3a2f] grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Search by Name (Admins Only) */}
               {!isEmployeeView ? (
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                  <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                     {language === 'en' ? 'Search Employee' : 'कर्मचारी खोजें'}
                   </label>
                   <div className="relative">
@@ -772,13 +779,13 @@ export default function LeavesHolidays({
                       placeholder={language === 'en' ? 'Name or ID...' : 'नाम या आईडी...'}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white font-semibold"
+                      className="w-full pl-9 pr-3 py-1.5 border border-slate-200 dark:border-[#1e3a2f] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 font-semibold"
                     />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center">
-                  <span className="text-[11px] font-bold text-slate-500">
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
                     {language === 'en' ? 'Showing your personal leave records' : 'आपके व्यक्तिगत अवकाश रिकॉर्ड दिखाए जा रहे हैं'}
                   </span>
                 </div>
@@ -786,39 +793,39 @@ export default function LeavesHolidays({
 
               {/* Status Filter */}
               <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                   {language === 'en' ? 'Status' : 'स्थिति'}
                 </label>
                 <select
                   value={filterLeaveStatus}
                   onChange={(e) => setFilterLeaveStatus(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none bg-white cursor-pointer"
+                  className="w-full border border-slate-200 dark:border-[#1e3a2f] rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 cursor-pointer"
                 >
-                  <option value="All">{language === 'en' ? 'All Statuses' : 'सभी स्थितियां'}</option>
-                  <option value="Pending">{language === 'en' ? 'Pending' : 'लंबित'}</option>
-                  <option value="Approved">{language === 'en' ? 'Approved' : 'स्वीकृत'}</option>
-                  <option value="Rejected">{language === 'en' ? 'Rejected' : 'अस्वीकृत'}</option>
+                  <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Statuses' : 'सभी स्थितियां'}</option>
+                  <option value="Pending" className="dark:bg-[#11221b]">{language === 'en' ? 'Pending' : 'लंबित'}</option>
+                  <option value="Approved" className="dark:bg-[#11221b]">{language === 'en' ? 'Approved' : 'स्वीकृत'}</option>
+                  <option value="Rejected" className="dark:bg-[#11221b]">{language === 'en' ? 'Rejected' : 'अस्वीकृत'}</option>
                 </select>
               </div>
 
               {/* Type Filter */}
               <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                   {language === 'en' ? 'Leave/Exception Type' : 'अवकाश का प्रकार'}
                 </label>
                 <select
                   value={filterLeaveType}
                   onChange={(e) => setFilterLeaveType(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none bg-white cursor-pointer"
+                  className="w-full border border-slate-200 dark:border-[#1e3a2f] rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 cursor-pointer"
                 >
-                  <option value="All">{language === 'en' ? 'All Types' : 'सभी प्रकार'}</option>
-                  <option value="Vacation">{language === 'en' ? 'Vacation' : 'वार्षिक छुट्टी (Vacation)'}</option>
-                  <option value="Sick">{language === 'en' ? 'Sick' : 'बीमारी छुट्टी (Sick)'}</option>
-                  <option value="Casual">{language === 'en' ? 'Casual' : 'आकस्मिक छुट्टी (Casual)'}</option>
-                  <option value="Half Day (Before Lunch)">{language === 'en' ? 'Half Day (Before Lunch)' : 'आधा दिन (लंच से पहले)'}</option>
-                  <option value="Half Day (After Lunch)">{language === 'en' ? 'Half Day (After Lunch)' : 'आधा दिन (लंच के बाद)'}</option>
-                  <option value="Late Coming">{language === 'en' ? 'Late Coming' : 'देर से आना (Late Coming)'}</option>
-                  <option value="Early Going">{language === 'en' ? 'Early Going' : 'जल्दी जाना (Early Going)'}</option>
+                  <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Types' : 'सभी प्रकार'}</option>
+                  <option value="Vacation" className="dark:bg-[#11221b]">{language === 'en' ? 'Vacation' : 'वार्षिक छुट्टी (Vacation)'}</option>
+                  <option value="Sick" className="dark:bg-[#11221b]">{language === 'en' ? 'Sick' : 'बीमारी छुट्टी (Sick)'}</option>
+                  <option value="Casual" className="dark:bg-[#11221b]">{language === 'en' ? 'Casual' : 'आकस्मिक छुट्टी (Casual)'}</option>
+                  <option value="Half Day (Before Lunch)" className="dark:bg-[#11221b]">{language === 'en' ? 'Half Day (Before Lunch)' : 'आधा दिन (लंच से पहले)'}</option>
+                  <option value="Half Day (After Lunch)" className="dark:bg-[#11221b]">{language === 'en' ? 'Half Day (After Lunch)' : 'आधा दिन (लंच के बाद)'}</option>
+                  <option value="Late Coming" className="dark:bg-[#11221b]">{language === 'en' ? 'Late Coming' : 'देर से आना (Late Coming)'}</option>
+                  <option value="Early Going" className="dark:bg-[#11221b]">{language === 'en' ? 'Early Going' : 'जल्दी जाना (Early Going)'}</option>
                 </select>
               </div>
             </div>
@@ -826,10 +833,10 @@ export default function LeavesHolidays({
             {/* List Table container */}
             <div className="space-y-3">
               {/* Desktop Table View (Hidden on Mobile) */}
-              <div className="hidden md:block overflow-x-auto border border-slate-150 rounded-xl">
+              <div className="hidden md:block overflow-x-auto border border-slate-150 dark:border-[#1e3a2f] rounded-xl">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                    <tr className="bg-slate-100 dark:bg-[#0c1a14] border-b border-slate-200 dark:border-[#1e3a2f] text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {!isEmployeeView && <th className="py-3 px-4">{language === 'en' ? 'Employee' : 'कर्मचारी'}</th>}
                       <th className="py-3 px-4">{language === 'en' ? 'Type' : 'प्रकार'}</th>
                       <th className="py-3 px-4">{language === 'en' ? 'Duration / Dates' : 'अवधि / तिथियां'}</th>
@@ -838,7 +845,7 @@ export default function LeavesHolidays({
                       <th className="py-3 px-4 text-center">{language === 'en' ? 'Details / Actions' : 'कार्रवाई / टिप्पणी'}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
+                  <tbody className="divide-y divide-slate-100 dark:divide-[#1e3a2f] font-medium text-slate-800 dark:text-slate-200">
                     {(() => {
                       const filtered = leaveRequests.filter(req => {
                         if (isEmployeeView && req.employeeId.toLowerCase() !== (employeeId || '').toLowerCase()) {
@@ -930,21 +937,51 @@ export default function LeavesHolidays({
                                   </button>
                                 </div>
                               ) : (
-                                <div className="text-left max-w-xs text-[10px] leading-relaxed text-slate-500 font-medium">
-                                  {req.approvedBy && (
-                                    <div>
-                                      <span className="font-extrabold text-slate-600">{language === 'en' ? 'Processed by:' : 'द्वारा प्रोसेस:'} </span>
-                                      {req.approvedBy}
-                                    </div>
-                                  )}
-                                  {req.remarks && (
-                                    <div className="italic mt-0.5">
-                                      <span className="font-extrabold text-slate-600">{language === 'en' ? 'Remarks:' : 'टिप्पणी:'} </span>
-                                      "{req.remarks}"
-                                    </div>
-                                  )}
-                                  {!req.approvedBy && !req.remarks && (
-                                    <span className="text-slate-400">-</span>
+                                <div className="text-left max-w-xs text-[10px] leading-relaxed text-slate-500 font-medium flex items-center justify-between gap-2">
+                                  <div>
+                                    {req.approvedBy && (
+                                      <div>
+                                        <span className="font-extrabold text-slate-600">{language === 'en' ? 'Processed by:' : 'द्वारा प्रोसेस:'} </span>
+                                        {req.approvedBy}
+                                      </div>
+                                    )}
+                                    {req.remarks && (
+                                      <div className="italic mt-0.5">
+                                        <span className="font-extrabold text-slate-600">{language === 'en' ? 'Remarks:' : 'टिप्पणी:'} </span>
+                                        "{req.remarks}"
+                                      </div>
+                                    )}
+                                    {!req.approvedBy && !req.remarks && (
+                                      <span className="text-slate-400">-</span>
+                                    )}
+                                  </div>
+
+                                  {!isEmployeeView && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const emp = employees.find(e => e.id === req.employeeId);
+                                        setWaRecipient({
+                                          name: req.employeeName,
+                                          mobileNo: emp?.mobileNo || emp?.personalMobileNo,
+                                          email: emp?.email || emp?.personalEmail
+                                        });
+                                        setWaCategory('leaveStatus');
+                                        setWaVars({
+                                          DATES: `${req.startDate} to ${req.endDate || req.startDate}`,
+                                          LEAVE_TYPE: req.leaveType,
+                                          STATUS: req.status,
+                                          REMARKS: req.remarks || 'None',
+                                          BY: req.approvedBy || 'HR Admin'
+                                        });
+                                        setWaModalOpen(true);
+                                      }}
+                                      className="p-1 px-2 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold shrink-0"
+                                      title="Notify Employee on WhatsApp"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                      <span>WhatsApp</span>
+                                    </button>
                                   )}
                                 </div>
                               )}
@@ -1085,7 +1122,7 @@ export default function LeavesHolidays({
       {subTab === 'calendar' && (
         <div className="space-y-6">
           {/* BEAUTIFUL RATHI'S BUILD MART HOLIDAY POSTER PANEL */}
-          <div className="bg-white border border-slate-250 rounded-2xl shadow-md overflow-hidden font-sans">
+          <div className="bg-white dark:bg-[#11221b] border border-slate-250 dark:border-[#1e3a2f] rounded-2xl shadow-md overflow-hidden font-sans">
             {/* Header Poster Top (Mirroring the uploaded image brand style) */}
             <div className="relative bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 py-8 px-6 text-center text-white border-b-4 border-amber-500 flex flex-col items-center">
               {/* Floating Orange Corner Accent */}
@@ -1130,10 +1167,10 @@ export default function LeavesHolidays({
             </div>
 
             {/* List Table directly matching Image layout */}
-            <div className="p-4 md:p-6 bg-slate-50/50">
+            <div className="p-4 md:p-6 bg-slate-50/50 dark:bg-[#0c1a14]/50">
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+                <table className="w-full text-left border-collapse text-xs bg-white dark:bg-[#11221b] rounded-xl border border-slate-200 dark:border-[#1e3a2f] overflow-hidden shadow-xs">
                   <thead>
                     <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider">
                       <th className="py-3 px-4 text-center w-16">#</th>
@@ -1146,28 +1183,28 @@ export default function LeavesHolidays({
                       )}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-150 font-bold text-slate-700">
+                  <tbody className="divide-y divide-slate-150 dark:divide-[#1e3a2f] font-bold text-slate-700 dark:text-slate-200">
                     {holidays.map((h, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-[#162e24] transition-colors">
                         <td className="py-4 px-4 text-center text-lg">{h.imgUrl}</td>
-                        <td className="py-4 px-4 text-slate-900 font-extrabold text-sm">
+                        <td className="py-4 px-4 text-slate-900 dark:text-slate-100 font-extrabold text-sm">
                           {language === 'en' ? h.occasion : h.hindiOccasion}
                         </td>
                         <td className="py-4 px-4">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${
                             h.type.includes('National') 
-                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                              ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800' 
                               : h.type.includes('Religious') 
-                                ? 'bg-purple-100 text-purple-800 border border-purple-200' 
-                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800' 
+                                : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                           }`}>
                             {language === 'en' ? h.type : h.hindiType}
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-slate-800 font-semibold font-mono text-xs">
+                        <td className="py-4 px-4 text-slate-800 dark:text-slate-200 font-semibold font-mono text-xs">
                           {h.date}
                         </td>
-                        <td className="py-4 px-4 text-center font-extrabold text-slate-900">
+                        <td className="py-4 px-4 text-center font-extrabold text-slate-900 dark:text-slate-100">
                           {language === 'en' ? h.duration : h.hindiDuration}
                         </td>
                         {!isEmployeeView && (
@@ -1175,14 +1212,14 @@ export default function LeavesHolidays({
                             <div className="flex items-center justify-center gap-1.5">
                               <button
                                 onClick={() => handleOpenEditHolidayModal(h, idx)}
-                                className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                                className="p-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-all cursor-pointer"
                                 title={language === 'en' ? 'Edit Holiday' : 'अवकाश संपादित करें'}
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteHoliday(idx)}
-                                className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                className="p-1.5 text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-all cursor-pointer"
                                 title={language === 'en' ? 'Delete Holiday' : 'अवकाश हटाएं'}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1199,21 +1236,21 @@ export default function LeavesHolidays({
               {/* Mobile Card View */}
               <div className="block md:hidden space-y-3">
                 {holidays.map((h, idx) => (
-                  <div key={idx} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xxs flex items-center justify-between gap-3">
+                  <div key={idx} className="bg-white dark:bg-[#11221b] p-3.5 rounded-xl border border-slate-200 dark:border-[#1e3a2f] shadow-xxs flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="text-2xl shrink-0 w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center">
+                      <div className="text-2xl shrink-0 w-10 h-10 rounded-lg bg-slate-50 dark:bg-[#0b1812] flex items-center justify-center">
                         {h.imgUrl}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="font-extrabold text-slate-900 text-sm truncate">
+                        <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm truncate">
                           {language === 'en' ? h.occasion : h.hindiOccasion}
                         </h4>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <span className="font-mono text-[10px] font-bold text-slate-500">
+                          <span className="font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400">
                             {h.date}
                           </span>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-[9px] font-extrabold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded">
+                          <span className="text-slate-300 dark:text-slate-600">•</span>
+                          <span className="text-[9px] font-extrabold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-[#0c1a14] px-1.5 py-0.2 rounded">
                             {language === 'en' ? h.duration : h.hindiDuration}
                           </span>
                         </div>
@@ -1223,10 +1260,10 @@ export default function LeavesHolidays({
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide ${
                         h.type.includes('National') 
-                          ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                          ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800' 
                           : h.type.includes('Religious') 
-                            ? 'bg-purple-100 text-purple-800 border border-purple-200' 
-                            : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800' 
+                            : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                       }`}>
                         {language === 'en' ? h.type.split(' ')[0] : h.hindiType.split(' ')[0]}
                       </span>
@@ -1235,14 +1272,14 @@ export default function LeavesHolidays({
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleOpenEditHolidayModal(h, idx)}
-                            className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md transition-all cursor-pointer"
+                            className="p-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-md transition-all cursor-pointer"
                             title={language === 'en' ? 'Edit' : 'संपादित करें'}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteHoliday(idx)}
-                            className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
+                            className="p-1 text-rose-600 dark:text-rose-400 hover:text-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-md transition-all cursor-pointer"
                             title={language === 'en' ? 'Delete' : 'हटाएं'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1705,6 +1742,18 @@ export default function LeavesHolidays({
             </form>
           </div>
         </div>
+      )}
+
+      {/* WhatsApp Modal Dispatcher */}
+      {adminSettings && (
+        <WhatsAppModal
+          isOpen={waModalOpen}
+          onClose={() => setWaModalOpen(false)}
+          settings={adminSettings}
+          recipient={waRecipient}
+          defaultCategory={waCategory}
+          variables={waVars}
+        />
       )}
     </div>
   );

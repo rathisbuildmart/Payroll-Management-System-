@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Plus Jakarta Sans", "Inter", sans-serif;
@@ -18,10 +20,249 @@
   --border: #e2e8f0;
 }
 
+.dark {
+  --bg: #0a120e;
+  --sidebar: #031c12;
+  --card: #11221b;
+  --text-main: #f1f5f9;
+  --text-sub: #94a3b8;
+  --primary: #10b981;
+  --border: #1e3a2f;
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   COMPREHENSIVE DARK MODE STYLING OVERRIDES
+   ========================================================================== */
+
+html.dark, body.dark, .dark {
+  background-color: #0a120e !important;
+  color: #f1f5f9 !important;
+}
+
+/* Container & Card Backgrounds */
+.dark .bg-white,
+.dark .bg-slate-900\/50,
+.dark [class*="bg-white/"],
+.dark [class*="bg-white "] {
+  background-color: #11221b !important;
+  color: #f1f5f9;
+}
+
+.dark .bg-gray-50,
+.dark .bg-slate-50,
+.dark .bg-\[\#f8fafc\],
+.dark .bg-gray-100,
+.dark .bg-slate-100,
+.dark .bg-emerald-50\/20,
+.dark .bg-gray-50\/30,
+.dark .bg-gray-50\/50,
+.dark .bg-gray-50\/70,
+.dark [class*="bg-slate-50/"],
+.dark [class*="bg-slate-100/"] {
+  background-color: #0b1812 !important;
+}
+
+/* Alert & Highlight Panels */
+.dark .bg-amber-50,
+.dark .bg-amber-50\/70,
+.dark .bg-amber-50\/50,
+.dark .bg-amber-50\/40,
+.dark .bg-amber-50\/30,
+.dark .bg-amber-50\/10,
+.dark .bg-yellow-50 {
+  background-color: #261a0c !important;
+  border-color: #4d3312 !important;
+  color: #fde047 !important;
+}
+
+.dark .bg-emerald-50,
+.dark .bg-emerald-50\/70,
+.dark .bg-emerald-50\/50,
+.dark .bg-emerald-50\/30,
+.dark .bg-emerald-50\/20,
+.dark .bg-emerald-50\/10,
+.dark .bg-green-50 {
+  background-color: #0b261b !important;
+  border-color: #124d35 !important;
+  color: #6ee7b7 !important;
+}
+
+.dark .bg-red-50,
+.dark .bg-rose-50,
+.dark .bg-rose-50\/50,
+.dark .bg-rose-50\/30,
+.dark .bg-rose-50\/20,
+.dark .bg-rose-50\/10,
+.dark .bg-rose-50\/70 {
+  background-color: #2a1117 !important;
+  border-color: #531722 !important;
+  color: #fca5a5 !important;
+}
+
+.dark .bg-blue-50,
+.dark .bg-blue-50\/50,
+.dark .bg-blue-50\/30,
+.dark .bg-blue-50\/20,
+.dark .bg-blue-50\/10 {
+  background-color: #0e1c2e !important;
+  border-color: #1d3b61 !important;
+  color: #93c5fd !important;
+}
+
+.dark .bg-teal-50,
+.dark .bg-teal-50\/50,
+.dark .bg-teal-50\/30 {
+  background-color: #0c2826 !important;
+  border-color: #124d47 !important;
+  color: #5eead4 !important;
+}
+
+/* Status Text Colors Override for Dark Mode Contrast */
+.dark .text-emerald-600,
+.dark .text-emerald-700,
+.dark .text-emerald-800,
+.dark .text-emerald-900,
+.dark .text-emerald-950,
+.dark .text-green-600,
+.dark .text-green-700,
+.dark .text-[#03623c],
+.dark .text-[#024d2e] {
+  color: #34d399 !important;
+}
+
+.dark .text-blue-500,
+.dark .text-blue-600,
+.dark .text-blue-700,
+.dark .text-blue-800 {
+  color: #60a5fa !important;
+}
+
+.dark .text-rose-500,
+.dark .text-rose-600,
+.dark .text-rose-700,
+.dark .text-red-500,
+.dark .text-red-600,
+.dark .text-red-700 {
+  color: #f87171 !important;
+}
+
+.dark .text-amber-500,
+.dark .text-amber-600,
+.dark .text-amber-700,
+.dark .text-amber-800,
+.dark .text-yellow-600,
+.dark .text-yellow-700 {
+  color: #fbbf24 !important;
+}
+
+.dark .text-teal-600,
+.dark .text-teal-700,
+.dark .text-teal-800 {
+  color: #2dd4bf !important;
+}
+
+.dark .text-indigo-600,
+.dark .text-indigo-700,
+.dark .text-indigo-800 {
+  color: #818cf8 !important;
+}
+
+/* General Text Colors */
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-gray-700,
+.dark .text-\[\#1e293b\],
+.dark .text-emerald-950 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-gray-600,
+.dark .text-slate-600,
+.dark .text-gray-500,
+.dark .text-slate-500,
+.dark .text-gray-500\/80 {
+  color: #94a3b8 !important;
+}
+
+.dark .text-gray-400,
+.dark .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Borders */
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-300,
+.dark .border-\[\#e2e8f0\],
+.dark .border-gray-200\/50,
+.dark .border-gray-200\/20 {
+  border-color: #1e3a2f !important;
+}
+
+/* Form Controls: Inputs, Selects, Textareas */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]),
+.dark select,
+.dark textarea {
+  background-color: #0b1812 !important;
+  color: #f1f5f9 !important;
+  border-color: #1e3a2f !important;
+}
+
+.dark select option {
+  background-color: #11221b !important;
+  color: #f1f5f9 !important;
+}
+
+/* Modals & Dialogs */
+.dark .fixed .bg-white,
+.dark .absolute .bg-white {
+  background-color: #11221b !important;
+  border-color: #1e3a2f !important;
+  color: #f1f5f9 !important;
+}
+
+/* Recharts & Visualizations */
+.dark .recharts-cartesian-grid line {
+  stroke: #1e3a2f !important;
+}
+
+.dark .recharts-text {
+  fill: #94a3b8 !important;
+}
+
+.dark .recharts-default-tooltip {
+  background-color: #11221b !important;
+  border-color: #1e3a2f !important;
+  color: #f1f5f9 !important;
+}
+
+.dark .recharts-tooltip-item-name,
+.dark .recharts-tooltip-item-value {
+  color: #f1f5f9 !important;
+}
+
 body {
   background-color: var(--bg);
   color: var(--text-main);
   font-family: var(--font-sans);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark table th {
+  background-color: #0f2b20 !important;
+  color: #94a3b8 !important;
+  border-bottom-color: #1e3a2f !important;
+}
+
+.dark table td {
+  border-bottom-color: #162e24 !important;
 }
 
 /* Compact Scrollbars */

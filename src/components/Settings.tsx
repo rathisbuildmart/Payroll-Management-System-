@@ -31,9 +31,25 @@ import {
   MapPin,
   Locate,
   Mail,
-  Send
+  Send,
+  MessageSquare,
+  Smartphone,
+  FileSpreadsheet,
+  Key,
+  Copy,
+  ExternalLink,
+  Sparkles,
+  RefreshCcw,
+  Info
 } from 'lucide-react';
 import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog } from '../types';
+import { 
+  DEFAULT_WHATSAPP_TEMPLATES, 
+  DEFAULT_EMAIL_TEMPLATES, 
+  buildMessageAutoSenderUrl, 
+  buildMessageAutoSenderExcelFormula,
+  formatPhoneNumber
+} from '../utils/whatsappHelper';
 
 interface SettingsProps {
   settings: AdminSettings;
@@ -220,8 +236,14 @@ export default function Settings({
   onClearAuditLogs,
   portalUser
 }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'roles_permissions' | 'audit_logs' | 'email_smtp'>('company');
+  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'roles_permissions' | 'audit_logs' | 'email_smtp' | 'whatsapp_auto'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
+  
+  // WhatsApp test states
+  const [waTestMobile, setWaTestMobile] = useState(() => settings.whatsappSenderNo || '8518880943');
+  const [waTestName, setWaTestName] = useState('Rahul Sharma');
+  const [copiedWaFormula, setCopiedWaFormula] = useState(false);
+  const [formulaMode, setFormulaMode] = useState<'direct' | 'cellRef'>('direct');
   
   // User Roles & Access states
   const [newAccName, setNewAccName] = useState('');
@@ -891,37 +913,37 @@ export default function Settings({
   });
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden" id="admin-settings-container">
+    <div className="bg-white dark:bg-[#11221b] rounded-lg border border-gray-200 dark:border-[#1e3a2f] shadow-sm overflow-hidden" id="admin-settings-container">
       {/* Admin Title Banner */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-950 text-white p-6 border-b border-slate-700">
+      <div className="bg-gradient-to-r from-[#03623c] to-[#024d2e] dark:from-[#06120c] dark:to-[#0f241a] text-white p-6 border-b border-emerald-700/30 dark:border-[#1e3a2f]">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-[#03623c] rounded-lg text-white">
             <SettingsIcon className="w-5 h-5 animate-spin-slow" />
           </div>
           <div>
             <h2 className="text-base font-bold font-display tracking-tight text-white">{t.adminTitle}</h2>
-            <p className="text-[11px] text-slate-300 font-medium">{t.adminSub}</p>
+            <p className="text-[11px] text-slate-300 dark:text-slate-400 font-medium">{t.adminSub}</p>
           </div>
         </div>
       </div>
 
       {/* Save Alert Banner */}
       {saveSuccess && (
-        <div className="bg-emerald-50 border-y border-emerald-200 text-emerald-800 px-5 py-3 text-xs font-semibold flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div className="bg-emerald-50 dark:bg-emerald-950/60 border-y border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 px-5 py-3 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{t.savedAlert}</span>
         </div>
       )}
 
       <div className="flex flex-col md:flex-row min-h-[500px]">
         {/* Left Sub-Tabs Nav */}
-        <aside className="w-full md:w-56 border-r border-gray-100 bg-slate-50/60 p-4 shrink-0 flex flex-row md:flex-col gap-1.5 overflow-x-auto">
+        <aside className="w-full md:w-56 border-r border-gray-100 dark:border-[#1e3a2f] bg-slate-50/60 dark:bg-[#0b1812] p-4 shrink-0 flex flex-row md:flex-col gap-1.5 overflow-x-auto">
           <button
             onClick={() => setActiveSubTab('company')}
             className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer ${
               activeSubTab === 'company'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Building className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
@@ -932,8 +954,8 @@ export default function Settings({
             onClick={() => setActiveSubTab('fields')}
             className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer ${
               activeSubTab === 'fields'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <ToggleLeft className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
@@ -944,8 +966,8 @@ export default function Settings({
             onClick={() => setActiveSubTab('masters')}
             className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer ${
               activeSubTab === 'masters'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <List className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
@@ -956,8 +978,8 @@ export default function Settings({
             onClick={() => setActiveSubTab('policy')}
             className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer ${
               activeSubTab === 'policy'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <SettingsIcon className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
@@ -968,8 +990,8 @@ export default function Settings({
             onClick={() => setActiveSubTab('security')}
             className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
               activeSubTab === 'security'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <ShieldAlert className={`w-3.5 h-3.5 shrink-0 md:mt-0.5 ${failedLogins.length > 0 ? 'text-amber-500 animate-pulse' : ''}`} />
@@ -981,14 +1003,12 @@ export default function Settings({
             )}
           </button>
 
-
-
           <button
             onClick={() => setActiveSubTab('database')}
             className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
               activeSubTab === 'database'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Database className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
@@ -999,8 +1019,8 @@ export default function Settings({
             onClick={() => setActiveSubTab('email_smtp')}
             className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
               activeSubTab === 'email_smtp'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Mail className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
@@ -1008,11 +1028,23 @@ export default function Settings({
           </button>
 
           <button
+            onClick={() => setActiveSubTab('whatsapp_auto')}
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
+              activeSubTab === 'whatsapp_auto'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 shrink-0 md:mt-0.5 text-emerald-500" />
+            <span>{language === 'en' ? 'WhatsApp & Email Auto' : 'व्हाट्सएप और ईमेल ऑटो'}</span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('roles_permissions')}
             className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
               activeSubTab === 'roles_permissions'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <KeyRound className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
@@ -1023,21 +1055,21 @@ export default function Settings({
             onClick={() => setActiveSubTab('audit_logs')}
             className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
               activeSubTab === 'audit_logs'
-                ? 'bg-slate-200 text-slate-900 shadow-xs border border-slate-300/40'
-                : 'text-gray-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <History className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
             <span>{language === 'en' ? 'User Audit Report' : 'यूजर ऑडिट रिपोर्ट'}</span>
           </button>
 
-          <div className="hidden md:block pt-6 mt-6 border-t border-gray-200/60">
+          <div className="hidden md:block pt-6 mt-6 border-t border-gray-200/60 dark:border-[#1e3a2f]">
             <button
               onClick={handleResetToDefault}
               className={`flex items-center gap-1.5 w-full text-left px-3 py-1.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
                 confirmReset 
-                  ? 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
-                  : 'text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 border border-red-200/50'
+                  ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse'
+                  : 'text-red-600 dark:text-rose-400 bg-red-50 dark:bg-rose-950/30 hover:bg-red-100 dark:hover:bg-rose-900/40 hover:text-red-700 dark:hover:text-rose-300 border border-red-200/50 dark:border-rose-900/50'
               }`}
             >
               <Undo className="w-3 h-3" />
@@ -1861,12 +1893,12 @@ export default function Settings({
 
           {activeSubTab === 'security' && (
             <div className="space-y-6">
-              <div className="border-b border-gray-150 pb-4">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 text-rose-500" />
+              <div className="border-b border-gray-150 dark:border-[#1e3a2f] pb-4">
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-rose-500 dark:text-rose-400" />
                   {language === 'en' ? 'Portal Security Audit Log' : 'पोर्टल सुरक्षा ऑडिट लॉग'}
                 </h3>
-                <p className="text-[11px] text-gray-500 font-medium mt-1">
+                <p className="text-[11px] text-gray-500 dark:text-slate-400 font-medium mt-1">
                   {language === 'en' 
                     ? 'Monitor failed login attempts to recognize potential security breaches, unauthorized entry attempts, or employees struggling with forgotten passwords.'
                     : 'भूले हुए पासवर्ड या संभावित अनधिकृत पहुंच का पता लगाने के लिए असफल लॉगिन प्रयासों की निगरानी करें।'}
@@ -1875,49 +1907,49 @@ export default function Settings({
 
               {/* Stats Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 rounded-xl border border-rose-100 bg-rose-50/50 flex flex-col justify-between shadow-xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-[#11221b] flex flex-col justify-between shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
                     {language === 'en' ? 'Total Unsuccessful Attempts' : 'कुल असफल प्रयास'}
                   </span>
                   <div className="flex items-baseline gap-2 mt-2">
-                    <span className="text-2xl font-black text-rose-950 font-mono">
+                    <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
                       {failedLogins.length}
                     </span>
-                    <span className="text-[10px] text-rose-600 font-semibold font-mono">
+                    <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold font-mono">
                       {language === 'en' ? 'logs' : 'लॉग'}
                     </span>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/50 flex flex-col justify-between shadow-xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-white dark:bg-[#11221b] flex flex-col justify-between shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                     {language === 'en' ? 'Unique IDs Targeted' : 'लक्षित विशिष्ट आईडी'}
                   </span>
                   <div className="flex items-baseline gap-2 mt-2">
-                    <span className="text-2xl font-black text-amber-950 font-mono">
+                    <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
                       {new Set(failedLogins.map(l => l.enteredId.toLowerCase())).size}
                     </span>
-                    <span className="text-[10px] text-amber-600 font-semibold font-mono">
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold font-mono">
                       {language === 'en' ? 'user IDs' : 'उपयोगकर्ता आईडी'}
                     </span>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/50 flex flex-col justify-between shadow-xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-white dark:bg-[#11221b] flex flex-col justify-between shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                     {language === 'en' ? 'System Audit Status' : 'सिस्टम ऑडिट स्थिति'}
                   </span>
                   <div className="flex items-center gap-2 mt-2">
                     {failedLogins.length >= 8 ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-black text-rose-700 bg-rose-100 px-2.5 py-1 rounded-full animate-pulse">
+                      <span className="inline-flex items-center gap-1 text-xs font-black text-rose-700 dark:text-rose-200 bg-rose-100 dark:bg-rose-950/80 px-2.5 py-1 rounded-full animate-pulse border border-rose-200 dark:border-rose-800">
                         ⚠️ {language === 'en' ? 'High Fail Rate' : 'उच्च विफलता दर'}
                       </span>
                     ) : failedLogins.length > 0 ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-800">
                         ℹ️ {language === 'en' ? 'Minor Incidents' : 'मामूली घटनाएं'}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
                         ✓ {language === 'en' ? 'Secure & Stable' : 'सुरक्षित और स्थिर'}
                       </span>
                     )}
@@ -1936,20 +1968,20 @@ export default function Settings({
 
                 if (flaggedIds.length > 0) {
                   return (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 animate-fade-in">
-                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="bg-amber-50/80 dark:bg-[#1c160c] border border-amber-200 dark:border-amber-800/80 rounded-xl p-4 flex gap-3 animate-fade-in shadow-xs">
+                      <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                       <div className="space-y-1">
-                        <h4 className="text-xs font-black text-amber-900 uppercase tracking-wide">
+                        <h4 className="text-xs font-black text-amber-900 dark:text-amber-300 uppercase tracking-wide">
                           {language === 'en' ? 'Security Action Warning Required' : 'सुरक्षा चेतावनी - ध्यान दें'}
                         </h4>
-                        <p className="text-[10px] text-amber-800 font-semibold leading-relaxed">
+                        <p className="text-[10px] text-amber-800 dark:text-amber-200 font-semibold leading-relaxed">
                           {language === 'en' 
                             ? 'The following User/Employee IDs have 3 or more unsuccessful login attempts. This could suggest forgotten passwords or unauthorized brute-forcing attempts:' 
                             : 'निम्नलिखित उपयोगकर्ता/कर्मचारी आईडी पर 3 या अधिक असफल प्रयास दर्ज किए गए हैं:'}
                         </p>
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {flaggedIds.map(([id, count]) => (
-                            <span key={id} className="inline-flex items-center bg-amber-200 text-amber-950 text-[10px] font-black px-2.5 py-1 rounded-md font-mono border border-amber-300 shadow-xs">
+                            <span key={id} className="inline-flex items-center bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 text-[10px] font-black px-2.5 py-1 rounded-md font-mono border border-amber-300 dark:border-amber-700 shadow-xs">
                               {id} ({count} {language === 'en' ? 'fails' : 'प्रयास'})
                             </span>
                           ))}
@@ -1962,7 +1994,7 @@ export default function Settings({
               })()}
 
               {/* Filter controls bar */}
-              <div className="bg-slate-50 border border-gray-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 font-sans">
+              <div className="bg-slate-50 dark:bg-[#0b1812] border border-gray-200 dark:border-[#1e3a2f] rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 font-sans">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
                   {/* Search input */}
                   <div className="relative">
@@ -1972,22 +2004,22 @@ export default function Settings({
                       placeholder={language === 'en' ? 'Search Employee ID...' : 'कर्मचारी आईडी खोजें...'}
                       value={securitySearch}
                       onChange={(e) => setSecuritySearch(e.target.value)}
-                      className="pl-9 pr-4 py-1.5 border border-gray-200 bg-white rounded-lg text-xs font-bold w-full sm:w-48 focus:outline-none focus:ring-1 focus:ring-[#03623c] font-mono shadow-2xs"
+                      className="pl-9 pr-4 py-1.5 border border-gray-200 dark:border-[#1e3a2f] bg-white dark:bg-[#11221b] text-slate-800 dark:text-slate-100 rounded-lg text-xs font-bold w-full sm:w-48 focus:outline-none focus:ring-1 focus:ring-[#03623c] font-mono shadow-2xs"
                     />
                   </div>
 
                   {/* Filter Reason dropdown */}
-                  <div className="flex items-center gap-1.5 bg-white border border-gray-200 px-2.5 py-1 rounded-lg shadow-2xs">
+                  <div className="flex items-center gap-1.5 bg-white dark:bg-[#11221b] border border-gray-200 dark:border-[#1e3a2f] px-2.5 py-1 rounded-lg shadow-2xs">
                     <Filter className="w-3 h-3 text-gray-400" />
                     <select
                       value={securityReasonFilter}
                       onChange={(e: any) => setSecurityReasonFilter(e.target.value)}
-                      className="text-xs font-bold text-gray-700 bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer"
+                      className="text-xs font-bold text-gray-700 dark:text-slate-200 bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer"
                     >
-                      <option value="all">{language === 'en' ? 'All Reasons' : 'सभी कारण'}</option>
-                      <option value="Incorrect Password">{language === 'en' ? 'Incorrect Password' : 'गलत पासवर्ड'}</option>
-                      <option value="User ID not found">{language === 'en' ? 'ID Not Found' : 'आईडी नहीं मिली'}</option>
-                      <option value="Admin Incorrect Password">{language === 'en' ? 'Admin Bad Password' : 'एडमिन गलत पासवर्ड'}</option>
+                      <option value="all" className="dark:bg-[#11221b]">{language === 'en' ? 'All Reasons' : 'सभी कारण'}</option>
+                      <option value="Incorrect Password" className="dark:bg-[#11221b]">{language === 'en' ? 'Incorrect Password' : 'गलत पासवर्ड'}</option>
+                      <option value="User ID not found" className="dark:bg-[#11221b]">{language === 'en' ? 'ID Not Found' : 'आईडी नहीं मिली'}</option>
+                      <option value="Admin Incorrect Password" className="dark:bg-[#11221b]">{language === 'en' ? 'Admin Bad Password' : 'एडमिन गलत पासवर्ड'}</option>
                     </select>
                   </div>
                 </div>
@@ -2000,7 +2032,7 @@ export default function Settings({
                         onClearFailedLogins();
                       }
                     }}
-                    className="text-xs font-black text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200/50 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-97"
+                    className="text-xs font-black text-rose-600 dark:text-rose-400 hover:text-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-3 py-1.5 rounded-lg border border-rose-200/50 dark:border-rose-900/50 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-97"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     {language === 'en' ? 'Clear Security Log' : 'सुरक्षा लॉग साफ़ करें'}
@@ -2018,8 +2050,8 @@ export default function Settings({
 
                 if (filteredLogs.length === 0) {
                   return (
-                    <div className="border border-dashed border-gray-250 rounded-2xl p-10 text-center font-sans">
-                      <p className="text-sm text-gray-500 italic">
+                    <div className="border border-dashed border-gray-250 dark:border-[#1e3a2f] rounded-2xl p-10 text-center font-sans">
+                      <p className="text-sm text-gray-500 dark:text-slate-400 italic">
                         {language === 'en' ? 'No failed login attempts found.' : 'कोई असफल लॉगिन प्रयास नहीं मिला।'}
                       </p>
                     </div>
@@ -2027,9 +2059,9 @@ export default function Settings({
                 }
 
                 return (
-                  <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-2xs max-h-[400px] overflow-y-auto">
+                  <div className="overflow-x-auto border border-gray-200 dark:border-[#1e3a2f] rounded-xl bg-white dark:bg-[#11221b] shadow-2xs max-h-[400px] overflow-y-auto">
                     <table className="w-full text-left border-collapse text-xs font-sans">
-                      <thead className="bg-slate-50 border-b border-gray-200 text-slate-600 font-black uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                      <thead className="bg-slate-50 dark:bg-[#0f2b20] border-b border-gray-200 dark:border-[#1e3a2f] text-slate-600 dark:text-slate-300 font-black uppercase text-[10px] tracking-wider sticky top-0 z-10">
                         <tr>
                           <th className="p-3">{language === 'en' ? 'Entered ID' : 'दर्ज की गई आईडी'}</th>
                           <th className="p-3">{language === 'en' ? 'Timestamp' : 'समय और तारीख'}</th>
@@ -2038,24 +2070,24 @@ export default function Settings({
                           <th className="p-3">{language === 'en' ? 'Browser Details' : 'ब्राउज़र विवरण'}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100 font-semibold text-slate-700">
+                      <tbody className="divide-y divide-gray-100 dark:divide-[#1e3a2f] font-semibold text-slate-700 dark:text-slate-200">
                         {filteredLogs.map((log) => (
-                          <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                          <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                             <td className="p-3">
-                              <span className="text-[10px] font-black font-mono text-rose-600 bg-rose-50 border border-rose-150 px-2.5 py-1 rounded">
+                              <span className="text-[10px] font-black font-mono text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border border-rose-150 dark:border-rose-800/50 px-2.5 py-1 rounded">
                                 {log.enteredId}
                               </span>
                             </td>
-                            <td className="p-3 text-slate-500 font-mono text-[10px]">
+                            <td className="p-3 text-slate-500 dark:text-slate-400 font-mono text-[10px]">
                               {new Date(log.timestamp).toLocaleString()}
                             </td>
                             <td className="p-3">
-                              <span className="text-rose-700 font-extrabold">{log.reason}</span>
+                              <span className="text-rose-700 dark:text-rose-400 font-extrabold">{log.reason}</span>
                             </td>
-                            <td className="p-3 font-mono text-[10px] text-slate-500">
+                            <td className="p-3 font-mono text-[10px] text-slate-500 dark:text-slate-400">
                               {log.ipAddress || '-'}
                             </td>
-                            <td className="p-3 max-w-[240px] truncate text-slate-400 font-medium text-[10px]" title={log.browserInfo}>
+                            <td className="p-3 max-w-[240px] truncate text-slate-400 dark:text-slate-400 font-medium text-[10px]" title={log.browserInfo}>
                               {log.browserInfo || '-'}
                             </td>
                           </tr>
@@ -3042,6 +3074,415 @@ export default function Settings({
                     </div>
                   </div>
                 )}
+              </div>
+
+            </div>
+          )}
+
+          {/* Sub Tab: WhatsApp & Email Automation Settings */}
+          {activeSubTab === 'whatsapp_auto' && (
+            <div className="space-y-6 font-sans">
+              
+              {/* Header card matching the style */}
+              <div className="bg-[#03623c]/5 border border-[#03623c]/15 rounded-xl p-5 shadow-3xs">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-[#03623c] rounded-xl text-white mt-0.5">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                        {language === 'en' 
+                          ? 'PART 5: WHATSAPP (MessageAutoSender) & EMAIL AUTOMATION' 
+                          : 'भाग 5: व्हाट्सएप (MessageAutoSender) और ईमेल ऑटोमेशन'}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-300 font-semibold mt-1 max-w-2xl leading-relaxed">
+                        {language === 'en'
+                          ? 'Set up API connection details for MessageAutoSender to send automated WhatsApp payslips, miss punch alerts, leave updates, and late warnings directly to employees.'
+                          : 'कर्मचारियों को सीधे स्वचालित व्हाट्सएप वेतन पर्ची, मिस पंच अलर्ट, छुट्टी अपडेट और देर से आने की चेतावनी भेजने के लिए MessageAutoSender के लिए API कनेक्शन विवरण सेट करें।'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Status Badge */}
+                  <div className="self-start md:self-auto flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-3 py-1 rounded-full shrink-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase text-emerald-800 dark:text-emerald-300 tracking-wider font-mono">
+                      MessageAutoSender API Ready
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* MessageAutoSender Gateway Credentials Form */}
+              <div className="bg-white dark:bg-[#11221b] border border-gray-200 dark:border-[#1e3a2f] rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#1e3a2f] pb-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <Key className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>MessageAutoSender API Gateway Credentials</span>
+                  </h4>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={localSettings.enableWhatsappAutomation ?? true}
+                      onChange={(e) => setLocalSettings({ ...localSettings, enableWhatsappAutomation: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#03623c]"></div>
+                    <span className="ml-2 text-xs font-bold text-slate-700 dark:text-slate-300">Enable Automation</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5 uppercase tracking-wide">
+                      MessageAutoSender Username (User ID)
+                    </label>
+                    <input
+                      type="text"
+                      value={localSettings.whatsappUsername || ''}
+                      placeholder="e.g. centraldata@rathibuildmart.com"
+                      onChange={(e) => setLocalSettings({ ...localSettings, whatsappUsername: e.target.value })}
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5 uppercase tracking-wide">
+                      MessageAutoSender API Password
+                    </label>
+                    <input
+                      type="password"
+                      value={localSettings.whatsappPassword || ''}
+                      placeholder="••••••••••••"
+                      onChange={(e) => setLocalSettings({ ...localSettings, whatsappPassword: e.target.value })}
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                        Default Sender Mobile No / Channel
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (localSettings.whatsappSenderNo) {
+                            setWaTestMobile(localSettings.whatsappSenderNo);
+                          }
+                        }}
+                        className="text-[10px] text-emerald-700 dark:text-emerald-400 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                        title="Copy sender number to test box"
+                      >
+                        <RefreshCcw className="w-3 h-3" />
+                        <span>Use for Test</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={localSettings.whatsappSenderNo || ''}
+                      placeholder="e.g. 8518880943 or 919876543210"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setLocalSettings({ ...localSettings, whatsappSenderNo: val });
+                        setWaTestMobile(val);
+                      }}
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Excel HYPERLINK Formula & Live Test Component */}
+              <div className="bg-gradient-to-br from-amber-500/10 to-emerald-500/10 border border-amber-300 dark:border-amber-900/60 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                      Excel & Google Sheets HYPERLINK Formula Generator
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const sender = localSettings.whatsappSenderNo || '8518880943';
+                        setWaTestMobile(sender);
+                        setWaTestName('Rahul Sharma');
+                      }}
+                      className="bg-amber-100 dark:bg-amber-950/80 hover:bg-amber-200 text-amber-900 dark:text-amber-200 px-3 py-1 rounded-lg text-xs font-bold border border-amber-300 dark:border-amber-800 flex items-center gap-1.5 cursor-pointer transition-all active:scale-98"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      <span>Fill Test Sample Data (डिफ़ॉल्ट प्रेषक भरें)</span>
+                    </button>
+                    <span className="text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold px-2.5 py-1 rounded-md border border-amber-300/60 font-mono">
+                      =HYPERLINK Formula
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                  Use this formula in your Excel or Google Sheets payroll files. It automatically compiles the direct MessageAutoSender API URL with your credentials!
+                </p>
+
+                {/* Interactive Test Inputs */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white dark:bg-[#0b1812] p-3 rounded-xl border border-gray-200 dark:border-[#1e3a2f]">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Test Receiver Mobile:</label>
+                      {localSettings.whatsappSenderNo && waTestMobile !== localSettings.whatsappSenderNo && (
+                        <button
+                          type="button"
+                          onClick={() => setWaTestMobile(localSettings.whatsappSenderNo || '')}
+                          className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline font-bold"
+                        >
+                          Sync Default Sender ({localSettings.whatsappSenderNo})
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={waTestMobile}
+                      onChange={(e) => setWaTestMobile(e.target.value)}
+                      placeholder="e.g. 8518880943"
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-slate-50 dark:bg-[#11221b] text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Test Receiver Name:</label>
+                    <input
+                      type="text"
+                      value={waTestName}
+                      onChange={(e) => setWaTestName(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-50 dark:bg-[#11221b] text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                {/* Generated Formula Display with Tabs */}
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-slate-800 dark:text-slate-200">Generated Formula:</span>
+                      <div className="flex bg-slate-200 dark:bg-slate-800 p-0.5 rounded-lg text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setFormulaMode('direct')}
+                          className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${formulaMode === 'direct' ? 'bg-white dark:bg-[#0b1812] text-emerald-700 dark:text-emerald-400 shadow-2xs' : 'text-slate-600 dark:text-slate-400'}`}
+                        >
+                          Direct Value URL
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormulaMode('cellRef')}
+                          className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${formulaMode === 'cellRef' ? 'bg-white dark:bg-[#0b1812] text-emerald-700 dark:text-emerald-400 shadow-2xs' : 'text-slate-600 dark:text-slate-400'}`}
+                        >
+                          Excel Cell Ref (User & B6)
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetMobile = formatPhoneNumber(waTestMobile || localSettings.whatsappSenderNo || '8518880943');
+                        const targetUser = localSettings.whatsappUsername || 'rathi';
+                        const targetPass = localSettings.whatsappPassword || 'Password';
+                        
+                        const formStr = formulaMode === 'direct'
+                          ? `=HYPERLINK("https://app.messageautosender.com/message/new?username=${targetUser}&password=${targetPass}&receiverMobileNo=${targetMobile}&receiverName=${encodeURIComponent(waTestName || 'test')}&message=MESSAGETEST", "Manual Test Send")`
+                          : buildMessageAutoSenderExcelFormula(
+                              'User',
+                              'Password',
+                              'B6',
+                              'C6',
+                              'MESSAGETEST',
+                              'Manual Test Send'
+                            );
+                        
+                        navigator.clipboard.writeText(formStr);
+                        setCopiedWaFormula(true);
+                        setTimeout(() => setCopiedWaFormula(false), 2000);
+                      }}
+                      className="text-emerald-700 dark:text-emerald-400 hover:underline font-bold flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+                    >
+                      {copiedWaFormula ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedWaFormula ? 'Formula Copied!' : 'Copy Formula'}</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-slate-900 text-emerald-400 rounded-xl font-mono text-xs overflow-x-auto border border-slate-800 shadow-inner select-all leading-relaxed">
+                    {formulaMode === 'direct'
+                      ? `=HYPERLINK("https://app.messageautosender.com/message/new?username=${localSettings.whatsappUsername || 'rathi'}&password=${localSettings.whatsappPassword || 'Password'}&receiverMobileNo=${formatPhoneNumber(waTestMobile || localSettings.whatsappSenderNo || '8518880943')}&receiverName=${encodeURIComponent(waTestName || 'test')}&message=MESSAGETEST", "Manual Test Send")`
+                      : buildMessageAutoSenderExcelFormula(
+                          'User',
+                          'Password',
+                          'B6',
+                          'C6',
+                          'MESSAGETEST',
+                          'Manual Test Send'
+                        )
+                    }
+                  </div>
+                </div>
+
+                {/* Launch Test Action */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    Direct API URL Target Mobile: <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono text-emerald-800 dark:text-emerald-300">{formatPhoneNumber(waTestMobile || localSettings.whatsappSenderNo || '8518880943')}</code>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetMobile = waTestMobile || localSettings.whatsappSenderNo || '8518880943';
+                      const testUrl = buildMessageAutoSenderUrl(
+                        localSettings.whatsappUsername || 'rathi',
+                        localSettings.whatsappPassword || 'Password',
+                        targetMobile,
+                        waTestName || 'Test User',
+                        `Test WhatsApp Notification from ${localSettings.companyName || 'Rathi Buildmart'} HR`
+                      );
+                      window.open(testUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="bg-[#03623c] hover:bg-[#024d2e] text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs transition-all active:scale-98"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Launch Live WhatsApp Test</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* WhatsApp Templates Library */}
+              <div className="bg-white dark:bg-[#11221b] border border-gray-200 dark:border-[#1e3a2f] rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#1e3a2f] pb-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>WhatsApp HR Message Templates</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalSettings({
+                        ...localSettings,
+                        whatsappTemplates: { ...DEFAULT_WHATSAPP_TEMPLATES }
+                      });
+                    }}
+                    className="text-slate-500 hover:text-slate-800 dark:text-slate-400 text-xs font-bold hover:underline cursor-pointer"
+                  >
+                    Reset Templates to Default
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Payslip Template */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span>1. Payslip Shared Alert Template</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={localSettings.whatsappTemplates?.payslip || DEFAULT_WHATSAPP_TEMPLATES.payslip}
+                      onChange={(e) => {
+                        setLocalSettings({
+                          ...localSettings,
+                          whatsappTemplates: {
+                            ...DEFAULT_WHATSAPP_TEMPLATES,
+                            ...localSettings.whatsappTemplates,
+                            payslip: e.target.value
+                          }
+                        });
+                      }}
+                      className="w-full p-2.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]"
+                    />
+                    <p className="text-[10px] text-slate-400">Variables: {'{NAME}'}, {'{MONTH}'}, {'{BASIC}'}, {'{NET_SALARY}'}, {'{STATUS}'}, {'{COMPANY_NAME}'}</p>
+                  </div>
+
+                  {/* Miss Punch Template */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span>2. Missed Punch Alert Template</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={localSettings.whatsappTemplates?.missPunch || DEFAULT_WHATSAPP_TEMPLATES.missPunch}
+                      onChange={(e) => {
+                        setLocalSettings({
+                          ...localSettings,
+                          whatsappTemplates: {
+                            ...DEFAULT_WHATSAPP_TEMPLATES,
+                            ...localSettings.whatsappTemplates,
+                            missPunch: e.target.value
+                          }
+                        });
+                      }}
+                      className="w-full p-2.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]"
+                    />
+                    <p className="text-[10px] text-slate-400">Variables: {'{NAME}'}, {'{DATE}'}, {'{COMPANY_NAME}'}, {'{HR_CONTACT}'}</p>
+                  </div>
+
+                  {/* Leave Status Template */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      <span>3. Leave Request Status Update Template</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={localSettings.whatsappTemplates?.leaveStatus || DEFAULT_WHATSAPP_TEMPLATES.leaveStatus}
+                      onChange={(e) => {
+                        setLocalSettings({
+                          ...localSettings,
+                          whatsappTemplates: {
+                            ...DEFAULT_WHATSAPP_TEMPLATES,
+                            ...localSettings.whatsappTemplates,
+                            leaveStatus: e.target.value
+                          }
+                        });
+                      }}
+                      className="w-full p-2.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]"
+                    />
+                    <p className="text-[10px] text-slate-400">Variables: {'{NAME}'}, {'{DATES}'}, {'{LEAVE_TYPE}'}, {'{STATUS}'}, {'{REMARKS}'}, {'{BY}'}</p>
+                  </div>
+
+                  {/* Late Warning Template */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                      <span>4. Late Arrival Warning Template</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={localSettings.whatsappTemplates?.lateWarning || DEFAULT_WHATSAPP_TEMPLATES.lateWarning}
+                      onChange={(e) => {
+                        setLocalSettings({
+                          ...localSettings,
+                          whatsappTemplates: {
+                            ...DEFAULT_WHATSAPP_TEMPLATES,
+                            ...localSettings.whatsappTemplates,
+                            lateWarning: e.target.value
+                          }
+                        });
+                      }}
+                      className="w-full p-2.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]"
+                    />
+                    <p className="text-[10px] text-slate-400">Variables: {'{NAME}'}, {'{DATE}'}, {'{CHECK_IN}'}, {'{SHIFT_TIMINGS}'}, {'{LATE_COUNT}'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Save Button */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="bg-[#03623c] hover:bg-[#024d2e] text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                >
+                  Save WhatsApp & Email Automation Settings
+                </button>
               </div>
 
             </div>
