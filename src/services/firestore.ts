@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './auth';
-import { Employee, Attendance, PayrollRecord, AdminSettings, FailedLoginAttempt } from '../types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, FailedLoginAttempt, TransactionalEmailLog } from '../types';
 
 const COLLECTION_NAME = 'payroll_system_data';
 const DOCUMENT_ID = 'shared_db';
@@ -11,6 +11,7 @@ export interface SharedData {
   payroll: PayrollRecord[];
   adminSettings?: AdminSettings;
   failedLogins?: FailedLoginAttempt[];
+  emailLogs?: TransactionalEmailLog[];
   spreadsheetId?: string | null;
   spreadsheetLink?: string | null;
   lastUpdated?: string;

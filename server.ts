@@ -20,6 +20,32 @@ async function startServer() {
     senderEmail?: string;
   }
 
+  interface TransactionalEmailLog {
+    id: string;
+    recipientEmail: string;
+    recipientName?: string;
+    type: 'OTP' | 'Welcome Message' | 'Leave Update' | 'SMTP Test' | 'Payslip' | 'Custom Notice';
+    subject: string;
+    status: 'Sent (SMTP)' | 'Simulated' | 'Failed';
+    sentAt: string;
+    otpCode?: string;
+    purpose?: string;
+    method?: 'SMTP' | 'SIMULATION' | 'Direct';
+    errorMessage?: string;
+    senderEmail?: string;
+    bodyPreview?: string;
+  }
+
+  const serverEmailLogs: TransactionalEmailLog[] = [];
+
+  const recordEmailLog = (log: TransactionalEmailLog) => {
+    serverEmailLogs.unshift(log);
+    if (serverEmailLogs.length > 300) {
+      serverEmailLogs.pop();
+    }
+    return log;
+  };
+
   // Nodemailer transporter helper
   const getTransporter = (smtpSettings?: SmtpSettings) => {
     let host = (smtpSettings?.host && smtpSettings.host.trim()) || process.env.SMTP_HOST;
@@ -60,6 +86,17 @@ async function startServer() {
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  // Get all transactional email logs
+  app.get('/api/email-logs', (req, res) => {
+    res.json({ success: true, logs: serverEmailLogs });
+  });
+
+  // Clear transactional email logs
+  app.post('/api/email-logs/clear', (req, res) => {
+    serverEmailLogs.length = 0;
+    res.json({ success: true, message: 'Transactional email history cleared.' });
   });
 
   // SMTP Connection & Dispatch Test Endpoint
@@ -183,10 +220,34 @@ async function startServer() {
       });
 
       console.log(`[SMTP Test] Test email successfully dispatched to ${recipient}`);
-      return res.json({ success: true, message: 'Test email dispatched successfully.' });
+      const logEntry = recordEmailLog({
+        id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        recipientEmail: recipient,
+        type: 'SMTP Test',
+        subject,
+        status: 'Sent (SMTP)',
+        sentAt: new Date().toISOString(),
+        purpose: 'SMTP Connectivity Validation',
+        method: 'SMTP',
+        senderEmail: senderEmail || user,
+        bodyPreview: 'Secure SMTP Gateway Dispatch Test Message'
+      });
+      return res.json({ success: true, message: 'Test email dispatched successfully.', logEntry });
     } catch (error: any) {
       console.error('[SMTP Test Error] Failed to dispatch test email:', error);
-      return res.json({ success: false, error: error.message || 'Failed to dispatch test email over specified SMTP configuration.' });
+      const logEntry = recordEmailLog({
+        id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        recipientEmail: recipient,
+        type: 'SMTP Test',
+        subject,
+        status: 'Failed',
+        sentAt: new Date().toISOString(),
+        purpose: 'SMTP Connectivity Validation',
+        method: 'SMTP',
+        errorMessage: error.message || 'SMTP Connection Error',
+        senderEmail: senderEmail || user
+      });
+      return res.json({ success: false, error: error.message || 'Failed to dispatch test email over specified SMTP configuration.', logEntry });
     }
   });
 
@@ -266,14 +327,42 @@ async function startServer() {
           html: htmlContent,
         });
         console.log(`[SMTP] OTP email successfully sent to ${email}`);
-        return res.json({ success: true, method: 'SMTP', message: 'Email sent successfully via real SMTP server.' });
+        const logEntry = recordEmailLog({
+          id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          recipientEmail: email,
+          recipientName: empName || '',
+          type: 'OTP',
+          subject,
+          status: 'Sent (SMTP)',
+          sentAt: new Date().toISOString(),
+          otpCode: otp,
+          purpose: purpose === 'login' ? 'Login 2FA OTP' : 'Password Reset OTP',
+          method: 'SMTP',
+          senderEmail: fromAddress,
+          bodyPreview: `One-Time Security OTP Code: ${otp}`
+        });
+        return res.json({ success: true, method: 'SMTP', message: 'Email sent successfully via real SMTP server.', logEntry });
       } else {
         // Fallback simulation mode
         console.log(`[SIMULATION] No SMTP configuration found. OTP for ${email} is ${otp}`);
+        const logEntry = recordEmailLog({
+          id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          recipientEmail: email,
+          recipientName: empName || '',
+          type: 'OTP',
+          subject,
+          status: 'Simulated',
+          sentAt: new Date().toISOString(),
+          otpCode: otp,
+          purpose: purpose === 'login' ? 'Login 2FA OTP' : 'Password Reset OTP',
+          method: 'SIMULATION',
+          bodyPreview: `Simulated OTP Code: ${otp}`
+        });
         return res.json({ 
           success: true, 
           method: 'SIMULATION', 
           message: 'Running in simulation mode (no SMTP configured in .env). Email logged on server terminal.',
+          logEntry,
           debugPayload: {
             to: email,
             subject,
@@ -298,10 +387,26 @@ async function startServer() {
         errMsg = `Connection was refused by ${host}:${port}. Please double-check the SMTP Host and Port.`;
       }
 
+      const logEntry = recordEmailLog({
+        id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        recipientEmail: email,
+        recipientName: empName || '',
+        type: 'OTP',
+        subject,
+        status: 'Failed',
+        sentAt: new Date().toISOString(),
+        otpCode: otp,
+        purpose: purpose === 'login' ? 'Login 2FA OTP' : 'Password Reset OTP',
+        method: 'SMTP',
+        errorMessage: errMsg,
+        bodyPreview: `Failed OTP Dispatch Code: ${otp}`
+      });
+
       return res.json({ 
         success: false, 
         smtpError: true,
         error: errMsg,
+        logEntry,
         debugPayload: {
           to: email,
           subject,
@@ -405,14 +510,40 @@ async function startServer() {
           html: htmlContent,
         });
         console.log(`[SMTP] Welcome email successfully sent to ${email}`);
-        return res.json({ success: true, method: 'SMTP', message: 'Welcome email sent successfully via real SMTP server.' });
+        const logEntry = recordEmailLog({
+          id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          recipientEmail: email,
+          recipientName: empName,
+          type: 'Welcome Message',
+          subject,
+          status: 'Sent (SMTP)',
+          sentAt: new Date().toISOString(),
+          purpose: 'New Employee Onboarding Credentials',
+          method: 'SMTP',
+          senderEmail: fromAddress,
+          bodyPreview: `Employee ID: ${empId}, Default Password: ${tempPassword || '123456'}`
+        });
+        return res.json({ success: true, method: 'SMTP', message: 'Welcome email sent successfully via real SMTP server.', logEntry });
       } else {
         // Fallback simulation mode
         console.log(`[SIMULATION] No SMTP configuration found. Welcome email logged for ${email}`);
+        const logEntry = recordEmailLog({
+          id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          recipientEmail: email,
+          recipientName: empName,
+          type: 'Welcome Message',
+          subject,
+          status: 'Simulated',
+          sentAt: new Date().toISOString(),
+          purpose: 'New Employee Onboarding Credentials',
+          method: 'SIMULATION',
+          bodyPreview: `Simulated Onboarding Credentials - Employee ID: ${empId}`
+        });
         return res.json({ 
           success: true, 
           method: 'SIMULATION', 
           message: 'Running in simulation mode (no SMTP configured in .env). Welcome email logged on server terminal.',
+          logEntry,
           debugPayload: {
             to: email,
             subject,
@@ -422,7 +553,20 @@ async function startServer() {
       }
     } catch (error: any) {
       console.error('[SMTP Error] Failed to send welcome email:', error);
-      return res.json({ success: false, error: error.message || 'SMTP Server failed to dispatch welcome email.' });
+      const logEntry = recordEmailLog({
+        id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        recipientEmail: email,
+        recipientName: empName,
+        type: 'Welcome Message',
+        subject,
+        status: 'Failed',
+        sentAt: new Date().toISOString(),
+        purpose: 'New Employee Onboarding Credentials',
+        method: 'SMTP',
+        errorMessage: error.message || 'SMTP Dispatch Failed',
+        bodyPreview: `Failed Welcome Email for ${empId}`
+      });
+      return res.json({ success: false, error: error.message || 'SMTP Server failed to dispatch welcome email.', logEntry });
     }
   });
 
@@ -529,13 +673,39 @@ async function startServer() {
           html: htmlContent,
         });
         console.log(`[SMTP] Leave update email successfully sent to ${email}`);
-        return res.json({ success: true, method: 'SMTP', message: 'Leave update email sent successfully via real SMTP.' });
+        const logEntry = recordEmailLog({
+          id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          recipientEmail: email,
+          recipientName: empName,
+          type: 'Leave Update',
+          subject,
+          status: 'Sent (SMTP)',
+          sentAt: new Date().toISOString(),
+          purpose: `Leave ${status}: ${leaveType}`,
+          method: 'SMTP',
+          senderEmail: fromAddress,
+          bodyPreview: `Leave Application for ${leaveType} (${startDate}) has been ${status}`
+        });
+        return res.json({ success: true, method: 'SMTP', message: 'Leave update email sent successfully via real SMTP.', logEntry });
       } else {
         console.log(`[SIMULATION] No SMTP configuration found. Leave update email logged for ${email}`);
+        const logEntry = recordEmailLog({
+          id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          recipientEmail: email,
+          recipientName: empName,
+          type: 'Leave Update',
+          subject,
+          status: 'Simulated',
+          sentAt: new Date().toISOString(),
+          purpose: `Leave ${status}: ${leaveType}`,
+          method: 'SIMULATION',
+          bodyPreview: `Simulated Leave Update: ${leaveType} ${status}`
+        });
         return res.json({ 
           success: true, 
           method: 'SIMULATION', 
           message: 'Running in simulation mode (no SMTP configured). Email logged on server.',
+          logEntry,
           debugPayload: {
             to: email,
             subject,
@@ -545,7 +715,20 @@ async function startServer() {
       }
     } catch (error: any) {
       console.error('[SMTP Error] Failed to send leave update email:', error);
-      return res.json({ success: false, error: error.message || 'SMTP Server failed to dispatch leave update email.' });
+      const logEntry = recordEmailLog({
+        id: `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        recipientEmail: email,
+        recipientName: empName,
+        type: 'Leave Update',
+        subject,
+        status: 'Failed',
+        sentAt: new Date().toISOString(),
+        purpose: `Leave ${status}: ${leaveType}`,
+        method: 'SMTP',
+        errorMessage: error.message || 'SMTP Leave Update Dispatch Failed',
+        bodyPreview: `Failed Leave Update email for ${empName}`
+      });
+      return res.json({ success: false, error: error.message || 'SMTP Server failed to dispatch leave update email.', logEntry });
     }
   });
 

@@ -56,7 +56,7 @@ import {
   fetchAdminSettings,
   saveAdminSettings
 } from './services/sheets';
-import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog, LeaveRequest } from './types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog, LeaveRequest, TransactionalEmailLog } from './types';
 import { saveToFirestore, loadFromFirestore } from './services/firestore';
 
 // Unique device fingerprint generator for browser lock
@@ -499,6 +499,118 @@ export default function App() {
     setIsDataModified(true);
   };
 
+  // Transactional Email Logs state
+  const [emailLogs, setEmailLogs] = useState<TransactionalEmailLog[]>(() => {
+    const saved = localStorage.getItem('cached_email_logs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const addEmailLog = (log: TransactionalEmailLog) => {
+    if (!log) return;
+    setEmailLogs(prev => {
+      if (prev.some(l => l.id === log.id)) return prev;
+      const updated = [log, ...prev].slice(0, 300);
+      localStorage.setItem('cached_email_logs', JSON.stringify(updated));
+      return updated;
+    });
+    setIsDataModified(true);
+  };
+
+  const handleClearEmailLogs = async () => {
+    if (!portalUser || portalUser.role !== 'admin') {
+      alert(language === 'en' ? 'Only Admin can clear email history!' : 'केवल एडमिन ही ईमेल इतिहास साफ़ कर सकते हैं!');
+      return;
+    }
+    setEmailLogs([]);
+    localStorage.setItem('cached_email_logs', JSON.stringify([]));
+    setIsDataModified(true);
+    try {
+      await fetch('/api/email-logs/clear', { method: 'POST' });
+    } catch (e) {
+      console.warn('Failed to clear server email logs:', e);
+    }
+  };
+
+  const handleSendTestEmail = async (recipient: string, type: 'OTP' | 'Welcome Message' | 'Custom Notice', subject: string, customBody?: string) => {
+    try {
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: recipient,
+          otp: type === 'OTP' ? Math.floor(100000 + Math.random() * 900000).toString() : '123456',
+          empName: 'Recipient User',
+          purpose: type === 'OTP' ? 'login' : 'custom_notice',
+          language,
+          smtpSettings: {
+            host: adminSettings.smtpHost,
+            port: adminSettings.smtpPort,
+            username: adminSettings.smtpUsername,
+            password: adminSettings.smtpPassword,
+            senderName: adminSettings.senderName,
+            senderEmail: adminSettings.senderEmail
+          }
+        })
+      });
+      const data = await res.json();
+      if (data.logEntry) {
+        addEmailLog(data.logEntry);
+      }
+      return { success: data.success, message: data.message, error: data.error };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Network error' };
+    }
+  };
+
+  const handleResendEmail = async (log: TransactionalEmailLog) => {
+    try {
+      const endpoint = log.type === 'Welcome Message' 
+        ? '/api/send-welcome' 
+        : log.type === 'Leave Update' 
+        ? '/api/send-leave-update' 
+        : '/api/send-otp';
+      
+      const payload: any = {
+        email: log.recipientEmail,
+        empName: log.recipientName || 'Employee',
+        language,
+        smtpSettings: {
+          host: adminSettings.smtpHost,
+          port: adminSettings.smtpPort,
+          username: adminSettings.smtpUsername,
+          password: adminSettings.smtpPassword,
+          senderName: adminSettings.senderName,
+          senderEmail: adminSettings.senderEmail
+        }
+      };
+
+      if (log.type === 'OTP') {
+        payload.otp = log.otpCode || Math.floor(100000 + Math.random() * 900000).toString();
+        payload.purpose = log.purpose?.includes('Reset') ? 'password_reset' : 'login';
+      } else if (log.type === 'Welcome Message') {
+        payload.empId = 'EMP_RESEND';
+        payload.tempPassword = '••••••';
+      } else if (log.type === 'Leave Update') {
+        payload.leaveType = 'Leave Notice';
+        payload.startDate = new Date().toISOString().substring(0, 10);
+        payload.status = 'Approved';
+      }
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.logEntry) {
+        addEmailLog(data.logEntry);
+      }
+      return { success: data.success, message: data.message, error: data.error };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Failed to resend email' };
+    }
+  };
+
   // Portal login & enhanced login UX states
   const [rememberMe, setRememberMe] = useState<boolean>(() => {
     return localStorage.getItem('payroll_remember_me') === 'true';
@@ -914,12 +1026,39 @@ export default function App() {
           if (globalData.failedLogins) {
             setFailedLogins(globalData.failedLogins);
           }
+          if (globalData.emailLogs && globalData.emailLogs.length > 0) {
+            setEmailLogs(prev => {
+              const map = new Map();
+              [...globalData.emailLogs!, ...prev].forEach(l => map.set(l.id, l));
+              const merged = Array.from(map.values()).slice(0, 300);
+              localStorage.setItem('cached_email_logs', JSON.stringify(merged));
+              return merged;
+            });
+          }
           if (globalData.spreadsheetId) {
             setSpreadsheetId(globalData.spreadsheetId);
           }
           if (globalData.spreadsheetLink) {
             setSpreadsheetLink(globalData.spreadsheetLink);
           }
+          
+          // Also fetch server-side recorded email logs
+          try {
+            const serverRes = await fetch('/api/email-logs');
+            const serverData = await serverRes.json();
+            if (serverData.success && serverData.logs && serverData.logs.length > 0) {
+              setEmailLogs(prev => {
+                const map = new Map();
+                [...serverData.logs, ...prev].forEach(l => map.set(l.id, l));
+                const merged = Array.from(map.values()).slice(0, 300);
+                localStorage.setItem('cached_email_logs', JSON.stringify(merged));
+                return merged;
+              });
+            }
+          } catch (e) {
+            console.warn('Could not fetch server email logs on boot:', e);
+          }
+
           console.log('Successfully loaded synced credentials from cloud Firestore');
         } else if (result && result.success && !result.data) {
           // Cloud Firestore is empty. Trigger a save so the baseline default employees/attendance
@@ -950,6 +1089,7 @@ export default function App() {
           payroll,
           adminSettings,
           failedLogins,
+          emailLogs,
           spreadsheetId,
           spreadsheetLink
         });
@@ -1373,6 +1513,7 @@ export default function App() {
       }
 
       setIsSendingPasswordLoginOtp(false);
+      if (data.logEntry) addEmailLog(data.logEntry);
       if (data.success) {
         setPasswordLoginOtpStep('enter_otp');
         if (data.method === 'SIMULATION') {
@@ -1758,6 +1899,7 @@ export default function App() {
             })
           });
           const data = await res.json();
+          if (data.logEntry) addEmailLog(data.logEntry);
           if (data.success && data.method === 'SIMULATION') {
             setLastSentEmail(data.debugPayload);
             setShowEmailViewer(true);
@@ -1795,6 +1937,7 @@ export default function App() {
       .then(res => res.json())
       .then(data => {
         console.log('Welcome email API response:', data);
+        if (data.logEntry) addEmailLog(data.logEntry);
         if (data.success && data.method === 'SIMULATION') {
           setLastSentEmail(data.debugPayload);
           setShowEmailViewer(true);
@@ -2697,6 +2840,7 @@ export default function App() {
                             }
 
                             setFirstLoginSendingOtp(false);
+                            if (data.logEntry) addEmailLog(data.logEntry);
                             if (data.success) {
                               setFirstLoginStep('email_otp');
                               if (data.method === 'SIMULATION') {
@@ -3580,6 +3724,7 @@ export default function App() {
                           }
 
                           setIsSendingLoginOtp(false);
+                          if (data.logEntry) addEmailLog(data.logEntry);
                           if (data.success) {
                             setLoginOtpStep('enter_otp');
                             if (data.method === 'SIMULATION') {
@@ -4057,6 +4202,7 @@ export default function App() {
                           }
 
                           setIsSendingForgotOtp(false);
+                          if (data.logEntry) addEmailLog(data.logEntry);
                           if (data.success) {
                             setForgotStep('verify_otp');
                             if (data.method === 'SIMULATION') {
@@ -5526,6 +5672,10 @@ export default function App() {
                   auditLogs={auditLogs}
                   onClearAuditLogs={handleClearAuditLogs}
                   portalUser={portalUser}
+                  emailLogs={emailLogs}
+                  onClearEmailLogs={handleClearEmailLogs}
+                  onSendTestEmail={handleSendTestEmail}
+                  onResendEmail={handleResendEmail}
                 />
               )}
             </div>

@@ -346,3 +346,19 @@ export interface LeaveRequest {
   remarks?: string;
 }
 
+export interface TransactionalEmailLog {
+  id: string;
+  recipientEmail: string;
+  recipientName?: string;
+  type: 'OTP' | 'Welcome Message' | 'Leave Update' | 'SMTP Test' | 'Payslip' | 'Custom Notice';
+  subject: string;
+  status: 'Sent (SMTP)' | 'Simulated' | 'Failed';
+  sentAt: string; // ISO String
+  otpCode?: string;
+  purpose?: string;
+  method?: 'SMTP' | 'SIMULATION' | 'Direct';
+  errorMessage?: string;
+  senderEmail?: string;
+  bodyPreview?: string;
+}
+

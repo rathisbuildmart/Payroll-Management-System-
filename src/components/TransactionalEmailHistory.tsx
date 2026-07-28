@@ -1,0 +1,895 @@
+import React, { useState, useMemo } from 'react';
+import { 
+  Mail, 
+  KeyRound, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Clock, 
+  Search, 
+  RefreshCw, 
+  Send, 
+  Eye, 
+  EyeOff, 
+  Copy, 
+  Trash2, 
+  Download, 
+  Server, 
+  Filter, 
+  Check, 
+  User, 
+  X,
+  Sparkles,
+  Info,
+  ShieldCheck,
+  ChevronDown
+} from 'lucide-react';
+import { TransactionalEmailLog, AdminSettings } from '../types';
+
+interface TransactionalEmailHistoryProps {
+  emailLogs: TransactionalEmailLog[];
+  onClearEmailLogs: () => void;
+  language: 'en' | 'hi';
+  adminSettings: AdminSettings;
+  onSendTestEmail?: (recipient: string, type: 'OTP' | 'Welcome Message' | 'Custom Notice', subject: string, customBody?: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  onResendEmail?: (log: TransactionalEmailLog) => Promise<{ success: boolean; message?: string; error?: string }>;
+}
+
+export default function TransactionalEmailHistory({
+  emailLogs = [],
+  onClearEmailLogs,
+  language = 'en',
+  adminSettings,
+  onSendTestEmail,
+  onResendEmail
+}: TransactionalEmailHistoryProps) {
+  // Filter & Search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState<string>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+
+  // Modal & Interactive states
+  const [selectedLogForModal, setSelectedLogForModal] = useState<TransactionalEmailLog | null>(null);
+  const [visibleOtps, setVisibleOtps] = useState<Record<string, boolean>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isResending, setIsResending] = useState<string | null>(null);
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
+  // Manual Email Dispatch Tool states
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [dispatchRecipient, setDispatchRecipient] = useState('');
+  const [dispatchName, setDispatchName] = useState('');
+  const [dispatchType, setDispatchType] = useState<'OTP' | 'Welcome Message' | 'Custom Notice'>('OTP');
+  const [dispatchSubject, setDispatchSubject] = useState('');
+  const [dispatchBody, setDispatchBody] = useState('');
+  const [isSendingCustom, setIsSendingCustom] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const isEn = language === 'en';
+
+  // Stats Calculations
+  const stats = useMemo(() => {
+    const total = emailLogs.length;
+    const smtpSent = emailLogs.filter(l => l.status === 'Sent (SMTP)').length;
+    const simulated = emailLogs.filter(l => l.status === 'Simulated').length;
+    const failed = emailLogs.filter(l => l.status === 'Failed').length;
+    const otps = emailLogs.filter(l => l.type === 'OTP').length;
+    const welcome = emailLogs.filter(l => l.type === 'Welcome Message').length;
+    return { total, smtpSent, simulated, failed, otps, welcome };
+  }, [emailLogs]);
+
+  // Filtered & Sorted Logs
+  const filteredLogs = useMemo(() => {
+    return emailLogs
+      .filter(log => {
+        // Type filter
+        if (selectedType !== 'ALL' && log.type !== selectedType) return false;
+        // Status filter
+        if (selectedStatus !== 'ALL' && log.status !== selectedStatus) return false;
+        // Search query
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          const matchRecipient = log.recipientEmail.toLowerCase().includes(q);
+          const matchName = log.recipientName?.toLowerCase().includes(q);
+          const matchSubject = log.subject.toLowerCase().includes(q);
+          const matchOtp = log.otpCode?.toLowerCase().includes(q);
+          const matchPurpose = log.purpose?.toLowerCase().includes(q);
+          return matchRecipient || matchName || matchSubject || matchOtp || matchPurpose;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.sentAt).getTime();
+        const timeB = new Date(b.sentAt).getTime();
+        return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
+      });
+  }, [emailLogs, selectedType, selectedStatus, searchQuery, sortOrder]);
+
+  const toggleOtpVisibility = (id: string) => {
+    setVisibleOtps(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleTriggerResend = async (log: TransactionalEmailLog) => {
+    setIsResending(log.id);
+    setActionSuccessMsg(null);
+    try {
+      if (onResendEmail) {
+        const res = await onResendEmail(log);
+        if (res.success) {
+          setActionSuccessMsg(isEn ? `Successfully resent email to ${log.recipientEmail}` : `${log.recipientEmail} को ईमेल सफलतापूर्वक पुनः भेजा गया`);
+        } else {
+          alert(res.error || (isEn ? 'Failed to resend email' : 'ईमेल पुनः भेजने में विफल'));
+        }
+      } else {
+        // Fallback fetch
+        const res = await fetch('/api/send-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: log.recipientEmail,
+            otp: log.otpCode || Math.floor(100000 + Math.random() * 900000).toString(),
+            empName: log.recipientName || 'Employee',
+            purpose: log.purpose?.includes('Reset') ? 'password_reset' : 'login',
+            language,
+            smtpSettings: {
+              host: adminSettings.smtpHost,
+              port: adminSettings.smtpPort,
+              username: adminSettings.smtpUsername,
+              password: adminSettings.smtpPassword,
+              senderName: adminSettings.senderName,
+              senderEmail: adminSettings.senderEmail
+            }
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setActionSuccessMsg(isEn ? `Resent email successfully!` : `ईमेल सफलतापूर्वक पुनः भेजा गया!`);
+        } else {
+          alert(data.error || 'Failed to resend email');
+        }
+      }
+    } catch (e: any) {
+      alert(e.message || 'Error resending email');
+    } finally {
+      setIsResending(null);
+      setTimeout(() => setActionSuccessMsg(null), 4000);
+    }
+  };
+
+  const handleSendCustomSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dispatchRecipient.trim()) return;
+    setIsSendingCustom(true);
+    try {
+      if (onSendTestEmail) {
+        const res = await onSendTestEmail(dispatchRecipient.trim(), dispatchType, dispatchSubject || 'Transactional Notice', dispatchBody);
+        if (res.success) {
+          setActionSuccessMsg(isEn ? `Email sent to ${dispatchRecipient}` : `${dispatchRecipient} को ईमेल भेजा गया`);
+          setShowDispatchModal(false);
+          setDispatchRecipient('');
+          setDispatchSubject('');
+          setDispatchBody('');
+        } else {
+          alert(res.error || 'Failed to dispatch email.');
+        }
+      } else {
+        const res = await fetch('/api/send-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: dispatchRecipient.trim(),
+            otp: Math.floor(100000 + Math.random() * 900000).toString(),
+            empName: dispatchName || 'Team Member',
+            purpose: 'login',
+            language,
+            smtpSettings: {
+              host: adminSettings.smtpHost,
+              port: adminSettings.smtpPort,
+              username: adminSettings.smtpUsername,
+              password: adminSettings.smtpPassword,
+              senderName: adminSettings.senderName,
+              senderEmail: adminSettings.senderEmail
+            }
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setActionSuccessMsg(isEn ? `Transactional message dispatched successfully!` : `ट्रांजेक्शनल संदेश सफलतापूर्वक भेजा गया!`);
+          setShowDispatchModal(false);
+          setDispatchRecipient('');
+        } else {
+          alert(data.error || 'Dispatch error');
+        }
+      }
+    } catch (e: any) {
+      alert(e.message || 'Error dispatching custom message');
+    } finally {
+      setIsSendingCustom(false);
+      setTimeout(() => setActionSuccessMsg(null), 4000);
+    }
+  };
+
+  const exportLogsAsCSV = () => {
+    if (filteredLogs.length === 0) return;
+    const headers = ['ID', 'Date & Time', 'Recipient Email', 'Recipient Name', 'Type', 'Subject', 'OTP Code', 'Status', 'Method', 'Error Message'];
+    const rows = filteredLogs.map(l => [
+      l.id,
+      new Date(l.sentAt).toLocaleString(),
+      `"${l.recipientEmail}"`,
+      `"${l.recipientName || ''}"`,
+      `"${l.type}"`,
+      `"${l.subject.replace(/"/g, '""')}"`,
+      `"${l.otpCode || ''}"`,
+      `"${l.status}"`,
+      `"${l.method || ''}"`,
+      `"${(l.errorMessage || '').replace(/"/g, '""')}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `transactional_email_history_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Action Notification Toast */}
+      {actionSuccessMsg && (
+        <div className="bg-emerald-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center justify-between text-xs font-bold animate-fade-in border border-emerald-400">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{actionSuccessMsg}</span>
+          </div>
+          <button onClick={() => setActionSuccessMsg(null)} className="hover:opacity-80 cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Main Header & Title */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-[#0f1d18] p-5 rounded-2xl border border-slate-200/80 dark:border-[#1e3a2f] shadow-xs">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                {isEn ? 'Transactional Email History' : 'ट्रांजेक्शनल ईमेल इतिहास'}
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  {isEn ? 'Admin Audit' : 'एडमिन ऑडिट'}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {isEn 
+                  ? 'Complete transparent delivery audit of OTP security codes, onboarding welcome emails, and leave updates.'
+                  : 'ओटीपी सुरक्षा कोड, ऑनबोर्डिंग स्वागत ईमेल और छुट्टी अपडेट का पूरा पारदर्शी वितरण ऑडिट।'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowDispatchModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-[#03623c] hover:bg-[#024d2e] text-white rounded-xl shadow-xs transition-all cursor-pointer"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>{isEn ? 'Send Test / Custom Email' : 'परीक्षण / कस्टम ईमेल भेजें'}</span>
+          </button>
+
+          <button
+            onClick={exportLogsAsCSV}
+            disabled={filteredLogs.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{isEn ? 'Export CSV' : 'सीएसवी एक्सपोर्ट'}</span>
+          </button>
+
+          {confirmClear ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  onClearEmailLogs();
+                  setConfirmClear(false);
+                }}
+                className="px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all cursor-pointer"
+              >
+                {isEn ? 'Confirm Clear' : 'साफ़ करने की पुष्टि करें'}
+              </button>
+              <button
+                onClick={() => setConfirmClear(false)}
+                className="px-2.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 rounded-xl cursor-pointer"
+              >
+                {isEn ? 'Cancel' : 'रद्द करें'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmClear(true)}
+              disabled={emailLogs.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 rounded-xl border border-rose-200/60 dark:border-rose-900/40 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{isEn ? 'Clear History' : 'इतिहास साफ़ करें'}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* KPI Stats Overview Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="bg-white dark:bg-[#0f1d18] p-4 rounded-xl border border-slate-200/80 dark:border-[#1e3a2f] shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">
+            <span>{isEn ? 'Total Dispatches' : 'कुल ईमेल प्रेषण'}</span>
+            <Mail className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div className="text-2xl font-black text-slate-900 dark:text-white">
+            {stats.total}
+          </div>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block">
+            {isEn ? 'Recorded in system' : 'सिस्टम में रिकॉर्ड'}
+          </span>
+        </div>
+
+        <div className="bg-white dark:bg-[#0f1d18] p-4 rounded-xl border border-slate-200/80 dark:border-[#1e3a2f] shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">
+            <span>{isEn ? 'Sent (SMTP)' : 'सफलतापूर्वक भेजा (SMTP)'}</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          </div>
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+            {stats.smtpSent}
+          </div>
+          <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 mt-1 block">
+            {stats.total > 0 ? `${Math.round((stats.smtpSent / stats.total) * 100)}% delivery rate` : 'Live Gateway'}
+          </span>
+        </div>
+
+        <div className="bg-white dark:bg-[#0f1d18] p-4 rounded-xl border border-slate-200/80 dark:border-[#1e3a2f] shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">
+            <span>{isEn ? 'Simulated Fallback' : 'सिमुलेशन मोड'}</span>
+            <Server className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
+            {stats.simulated}
+          </div>
+          <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80 mt-1 block">
+            {isEn ? 'Local / Terminal mode' : 'स्थानीय टर्मिनल मोड'}
+          </span>
+        </div>
+
+        <div className="bg-white dark:bg-[#0f1d18] p-4 rounded-xl border border-slate-200/80 dark:border-[#1e3a2f] shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">
+            <span>{isEn ? 'OTP Security Codes' : 'ओटीपी कोड संदेश'}</span>
+            <KeyRound className="w-4 h-4 text-blue-500" />
+          </div>
+          <div className="text-2xl font-black text-blue-600 dark:text-blue-400">
+            {stats.otps}
+          </div>
+          <span className="text-[10px] text-blue-600/80 dark:text-blue-400/80 mt-1 block">
+            {isEn ? 'Login & Password Reset' : 'लॉगिन एवं पासवर्ड रीसेट'}
+          </span>
+        </div>
+
+        <div className="bg-white dark:bg-[#0f1d18] p-4 rounded-xl border border-slate-200/80 dark:border-[#1e3a2f] shadow-2xs col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">
+            <span>{isEn ? 'Failed Delivery' : 'विफल प्रेषण'}</span>
+            <AlertTriangle className="w-4 h-4 text-rose-500" />
+          </div>
+          <div className="text-2xl font-black text-rose-600 dark:text-rose-400">
+            {stats.failed}
+          </div>
+          <span className="text-[10px] text-rose-500 mt-1 block">
+            {stats.failed > 0 ? (isEn ? 'Check SMTP settings' : 'SMTP सेटिंग्स की जाँच करें') : (isEn ? 'Zero failed errors' : 'कोई विफलता नहीं')}
+          </span>
+        </div>
+      </div>
+
+      {/* Filter & Search Bar */}
+      <div className="bg-white dark:bg-[#0f1d18] p-4 rounded-2xl border border-slate-200/80 dark:border-[#1e3a2f] shadow-xs space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          {/* Search Box */}
+          <div className="relative md:col-span-5">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={isEn ? 'Search recipient email, name, subject or OTP code...' : 'प्राप्तकर्ता ईमेल, नाम, विषय या ओटीपी कोड खोजें...'}
+              className="w-full pl-9 pr-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Type Filter */}
+          <div className="md:col-span-3">
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 font-medium cursor-pointer"
+            >
+              <option value="ALL">{isEn ? 'All Email Types' : 'सभी ईमेल प्रकार'}</option>
+              <option value="OTP">{isEn ? 'OTP Security Codes' : 'ओटीपी सुरक्षा कोड'}</option>
+              <option value="Welcome Message">{isEn ? 'Welcome & Onboarding' : 'स्वागत और ऑनबोर्डिंग'}</option>
+              <option value="Leave Update">{isEn ? 'Leave Approval Updates' : 'छुट्टी की सूचना'}</option>
+              <option value="SMTP Test">{isEn ? 'SMTP Gateway Tests' : 'SMTP परीक्षण संदेश'}</option>
+              <option value="Custom Notice">{isEn ? 'Custom / Other Notices' : 'कस्टम नोटिस'}</option>
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="md:col-span-2">
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 font-medium cursor-pointer"
+            >
+              <option value="ALL">{isEn ? 'All Delivery Statuses' : 'सभी स्थिति'}</option>
+              <option value="Sent (SMTP)">{isEn ? 'Sent (SMTP)' : 'सफलतापूर्वक भेजा'}</option>
+              <option value="Simulated">{isEn ? 'Simulated' : 'सिमुलेटेड'}</option>
+              <option value="Failed">{isEn ? 'Failed' : 'विफल'}</option>
+            </select>
+          </div>
+
+          {/* Sort Order */}
+          <div className="md:col-span-2">
+            <button
+              onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer"
+            >
+              <span>{sortOrder === 'newest' ? (isEn ? 'Newest First' : 'नवीनतम पहले') : (isEn ? 'Oldest First' : 'पुराना पहले')}</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${sortOrder === 'oldest' ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Badges Summary */}
+        {(selectedType !== 'ALL' || selectedStatus !== 'ALL' || searchQuery.trim()) && (
+          <div className="flex items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
+            <span className="text-slate-400 text-[11px] font-semibold">{isEn ? 'Active Filters:' : 'सक्रिय फ़िल्टर:'}</span>
+            {selectedType !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[11px] font-medium">
+                Type: {selectedType}
+                <button onClick={() => setSelectedType('ALL')} className="hover:opacity-75 cursor-pointer"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {selectedStatus !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[11px] font-medium">
+                Status: {selectedStatus}
+                <button onClick={() => setSelectedStatus('ALL')} className="hover:opacity-75 cursor-pointer"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {searchQuery.trim() && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-[11px] font-medium">
+                "{searchQuery}"
+                <button onClick={() => setSearchQuery('')} className="hover:opacity-75 cursor-pointer"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setSelectedType('ALL');
+                setSelectedStatus('ALL');
+                setSearchQuery('');
+              }}
+              className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer ml-auto"
+            >
+              {isEn ? 'Reset All' : 'सभी रीसेट करें'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Email Logs Table */}
+      <div className="bg-white dark:bg-[#0f1d18] rounded-2xl border border-slate-200/80 dark:border-[#1e3a2f] shadow-xs overflow-hidden">
+        {filteredLogs.length === 0 ? (
+          <div className="text-center py-16 px-4">
+            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 flex items-center justify-center mx-auto mb-3">
+              <Mail className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">
+              {emailLogs.length === 0 
+                ? (isEn ? 'No Transactional Email Logs Recorded Yet' : 'अभी तक कोई ईमेल लॉग दर्ज नहीं है')
+                : (isEn ? 'No Emails Match Your Search Criteria' : 'आपके खोज मापदंड से कोई ईमेल मेल नहीं खाता')}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+              {emailLogs.length === 0 
+                ? (isEn ? 'Transactional emails dispatched for user OTPs, onboarding passwords, or leave updates will appear here automatically.' : 'उपयोगकर्ता ओटीपी, ऑनबोर्डिंग पासवर्ड, या छुट्टी के अपडेट के लिए भेजे गए ईमेल यहां स्वचालित रूप से दिखाई देंगे।')
+                : (isEn ? 'Try adjusting your filter selection or clear the search query.' : 'कृपया अपना फ़िल्टर समायोजित करें या खोज साफ़ करें।')}
+            </p>
+            {emailLogs.length > 0 && (
+              <button
+                onClick={() => {
+                  setSelectedType('ALL');
+                  setSelectedStatus('ALL');
+                  setSearchQuery('');
+                }}
+                className="px-3.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 rounded-xl border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 cursor-pointer transition-all"
+              >
+                {isEn ? 'Clear Filters' : 'फ़िल्टर हटाएं'}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/80 dark:bg-slate-900/80 border-b border-slate-200/80 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                  <th className="py-3 px-4">{isEn ? 'Sent Timestamp' : 'भेजने का समय'}</th>
+                  <th className="py-3 px-4">{isEn ? 'Recipient' : 'प्राप्तकर्ता'}</th>
+                  <th className="py-3 px-4">{isEn ? 'Type' : 'प्रकार'}</th>
+                  <th className="py-3 px-4">{isEn ? 'OTP Code' : 'ओटीपी कोड'}</th>
+                  <th className="py-3 px-4">{isEn ? 'Subject & Purpose' : 'विषय एवं उद्देश्य'}</th>
+                  <th className="py-3 px-4">{isEn ? 'Delivery Gateway' : 'स्थिति एवं गेटवे'}</th>
+                  <th className="py-3 px-4 text-right">{isEn ? 'Actions' : 'कार्रवाई'}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {filteredLogs.map((log) => {
+                  const isOtpVisible = visibleOtps[log.id];
+                  const isSmtp = log.status === 'Sent (SMTP)';
+                  const isSimulated = log.status === 'Simulated';
+                  const isFailed = log.status === 'Failed';
+
+                  return (
+                    <tr 
+                      key={log.id} 
+                      className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors group"
+                    >
+                      {/* Date & Time */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">
+                          {new Date(log.sentAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </div>
+                        <div className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          {new Date(log.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                      </td>
+
+                      {/* Recipient */}
+                      <td className="py-3 px-4 max-w-[200px]">
+                        <div className="font-bold text-slate-900 dark:text-white truncate flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{log.recipientName || 'Employee User'}</span>
+                        </div>
+                        <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-mono truncate">
+                          {log.recipientEmail}
+                        </div>
+                      </td>
+
+                      {/* Type Badge */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${
+                          log.type === 'OTP' 
+                            ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60'
+                            : log.type === 'Welcome Message'
+                            ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/60'
+                            : log.type === 'Leave Update'
+                            ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        }`}>
+                          {log.type === 'OTP' && <KeyRound className="w-3 h-3" />}
+                          {log.type === 'Welcome Message' && <Sparkles className="w-3 h-3" />}
+                          {log.type === 'Leave Update' && <Clock className="w-3 h-3" />}
+                          {log.type === 'SMTP Test' && <Server className="w-3 h-3" />}
+                          <span>{log.type}</span>
+                        </span>
+                      </td>
+
+                      {/* OTP Code with Mask / Unmask & Copy */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        {log.otpCode ? (
+                          <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-800 font-mono text-xs">
+                            <span className="font-black text-emerald-700 dark:text-emerald-400 tracking-wider">
+                              {isOtpVisible ? log.otpCode : '••••••'}
+                            </span>
+                            <button
+                              onClick={() => toggleOtpVisibility(log.id)}
+                              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer rounded"
+                              title={isOtpVisible ? 'Hide OTP' : 'Show OTP'}
+                            >
+                              {isOtpVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                            <button
+                              onClick={() => copyToClipboard(log.otpCode!, `otp-${log.id}`)}
+                              className="text-slate-400 hover:text-emerald-600 p-0.5 cursor-pointer rounded ml-0.5"
+                              title="Copy OTP Code"
+                            >
+                              {copiedId === `otp-${log.id}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-600 text-[11px] italic">—</span>
+                        )}
+                      </td>
+
+                      {/* Subject & Purpose */}
+                      <td className="py-3 px-4 max-w-[260px]">
+                        <div className="font-medium text-slate-800 dark:text-slate-200 truncate" title={log.subject}>
+                          {log.subject}
+                        </div>
+                        {log.purpose && (
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                            {log.purpose}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Status Gateway */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          {isSmtp && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                              <span>{isEn ? 'Sent (SMTP)' : 'सफल (SMTP)'}</span>
+                            </span>
+                          )}
+                          {isSimulated && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                              <Server className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                              <span>{isEn ? 'Simulated' : 'सिमुलेटेड'}</span>
+                            </span>
+                          )}
+                          {isFailed && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300 dark:border-rose-800" title={log.errorMessage}>
+                              <AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+                              <span>{isEn ? 'Failed Error' : 'विफल'}</span>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setSelectedLogForModal(log)}
+                            className="px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-all cursor-pointer"
+                          >
+                            {isEn ? 'View Log' : 'विवरण देखें'}
+                          </button>
+
+                          <button
+                            onClick={() => handleTriggerResend(log)}
+                            disabled={isResending === log.id}
+                            className="p-1.5 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                            title={isEn ? 'Resend Email / Re-trigger OTP' : 'ईमेल पुनः भेजें'}
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isResending === log.id ? 'animate-spin' : ''}`} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* View Email Log Details Modal */}
+      {selectedLogForModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#0f1d18] rounded-2xl border border-slate-200 dark:border-[#1e3a2f] shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {isEn ? 'Transactional Email Log Details' : 'ट्रांजेक्शनल ईमेल लॉग विवरण'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono">ID: {selectedLogForModal.id}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedLogForModal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">{isEn ? 'Recipient' : 'प्राप्तकर्ता'}</span>
+                  <div className="font-bold text-slate-900 dark:text-white">{selectedLogForModal.recipientName || 'User'}</div>
+                  <div className="text-emerald-700 dark:text-emerald-400 font-mono text-[11px]">{selectedLogForModal.recipientEmail}</div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">{isEn ? 'Sent Timestamp' : 'भेजने का समय'}</span>
+                  <div className="font-medium text-slate-800 dark:text-slate-200">
+                    {new Date(selectedLogForModal.sentAt).toLocaleString()}
+                  </div>
+                  <div className="text-slate-400 text-[10px]">Method: {selectedLogForModal.method || 'SMTP'}</div>
+                </div>
+              </div>
+
+              {selectedLogForModal.otpCode && (
+                <div className="bg-emerald-50 dark:bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
+                      {isEn ? 'Verified Security One-Time Password (OTP)' : 'सत्यापित वन-टाइम पासवर्ड (ओटीपी)'}
+                    </span>
+                    <span className="text-xl font-black font-mono text-emerald-700 dark:text-emerald-400 tracking-widest block mt-0.5">
+                      {selectedLogForModal.otpCode}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(selectedLogForModal.otpCode!, 'modal-otp')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all cursor-pointer shadow-xs"
+                  >
+                    {copiedId === 'modal-otp' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedId === 'modal-otp' ? (isEn ? 'Copied!' : 'कॉपी हुआ!') : (isEn ? 'Copy OTP' : 'ओटीपी कॉपी करें')}</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{isEn ? 'Subject Title' : 'विषय'}</span>
+                  <div className="p-2.5 bg-slate-100 dark:bg-slate-900 rounded-xl font-medium text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800">
+                    {selectedLogForModal.subject}
+                  </div>
+                </div>
+
+                {selectedLogForModal.bodyPreview && (
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{isEn ? 'Message Payload / Preview' : 'संदेश पेलोड'}</span>
+                    <div className="p-3 bg-slate-900 text-emerald-400 rounded-xl font-mono text-[11px] leading-relaxed border border-slate-800 whitespace-pre-wrap">
+                      {selectedLogForModal.bodyPreview}
+                    </div>
+                  </div>
+                )}
+
+                {selectedLogForModal.errorMessage && (
+                  <div>
+                    <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block mb-1">{isEn ? 'SMTP Gateway Error Diagnostics' : 'SMTP त्रुटि विवरण'}</span>
+                    <div className="p-3 bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 rounded-xl text-[11px] border border-rose-200 dark:border-rose-900 font-mono">
+                      {selectedLogForModal.errorMessage}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <button
+                onClick={() => handleTriggerResend(selectedLogForModal)}
+                disabled={isResending === selectedLogForModal.id}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-[#03623c] hover:bg-[#024d2e] text-white rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isResending === selectedLogForModal.id ? 'animate-spin' : ''}`} />
+                <span>{isEn ? 'Resend to Recipient' : 'पुनः प्राप्तकर्ता को भेजें'}</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedLogForModal(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-xl transition-all cursor-pointer"
+              >
+                {isEn ? 'Close' : 'बंद करें'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Test / Custom Email Modal */}
+      {showDispatchModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#0f1d18] rounded-2xl border border-slate-200 dark:border-[#1e3a2f] shadow-2xl max-w-lg w-full overflow-hidden">
+            <div className="p-4 bg-[#03623c] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Send className="w-4 h-4" />
+                <h3 className="text-sm font-bold">
+                  {isEn ? 'Dispatch Test / Custom Transactional Email' : 'परीक्षण / कस्टम ईमेल भेजें'}
+                </h3>
+              </div>
+              <button onClick={() => setShowDispatchModal(false)} className="text-white/80 hover:text-white cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendCustomSubmit} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  {isEn ? 'Recipient Email Address *' : 'प्राप्तकर्ता ईमेल पता *'}
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={dispatchRecipient}
+                  onChange={(e) => setDispatchRecipient(e.target.value)}
+                  placeholder="e.g. employee@rathibuildmart.com"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500/30"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    {isEn ? 'Recipient Name' : 'प्राप्तकर्ता का नाम'}
+                  </label>
+                  <input
+                    type="text"
+                    value={dispatchName}
+                    onChange={(e) => setDispatchName(e.target.value)}
+                    placeholder="e.g. Rajesh Kumar"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    {isEn ? 'Message Type' : 'संदेश का प्रकार'}
+                  </label>
+                  <select
+                    value={dispatchType}
+                    onChange={(e) => setDispatchType(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+                  >
+                    <option value="OTP">OTP Verification Code</option>
+                    <option value="Welcome Message">Welcome & Credentials</option>
+                    <option value="Custom Notice">Custom Notice</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  {isEn ? 'Subject Header (Optional)' : 'विषय (ऐच्छिक)'}
+                </label>
+                <input
+                  type="text"
+                  value={dispatchSubject}
+                  onChange={(e) => setDispatchSubject(e.target.value)}
+                  placeholder="e.g. Test Transactional Gateway Verification"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500/30"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDispatchModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer"
+                >
+                  {isEn ? 'Cancel' : 'रद्द करें'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSendingCustom || !dispatchRecipient.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-[#03623c] hover:bg-[#024d2e] text-white rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Send className={`w-3.5 h-3.5 ${isSendingCustom ? 'animate-bounce' : ''}`} />
+                  <span>{isSendingCustom ? (isEn ? 'Sending...' : 'भेजा जा रहा है...') : (isEn ? 'Dispatch Email' : 'ईमेल भेजें')}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

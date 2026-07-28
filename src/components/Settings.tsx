@@ -42,7 +42,8 @@ import {
   RefreshCcw,
   Info
 } from 'lucide-react';
-import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog } from '../types';
+import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog, TransactionalEmailLog } from '../types';
+import TransactionalEmailHistory from './TransactionalEmailHistory';
 import { 
   DEFAULT_WHATSAPP_TEMPLATES, 
   DEFAULT_EMAIL_TEMPLATES, 
@@ -74,6 +75,11 @@ interface SettingsProps {
   auditLogs?: AuditLog[];
   onClearAuditLogs?: () => void;
   portalUser?: any;
+
+  emailLogs?: TransactionalEmailLog[];
+  onClearEmailLogs?: () => void;
+  onSendTestEmail?: (recipient: string, type: 'OTP' | 'Welcome Message' | 'Custom Notice', subject: string, customBody?: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  onResendEmail?: (log: TransactionalEmailLog) => Promise<{ success: boolean; message?: string; error?: string }>;
 }
 
 export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
@@ -237,9 +243,13 @@ export default function Settings({
   onClearSheetsSession,
   auditLogs = [],
   onClearAuditLogs,
-  portalUser
+  portalUser,
+  emailLogs = [],
+  onClearEmailLogs,
+  onSendTestEmail,
+  onResendEmail
 }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'roles_permissions' | 'audit_logs' | 'email_smtp' | 'whatsapp_auto'>('company');
+  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'roles_permissions' | 'audit_logs' | 'email_smtp' | 'whatsapp_auto' | 'email_logs'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
 
   useEffect(() => {
@@ -1068,6 +1078,23 @@ export default function Settings({
           >
             <History className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
             <span>{language === 'en' ? 'User Audit Report' : 'यूजर ऑडिट रिपोर्ट'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('email_logs')}
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
+              activeSubTab === 'email_logs'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Mail className="w-3.5 h-3.5 shrink-0 md:mt-0.5 text-blue-500" />
+            <span>{language === 'en' ? 'Email History' : 'ईमेल इतिहास'}</span>
+            {emailLogs.length > 0 && (
+              <span className="ml-auto bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.2 text-[9px] font-mono rounded-full font-bold">
+                {emailLogs.length}
+              </span>
+            )}
           </button>
 
           <div className="hidden md:block pt-6 mt-6 border-t border-gray-200/60 dark:border-[#1e3a2f]">
@@ -2893,6 +2920,18 @@ export default function Settings({
                 );
               })()}
             </div>
+          )}
+
+          {/* Sub Tab: Transactional Email History */}
+          {activeSubTab === 'email_logs' && (
+            <TransactionalEmailHistory
+              emailLogs={emailLogs}
+              onClearEmailLogs={onClearEmailLogs || (() => {})}
+              language={language}
+              adminSettings={localSettings}
+              onSendTestEmail={onSendTestEmail}
+              onResendEmail={onResendEmail}
+            />
           )}
 
           {/* Sub Tab: SMTP Custom Email Server Settings */}
