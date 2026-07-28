@@ -162,9 +162,12 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   enableProfessionalTax: true,
   enablePaidLeaveCalculation: true,
   paidLeaveStartAfterMonths: 0,
-  hrContactEmail: 'centraldata@rathibuildmart.com',
+  hrContactEmail: 'hr@rathibuildmart.com',
   hrContactPhone: '+91 91111 22222',
-  hrContactManager: 'Rathi Build Mart Directors & IT Desk',
+  hrContactManager: 'Rathi HR Desk',
+  itContactEmail: 'it.support@rathibuildmart.com',
+  itContactPhone: '+91 98888 77777',
+  itContactManager: 'Rathi IT Management Desk',
   rulesShiftTiming: '09:30 AM - 06:30 PM',
   rulesHalfDaySlot: 'Before 01:30 PM',
   rulesLatePunchGrace: '09:45 AM',
@@ -1166,36 +1169,79 @@ export default function Settings({
                   Login Info Desk Settings (लॉगिन पेज हेल्पडेस्क और नियम)
                 </h4>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Managed By / Provider (प्रबंधनकर्ता)</label>
-                    <input 
-                      type="text" 
-                      value={localSettings.hrContactManager || ''}
-                      onChange={(e) => setLocalSettings({...localSettings, hrContactManager: e.target.value})}
-                      placeholder="e.g. Directors & IT Desk"
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                    />
+                <div className="space-y-2">
+                  <span className="text-[11px] font-black uppercase text-[#03623c] tracking-wider block">
+                    1. HR Helpdesk Contact (एचआर हेल्पलाइन व संपर्क)
+                  </span>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Manager / Desk (एचआर प्रमुख)</label>
+                      <input 
+                        type="text" 
+                        value={localSettings.hrContactManager || ''}
+                        onChange={(e) => setLocalSettings({...localSettings, hrContactManager: e.target.value})}
+                        placeholder="e.g. Rathi HR Desk"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Email (एचआर ईमेल)</label>
+                      <input 
+                        type="email" 
+                        value={localSettings.hrContactEmail || ''}
+                        onChange={(e) => setLocalSettings({...localSettings, hrContactEmail: e.target.value})}
+                        placeholder="e.g. hr@rathibuildmart.com"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Phone (एचआर फोन नंबर)</label>
+                      <input 
+                        type="text" 
+                        value={localSettings.hrContactPhone || ''}
+                        onChange={(e) => setLocalSettings({...localSettings, hrContactPhone: e.target.value})}
+                        placeholder="e.g. +91 91111 22222"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Helpdesk Email (एचआर ईमेल)</label>
-                    <input 
-                      type="email" 
-                      value={localSettings.hrContactEmail || ''}
-                      onChange={(e) => setLocalSettings({...localSettings, hrContactEmail: e.target.value})}
-                      placeholder="e.g. hr@rathibuildmart.com"
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Helpdesk Phone (एचआर फोन नंबर)</label>
-                    <input 
-                      type="text" 
-                      value={localSettings.hrContactPhone || ''}
-                      onChange={(e) => setLocalSettings({...localSettings, hrContactPhone: e.target.value})}
-                      placeholder="e.g. +91 91111 22222"
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                    />
+                </div>
+
+                <div className="space-y-2 border-t border-gray-200/80 pt-3">
+                  <span className="text-[11px] font-black uppercase text-teal-700 tracking-wider block">
+                    2. IT Management & Tech Support (आईटी प्रबंधन व टेक डेस्क)
+                  </span>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">IT Manager / Desk (आईटी प्रमुख)</label>
+                      <input 
+                        type="text" 
+                        value={localSettings.itContactManager || ''}
+                        onChange={(e) => setLocalSettings({...localSettings, itContactManager: e.target.value})}
+                        placeholder="e.g. IT & System Management Desk"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">IT Email (आईटी ईमेल)</label>
+                      <input 
+                        type="email" 
+                        value={localSettings.itContactEmail || ''}
+                        onChange={(e) => setLocalSettings({...localSettings, itContactEmail: e.target.value})}
+                        placeholder="e.g. it.support@rathibuildmart.com"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">IT Phone (आईटी फोन नंबर)</label>
+                      <input 
+                        type="text" 
+                        value={localSettings.itContactPhone || ''}
+                        onChange={(e) => setLocalSettings({...localSettings, itContactPhone: e.target.value})}
+                        placeholder="e.g. +91 98888 77777"
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
 

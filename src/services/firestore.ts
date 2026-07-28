@@ -16,6 +16,25 @@ export interface SharedData {
   lastUpdated?: string;
 }
 
+// Timeout helper to prevent Firestore network stalls or unhandled rejections
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Firestore network operation timed out'));
+    }, timeoutMs);
+
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+};
+
 /**
  * Saves all application data to Firestore
  */
@@ -25,10 +44,13 @@ export async function saveToFirestore(data: SharedData): Promise<{ success: bool
     // Deeply serialize and deserialize to strip undefined values which crash Firestore setDoc
     const sanitizedData = JSON.parse(JSON.stringify(data));
     
-    await setDoc(docRef, {
-      ...sanitizedData,
-      lastUpdated: new Date().toISOString()
-    });
+    await withTimeout(
+      setDoc(docRef, {
+        ...sanitizedData,
+        lastUpdated: new Date().toISOString()
+      }),
+      10000
+    );
     console.log('Successfully synced data to Firestore');
     return { success: true };
   } catch (error: any) {
@@ -36,7 +58,7 @@ export async function saveToFirestore(data: SharedData): Promise<{ success: bool
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       console.log('Firestore sync skipped: System is working offline. Local changes saved in browser.');
     } else {
-      console.error('Firestore sync failed:', errMsg);
+      console.warn('Firestore sync skipped (offline or unavailable):', errMsg);
     }
     return { success: false, error: errMsg };
   }
@@ -48,7 +70,7 @@ export async function saveToFirestore(data: SharedData): Promise<{ success: bool
 export async function loadFromFirestore(): Promise<{ data: SharedData | null; success: boolean; error?: string }> {
   try {
     const docRef = doc(db, COLLECTION_NAME, DOCUMENT_ID);
-    const docSnap = await getDoc(docRef);
+    const docSnap = await withTimeout(getDoc(docRef), 10000);
     if (docSnap.exists()) {
       return { data: docSnap.data() as SharedData, success: true };
     }
@@ -58,7 +80,7 @@ export async function loadFromFirestore(): Promise<{ data: SharedData | null; su
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       console.log('Firestore loading skipped: System is working offline. Loading local cache.');
     } else {
-      console.log('Firestore loading skipped (offline or sandbox):', errMsg);
+      console.warn('Firestore loading skipped (offline or unavailable):', errMsg);
     }
     return { data: null, success: false, error: errMsg };
   }

@@ -718,7 +718,7 @@ export async function savePayrollHistory(spreadsheetId: string, payroll: Payroll
  * Saves Admin Settings back to the Settings sheet
  */
 export async function saveAdminSettings(spreadsheetId: string, settings: AdminSettings, token: string): Promise<void> {
-  const range = 'Settings!A1:B100';
+  const range = 'Settings!A1:B200';
   const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:clear`;
   await fetch(clearUrl, {
     method: 'POST',
@@ -759,6 +759,9 @@ export async function saveAdminSettings(spreadsheetId: string, settings: AdminSe
     ['hrContactEmail', settings.hrContactEmail || ''],
     ['hrContactPhone', settings.hrContactPhone || ''],
     ['hrContactManager', settings.hrContactManager || ''],
+    ['itContactEmail', settings.itContactEmail || ''],
+    ['itContactPhone', settings.itContactPhone || ''],
+    ['itContactManager', settings.itContactManager || ''],
     ['roleAccounts', JSON.stringify(settings.roleAccounts || [])],
     ['rolePermissions', JSON.stringify(settings.rolePermissions || {})],
     ['enableEmployeePayslips', settings.enableEmployeePayslips ? 'TRUE' : 'FALSE'],
@@ -801,7 +804,7 @@ export async function saveAdminSettings(spreadsheetId: string, settings: AdminSe
  * Reads Admin Settings from the Settings sheet
  */
 export async function fetchAdminSettings(spreadsheetId: string, token: string): Promise<AdminSettings | null> {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Settings!A1:B100`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Settings!A1:B200`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,

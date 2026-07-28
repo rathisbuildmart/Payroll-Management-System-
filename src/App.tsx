@@ -36,6 +36,8 @@ import {
   ChevronRight,
   Clock,
   UserCheck,
+  PhoneCall,
+  Monitor,
   Sun,
   Moon
 } from 'lucide-react';
@@ -550,7 +552,7 @@ export default function App() {
   const [isSendingLoginOtp, setIsSendingLoginOtp] = useState(false);
   const [loginOtpEmail, setLoginOtpEmail] = useState('');
   const [loginMobileTab, setLoginMobileTab] = useState<'signin' | 'info'>('signin');
-  const [infoSubTab, setInfoSubTab] = useState<'notices' | 'hr' | 'rules'>('notices');
+  const [infoSubTab, setInfoSubTab] = useState<'notices' | 'hr' | 'it' | 'rules'>('notices');
 
   // Password 2FA OTP States
   const [passwordLoginOtpStep, setPasswordLoginOtpStep] = useState<'password' | 'enter_otp'>('password');
@@ -1129,6 +1131,8 @@ export default function App() {
           activeSettings = { ...INITIAL_ADMIN_SETTINGS, ...adminSettings, ...fetchedSettings };
           setAdminSettings(activeSettings);
           localStorage.setItem('payroll_admin_settings', JSON.stringify(activeSettings));
+          // Ensure all 52 setting keys (SMTP, Rules, Roles, Automation) are populated in Google Sheets
+          await saveAdminSettings(sheetId, activeSettings, accessToken);
         } else {
           // If the sheet doesn't have settings yet, write current local settings to Google Sheets
           await saveAdminSettings(sheetId, adminSettings, accessToken);
@@ -1225,6 +1229,87 @@ export default function App() {
         setToken(null);
         setNeedsAuth(true);
       }
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  const handleForceSyncNow = async () => {
+    setIsLoadingData(true);
+    setSyncStatus('syncing');
+    const nowIso = new Date().toISOString();
+
+    addSyncLog(
+      language === 'en' ? 'Force Sync Started' : 'फ़ोर्स सिंक शुरू',
+      'syncing',
+      language === 'en'
+        ? 'Synchronizing database collections with Cloud Firestore and Google Sheets...'
+        : 'क्लाउड फ़ायरस्टोर और गूगल शीट्स के साथ डेटाबेस सिंक किया जा रहा है...'
+    );
+
+    try {
+      // 1. First push local state to Cloud Firestore so unsaved local changes are preserved
+      await saveToFirestore({
+        employees,
+        attendance,
+        payroll,
+        adminSettings,
+        failedLogins,
+        spreadsheetId,
+        spreadsheetLink,
+        lastUpdated: nowIso
+      });
+
+      // 2. If Google OAuth token is active, save to Google Sheets and refresh
+      if (token) {
+        await loadApplicationData(token);
+      } else {
+        // 3. Otherwise reload fresh state from Cloud Firestore
+        const fsResult = await loadFromFirestore();
+        if (fsResult && fsResult.success && fsResult.data) {
+          const globalData = fsResult.data;
+          if (globalData.employees) setEmployees(globalData.employees);
+          if (globalData.attendance) setAttendance(globalData.attendance);
+          if (globalData.payroll) setPayroll(globalData.payroll);
+          if (globalData.adminSettings) setAdminSettings(prev => ({ ...prev, ...globalData.adminSettings }));
+          if (globalData.failedLogins) setFailedLogins(globalData.failedLogins);
+          if (globalData.spreadsheetId) setSpreadsheetId(globalData.spreadsheetId);
+          if (globalData.spreadsheetLink) setSpreadsheetLink(globalData.spreadsheetLink);
+        }
+      }
+
+      setSyncStatus('synced');
+      setIsDataModified(false);
+      setLastSuccessfulSyncTime(nowIso);
+      localStorage.setItem('payroll_last_success_sync', nowIso);
+
+      addSyncLog(
+        language === 'en' ? 'Force Sync Completed' : 'फ़ोर्स सिंक पूरा हुआ',
+        'success',
+        language === 'en'
+          ? `All collections successfully synchronized at ${new Date().toLocaleTimeString()}.`
+          : `सभी कलेक्शन ${new Date().toLocaleTimeString()} पर सफलतापूर्वक सिंक हो गए।`
+      );
+
+      alert(
+        language === 'en'
+          ? 'Database successfully synchronized with Cloud Firestore & Google Sheets!'
+          : 'डेटाबेस क्लाउड फ़ायरस्टोर और गूगल शीट्स के साथ सफलतापूर्वक सिंक हो गया है!'
+      );
+    } catch (err: any) {
+      console.error('Force Sync error:', err);
+      setSyncStatus('error');
+      const errMsg = err?.message || String(err);
+      addSyncLog(
+        language === 'en' ? 'Force Sync Failed' : 'फ़ोर्स सिंक विफल',
+        'error',
+        language === 'en' ? `Sync failed: ${errMsg}` : `सिंक विफल: ${errMsg}`
+      );
+      alert(
+        language === 'en'
+          ? `Sync failed: ${errMsg}`
+          : `सिंक विफल: ${errMsg}`
+      );
     } finally {
       setIsLoadingData(false);
     }
@@ -2168,7 +2253,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setInfoSubTab('notices')}
-                  className={`flex-1 text-center py-1 rounded text-[8px] md:text-[9.5px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                  className={`flex-1 text-center py-1 rounded text-[7.5px] md:text-[9px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
                     infoSubTab === 'notices'
                       ? 'bg-slate-850 text-emerald-400 shadow-sm border border-slate-800/40'
                       : 'text-slate-400 hover:text-slate-200'
@@ -2179,18 +2264,29 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setInfoSubTab('hr')}
-                  className={`flex-1 text-center py-1 rounded text-[8px] md:text-[9.5px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                  className={`flex-1 text-center py-1 rounded text-[7.5px] md:text-[9px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
                     infoSubTab === 'hr'
                       ? 'bg-slate-850 text-emerald-400 shadow-sm border border-slate-800/40'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  👤 {language === 'en' ? 'HR & Mgmt' : 'एचआर व प्रबंधन'}
+                  👤 {language === 'en' ? 'HR Help' : 'एचआर सहायता'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInfoSubTab('it')}
+                  className={`flex-1 text-center py-1 rounded text-[7.5px] md:text-[9px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                    infoSubTab === 'it'
+                      ? 'bg-slate-850 text-teal-400 shadow-sm border border-slate-800/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  💻 {language === 'en' ? 'IT Mgmt' : 'आईटी प्रबंधन'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setInfoSubTab('rules')}
-                  className={`flex-1 text-center py-1 rounded text-[8px] md:text-[9.5px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                  className={`flex-1 text-center py-1 rounded text-[7.5px] md:text-[9px] font-black uppercase tracking-wider transition-all duration-150 cursor-pointer ${
                     infoSubTab === 'rules'
                       ? 'bg-slate-850 text-emerald-400 shadow-sm border border-slate-800/40'
                       : 'text-slate-400 hover:text-slate-200'
@@ -2209,26 +2305,39 @@ export default function App() {
                       {language === 'en' ? 'Notice Board & Circulars' : 'सूचना पट्ट और परिपत्र'}
                     </span>
                     <span className="text-[7.5px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      {announcements.length} {language === 'en' ? 'Active' : 'सक्रिय'}
+                      {announcements.filter(a => (!a.scheduledDate || a.scheduledDate <= new Date().toISOString().split('T')[0]) && (!a.expiryDate || a.expiryDate >= new Date().toISOString().split('T')[0])).length} {language === 'en' ? 'Active' : 'सक्रिय'}
                     </span>
                   </div>
- 
-                  <div className="space-y-2 max-h-[150px] md:max-h-[130px] overflow-y-auto pr-1 select-none custom-scrollbar">
-                    {announcements.length === 0 ? (
-                      <p className="text-[10px] text-slate-500 italic">
-                        {language === 'en' ? 'No recent company announcements.' : 'कोई हालिया कंपनी घोषणाएं नहीं हैं।'}
-                      </p>
-                    ) : (
-                      announcements.map((ann) => {
+
+                  <div className="space-y-2 max-h-[160px] md:max-h-[140px] overflow-y-auto pr-1 select-none custom-scrollbar">
+                    {(() => {
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      const activeList = announcements.filter(ann => {
+                        if (ann.scheduledDate && ann.scheduledDate > todayStr) return false;
+                        if (ann.expiryDate && ann.expiryDate < todayStr) return false;
+                        return true;
+                      }).sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+
+                      if (activeList.length === 0) {
+                        return (
+                          <p className="text-[10px] text-slate-500 italic">
+                            {language === 'en' ? 'No active company announcements at this time.' : 'इस समय कोई सक्रिय कंपनी घोषणाएं नहीं हैं।'}
+                          </p>
+                        );
+                      }
+
+                      return activeList.map((ann) => {
                         let badgeBg = 'bg-slate-900 border-slate-800 text-slate-400';
                         if (ann.badge === 'Critical') badgeBg = 'bg-rose-950/40 border-rose-900/30 text-rose-400';
+                        if (ann.badge === 'Urgent') badgeBg = 'bg-rose-950/60 border-rose-800 text-rose-300';
                         if (ann.badge === 'Holiday') badgeBg = 'bg-amber-950/40 border-amber-900/30 text-amber-400';
                         if (ann.badge === 'Policy') badgeBg = 'bg-sky-950/40 border-sky-900/30 text-sky-400';
                         
                         return (
-                          <div key={ann.id} className="bg-slate-900/40 hover:bg-slate-900/70 border border-slate-800/80 p-2.5 rounded-lg transition-all">
+                          <div key={ann.id} className={`p-2.5 rounded-lg transition-all border ${ann.isPinned ? 'bg-amber-950/20 border-amber-500/30' : 'bg-slate-900/40 hover:bg-slate-900/70 border-slate-800/80'}`}>
                             <div className="flex items-start justify-between gap-2">
-                              <h4 className="text-[11px] font-bold text-slate-200 line-clamp-1">
+                              <h4 className="text-[11px] font-bold text-slate-200 line-clamp-1 flex items-center gap-1">
+                                {ann.isPinned && <span className="text-amber-400 text-[9px]" title="Pinned">📌</span>}
                                 {language === 'en' ? ann.title : ann.titleHi}
                               </h4>
                               <span className={`text-[7.5px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${badgeBg} shrink-0`}>
@@ -2238,56 +2347,109 @@ export default function App() {
                             <p className="text-[9.5px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
                               {language === 'en' ? ann.content : ann.contentHi}
                             </p>
-                            <div className="flex justify-between items-center mt-1 pt-1 border-t border-slate-800/40">
-                              <span className="text-[8px] font-mono text-slate-500">{ann.date}</span>
-                              <span className="text-[7.5px] text-slate-500 italic">HR Department</span>
+                            <div className="flex justify-between items-center mt-1.5 pt-1 border-t border-slate-800/40">
+                              <span className="text-[8px] font-mono text-slate-500">📅 {ann.scheduledDate || ann.date}</span>
+                              {ann.attachmentUrl ? (
+                                <a href={ann.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-[8px] font-bold text-emerald-400 hover:underline flex items-center gap-0.5">
+                                  <span>📎 Document</span>
+                                </a>
+                              ) : (
+                                <span className="text-[7.5px] text-slate-500 italic">HR Department</span>
+                              )}
                             </div>
                           </div>
                         );
-                      })
-                    )}
+                      });
+                    })()}
                   </div>
                 </div>
               )}
 
-              {/* Sub-tab content - HR & Management Detail */}
+              {/* Sub-tab content - HR Support Detail */}
               {infoSubTab === 'hr' && (
                 <div className="space-y-2">
                   <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
-                    <UserCheck className="w-3.5 h-3.5 text-teal-400" />
-                    {language === 'en' ? 'Management & HR Helpline' : 'प्रबंधन एवं एचआर हेल्पलाइन'}
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    {language === 'en' ? 'Human Resources (HR) Support' : 'एचआर हेल्पलाइन व सहायता'}
                   </span>
-                  <div className="bg-slate-900/40 border border-slate-800/80 p-2.5 rounded-lg space-y-2 max-h-[150px] md:max-h-[130px] overflow-y-auto custom-scrollbar">
+                  <div className="bg-slate-900/40 border border-slate-800/80 p-2.5 rounded-lg space-y-2.5 max-h-[170px] md:max-h-[150px] overflow-y-auto custom-scrollbar">
                     {/* Managed By Info */}
                     <div>
                       <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-500 block">
-                        {language === 'en' ? 'Managed By' : 'प्रबंधनकर्ता'}
+                        {language === 'en' ? 'HR Department Head' : 'एचआर विभाग प्रमुख'}
                       </span>
                       <p className="text-[10px] font-bold text-slate-200 mt-0.5">
-                        {adminSettings.hrContactManager || 'Rathi Build Mart Directors & IT Desk'}
+                        {adminSettings.hrContactManager || 'Rathi HR Helpdesk'}
                       </p>
                       <p className="text-[9px] text-slate-400 mt-0.5 leading-normal">
                         {language === 'en' 
-                          ? `This software is managed by ${adminSettings.companyName || 'Rathi Build Mart'} Head Office to process automatic paychecks and logs.` 
-                          : `स्वचालित वेतन पर्ची और लॉग संसाधित करने के लिए ${adminSettings.companyName || 'मुख्य कार्यालय'} द्वारा प्रबंधित।`}
+                          ? 'Contact HR for salary slip queries, leave approvals, attendance records, and company policies.' 
+                          : 'वेतन पर्ची, छुट्टी स्वीकृति, उपस्थिति रिकॉर्ड और कंपनी नीतियों के लिए एचआर से संपर्क करें।'}
                       </p>
                     </div>
 
-                    {/* HR Contact Detail */}
-                    <div className="border-t border-slate-800/50 pt-2">
+                    {/* HR Contact Direct Buttons */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-slate-800/50 pt-2">
+                      <a
+                        href={`tel:${(adminSettings.hrContactPhone || '+91 91111 22222').replace(/\s+/g, '')}`}
+                        className="flex items-center justify-center gap-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-[9.5px] py-2 px-2.5 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer text-center"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5 shrink-0 text-white" />
+                        <span>{language === 'en' ? 'Call HR' : 'कॉल करें'}: {adminSettings.hrContactPhone || '+91 91111 22222'}</span>
+                      </a>
+
+                      <a
+                        href={`mailto:${adminSettings.hrContactEmail || 'hr@rathibuildmart.com'}`}
+                        className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-750 text-emerald-300 hover:text-white font-bold text-[9.5px] py-2 px-2.5 rounded-lg border border-slate-700/80 transition-all active:scale-95 cursor-pointer truncate text-center"
+                      >
+                        <Mail className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                        <span className="truncate">{language === 'en' ? 'Email HR' : 'ईमेल करें'}</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-tab content - IT Management Detail */}
+              {infoSubTab === 'it' && (
+                <div className="space-y-2">
+                  <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    <Monitor className="w-3.5 h-3.5 text-teal-400" />
+                    {language === 'en' ? 'IT Management & System Desk' : 'आईटी प्रबंधन व टेक सहायता'}
+                  </span>
+                  <div className="bg-slate-900/40 border border-slate-800/80 p-2.5 rounded-lg space-y-2.5 max-h-[170px] md:max-h-[150px] overflow-y-auto custom-scrollbar">
+                    {/* Managed By Info */}
+                    <div>
                       <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-500 block">
-                        {language === 'en' ? 'HR Help Desk' : 'सहायता डेस्क'}
+                        {language === 'en' ? 'IT Manager / Tech Desk' : 'आईटी प्रमुख / टेक सहायता'}
                       </span>
-                      <div className="mt-1 space-y-1 text-[9px] text-slate-300 font-semibold font-mono">
-                        <div className="flex items-center gap-1">
-                          <span className="text-emerald-400">📧</span>
-                          <span className="break-all">{adminSettings.hrContactEmail || 'centraldata@rathibuildmart.com'}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-emerald-400">📞</span>
-                          <span>{adminSettings.hrContactPhone || '+91 91111 22222'}</span>
-                        </div>
-                      </div>
+                      <p className="text-[10px] font-bold text-slate-200 mt-0.5">
+                        {adminSettings.itContactManager || 'Rathi IT Management Desk'}
+                      </p>
+                      <p className="text-[9px] text-slate-400 mt-0.5 leading-normal">
+                        {language === 'en' 
+                          ? 'Contact IT Management for login issues, password reset, device restriction unblock, and software support.' 
+                          : 'लॉगिन समस्याओं, पासवर्ड रीसेट, डिवाइस लॉक हटाने और सॉफ्टवेयर सहायता के लिए आईटी प्रबंधन से संपर्क करें।'}
+                      </p>
+                    </div>
+
+                    {/* IT Contact Direct Buttons */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-slate-800/50 pt-2">
+                      <a
+                        href={`tel:${(adminSettings.itContactPhone || '+91 98888 77777').replace(/\s+/g, '')}`}
+                        className="flex items-center justify-center gap-1.5 bg-teal-600/90 hover:bg-teal-500 text-white font-bold text-[9.5px] py-2 px-2.5 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer text-center"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5 shrink-0 text-white" />
+                        <span>{language === 'en' ? 'Call IT Desk' : 'कॉल आईटी डेस्क'}: {adminSettings.itContactPhone || '+91 98888 77777'}</span>
+                      </a>
+
+                      <a
+                        href={`mailto:${adminSettings.itContactEmail || 'it.support@rathibuildmart.com'}`}
+                        className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-750 text-teal-300 hover:text-white font-bold text-[9.5px] py-2 px-2.5 rounded-lg border border-slate-700/80 transition-all active:scale-95 cursor-pointer truncate text-center"
+                      >
+                        <Mail className="w-3.5 h-3.5 shrink-0 text-teal-400" />
+                        <span className="truncate">{language === 'en' ? 'Email IT Desk' : 'ईमेल करें'}</span>
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -3635,7 +3797,43 @@ export default function App() {
                         ? 'All unsuccessful sign-in attempts are logged securely in our Firestore security audit database.' 
                         : 'सभी असफल लॉगिन प्रयास हमारे फ़ायरस्टोर सुरक्षा ऑडिट डेटाबेस में सुरक्षित रूप से दर्ज किए जाते हैं।'}
                     </p>
-                    <div className="border-t border-slate-800/40 pt-2.5 mt-1.5 flex justify-center">
+                    <div className="border-t border-slate-800/40 pt-2.5 mt-1.5 space-y-2">
+                      <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 block text-center font-mono">
+                        {language === 'en' ? 'Direct Help Contacts' : 'प्रत्यक्ष सहायता संपर्क'}
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <a
+                          href={`tel:${(adminSettings.hrContactPhone || '+91 91111 22222').replace(/\s+/g, '')}`}
+                          className="flex items-center justify-center gap-1 bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold text-[8.5px] py-1.5 px-1.5 rounded-lg transition-all text-center"
+                        >
+                          <PhoneCall className="w-3 h-3 shrink-0" />
+                          <span>HR: {adminSettings.hrContactPhone || '+91 91111 22222'}</span>
+                        </a>
+                        <a
+                          href={`tel:${(adminSettings.itContactPhone || '+91 98888 77777').replace(/\s+/g, '')}`}
+                          className="flex items-center justify-center gap-1 bg-teal-600/80 hover:bg-teal-500 text-white font-bold text-[8.5px] py-1.5 px-1.5 rounded-lg transition-all text-center"
+                        >
+                          <PhoneCall className="w-3 h-3 shrink-0" />
+                          <span>IT: {adminSettings.itContactPhone || '+91 98888 77777'}</span>
+                        </a>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <a
+                          href={`mailto:${adminSettings.hrContactEmail || 'hr@rathibuildmart.com'}`}
+                          className="flex items-center justify-center gap-1 bg-slate-800 hover:bg-slate-700 text-emerald-300 font-bold text-[8.5px] py-1.5 px-1.5 rounded-lg border border-slate-700 transition-all text-center truncate"
+                        >
+                          <Mail className="w-3 h-3 shrink-0 text-emerald-400" />
+                          <span className="truncate">Email HR</span>
+                        </a>
+                        <a
+                          href={`mailto:${adminSettings.itContactEmail || 'it.support@rathibuildmart.com'}`}
+                          className="flex items-center justify-center gap-1 bg-slate-800 hover:bg-slate-700 text-teal-300 font-bold text-[8.5px] py-1.5 px-1.5 rounded-lg border border-slate-700 transition-all text-center truncate"
+                        >
+                          <Mail className="w-3 h-3 shrink-0 text-teal-400" />
+                          <span className="truncate">Email IT</span>
+                        </a>
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => {
@@ -3647,10 +3845,10 @@ export default function App() {
                           setSupportMsg('');
                           setSupportCategory('sign_in_issue');
                         }}
-                        className="w-full bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 hover:text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                        className="w-full bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 mt-1"
                       >
-                        <LifeBuoy className="w-3.5 h-3.5 shrink-0" />
-                        {language === 'en' ? 'Contact HR Helpdesk Support' : 'एचआर हेल्पडेस्क से संपर्क करें'}
+                        <LifeBuoy className="w-3 h-3 shrink-0 text-emerald-400" />
+                        {language === 'en' ? 'Submit Support Ticket' : 'सपोर्ट टिकट भेजें'}
                       </button>
                     </div>
                   </div>
@@ -4097,9 +4295,56 @@ export default function App() {
                     </h3>
                     <p className="text-[11px] text-slate-400 font-semibold leading-normal">
                       {language === 'en' 
-                        ? 'Having issues with attendance logs, salary slips, or profile registrations? Leave a message for Rathi HR.'
-                        : 'उपस्थिति लॉग, वेतन पर्ची या प्रोफ़ाइल पंजीकरण में समस्या आ रही है? राठी एचआर के लिए एक संदेश छोड़ें।'}
+                        ? 'Having issues with attendance logs, salary slips, or profile registrations? Contact HR or IT directly below or submit a support ticket.'
+                        : 'उपस्थिति लॉग, वेतन पर्ची या प्रोफ़ाइल में समस्या आ रही है? सीधे नीचे एचआर या आईटी से संपर्क करें या एक सहायता टिकट जमा करें।'}
                     </p>
+
+                    {/* Direct Contact Bar for HR & IT */}
+                    <div className="grid grid-cols-2 gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-left">
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400 block font-mono">
+                          👤 HR Support
+                        </span>
+                        <div className="flex flex-col gap-1">
+                          <a 
+                            href={`tel:${(adminSettings.hrContactPhone || '+91 91111 22222').replace(/\s+/g, '')}`} 
+                            className="flex items-center gap-1 text-[8.5px] text-white hover:text-emerald-300 font-mono font-bold bg-emerald-950/60 hover:bg-emerald-900/80 px-2 py-1 rounded border border-emerald-800/50"
+                          >
+                            <PhoneCall className="w-3 h-3 text-emerald-400 shrink-0" />
+                            <span className="truncate">{adminSettings.hrContactPhone || '+91 91111 22222'}</span>
+                          </a>
+                          <a 
+                            href={`mailto:${adminSettings.hrContactEmail || 'hr@rathibuildmart.com'}`} 
+                            className="flex items-center gap-1 text-[8.5px] text-slate-300 hover:text-white font-mono bg-slate-900 px-2 py-1 rounded border border-slate-800 truncate"
+                          >
+                            <Mail className="w-3 h-3 text-emerald-400 shrink-0" />
+                            <span className="truncate">{adminSettings.hrContactEmail || 'hr@rathibuildmart.com'}</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-teal-400 block font-mono">
+                          💻 IT Management
+                        </span>
+                        <div className="flex flex-col gap-1">
+                          <a 
+                            href={`tel:${(adminSettings.itContactPhone || '+91 98888 77777').replace(/\s+/g, '')}`} 
+                            className="flex items-center gap-1 text-[8.5px] text-white hover:text-teal-300 font-mono font-bold bg-teal-950/60 hover:bg-teal-900/80 px-2 py-1 rounded border border-teal-800/50"
+                          >
+                            <PhoneCall className="w-3 h-3 text-teal-400 shrink-0" />
+                            <span className="truncate">{adminSettings.itContactPhone || '+91 98888 77777'}</span>
+                          </a>
+                          <a 
+                            href={`mailto:${adminSettings.itContactEmail || 'it.support@rathibuildmart.com'}`} 
+                            className="flex items-center gap-1 text-[8.5px] text-slate-300 hover:text-white font-mono bg-slate-900 px-2 py-1 rounded border border-slate-800 truncate"
+                          >
+                            <Mail className="w-3 h-3 text-teal-400 shrink-0" />
+                            <span className="truncate">{adminSettings.itContactEmail || 'it.support@rathibuildmart.com'}</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-3 mt-4 overflow-y-auto max-h-[300px] pr-1">
@@ -4840,27 +5085,7 @@ export default function App() {
 
             {/* Force Refresh */}
             <button
-              onClick={async () => {
-                setIsLoadingData(true);
-                try {
-                  if (token) {
-                    await loadApplicationData(token);
-                  } else {
-                    const result = await loadFromFirestore();
-                    if (result && result.success && result.data) {
-                      if (result.data.employees) setEmployees(result.data.employees);
-                      if (result.data.attendance) setAttendance(result.data.attendance);
-                      if (result.data.payroll) setPayroll(result.data.payroll);
-                      if (result.data.adminSettings) setAdminSettings(result.data.adminSettings);
-                    }
-                    setSyncStatus('synced');
-                  }
-                } catch (e) {
-                  console.warn("Refresh error:", e);
-                } finally {
-                  setIsLoadingData(false);
-                }
-              }}
+              onClick={handleForceSyncNow}
               disabled={isLoadingData}
               className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200 shadow-xxs bg-white cursor-pointer transition-all active:scale-95"
               title={uiTexts.refresh}
@@ -4984,9 +5209,17 @@ export default function App() {
                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       <span>{language === 'en' ? 'Connection Status' : 'कनेक्शन स्थिति'}</span>
                       <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
-                        token ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'
+                        token 
+                          ? 'bg-green-100 text-green-700' 
+                          : isOnline 
+                            ? 'bg-amber-100 text-amber-800' 
+                            : 'bg-rose-100 text-rose-700'
                       }`}>
-                        {token ? (language === 'en' ? 'Connected' : 'कनेक्टेड') : (language === 'en' ? 'Offline Mode' : 'ऑफ़लाइन मोड')}
+                        {token 
+                          ? (language === 'en' ? 'Google Sheets & Firestore Connected' : 'गूगल शीट्स और फ़ायरस्टोर कनेक्टेड')
+                          : isOnline
+                            ? (language === 'en' ? 'Firestore Cloud Online (Sheet Unlinked)' : 'फ़ायरस्टोर क्लाउड ऑनलाइन (शीट अनलिंक्ड)')
+                            : (language === 'en' ? 'Offline Mode (Local Cache)' : 'ऑफ़लाइन मोड (लोकल कैश)')}
                       </span>
                     </div>
 
@@ -5013,6 +5246,27 @@ export default function App() {
                       </div>
                     )}
 
+                    {/* Option to Link Google Sheets if currently unlinked */}
+                    {!token && (
+                      <div className="pt-1.5 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={handleLogin}
+                          disabled={isLoggingIn}
+                          className="w-full bg-[#03623c] hover:bg-[#024a2d] text-white py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-3xs active:scale-95"
+                        >
+                          {isLoggingIn ? (
+                            <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                              <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2 C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.761H12.545z" />
+                            </svg>
+                          )}
+                          <span>{language === 'en' ? 'Link Google Sheets Account' : 'गूगल शीट्स अकाउंट लिंक करें'}</span>
+                        </button>
+                      </div>
+                    )}
+
                     {/* Last Sync Time */}
                     <div className="flex justify-between items-center text-xs text-slate-600 border-t border-slate-100 pt-2 mt-2">
                       <span className="font-semibold">{language === 'en' ? 'Last Successful Sync:' : 'अंतिम सफल सिंक:'}</span>
@@ -5036,44 +5290,11 @@ export default function App() {
                   {/* Actions inside panel */}
                   <div className="flex gap-2">
                     <button
-                      onClick={async () => {
-                        if (token) {
-                          loadApplicationData(token);
-                        } else {
-                          setIsLoadingData(true);
-                          try {
-                            const result = await loadFromFirestore();
-                            if (result && result.success && result.data) {
-                              const globalData = result.data;
-                              if (globalData.employees) setEmployees(globalData.employees);
-                              if (globalData.attendance) setAttendance(globalData.attendance);
-                              if (globalData.payroll) setPayroll(globalData.payroll);
-                              if (globalData.adminSettings) setAdminSettings(globalData.adminSettings);
-                              alert(language === 'en' ? 'Cloud Firestore database loaded successfully!' : 'क्लाउड फ़ायरस्टोर डेटाबेस सफलतापूर्वक लोड किया गया!');
-                            } else {
-                              const errorDetail = result?.error ? `\n\nError: ${result.error}` : '';
-                              alert(
-                                language === 'en' 
-                                  ? `Failed to load from Cloud Firestore. Working with local cache.${errorDetail}` 
-                                  : `क्लाउड फ़ायरस्टोर से लोड करने में विफल। स्थानीय कैश के साथ काम किया जा रहा है।${errorDetail}`
-                              );
-                            }
-                          } catch (err: any) {
-                            const errorDetail = err?.message || String(err);
-                            alert(
-                              language === 'en' 
-                                ? `Cloud Firestore connection error. Working with local cache.\n\nError: ${errorDetail}` 
-                                : `क्लाउड फ़ायरस्टोर कनेक्शन त्रुटि। स्थानीय कैश के साथ काम किया जा रहा है।\n\nत्रुटि: ${errorDetail}`
-                            );
-                          } finally {
-                            setIsLoadingData(false);
-                          }
-                        }
-                      }}
+                      onClick={handleForceSyncNow}
                       disabled={isLoadingData}
-                      className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1"
+                      className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white border border-emerald-800 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-3xs active:scale-95 disabled:opacity-50"
                     >
-                      <RefreshCw className={`w-3 h-3 ${isLoadingData ? 'animate-spin' : ''}`} />
+                      <RefreshCw className={`w-3.5 h-3.5 ${isLoadingData ? 'animate-spin' : ''}`} />
                       {language === 'en' ? 'Force Sync Now' : 'अभी सिंक करें'}
                     </button>
                     <button

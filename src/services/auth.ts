@@ -25,7 +25,7 @@ const config = {
 const app = initializeApp(config);
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true
+  experimentalAutoDetectLongPolling: true
 });
 
 const provider = new GoogleAuthProvider();

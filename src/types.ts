@@ -229,10 +229,13 @@ export interface AdminSettings {
     leaveSubject?: string;
     leaveBody?: string;
   };
-  // Dynamic HR & Timings settings for Login subtabs
+  // Dynamic HR, IT & Timings settings for Login subtabs
   hrContactEmail?: string;
   hrContactPhone?: string;
   hrContactManager?: string;
+  itContactEmail?: string;
+  itContactPhone?: string;
+  itContactManager?: string;
   rulesShiftTiming?: string;
   rulesHalfDaySlot?: string;
   rulesLatePunchGrace?: string;
