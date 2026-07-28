@@ -138,6 +138,7 @@ import EmployeePortal from './components/EmployeePortal';
 import LeavesHolidays from './components/LeavesHolidays';
 import EmployeeLedger from './components/EmployeeLedger';
 import NoticesSupport from './components/NoticesSupport';
+import RichTextRenderer from './components/RichTextRenderer';
 
 export interface PortalUser {
   id: string;
@@ -2487,9 +2488,10 @@ export default function App() {
                                 {language === 'en' ? ann.badge : ann.badgeHi}
                               </span>
                             </div>
-                            <p className="text-[9.5px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
-                              {language === 'en' ? ann.content : ann.contentHi}
-                            </p>
+                            <RichTextRenderer
+                              content={language === 'en' ? ann.content : ann.contentHi}
+                              className="text-[9.5px] text-slate-300 dark:text-slate-300 mt-1"
+                            />
                             <div className="flex justify-between items-center mt-1.5 pt-1 border-t border-slate-800/40">
                               <span className="text-[8px] font-mono text-slate-500">📅 {ann.scheduledDate || ann.date}</span>
                               {ann.attachmentUrl ? (

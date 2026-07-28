@@ -23,6 +23,8 @@ import {
   Sparkles,
   Check
 } from 'lucide-react';
+import RichTextEditor from './RichTextEditor';
+import RichTextRenderer from './RichTextRenderer';
 
 interface NoticesSupportProps {
   language: 'en' | 'hi';
@@ -370,32 +372,23 @@ export default function NoticesSupport({
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      {language === 'en' ? 'Content (English)' : 'विवरण (अंग्रेजी)'} <span className="text-rose-500">*</span>
-                    </label>
-                    <textarea
-                      required
-                      rows={2.5}
-                      value={newNoticeContent}
-                      onChange={(e) => setNewNoticeContent(e.target.value)}
-                      placeholder="Write detailed notification circular description in English..."
-                      className="w-full border border-slate-200 rounded-xl p-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#03623c]/10 focus:border-[#03623c] bg-white text-slate-800 resize-none transition-all shadow-3xs"
-                    />
-                  </div>
+                  <RichTextEditor
+                    label={language === 'en' ? 'Content (English)' : 'विवरण (अंग्रेजी)'}
+                    value={newNoticeContent}
+                    onChange={setNewNoticeContent}
+                    placeholder="Write detailed notification circular description in English... Add bold, lists, or links using the rich toolbar above."
+                    language={language}
+                    minHeight="100px"
+                  />
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      {language === 'en' ? 'Content (Hindi)' : 'विवरण (हिंदी)'}
-                    </label>
-                    <textarea
-                      rows={2.5}
-                      value={newNoticeContentHi}
-                      onChange={(e) => setNewNoticeContentHi(e.target.value)}
-                      placeholder="परिपत्र का विस्तृत विवरण हिंदी में लिखें..."
-                      className="w-full border border-slate-200 rounded-xl p-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#03623c]/10 focus:border-[#03623c] bg-white text-slate-800 resize-none transition-all shadow-3xs"
-                    />
-                  </div>
+                  <RichTextEditor
+                    label={language === 'en' ? 'Content (Hindi)' : 'विवरण (हिंदी)'}
+                    value={newNoticeContentHi}
+                    onChange={setNewNoticeContentHi}
+                    placeholder="परिपत्र का विस्तृत विवरण हिंदी में लिखें... आवश्यकतानुसार बोल्ड, लिस्ट एवं लिंक जोड़ें।"
+                    language={language}
+                    minHeight="90px"
+                  />
 
                   {/* Date & Scheduling options */}
                   <div className="p-3.5 bg-slate-50/70 border border-slate-100 rounded-xl space-y-3">
@@ -631,9 +624,10 @@ export default function NoticesSupport({
                               {language === 'en' ? ann.title : ann.titleHi}
                             </h5>
 
-                            <p className="text-[11px] text-slate-600 leading-relaxed font-semibold whitespace-pre-line">
-                              {language === 'en' ? ann.content : ann.contentHi}
-                            </p>
+                            <RichTextRenderer
+                              content={language === 'en' ? ann.content : ann.contentHi}
+                              language={language}
+                            />
 
                             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-50">
                               <div className="flex items-center gap-3 text-[9px] text-slate-400 font-mono">
@@ -959,30 +953,21 @@ export default function NoticesSupport({
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  {language === 'en' ? 'Content (English)' : 'विवरण (अंग्रेजी)'}
-                </label>
-                <textarea
-                  required
-                  rows={2.5}
-                  value={editingNotice.content || ''}
-                  onChange={(e) => setEditingNotice({ ...editingNotice, content: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl p-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#03623c]/20 resize-none"
-                />
-              </div>
+              <RichTextEditor
+                label={language === 'en' ? 'Content (English)' : 'विवरण (अंग्रेजी)'}
+                value={editingNotice.content || ''}
+                onChange={(val) => setEditingNotice({ ...editingNotice, content: val })}
+                language={language}
+                minHeight="100px"
+              />
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  {language === 'en' ? 'Content (Hindi)' : 'विवरण (हिंदी)'}
-                </label>
-                <textarea
-                  rows={2.5}
-                  value={editingNotice.contentHi || ''}
-                  onChange={(e) => setEditingNotice({ ...editingNotice, contentHi: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl p-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#03623c]/20 resize-none"
-                />
-              </div>
+              <RichTextEditor
+                label={language === 'en' ? 'Content (Hindi)' : 'विवरण (हिंदी)'}
+                value={editingNotice.contentHi || ''}
+                onChange={(val) => setEditingNotice({ ...editingNotice, contentHi: val })}
+                language={language}
+                minHeight="90px"
+              />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">

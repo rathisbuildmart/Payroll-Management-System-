@@ -7,11 +7,11 @@ import './index.css';
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason;
-    const msg = typeof reason === 'string' ? reason : reason?.message || '';
+    const msg = typeof reason === 'string' ? reason : (reason?.message || String(reason || ''));
     if (
-      msg.includes('WebSocket closed without opened') ||
-      msg.includes('failed to connect to websocket') ||
-      msg.includes('vite')
+      /websocket/i.test(msg) ||
+      /vite/i.test(msg) ||
+      msg.includes('closed without opened')
     ) {
       event.preventDefault();
       event.stopPropagation();
@@ -19,10 +19,11 @@ if (typeof window !== 'undefined') {
   });
 
   window.addEventListener('error', (event) => {
-    const msg = event.message || '';
+    const msg = event.message || String(event.error?.message || '');
     if (
-      msg.includes('WebSocket closed without opened') ||
-      msg.includes('failed to connect to websocket')
+      /websocket/i.test(msg) ||
+      /vite/i.test(msg) ||
+      msg.includes('closed without opened')
     ) {
       event.preventDefault();
       event.stopPropagation();
