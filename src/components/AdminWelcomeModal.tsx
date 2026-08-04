@@ -66,19 +66,19 @@ export const AdminWelcomeModal: React.FC<AdminWelcomeModalProps> = ({
       return;
     }
 
-    const intervalTime = 50;
-    const step = (intervalTime / durationMs) * 100;
+    setProgress(100);
+    const startTime = Date.now();
 
     const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev <= 0) {
-          clearInterval(interval);
-          onClose();
-          return 0;
-        }
-        return prev - step;
-      });
-    }, intervalTime);
+      const elapsed = Date.now() - startTime;
+      const remainingPct = Math.max(0, 100 - (elapsed / durationMs) * 100);
+      setProgress(remainingPct);
+
+      if (remainingPct <= 0) {
+        clearInterval(interval);
+        onClose();
+      }
+    }, 50);
 
     return () => clearInterval(interval);
   }, [isOpen, durationMs, onClose]);
