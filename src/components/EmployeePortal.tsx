@@ -9,6 +9,7 @@ import { Employee, Attendance, PayrollRecord, AdminSettings, LeaveRequest, getCu
 import LeavesHolidays from './LeavesHolidays';
 import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
 import MonthlyCalendarReport from './MonthlyCalendarReport';
+import { parseGoogleDriveImageUrl } from '../utils/driveUtils';
 
 interface EmployeePortalProps {
   employee: Employee;
@@ -778,7 +779,7 @@ export default function EmployeePortal({
         <div className="flex items-center gap-3 sm:gap-5 relative z-10 w-full md:w-auto">
           {employee.photoUrl ? (
             <img 
-              src={employee.photoUrl} 
+              src={parseGoogleDriveImageUrl(employee.photoUrl)} 
               alt={employee.name} 
               className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-2xl object-cover border border-emerald-500/30 shadow-md shrink-0"
               referrerPolicy="no-referrer"

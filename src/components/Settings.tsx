@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Settings as SettingsIcon, 
   Building, 
@@ -40,10 +40,15 @@ import {
   ExternalLink,
   Sparkles,
   RefreshCcw,
-  Info
+  Info,
+  Crown
 } from 'lucide-react';
 import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog, TransactionalEmailLog } from '../types';
+import AdminWelcomeModal from './AdminWelcomeModal';
+import { getCostCenterPrefix } from '../utils/costCenterUtils';
 import TransactionalEmailHistory from './TransactionalEmailHistory';
+import FirebaseStorageMonitor from './FirebaseStorageMonitor';
+import TemplateManager from './TemplateManager';
 import { 
   DEFAULT_WHATSAPP_TEMPLATES, 
   DEFAULT_EMAIL_TEMPLATES, 
@@ -154,7 +159,17 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   esicContributionRate: 0.75,
   departments: ['Management', 'Engineering', 'Human Resources', 'Sales', 'Marketing', 'Finance', 'Operations', 'IT Support', 'Other'],
   branches: ['Bangalore HQ', 'Mysore Branch', 'Hubli Hub', 'Mangalore Office'],
-  costCenters: ['Production Tech', 'HR Admin', 'Marketing Hub', 'Sales Ops'],
+  costCenters: [
+    'Raipur Store',
+    'Raipur Store Cash',
+    'Raipur Warehouse',
+    'Raipur Warehouse Cash',
+    'Jagdalpur Store',
+    'Jagdalpur Store Cash',
+    'Bilaspur Store Cash',
+    'Production Tech',
+    'HR Admin'
+  ],
   employeeGroups: ['Direct Contract', 'Permanent Staff', 'Consultant', 'Intern'],
   workTimings: ['General Shift (09:00 AM - 06:00 PM)', 'Night Shift (09:00 PM - 06:00 AM)', 'Morning Shift (06:00 AM - 03:00 PM)'],
   weeklyOffProfiles: ['Sunday Off', 'Saturday & Sunday Off', 'Rotational Off'],
@@ -221,7 +236,8 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   smtpPassword: '',
   senderName: 'Rathi LMS System',
   senderEmail: 'rbmlms@rathibuildmart.com',
-  enablePasswordLoginOtp: false
+  enablePasswordLoginOtp: false,
+  enableAdminWelcomePopup: true
 };
 
 export default function Settings({ 
@@ -251,6 +267,7 @@ export default function Settings({
 }: SettingsProps) {
   const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'roles_permissions' | 'audit_logs' | 'email_smtp' | 'whatsapp_auto' | 'email_logs'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
+  const [showWelcomePreviewModal, setShowWelcomePreviewModal] = useState(false);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -679,6 +696,244 @@ export default function Settings({
       ...localSettings,
       [activeMasterList]: updatedList
     });
+  };
+
+  const masterFileInputRef = useRef<HTMLInputElement>(null);
+
+  const exportAllMastersCSV = () => {
+    const headers = ['Category', 'Option Name', 'Cost Center ID Prefix (Optional)'];
+    const rows: string[][] = [];
+
+    const categories: Array<{ key: keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'>; name: string }> = [
+      { key: 'departments', name: 'Departments' },
+      { key: 'branches', name: 'Branches' },
+      { key: 'costCenters', name: 'Cost Centers' },
+      { key: 'employeeGroups', name: 'Employee Groups' },
+      { key: 'workTimings', name: 'Work Timings' },
+      { key: 'weeklyOffProfiles', name: 'Weekly Off Profiles' },
+      { key: 'leaveTypes', name: 'Leave Types' }
+    ];
+
+    categories.forEach(cat => {
+      const items = (localSettings[cat.key] as string[]) || [];
+      items.forEach(item => {
+        let prefix = '';
+        if (cat.key === 'costCenters') {
+          prefix = getCostCenterPrefix(item, localSettings.costCenterCodes);
+        }
+        rows.push([cat.name, item, prefix]);
+      });
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.download = `all_dropdown_masters_${dateStr}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportCurrentMasterCSV = () => {
+    const listNameMap: Record<string, string> = {
+      departments: 'Departments',
+      branches: 'Branches',
+      costCenters: 'Cost Centers',
+      employeeGroups: 'Employee Groups',
+      workTimings: 'Work Timings',
+      weeklyOffProfiles: 'Weekly Off Profiles',
+      leaveTypes: 'Leave Types'
+    };
+
+    const categoryName = listNameMap[activeMasterList] || activeMasterList;
+    const items = (localSettings[activeMasterList] as string[]) || [];
+    const headers = ['Category', 'Option Name', 'Cost Center ID Prefix (Optional)'];
+
+    const rows = items.map(item => {
+      let prefix = '';
+      if (activeMasterList === 'costCenters') {
+        prefix = getCostCenterPrefix(item, localSettings.costCenterCodes);
+      }
+      return [categoryName, item, prefix];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.download = `${activeMasterList}_master_export_${dateStr}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadMasterTemplate = () => {
+    const headers = ['Category', 'Option Name', 'Cost Center ID Prefix (Optional)'];
+    const sampleRows = [
+      ['Departments', 'Quality Assurance', ''],
+      ['Branches', 'Delhi NCR Office', ''],
+      ['Cost Centers', 'Jaipur Hub', 'JPR'],
+      ['Employee Groups', 'Contractual Staff', ''],
+      ['Work Timings', 'General Shift (09:00 AM - 06:00 PM)', ''],
+      ['Weekly Off Profiles', 'Sunday Only', ''],
+      ['Leave Types', 'Maternity Leave', '']
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...sampleRows.map(row => row.map(val => `"${val}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dropdown_masters_template.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleMasterCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        alert(language === 'en' ? 'CSV file is empty!' : 'CSV फ़ाइल खाली है!');
+        return;
+      }
+
+      const parseCSVLine = (line: string): string[] => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              current += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      const rows = lines.map(parseCSVLine);
+      const firstRow = rows[0] || [];
+      const isHeader = firstRow.some(col => 
+        ['category', 'option name', 'name', 'cost center', 'department', 'branch', 'option'].includes(col.toLowerCase())
+      );
+
+      const dataRows = isHeader ? rows.slice(1) : rows;
+
+      let catIdx = -1;
+      let nameIdx = -1;
+      let prefixIdx = -1;
+
+      if (isHeader) {
+        firstRow.forEach((col, idx) => {
+          const lower = col.toLowerCase().replace(/[\s_*-]/g, '');
+          if (['category', 'type', 'list', 'master'].includes(lower)) catIdx = idx;
+          if (['optionname', 'name', 'title', 'value', 'item', 'option'].includes(lower)) nameIdx = idx;
+          if (['costcenteridprefix', 'idprefix', 'prefix', 'code'].includes(lower)) prefixIdx = idx;
+        });
+      }
+
+      if (nameIdx === -1) {
+        if (catIdx === 0) nameIdx = 1;
+        else nameIdx = catIdx === -1 ? 0 : 1;
+      }
+
+      let addedCount = 0;
+      const updatedSettings = { ...localSettings };
+      const updatedCostCenterCodes = { ...(localSettings.costCenterCodes || {}) };
+
+      const normalizeCat = (catStr: string): keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'> | null => {
+        const s = catStr.toLowerCase().replace(/[\s_-]/g, '');
+        if (s.includes('dept') || s.includes('department')) return 'departments';
+        if (s.includes('branch')) return 'branches';
+        if (s.includes('cost')) return 'costCenters';
+        if (s.includes('group')) return 'employeeGroups';
+        if (s.includes('timing') || s.includes('shift')) return 'workTimings';
+        if (s.includes('weeklyoff') || s.includes('off')) return 'weeklyOffProfiles';
+        if (s.includes('leave')) return 'leaveTypes';
+        return null;
+      };
+
+      dataRows.forEach(row => {
+        if (!row || row.length === 0) return;
+        const optName = (row[nameIdx] || (catIdx === -1 ? row[0] : '') || '').trim();
+        if (!optName) return;
+
+        let targetCat: keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'> | null = null;
+        if (catIdx !== -1 && row[catIdx]) {
+          targetCat = normalizeCat(row[catIdx]);
+        }
+        if (!targetCat) {
+          targetCat = activeMasterList;
+        }
+
+        const currentItems = (updatedSettings[targetCat] as string[]) || [];
+        if (!currentItems.some(item => item.toLowerCase() === optName.toLowerCase())) {
+          updatedSettings[targetCat] = [...currentItems, optName] as any;
+          addedCount++;
+
+          if (targetCat === 'costCenters' && prefixIdx !== -1 && row[prefixIdx]) {
+            const prefixVal = row[prefixIdx].trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (prefixVal) {
+              updatedCostCenterCodes[optName] = prefixVal;
+            }
+          }
+        }
+      });
+
+      if (addedCount > 0) {
+        updatedSettings.costCenterCodes = updatedCostCenterCodes;
+        setLocalSettings(updatedSettings);
+        alert(
+          language === 'en'
+            ? `Successfully imported ${addedCount} new dropdown option(s) into Master Lists!`
+            : `सफलतापूर्वक मास्टर सूचियों में ${addedCount} नए विकल्प आयात किए गए!`
+        );
+      } else {
+        alert(
+          language === 'en'
+            ? 'No new dropdown options were added (items may already exist).'
+            : 'कोई नया विकल्प नहीं जोड़ा गया (वे पहले से मौजूद हो सकते हैं)।'
+        );
+      }
+    };
+
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const roleAccounts = localSettings.roleAccounts || [];
@@ -1419,6 +1674,87 @@ export default function Settings({
           {/* Sub Tab: Dropdown Masters Dynamic Management */}
           {activeSubTab === 'masters' && (
             <div className="space-y-4">
+              {/* Bulk Master CSV Header Card */}
+              <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-emerald-100/80 pb-3">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-emerald-700" />
+                      {language === 'en' ? 'Bulk Master Options Upload & Export (CSV)' : 'ड्रॉपडाउन मास्टर थोक आयात और एक्सपोर्ट (CSV)'}
+                    </h4>
+                    <p className="text-[11px] text-emerald-700 font-medium">
+                      {language === 'en'
+                        ? 'Download current dropdown options, edit in Excel/CSV, and re-upload to update all master lists in bulk.'
+                        : 'मौजूदा ड्रॉपडाउन विकल्पों को डाउनलोड करें, एक्सेल में संपादित करें और थोक में अपडेट करने के लिए दोबारा अपलोड करें।'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <input
+                      type="file"
+                      ref={masterFileInputRef}
+                      onChange={handleMasterCSVUpload}
+                      accept=".csv,.txt"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => masterFileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#03623c] hover:bg-[#024d2e] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-3xs"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      {language === 'en' ? 'Bulk Upload CSV' : 'थोक में अपलोड करें (CSV)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportAllMastersCSV}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-emerald-100 border border-emerald-200 text-xs font-bold text-emerald-800 rounded-lg transition-colors cursor-pointer shadow-3xs"
+                      title="Export all 7 master dropdown lists to a single CSV"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      {language === 'en' ? 'Export All Masters' : 'सभी मास्टर एक्सपोर्ट करें'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportCurrentMasterCSV}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 border border-blue-200 text-xs font-bold text-blue-700 rounded-lg transition-colors cursor-pointer shadow-3xs"
+                      title="Export selected list to CSV"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      {language === 'en' ? 'Export Current List' : 'वर्तमान सूची एक्सपोर्ट'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadMasterTemplate}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-gray-500" />
+                      {language === 'en' ? 'Sample Template' : 'नमूना टेम्पलेट'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* CSV Format Quick Guide */}
+                <div className="bg-white/80 rounded-lg p-2.5 border border-emerald-100/60 text-[11px] text-emerald-950 space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-emerald-900">
+                    <span>💡 {language === 'en' ? 'How to fill data in Excel/CSV:' : 'एक्सेल/CSV में डेटा कैसे भरें:'}</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 font-mono text-[10px]">
+                    <div className="bg-emerald-50/50 p-1.5 rounded border border-emerald-100">
+                      <strong className="text-emerald-900 font-sans block text-[11px]">Column A: Category</strong>
+                      Departments, Branches, Cost Centers, Employee Groups, Work Timings, Weekly Off Profiles, Leave Types
+                    </div>
+                    <div className="bg-emerald-50/50 p-1.5 rounded border border-emerald-100">
+                      <strong className="text-emerald-900 font-sans block text-[11px]">Column B: Option Name</strong>
+                      Quality Assurance, General Shift (09:00 AM - 06:00 PM), Sunday Only, Maternity Leave, etc.
+                    </div>
+                    <div className="bg-emerald-50/50 p-1.5 rounded border border-emerald-100">
+                      <strong className="text-emerald-900 font-sans block text-[11px]">Column C: Prefix Code (Optional)</strong>
+                      For Cost Centers only (e.g., JPR for Jaipur Hub, RPR for Raipur Store)
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-2">{t.masterSelect}</label>
                 <select
@@ -1520,18 +1856,30 @@ export default function Settings({
                   {((localSettings[activeMasterList] as string[]) || []).length === 0 ? (
                     <p className="p-4 text-center text-xs text-gray-400 font-semibold">{t.noOptions}</p>
                   ) : (
-                    ((localSettings[activeMasterList] as string[]) || []).map((item, index) => (
-                      <div key={index} className="flex items-center justify-between py-2 px-3 hover:bg-slate-50 transition-colors">
-                        <span className="text-xs font-bold text-gray-800">{item}</span>
-                        <button
-                          onClick={() => handleRemoveMasterItem(item)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors cursor-pointer"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))
+                    ((localSettings[activeMasterList] as string[]) || []).map((item, index) => {
+                      const prefix = activeMasterList === 'costCenters' ? getCostCenterPrefix(item, localSettings.costCenterCodes) : '';
+                      return (
+                        <div key={index} className="flex items-center justify-between py-2 px-3 hover:bg-slate-50 transition-colors">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-bold text-gray-800">{item}</span>
+                            {activeMasterList === 'costCenters' && (
+                              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                                <span className="font-semibold text-gray-500">ID Prefix:</span>
+                                <span className="text-emerald-800 dark:text-emerald-200 font-bold">{prefix}</span>
+                                <span className="text-[9px] text-emerald-600/70 font-normal">({prefix}001, {prefix}002...)</span>
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleRemoveMasterItem(item)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -1767,6 +2115,38 @@ export default function Settings({
                       </span>
                     </div>
                   </label>
+
+                  <div className="flex flex-col justify-between p-3 bg-gradient-to-br from-amber-50/80 via-white to-emerald-50/40 rounded-lg border border-amber-200/80 shadow-2xs col-span-1 sm:col-span-2 lg:col-span-1 gap-2">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox"
+                        checked={localSettings.enableAdminWelcomePopup !== false}
+                        onChange={(e) => setLocalSettings({...localSettings, enableAdminWelcomePopup: e.target.checked})}
+                        className="w-4 h-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded cursor-pointer"
+                        id="chk-enable-admin-welcome-popup"
+                      />
+                      <div>
+                        <span className="block text-xs font-bold text-gray-900 flex items-center gap-1">
+                          <Crown className="w-3.5 h-3.5 text-amber-500" />
+                          {language === 'en' ? "Admin 'Welcome Boss' Animation Popup" : "एडमिन 'Welcome Boss' एनिमेटेड पॉपअप"}
+                        </span>
+                        <span className="text-[9px] text-slate-500 font-medium block mt-0.5">
+                          {language === 'en'
+                            ? "Currently: " + (localSettings.enableAdminWelcomePopup !== false ? "ON (Auto Good Morning/Evening Greeting)" : "OFF (Disabled)")
+                            : "वर्तमान स्थिति: " + (localSettings.enableAdminWelcomePopup !== false ? "सक्रिय (ON - समय अनुसार ग्रीटिंग)" : "निष्क्रिय (OFF)")}
+                        </span>
+                      </div>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowWelcomePreviewModal(true)}
+                      className="self-start text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer border border-amber-300/60"
+                      id="btn-preview-welcome-popup"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-600" />
+                      {language === 'en' ? "Preview Animation" : "एनिमेशन टेस्ट करें"}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Secure GPS Geofencing Configuration */}
@@ -2186,10 +2566,27 @@ export default function Settings({
                 </h3>
                 <p className="text-[10px] text-gray-500 mt-1 leading-normal font-sans">
                   {language === 'en' 
-                    ? 'Manage your cloud storage connections, troubleshoot Google Sheets sync errors, or backup and restore your complete HRMS database.' 
-                    : 'अपने क्लाउड स्टोरेज कनेक्शन प्रबंधित करें, Google Sheets सिंक त्रुटियों को दूर करें, या अपने संपूर्ण HRMS डेटाबेस का बैकअप लें और उसे पुनर्स्थापित करें।'}
+                    ? 'Manage your cloud storage connections, monitor live storage consumption (KB/MB), troubleshoot Google Sheets sync errors, or backup and restore your complete HRMS database.' 
+                    : 'अपने क्लाउड स्टोरेज कनेक्शन प्रबंधित करें, लाइव स्टोरेज (केबी/एमबी) उपयोग की निगरानी करें, Google Sheets सिंक त्रुटियों को दूर करें, या संपूर्ण डेटाबेस बैकअप लें।'}
                 </p>
               </div>
+
+              {/* Live Firebase Cloud Storage Monitor */}
+              <FirebaseStorageMonitor
+                language={language}
+                employees={employees}
+                attendance={attendance}
+                payroll={payroll}
+                adminSettings={settings}
+                failedLogins={failedLogins}
+                emailLogs={emailLogs}
+                announcements={announcements}
+                hrTickets={hrTickets}
+                passwordRequests={passwordRequests}
+                auditLogs={auditLogs}
+                onClearEmailLogs={onClearEmailLogs}
+                onClearAuditLogs={onClearAuditLogs}
+              />
 
               {/* Troubleshooting Card */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs font-sans">
@@ -3443,137 +3840,13 @@ export default function Settings({
                 </div>
               </div>
 
-              {/* WhatsApp Templates Library */}
-              <div className="bg-white dark:bg-[#11221b] border border-gray-200 dark:border-[#1e3a2f] rounded-2xl p-5 shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#1e3a2f] pb-3">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span>WhatsApp HR Message Templates</span>
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLocalSettings({
-                        ...localSettings,
-                        whatsappTemplates: { ...DEFAULT_WHATSAPP_TEMPLATES }
-                      });
-                    }}
-                    className="text-slate-500 hover:text-slate-800 dark:text-slate-400 text-xs font-bold hover:underline cursor-pointer"
-                  >
-                    Reset Templates to Default
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Payslip Template */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      <span>1. Payslip Shared Alert Template</span>
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={localSettings.whatsappTemplates?.payslip || DEFAULT_WHATSAPP_TEMPLATES.payslip}
-                      onChange={(e) => {
-                        setLocalSettings({
-                          ...localSettings,
-                          whatsappTemplates: {
-                            ...DEFAULT_WHATSAPP_TEMPLATES,
-                            ...localSettings.whatsappTemplates,
-                            payslip: e.target.value
-                          }
-                        });
-                      }}
-                      className="w-full p-2.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]"
-                    />
-                    <p className="text-[10px] text-slate-400">Variables: {'{NAME}'}, {'{MONTH}'}, {'{BASIC}'}, {'{NET_SALARY}'}, {'{STATUS}'}, {'{COMPANY_NAME}'}</p>
-                  </div>
-
-                  {/* Miss Punch Template */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                      <span>2. Missed Punch Alert Template</span>
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={localSettings.whatsappTemplates?.missPunch || DEFAULT_WHATSAPP_TEMPLATES.missPunch}
-                      onChange={(e) => {
-                        setLocalSettings({
-                          ...localSettings,
-                          whatsappTemplates: {
-                            ...DEFAULT_WHATSAPP_TEMPLATES,
-                            ...localSettings.whatsappTemplates,
-                            missPunch: e.target.value
-                          }
-                        });
-                      }}
-                      className="w-full p-2.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]"
-                    />
-                    <p className="text-[10px] text-slate-400">Variables: {'{NAME}'}, {'{DATE}'}, {'{COMPANY_NAME}'}, {'{HR_CONTACT}'}</p>
-                  </div>
-
-                  {/* Leave Status Template */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                      <span>3. Leave Request Status Update Template</span>
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={localSettings.whatsappTemplates?.leaveStatus || DEFAULT_WHATSAPP_TEMPLATES.leaveStatus}
-                      onChange={(e) => {
-                        setLocalSettings({
-                          ...localSettings,
-                          whatsappTemplates: {
-                            ...DEFAULT_WHATSAPP_TEMPLATES,
-                            ...localSettings.whatsappTemplates,
-                            leaveStatus: e.target.value
-                          }
-                        });
-                      }}
-                      className="w-full p-2.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]"
-                    />
-                    <p className="text-[10px] text-slate-400">Variables: {'{NAME}'}, {'{DATES}'}, {'{LEAVE_TYPE}'}, {'{STATUS}'}, {'{REMARKS}'}, {'{BY}'}</p>
-                  </div>
-
-                  {/* Late Warning Template */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-extrabold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                      <span>4. Late Arrival Warning Template</span>
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={localSettings.whatsappTemplates?.lateWarning || DEFAULT_WHATSAPP_TEMPLATES.lateWarning}
-                      onChange={(e) => {
-                        setLocalSettings({
-                          ...localSettings,
-                          whatsappTemplates: {
-                            ...DEFAULT_WHATSAPP_TEMPLATES,
-                            ...localSettings.whatsappTemplates,
-                            lateWarning: e.target.value
-                          }
-                        });
-                      }}
-                      className="w-full p-2.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]"
-                    />
-                    <p className="text-[10px] text-slate-400">Variables: {'{NAME}'}, {'{DATE}'}, {'{CHECK_IN}'}, {'{SHIFT_TIMINGS}'}, {'{LATE_COUNT}'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Save Button */}
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  className="bg-[#03623c] hover:bg-[#024d2e] text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
-                >
-                  Save WhatsApp & Email Automation Settings
-                </button>
-              </div>
-
+              {/* WhatsApp & Email Templates Manager */}
+              <TemplateManager
+                language={language}
+                settings={localSettings}
+                onUpdateSettings={(updated) => setLocalSettings(updated)}
+                onSaveAll={handleSave}
+              />
             </div>
           )}
 
@@ -3758,6 +4031,18 @@ export default function Settings({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Admin Welcome Boss Preview Modal */}
+          {showWelcomePreviewModal && (
+            <AdminWelcomeModal
+              isOpen={showWelcomePreviewModal}
+              onClose={() => setShowWelcomePreviewModal(false)}
+              adminName={portalUser?.name || 'Boss'}
+              role={portalUser?.role || 'admin'}
+              language={language}
+              companyName={localSettings.companyName}
+            />
           )}
 
         </div>

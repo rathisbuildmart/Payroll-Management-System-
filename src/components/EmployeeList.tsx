@@ -1,11 +1,14 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders, Smartphone, Key, UserCog, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders, Smartphone, Key, UserCog, ArrowUpDown, ArrowUp, ArrowDown, Trash2, Link2 } from 'lucide-react';
 import { Employee, AdminSettings, getCurrentBasicSalary } from '../types';
+import { getCostCenterPrefix, generateNextEmployeeId } from '../utils/costCenterUtils';
+import { parseGoogleDriveImageUrl } from '../utils/driveUtils';
 
 interface EmployeeListProps {
   employees: Employee[];
   onAddEmployee: (emp: Employee) => Promise<void>;
-  onUpdateEmployee: (emp: Employee) => Promise<void>;
+  onUpdateEmployee: (emp: Employee, oldEmpId?: string) => Promise<void>;
+  onDeleteEmployee?: (empId: string) => Promise<void>;
   onBulkAddEmployees: (newEmployees: Employee[]) => Promise<void>;
   language: 'en' | 'hi';
   adminSettings: AdminSettings;
@@ -15,7 +18,7 @@ interface EmployeeListProps {
 const DEPARTMENTS = ['Management', 'Engineering', 'Human Resources', 'Sales', 'Marketing', 'Finance', 'Operations', 'IT Support', 'Other'];
 const PAYMENT_METHODS: Employee['paymentMethod'][] = ['Bank Transfer', 'Cash', 'Cheque'];
 
-export default function EmployeeList({ employees, onAddEmployee, onUpdateEmployee, onBulkAddEmployees, language, adminSettings, portalUser }: EmployeeListProps) {
+export default function EmployeeList({ employees, onAddEmployee, onUpdateEmployee, onDeleteEmployee, onBulkAddEmployees, language, adminSettings, portalUser }: EmployeeListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedBranch, setSelectedBranch] = useState('All');
@@ -25,6 +28,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [unlockEmployeeIdEdit, setUnlockEmployeeIdEdit] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [resetQuickSearchId, setResetQuickSearchId] = useState('');
   const [activeAccessMenuId, setActiveAccessMenuId] = useState<string | null>(null);
@@ -214,7 +218,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       // Bulk CSV Import Keys
       bulkImportBtn: "Bulk Import (CSV)",
       bulkImportTitle: "Bulk Import Employee Details",
-      downloadTemplate: "Download CSV Template",
+      exportDataBtn: "Export All Data (CSV)",
+      exportExistingBtn: "Export Existing Employees Data ({count})",
+      downloadTemplate: "Download Sample Template",
       dragDropText: "Drag and drop your CSV file here, or click to browse",
       selectFile: "Select CSV File",
       invalidCsv: "Invalid CSV format or missing headers.",
@@ -225,7 +231,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       btnConfirmImport: "Confirm & Sync {count} Employees",
       colStatusValid: "Valid",
       colStatusError: "Error",
-      requiredHeaderWarning: "Required columns: Employee ID, Full Name. Other columns are optional."
+      requiredHeaderWarning: "Required columns (marked with *): Employee ID *, Full Name *. Other columns are optional."
     },
     hi: {
       title: "कर्मचारी निर्देशिका",
@@ -268,7 +274,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       // Bulk CSV Import Keys
       bulkImportBtn: "थोक आयात (CSV)",
       bulkImportTitle: "CSV फ़ाइल से थोक कर्मचारी डेटा आयात करें",
-      downloadTemplate: "CSV टेम्पलेट डाउनलोड करें",
+      exportDataBtn: "सभी डेटा एक्सपोर्ट करें (CSV)",
+      exportExistingBtn: "मौजूदा कर्मचारियों का डेटा एक्सपोर्ट करें ({count})",
+      downloadTemplate: "नमूना CSV टेम्पलेट डाउनलोड करें",
       dragDropText: "अपनी CSV फ़ाइल यहाँ ड्रैग और ड्रॉप करें, या ब्राउज़ करने के लिए क्लिक करें",
       selectFile: "CSV फ़ाइल चुनें",
       invalidCsv: "अमान्य CSV प्रारूप या हेडर गायब हैं।",
@@ -279,7 +287,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       btnConfirmImport: "पुष्टि करें और {count} कर्मचारियों को सिंक करें",
       colStatusValid: "सही",
       colStatusError: "त्रुटि",
-      requiredHeaderWarning: "आवश्यक कॉलम: कर्मचारी आईडी (Employee ID), पूरा नाम (Full Name)। अन्य कॉलम वैकल्पिक हैं।"
+      requiredHeaderWarning: "आवश्यक कॉलम (* से चिह्नित): कर्मचारी आईडी (Employee ID *), पूरा नाम (Full Name *)। अन्य कॉलम वैकल्पिक हैं।"
     }
   }[language];
 
@@ -291,6 +299,8 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     });
     return ['All', ...Array.from(branches)];
   }, [employees]);
+
+  const inactiveEmps = useMemo(() => employees.filter(e => !e.isActive), [employees]);
 
   const employeeOptions = useMemo(() => {
     return employees
@@ -433,7 +443,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       const { headers, rows } = parseCSV(text);
       
       const findIndex = (aliases: string[]): number => {
-        return headers.findIndex(h => aliases.includes(h.toLowerCase().replace(/[\s_-]/g, '')));
+        return headers.findIndex(h => aliases.includes(h.toLowerCase().replace(/[\s_*()-]/g, '')));
       };
 
       const idIdx = findIndex(['id', 'employeeid', 'empid', 'आईडी']);
@@ -792,8 +802,8 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
 
   const downloadTemplate = () => {
     const headers = [
-      'Employee ID',
-      'Full Name',
+      'Employee ID *',
+      'Full Name *',
       'Department',
       'Designation',
       'Joining Date (YYYY-MM-DD)',
@@ -891,11 +901,176 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       ...sampleRows.map(row => row.map(val => `"${val}"`).join(','))
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute('download', 'employee_import_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportEmployeesCSV = (employeeList: Employee[], customPrefix?: string) => {
+    const headers = [
+      'Employee ID *',
+      'Full Name *',
+      'Department',
+      'Designation',
+      'Joining Date (YYYY-MM-DD)',
+      'Basic Salary',
+      'Allowances',
+      'Deductions',
+      'Overtime Hourly Rate',
+      'Payment Method',
+      'Is Active',
+      'First Name',
+      'Last Name',
+      'Email',
+      'Mobile No',
+      'Personal Mobile No',
+      'Personal Email',
+      'DOB (YYYY-MM-DD)',
+      'Blood Group',
+      'Emergency Contact No',
+      'CTC Offered',
+      'Gender',
+      'Employment Type',
+      'Probation Date (YYYY-MM-DD)',
+      'Res Line 1',
+      'Res Line 2',
+      'Res Country',
+      'Res State',
+      'Res City',
+      'Res Pin Code',
+      'Perm Line 1',
+      'Perm Line 2',
+      'Perm Country',
+      'Perm State',
+      'Perm City',
+      'Perm Pin Code',
+      'Bank Account No',
+      'Bank Account Holder Name',
+      'Bank Name',
+      'IFSC Code',
+      'PAN No',
+      'PF Account No',
+      'ESIC No',
+      'Aadhaar No',
+      'UAN',
+      'Confirmation Date (YYYY-MM-DD)',
+      'Branch',
+      'Cost Center',
+      'Reporting To',
+      'Notice Period',
+      'Work Timing',
+      'Employee Group',
+      'Weekly Off Profile',
+      'Leave Type',
+      'Reference Number',
+      'Password',
+      'HRA',
+      'DA',
+      'Conveyance Allowance',
+      'Advance Salary Balance',
+      'Advance Salary Deduction',
+      'CL Balance',
+      'EL Balance',
+      'Is PF Applicable',
+      'Is ESIC Applicable',
+      'Is PT Applicable',
+      'Is HRA Applicable',
+      'Is DA Applicable',
+      'Is Conveyance Applicable',
+      'Is Paid Leave Applicable'
+    ];
+
+    const rows = employeeList.map(emp => [
+      emp.id || '',
+      emp.name || '',
+      emp.department || '',
+      emp.designation || '',
+      emp.joiningDate || '',
+      emp.basicSalary ?? '',
+      emp.allowances ?? '',
+      emp.deductions ?? '',
+      emp.hourlyRate ?? '',
+      emp.paymentMethod || 'Bank Transfer',
+      emp.isActive !== false ? 'true' : 'false',
+      emp.firstName || '',
+      emp.lastName || '',
+      emp.email || '',
+      emp.mobileNo || '',
+      emp.personalMobileNo || '',
+      emp.personalEmail || '',
+      emp.dob || '',
+      emp.bloodGroup || '',
+      emp.emergencyContactNo || '',
+      emp.ctcOffered ?? '',
+      emp.gender || 'Male',
+      emp.employmentType || 'Fresher',
+      emp.probationDate || '',
+      emp.resLine1 || '',
+      emp.resLine2 || '',
+      emp.resCountry || 'India',
+      emp.resState || '',
+      emp.resCity || '',
+      emp.resPinCode || '',
+      emp.permLine1 || '',
+      emp.permLine2 || '',
+      emp.permCountry || 'India',
+      emp.permState || '',
+      emp.permCity || '',
+      emp.permPinCode || '',
+      emp.bankAccountNo || '',
+      emp.bankAccountHolderName || '',
+      emp.bankName || '',
+      emp.ifscCode || '',
+      emp.panNo || '',
+      emp.pfAccountNo || '',
+      emp.esicNo || '',
+      emp.aadhaarNo || '',
+      emp.uan || '',
+      emp.confirmationDate || '',
+      emp.branch || '',
+      emp.costCenter || '',
+      emp.reportingTo || '',
+      emp.noticePeriod || '',
+      emp.workTiming || '',
+      emp.employeeGroup || '',
+      emp.weeklyOffProfile || '',
+      emp.leaveType || '',
+      emp.referenceNumber || '',
+      emp.password || '',
+      emp.hra ?? '',
+      emp.da ?? '',
+      emp.conveyanceAllowance ?? '',
+      emp.advanceSalaryBalance ?? '',
+      emp.advanceSalaryDeduction ?? '',
+      emp.clBalance ?? '',
+      emp.elBalance ?? '',
+      emp.isPfApplicable !== false ? 'true' : 'false',
+      emp.isEsicApplicable !== false ? 'true' : 'false',
+      emp.isPtApplicable !== false ? 'true' : 'false',
+      emp.isHraApplicable !== false ? 'true' : 'false',
+      emp.isDaApplicable !== false ? 'true' : 'false',
+      emp.isConveyanceApplicable !== false ? 'true' : 'false',
+      emp.isPaidLeaveApplicable !== false ? 'true' : 'false'
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    const dateStr = new Date().toISOString().split('T')[0];
+    const fileName = customPrefix ? `${customPrefix}_${dateStr}.csv` : (selectedStatus === 'Inactive' ? `inactive_employees_backup_${dateStr}.csv` : `all_employees_export_${dateStr}.csv`);
+    link.setAttribute('download', fileName);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -920,14 +1095,11 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   };
 
   const openAddModal = () => {
-    // Auto generate next ID
-    let nextIdNum = employees.length + 1;
-    let nextId = `EMP${String(nextIdNum).padStart(3, '0')}`;
-    while (employees.some(e => e.id === nextId)) {
-      nextIdNum += 1;
-      nextId = `EMP${String(nextIdNum).padStart(3, '0')}`;
-    }
+    // Auto generate next ID based on Cost Center series
+    const defaultCostCenter = adminSettings?.costCenters?.[0] || '';
+    const nextId = generateNextEmployeeId(defaultCostCenter, employees, adminSettings?.costCenterCodes);
 
+    setUnlockEmployeeIdEdit(false);
     setEditingEmployee(null);
     setFormData({
       id: nextId,
@@ -1019,6 +1191,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   };
 
   const openEditModal = (emp: Employee) => {
+    setUnlockEmployeeIdEdit(false);
     setEditingEmployee(emp);
     setFormData({
       id: emp.id,
@@ -1116,10 +1289,17 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       const checked = (e.target as HTMLInputElement).checked;
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else {
-      setFormData(prev => ({ 
-        ...prev, 
-        [name]: type === 'number' ? Number(value) : value 
-      }));
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          [name]: type === 'number' ? Number(value) : value
+        };
+        // Auto regenerate Employee ID when Cost Center changes for new employees
+        if (name === 'costCenter' && !editingEmployee && typeof value === 'string') {
+          updated.id = generateNextEmployeeId(value, employees, adminSettings?.costCenterCodes);
+        }
+        return updated;
+      });
     }
   };
 
@@ -1130,7 +1310,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     setIsSaving(true);
     try {
       if (editingEmployee) {
-        await onUpdateEmployee({ ...formData });
+        await onUpdateEmployee({ ...formData }, editingEmployee.id);
       } else {
         await onAddEmployee({ ...formData });
       }
@@ -1151,6 +1331,17 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       });
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDeleteEmployeeRecord = async (emp: Employee) => {
+    const confirmMsg = language === 'en'
+      ? `Are you sure you want to permanently delete employee "${emp.name}" (${emp.id})? This will free up Employee ID ${emp.id}.`
+      : `क्या आप वाकई कर्मचारी "${emp.name}" (${emp.id}) को स्थायी रूप से हटाना चाहते हैं? इससे Employee ID ${emp.id} पुनः उपयोग के लिए खाली हो जाएगा।`;
+    if (window.confirm(confirmMsg)) {
+      if (onDeleteEmployee) {
+        await onDeleteEmployee(emp.id);
+      }
     }
   };
 
@@ -1232,10 +1423,48 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
             value={type === 'number' ? (formData[fieldId] === undefined ? '' : formData[fieldId]) : (formData[fieldId] as string || '')}
             onChange={handleInputChange}
             required={meta.isMandatory}
-            disabled={fieldId === 'id' && !!editingEmployee}
+            disabled={fieldId === 'id' && !!editingEmployee && !unlockEmployeeIdEdit}
             placeholder={`Enter ${label}`}
             className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-medium disabled:bg-gray-50 disabled:text-gray-400"
           />
+        )}
+        {fieldId === 'id' && editingEmployee && (
+          <div className="mt-1.5 space-y-1">
+            <button
+              type="button"
+              onClick={() => setUnlockEmployeeIdEdit(!unlockEmployeeIdEdit)}
+              className="text-[11px] text-amber-800 font-bold underline cursor-pointer hover:text-amber-900 flex items-center gap-1"
+            >
+              <Key className="w-3 h-3 text-amber-600" />
+              {unlockEmployeeIdEdit
+                ? (language === 'en' ? '🔒 Lock Employee ID Field' : '🔒 कर्मचारी आईडी फील्ड लॉक करें')
+                : (language === 'en' ? '🔓 Change / Edit Employee ID' : '🔓 कर्मचारी आईडी बदलने हेतु अनलॉक करें')
+              }
+            </button>
+            {unlockEmployeeIdEdit && (
+              <p className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded p-1.5 font-semibold">
+                {language === 'en'
+                  ? '⚠️ Notice: Changing Employee ID will automatically migrate all linked attendance, payroll, and leave records to the new ID.'
+                  : '⚠️ सूचना: कर्मचारी आईडी बदलने पर इस कर्मचारी से जुड़े सभी पुराने अटेंडेंस, पेरोल और लीव रिकॉर्ड्स नए ID पर ऑटो-शिफ्ट हो जाएंगे।'}
+              </p>
+            )}
+          </div>
+        )}
+        {fieldId === 'id' && formData.costCenter && (
+          <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 mt-1">
+            <span>Series Prefix:</span>
+            <span className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono font-black text-emerald-800">
+              {getCostCenterPrefix(formData.costCenter, adminSettings?.costCenterCodes)}
+            </span>
+            <span className="text-[9.5px] text-gray-500 font-normal">
+              ({getCostCenterPrefix(formData.costCenter, adminSettings?.costCenterCodes)}001, {getCostCenterPrefix(formData.costCenter, adminSettings?.costCenterCodes)}002...)
+            </span>
+          </p>
+        )}
+        {fieldId === 'costCenter' && formData.costCenter && (
+          <p className="text-[10px] text-slate-500 font-medium mt-1">
+            Auto ID Prefix: <strong className="text-emerald-700 font-mono font-black">{getCostCenterPrefix(formData.costCenter, adminSettings?.costCenterCodes)}</strong>
+          </p>
         )}
       </div>
     );
@@ -1519,8 +1748,35 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
 
           {hasPermission('add') && (
             <>
+              {/* Export Inactive / Left Employees Backup CSV Button */}
+              {inactiveEmps.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => exportEmployeesCSV(inactiveEmps, 'inactive_employees_backup')}
+                  className="border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xxs"
+                  title={language === 'en' ? `Export backup CSV for ${inactiveEmps.length} inactive/left employees` : `${inactiveEmps.length} निष्क्रीय कर्मचारियों की जानकारी CSV में डाउनलोड करें`}
+                  id="btn-export-inactive-csv"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-700" />
+                  {language === 'en' ? `Export Inactive (${inactiveEmps.length})` : `निष्क्रिय बैकअप (${inactiveEmps.length})`}
+                </button>
+              )}
+
+              {/* Export All Employees CSV Button */}
+              <button
+                type="button"
+                onClick={() => exportEmployeesCSV(employees)}
+                className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
+                title={language === 'en' ? 'Export all employee records for bulk editing' : 'सभी कर्मचारियों का डेटा CSV में डाउनलोड/एक्सपोर्ट करें'}
+                id="btn-export-csv-trigger"
+              >
+                <Download className="w-4 h-4 text-emerald-700" />
+                {t.exportDataBtn}
+              </button>
+
               {/* Bulk Import Button */}
               <button
+                type="button"
                 onClick={() => setIsImportModalOpen(true)}
                 className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
                 id="btn-bulk-import-trigger"
@@ -1668,7 +1924,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         <div className="flex items-center gap-3">
                           {emp.photoUrl ? (
                             <img 
-                              src={emp.photoUrl} 
+                              src={parseGoogleDriveImageUrl(emp.photoUrl)} 
                               alt={emp.name} 
                               className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
                               referrerPolicy="no-referrer"
@@ -2003,18 +2259,28 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                           </button>
                         )}
                         {hasPermission('delete') && (
-                          <button
-                            onClick={() => toggleActiveStatus(emp)}
-                            className={`p-1.5 rounded-lg transition-all ${
-                              emp.isActive 
-                                ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' 
-                                : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
-                            }`}
-                            title={emp.isActive ? t.deactivate : t.activate}
-                            id={`toggle-${emp.id}`}
-                          >
-                            {emp.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => toggleActiveStatus(emp)}
+                              className={`p-1.5 rounded-lg transition-all ${
+                                emp.isActive 
+                                  ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' 
+                                  : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                              }`}
+                              title={emp.isActive ? t.deactivate : t.activate}
+                              id={`toggle-${emp.id}`}
+                            >
+                              {emp.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEmployeeRecord(emp)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title={language === 'en' ? 'Delete Employee Record' : 'कर्मचारी रिकॉर्ड हटाएं'}
+                              id={`delete-${emp.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -2197,33 +2463,48 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                 {/* Column 3: Employment Detail, Salary Info & Photo Upload */}
                 <div className="space-y-4">
                   {/* Category Card: Profile Photo */}
-                  <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 flex flex-col items-center justify-center text-center space-y-2.5">
+                  <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 flex flex-col items-center text-center space-y-3">
                     <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5 w-full">
-                      Profile Photo
+                      {language === 'en' ? 'Profile Photo (Google Drive Link)' : 'प्रोफ़ाइल फ़ोटो (गूगल ड्राइव लिंक)'}
                     </h4>
                     
-                    <div className="relative w-24 h-24 rounded-full border border-gray-200 bg-white flex items-center justify-center overflow-hidden shrink-0 group">
+                    <div className="relative w-20 h-20 rounded-full border-2 border-dashed border-gray-300 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
                       {formData.photoUrl ? (
                         <img 
-                          src={formData.photoUrl} 
+                          src={parseGoogleDriveImageUrl(formData.photoUrl)} 
                           alt="Profile preview" 
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
                         />
                       ) : (
-                        <Camera className="w-8 h-8 text-gray-300 group-hover:text-gray-400 transition-colors" />
+                        <Camera className="w-7 h-7 text-gray-300" />
                       )}
-                      <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold cursor-pointer transition-all">
-                        Upload
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handlePhotoUpload} 
-                          className="hidden" 
-                        />
-                      </label>
                     </div>
-                    <p className="text-[10px] text-gray-400 font-medium">PNG or JPG up to 1MB</p>
+
+                    <div className="w-full space-y-1.5 text-left">
+                      <label className="text-[11px] font-semibold text-gray-700 flex items-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5 text-blue-600" />
+                        {language === 'en' ? 'Google Drive Link / Image URL' : 'गूगल ड्राइव या फ़ोटो वेब लिंक'}
+                      </label>
+                      <input
+                        type="url"
+                        name="photoUrl"
+                        value={formData.photoUrl || ''}
+                        onChange={(e) => {
+                          const rawVal = e.target.value;
+                          const formatted = parseGoogleDriveImageUrl(rawVal);
+                          setFormData(prev => ({ ...prev, photoUrl: formatted }));
+                        }}
+                        placeholder="https://drive.google.com/file/d/..."
+                        className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-mono"
+                        id="input-photo-url-link"
+                      />
+                      <p className="text-[10px] text-gray-500 leading-normal">
+                        {language === 'en' 
+                          ? 'Paste Google Drive shareable link. Link will sync directly with Google Sheet.' 
+                          : 'गूगल ड्राइव का Shareable link पेस्ट करें। यह गूगल शीट में भी सीधे सेव होगा।'}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Category Card: Employment Detail */}
@@ -2569,16 +2850,30 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     {t.requiredHeaderWarning}
                   </p>
                   <p className="text-[11px] text-gray-500 font-medium">
-                    Allowed columns: Employee ID, Full Name, Department, Designation, Joining Date, Basic Salary, Allowances, Deductions, Overtime Hourly Rate, Payment Method, Is Active
+                    {language === 'en'
+                      ? 'Tip: You can export all existing employee data, edit/correct the values in Excel, and upload the updated file back to sync modifications.'
+                      : 'टिप: आप मौजूदा सभी कर्मचारियों का डेटा डाउनलोड करके एक्सेल में संशोधन/सुधार कर सकते हैं और दोबारा अपलोड करके अपडेट कर सकते हैं।'}
                   </p>
                 </div>
-                <button
-                  onClick={downloadTemplate}
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-xs font-bold text-blue-700 rounded-lg transition-colors cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  {t.downloadTemplate}
-                </button>
+                <div className="shrink-0 flex flex-wrap sm:flex-nowrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => exportEmployeesCSV(employees)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-xxs"
+                    title="Export existing employee data to edit & re-upload"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {t.exportExistingBtn.replace('{count}', String(employees.length))}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadTemplate}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 border border-blue-200 text-xs font-bold text-blue-700 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {t.downloadTemplate}
+                  </button>
+                </div>
               </div>
 
               {/* Drag & Drop File Zone */}

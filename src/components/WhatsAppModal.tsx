@@ -90,6 +90,49 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
   const [emailSub, setEmailSub] = useState(resolvedEmailSubject);
   const [emailText, setEmailText] = useState(resolvedEmailBody);
 
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>(defaultCategory);
+
+  // Template switching logic
+  const handleSelectTemplate = (key: string) => {
+    setSelectedTemplateKey(key);
+
+    // Check if key matches custom template list
+    const customTpl = (settings.customMessageTemplates || []).find((t) => t.id === key);
+    if (customTpl) {
+      if (customTpl.whatsappBody) {
+        setWaMessage(processTemplate(customTpl.whatsappBody, mergedVars));
+      }
+      if (customTpl.emailSubject) {
+        setEmailSub(processTemplate(customTpl.emailSubject, mergedVars));
+      }
+      if (customTpl.emailBody) {
+        setEmailText(processTemplate(customTpl.emailBody, mergedVars));
+      }
+    } else {
+      // Standard template keys
+      const stdWa = settings.whatsappTemplates?.[key as keyof typeof DEFAULT_WHATSAPP_TEMPLATES] || DEFAULT_WHATSAPP_TEMPLATES[key as keyof typeof DEFAULT_WHATSAPP_TEMPLATES] || DEFAULT_WHATSAPP_TEMPLATES.customNotice;
+      setWaMessage(processTemplate(stdWa, mergedVars));
+
+      // Standard email matching if applicable
+      if (key === 'payslip') {
+        const sub = settings.emailTemplates?.payslipSubject || DEFAULT_EMAIL_TEMPLATES.payslipSubject;
+        const body = settings.emailTemplates?.payslipBody || DEFAULT_EMAIL_TEMPLATES.payslipBody;
+        setEmailSub(processTemplate(sub, mergedVars));
+        setEmailText(processTemplate(body, mergedVars));
+      } else if (key === 'missPunch') {
+        const sub = settings.emailTemplates?.missPunchSubject || DEFAULT_EMAIL_TEMPLATES.missPunchSubject;
+        const body = settings.emailTemplates?.missPunchBody || DEFAULT_EMAIL_TEMPLATES.missPunchBody;
+        setEmailSub(processTemplate(sub, mergedVars));
+        setEmailText(processTemplate(body, mergedVars));
+      } else if (key === 'leaveStatus') {
+        const sub = settings.emailTemplates?.leaveSubject || DEFAULT_EMAIL_TEMPLATES.leaveSubject;
+        const body = settings.emailTemplates?.leaveBody || DEFAULT_EMAIL_TEMPLATES.leaveBody;
+        setEmailSub(processTemplate(sub, mergedVars));
+        setEmailText(processTemplate(body, mergedVars));
+      }
+    }
+  };
+
   const cleanPhone = formatPhoneNumber(recipient.mobileNo);
 
   // MessageAutoSender API URL
@@ -214,6 +257,38 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
 
         {/* Body Content */}
         <div className="p-5 overflow-y-auto space-y-4 grow font-sans">
+
+          {/* Quick Template Switcher Dropdown */}
+          <div className="p-3 bg-slate-50 dark:bg-[#0c1a14] border border-slate-200 dark:border-[#1e3a2f] rounded-xl flex items-center justify-between gap-3 text-xs">
+            <span className="font-extrabold text-slate-700 dark:text-slate-200 shrink-0 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#03623c] dark:text-emerald-400" />
+              <span>Select Template:</span>
+            </span>
+            <select
+              value={selectedTemplateKey}
+              onChange={(e) => handleSelectTemplate(e.target.value)}
+              className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] text-slate-800 dark:text-slate-100 rounded-lg px-2.5 py-1.5 font-bold text-xs focus:ring-2 focus:ring-[#03623c] cursor-pointer grow max-w-xs"
+            >
+              <optgroup label="Standard HR Templates">
+                <option value="payslip">1. Payslip Shared Alert</option>
+                <option value="missPunch">2. Missed Punch Alert</option>
+                <option value="leaveStatus">3. Leave Request Status Update</option>
+                <option value="lateWarning">4. Late Arrival Warning</option>
+                <option value="salaryDisbursed">5. Salary Disbursed Notice</option>
+                <option value="customNotice">6. Custom HR Circular</option>
+              </optgroup>
+
+              {(settings.customMessageTemplates || []).length > 0 && (
+                <optgroup label="Custom Added Templates">
+                  {(settings.customMessageTemplates || []).map((ct) => (
+                    <option key={ct.id} value={ct.id}>
+                      ★ {ct.name} ({ct.category.toUpperCase()})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
 
           {sentStatus && (
             <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 animate-fade-in">

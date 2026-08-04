@@ -181,6 +181,7 @@ export interface AdminSettings {
   departments: string[];
   branches: string[];
   costCenters: string[];
+  costCenterCodes?: Record<string, string>;
   employeeGroups: string[];
   workTimings: string[];
   weeklyOffProfiles: string[];
@@ -208,6 +209,7 @@ export interface AdminSettings {
   senderName?: string;
   senderEmail?: string;
   enablePasswordLoginOtp?: boolean;
+  enableAdminWelcomePopup?: boolean;
   // WhatsApp & Email Automation Settings
   whatsappUsername?: string;
   whatsappPassword?: string;
@@ -220,6 +222,7 @@ export interface AdminSettings {
     lateWarning?: string;
     salaryDisbursed?: string;
     customNotice?: string;
+    [key: string]: string | undefined;
   };
   emailTemplates?: {
     payslipSubject?: string;
@@ -228,7 +231,17 @@ export interface AdminSettings {
     missPunchBody?: string;
     leaveSubject?: string;
     leaveBody?: string;
+    [key: string]: string | undefined;
   };
+  customMessageTemplates?: Array<{
+    id: string;
+    name: string;
+    category: 'whatsapp' | 'email' | 'both';
+    whatsappBody?: string;
+    emailSubject?: string;
+    emailBody?: string;
+    createdAt?: string;
+  }>;
   // Dynamic HR, IT & Timings settings for Login subtabs
   hrContactEmail?: string;
   hrContactPhone?: string;

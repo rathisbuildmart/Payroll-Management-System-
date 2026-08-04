@@ -3,6 +3,7 @@ import { Calendar, CreditCard, Check, Printer, FileText, DollarSign, Calculator,
 import { jsPDF } from 'jspdf';
 import { Employee, Attendance, PayrollRecord, OneTimeDeduction, AdminSettings, getCurrentBasicSalary } from '../types';
 import { WhatsAppModal } from './WhatsAppModal';
+import { parseGoogleDriveImageUrl } from '../utils/driveUtils';
 
 interface PayrollCalculatorProps {
   employees: Employee[];
@@ -2054,7 +2055,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                         <div className="flex items-center gap-3.5">
                           {emp?.photoUrl ? (
                             <img 
-                              src={emp.photoUrl} 
+                              src={parseGoogleDriveImageUrl(emp.photoUrl)} 
                               alt={emp.name} 
                               className="w-9 h-9 rounded-full object-cover border border-slate-200/80 dark:border-[#1e3a2f] shrink-0 shadow-2xs"
                               referrerPolicy="no-referrer"

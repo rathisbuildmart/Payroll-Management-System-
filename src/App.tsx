@@ -139,6 +139,8 @@ import LeavesHolidays from './components/LeavesHolidays';
 import EmployeeLedger from './components/EmployeeLedger';
 import NoticesSupport from './components/NoticesSupport';
 import RichTextRenderer from './components/RichTextRenderer';
+import FirebaseStorageMonitor from './components/FirebaseStorageMonitor';
+import AdminWelcomeModal from './components/AdminWelcomeModal';
 
 export interface PortalUser {
   id: string;
@@ -981,6 +983,24 @@ export default function App() {
     }
   }, [portalUser, adminSettings, currentTab]);
 
+  // State for Admin Welcome Boss Popup
+  const [showAdminWelcomeModal, setShowAdminWelcomeModal] = useState(false);
+
+  // Trigger Admin Welcome Popup once per session when Admin or Manager logs in
+  useEffect(() => {
+    if (
+      portalUser &&
+      portalUser.role !== 'employee' &&
+      adminSettings.enableAdminWelcomePopup !== false
+    ) {
+      const hasShown = sessionStorage.getItem('has_shown_admin_welcome_popup');
+      if (!hasShown) {
+        setShowAdminWelcomeModal(true);
+        sessionStorage.setItem('has_shown_admin_welcome_popup', 'true');
+      }
+    }
+  }, [portalUser, adminSettings.enableAdminWelcomePopup]);
+
   // Dynamically update document title and favicon when company name or logo changes
   useEffect(() => {
     document.title = `${adminSettings.companyName || 'Rathi Buildmart'} - Payroll & Attendance Portal`;
@@ -1544,6 +1564,7 @@ export default function App() {
       onConfirm: () => {
         setPortalUser(null);
         localStorage.removeItem('payroll_portal_user');
+        sessionStorage.removeItem('has_shown_admin_welcome_popup');
         if (localStorage.getItem('payroll_remember_me') === 'true') {
           setLoginId(localStorage.getItem('payroll_remembered_login_id') || '');
         } else {
@@ -1643,6 +1664,7 @@ export default function App() {
       onConfirm: async () => {
         setPortalUser(null);
         localStorage.removeItem('payroll_portal_user');
+        sessionStorage.removeItem('has_shown_admin_welcome_popup');
         if (localStorage.getItem('payroll_remember_me') === 'true') {
           setLoginId(localStorage.getItem('payroll_remembered_login_id') || '');
         } else {
@@ -2031,16 +2053,55 @@ export default function App() {
     }
   };
 
-  const handleUpdateEmployee = async (updatedEmp: Employee) => {
-    const updated = employees.map(emp => emp.id === updatedEmp.id ? updatedEmp : emp);
+  const handleDeleteEmployee = async (empIdToDelete: string) => {
+    const targetEmp = employees.find(e => e.id === empIdToDelete);
+    const updated = employees.filter(emp => emp.id !== empIdToDelete);
     setEmployees(updated);
+    setIsDataModified(true);
+    if (!spreadsheetId || !token) {
+      setSyncStatus('synced');
+      addSyncLog(
+        language === 'en' ? 'Delete Employee (Local)' : 'कर्मचारी हटाएं (स्थानीय)',
+        'success',
+        language === 'en' ? `Deleted employee ${targetEmp?.name || empIdToDelete} from local database.` : `स्थानीय डेटाबेस से कर्मचारी ${targetEmp?.name || empIdToDelete} हटाया गया।`
+      );
+      return;
+    }
+    setSyncStatus('syncing');
+    addSyncLog(
+      language === 'en' ? 'Delete Employee' : 'कर्मचारी हटाएं',
+      'syncing',
+      language === 'en' ? `Removing ${targetEmp?.name || empIdToDelete} from Google Sheets...` : `कर्मचारी ${targetEmp?.name || empIdToDelete} को Google Sheets से हटाया जा रहा है...`
+    );
+    try {
+      await saveEmployees(spreadsheetId, updated, token);
+      setSyncStatus('synced');
+    } catch (err: any) {
+      setSyncStatus('error');
+      throw err;
+    }
+  };
+
+  const handleUpdateEmployee = async (updatedEmp: Employee, oldEmpId?: string) => {
+    const targetId = oldEmpId || updatedEmp.id;
+    const updated = employees.map(emp => (emp.id === targetId || emp.id === updatedEmp.id) ? updatedEmp : emp);
+    setEmployees(updated);
+
+    if (oldEmpId && oldEmpId !== updatedEmp.id) {
+      setAttendance(prev => prev.map(a => a.employeeId === oldEmpId ? { ...a, employeeId: updatedEmp.id } : a));
+      setPayroll(prev => prev.map(p => p.employeeId === oldEmpId ? { ...p, employeeId: updatedEmp.id } : p));
+      setLeaveRequests(prev => prev.map(l => l.employeeId === oldEmpId ? { ...l, employeeId: updatedEmp.id } : l));
+      setPasswordRequests(prev => prev.map(p => p.empId === oldEmpId ? { ...p, empId: updatedEmp.id } : p));
+      setHrTickets(prev => prev.map(t => t.empId === oldEmpId ? { ...t, empId: updatedEmp.id } : t));
+    }
+
     setIsDataModified(true);
     if (!spreadsheetId || !token) {
       setSyncStatus('synced');
       addSyncLog(
         language === 'en' ? 'Update Employee (Local)' : 'कर्मचारी अपडेट करें (स्थानीय)',
         'success',
-        language === 'en' ? `Updated ${updatedEmp.name} details in local database (offline).` : `स्थानीय डेटाबेस में ${updatedEmp.name} का विवरण अपडेट किया गया (ऑफ़लाइन)।`
+        language === 'en' ? `Updated ${updatedEmp.name} (${updatedEmp.id}) details in local database (offline).` : `स्थानीय डेटाबेस में ${updatedEmp.name} (${updatedEmp.id}) का विवरण अपडेट किया गया (ऑफ़लाइन)।`
       );
       return;
     }
@@ -5204,6 +5265,21 @@ export default function App() {
               <span className={`w-1 h-1 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
               {isOnline ? (language === 'en' ? 'Online' : 'ऑनलाइन') : (language === 'en' ? 'Offline' : 'ऑफ़लाइन')}
             </span>
+
+            {/* Live Compact Storage Indicator */}
+            {portalUser?.role === 'admin' && (
+              <FirebaseStorageMonitor
+                compact
+                language={language}
+                employees={employees}
+                attendance={attendance}
+                payroll={payroll}
+                adminSettings={adminSettings}
+                emailLogs={emailLogs}
+                announcements={announcements}
+                failedLogins={failedLogins}
+              />
+            )}
           </div>
 
           {/* Controls Area */}
@@ -5588,6 +5664,7 @@ export default function App() {
                   employees={filteredEmployees} 
                   onAddEmployee={handleAddEmployee} 
                   onUpdateEmployee={handleUpdateEmployee} 
+                  onDeleteEmployee={handleDeleteEmployee}
                   onBulkAddEmployees={handleBulkAddEmployees}
                   language={language} 
                   adminSettings={adminSettings}
@@ -5939,6 +6016,18 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Admin "Welcome Boss" Animated Greeting Popup Modal */}
+      {showAdminWelcomeModal && portalUser && portalUser.role !== 'employee' && (
+        <AdminWelcomeModal
+          isOpen={showAdminWelcomeModal}
+          onClose={() => setShowAdminWelcomeModal(false)}
+          adminName={portalUser.name || 'Boss'}
+          role={portalUser.role}
+          language={language}
+          companyName={adminSettings.companyName}
+        />
       )}
 
     </div>

@@ -768,6 +768,7 @@ export async function saveAdminSettings(spreadsheetId: string, settings: AdminSe
     ['enableGeofencing', settings.enableGeofencing ? 'TRUE' : 'FALSE'],
     ['enableMobileAttendance', settings.enableMobileAttendance !== false ? 'TRUE' : 'FALSE'],
     ['enablePasswordLoginOtp', settings.enablePasswordLoginOtp ? 'TRUE' : 'FALSE'],
+    ['enableAdminWelcomePopup', settings.enableAdminWelcomePopup !== false ? 'TRUE' : 'FALSE'],
     ['geofenceOutlets', JSON.stringify(settings.geofenceOutlets || [])],
     ['smtpHost', settings.smtpHost || ''],
     ['smtpPort', settings.smtpPort || 587],
@@ -826,7 +827,8 @@ export async function fetchAdminSettings(spreadsheetId: string, token: string): 
   const booleanFields = [
     'enableHra', 'enableDa', 'enableConveyance', 'enableProfessionalTax', 
     'enablePaidLeaveCalculation', 'enableEmployeePayslips', 'enableGeofencing', 
-    'enableMobileAttendance', 'enablePasswordLoginOtp', 'enableWhatsappAutomation'
+    'enableMobileAttendance', 'enablePasswordLoginOtp', 'enableWhatsappAutomation',
+    'enableAdminWelcomePopup'
   ];
   const jsonFields = [
     'departments', 'branches', 'costCenters', 'employeeGroups',
