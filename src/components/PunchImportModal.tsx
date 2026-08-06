@@ -3,6 +3,7 @@ import {
   X, FileSpreadsheet, Upload, AlertCircle, CheckCircle, Info, RefreshCw, ChevronRight, HelpCircle 
 } from 'lucide-react';
 import { Employee, Attendance, AdminSettings } from '../types';
+import { useModalBackHandler } from '../utils/useHistoryBackHandler';
 import { 
   getShiftTimings, 
   getHalfDayCheckOut, 
@@ -26,6 +27,8 @@ export default function PunchImportModal({
   language,
   adminSettings
 }: PunchImportModalProps) {
+  useModalBackHandler(isOpen, onClose, 'punch-import-modal');
+
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Upload, 2: Map, 3: Preview
   const [fileContent, setFileContent] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');

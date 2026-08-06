@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Crown, Sparkles, Sun, Moon, Sunset, Sunrise, ShieldCheck, CheckCircle2, Clock, X, Zap, Activity } from 'lucide-react';
+import { useModalBackHandler } from '../utils/useHistoryBackHandler';
 
 interface AdminWelcomeModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export const AdminWelcomeModal: React.FC<AdminWelcomeModalProps> = ({
   companyName = 'Rathi Buildmart',
   durationMs = 5000,
 }) => {
+  useModalBackHandler(isOpen, onClose, 'admin-welcome-modal');
+
   const [progress, setProgress] = useState(100);
   const [currentTime, setCurrentTime] = useState(new Date());
 

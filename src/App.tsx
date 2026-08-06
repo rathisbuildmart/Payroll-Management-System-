@@ -141,6 +141,7 @@ import NoticesSupport from './components/NoticesSupport';
 import RichTextRenderer from './components/RichTextRenderer';
 import FirebaseStorageMonitor from './components/FirebaseStorageMonitor';
 import AdminWelcomeModal from './components/AdminWelcomeModal';
+import { useModalBackHandler } from './utils/useHistoryBackHandler';
 
 export interface PortalUser {
   id: string;
@@ -916,6 +917,49 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support'>('dashboard');
   const [activeNoticeSubTab, setActiveNoticeSubTab] = useState<'announcements' | 'passwords' | 'tickets'>('announcements');
 
+  // Helper for navigating between tabs with Browser History support (enables Browser Back button)
+  const navigateToTab = (
+    tab: 'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support',
+    noticeSubTab?: 'announcements' | 'passwords' | 'tickets' | 'notices' | string
+  ) => {
+    const validNoticeSubTab = (noticeSubTab === 'notices' || !noticeSubTab)
+      ? activeNoticeSubTab
+      : (noticeSubTab as 'announcements' | 'passwords' | 'tickets');
+
+    if (tab !== currentTab || (noticeSubTab && validNoticeSubTab !== activeNoticeSubTab)) {
+      if (typeof window !== 'undefined') {
+        window.history.pushState({ page: 'app', tab, activeNoticeSubTab: validNoticeSubTab }, '');
+      }
+      setCurrentTab(tab);
+      if (validNoticeSubTab) {
+        setActiveNoticeSubTab(validNoticeSubTab);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Set initial state in browser history stack
+    if (!window.history.state || !window.history.state.tab) {
+      window.history.replaceState({ page: 'app', tab: currentTab, activeNoticeSubTab }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.tab) {
+        setCurrentTab(e.state.tab);
+        if (e.state.activeNoticeSubTab) {
+          setActiveNoticeSubTab(e.state.activeNoticeSubTab);
+        }
+      } else {
+        setCurrentTab('dashboard');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const [isSidebarHovered, setIsSidebarHovered] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en'); // Set default to English as bilingual toggle is disabled
@@ -932,6 +976,12 @@ export default function App() {
   } | null>(null);
 
   const [showPendingAlertModal, setShowPendingAlertModal] = useState<boolean>(false);
+
+  // Register Back-Button Handlers for Modals and Mobile Sidebar Drawers
+  useModalBackHandler(isMobileMenuOpen, () => setIsMobileMenuOpen(false), 'mobile-menu');
+  useModalBackHandler(showSeedDialog, () => setShowSeedDialog(false), 'seed-dialog');
+  useModalBackHandler(showPendingAlertModal, () => setShowPendingAlertModal(false), 'pending-alert-modal');
+  useModalBackHandler(!!confirmDialog?.isOpen, () => setConfirmDialog(null), 'confirm-dialog');
 
   useEffect(() => {
     if (!portalUser || portalUser.role === 'employee') {
@@ -4869,7 +4919,7 @@ export default function App() {
                     <div className="relative flex items-center justify-start w-full">
                       <button
                         onClick={() => {
-                          setCurrentTab(item.id);
+                          navigateToTab(item.id);
                           if (isMobile) {
                             setIsMobileMenuOpen(false);
                           }
@@ -4925,8 +4975,7 @@ export default function App() {
                         {/* Sub-item: Manage Announcements */}
                         <button
                           onClick={() => {
-                            setCurrentTab('notices_support');
-                            setActiveNoticeSubTab('announcements');
+                            navigateToTab('notices_support', 'announcements');
                             if (isMobile) {
                               setIsMobileMenuOpen(false);
                             }
@@ -4951,8 +5000,7 @@ export default function App() {
                         {/* Sub-item: Forgot Password Gateways */}
                         <button
                           onClick={() => {
-                            setCurrentTab('notices_support');
-                            setActiveNoticeSubTab('passwords');
+                            navigateToTab('notices_support', 'passwords');
                             if (isMobile) {
                               setIsMobileMenuOpen(false);
                             }
@@ -4979,8 +5027,7 @@ export default function App() {
                         {/* Sub-item: HR Helpdesk Support Tickets */}
                         <button
                           onClick={() => {
-                            setCurrentTab('notices_support');
-                            setActiveNoticeSubTab('tickets');
+                            navigateToTab('notices_support', 'tickets');
                             if (isMobile) {
                               setIsMobileMenuOpen(false);
                             }
@@ -5013,7 +5060,7 @@ export default function App() {
                 <div key={item.id} className="relative group flex items-center justify-start w-full">
                   <button
                     onClick={() => {
-                      setCurrentTab(item.id);
+                      navigateToTab(item.id);
                       if (isMobile) {
                         setIsMobileMenuOpen(false);
                       }
@@ -5646,12 +5693,11 @@ export default function App() {
                   attendance={filteredAttendance} 
                   payroll={filteredPayroll} 
                   language={language} 
-                  onNavigate={setCurrentTab}
+                  onNavigate={navigateToTab}
                   passwordRequests={passwordRequests}
                   hrTickets={hrTickets}
                   onNavigateNoticeSubTab={(subTab) => {
-                    setCurrentTab('notices_support');
-                    setActiveNoticeSubTab(subTab);
+                    navigateToTab('notices_support', subTab);
                   }}
                   failedLogins={failedLogins}
                   onUpdateEmployee={handleUpdateEmployee}
@@ -5960,8 +6006,7 @@ export default function App() {
                 onClick={() => {
                   sessionStorage.setItem('dismissed_pending_alert', 'true');
                   setShowPendingAlertModal(false);
-                  setCurrentTab('notices_support');
-                  setActiveNoticeSubTab('passwords');
+                  navigateToTab('notices_support', 'passwords');
                 }}
                 className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-slate-950 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(16,185,129,0.25)] hover:scale-[1.02]"
               >

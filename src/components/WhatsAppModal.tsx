@@ -14,6 +14,7 @@ import {
   Info
 } from 'lucide-react';
 import { AdminSettings } from '../types';
+import { useModalBackHandler } from '../utils/useHistoryBackHandler';
 import { 
   buildMessageAutoSenderUrl, 
   buildMessageAutoSenderExcelFormula, 
@@ -53,6 +54,8 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
   emailSubject: customEmailSubject,
   emailBody: customEmailBody
 }) => {
+  useModalBackHandler(isOpen, onClose, 'whatsapp-modal');
+
   if (!isOpen) return null;
 
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'email' | 'formula'>('whatsapp');

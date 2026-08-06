@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import { Employee, Attendance, PayrollRecord, OneTimeDeduction, AdminSettings, getCurrentBasicSalary } from '../types';
 import { WhatsAppModal } from './WhatsAppModal';
 import { parseGoogleDriveImageUrl } from '../utils/driveUtils';
+import MasterAttendanceSalarySheetModal from './MasterAttendanceSalarySheetModal';
 
 interface PayrollCalculatorProps {
   employees: Employee[];
@@ -54,6 +55,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   const [editingRecord, setEditingRecord] = useState<PayrollRecord | null>(null);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [isMasterSheetOpen, setIsMasterSheetOpen] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'ledger' | 'refunds'>('ledger');
 
   // WhatsApp & Email modal state
@@ -1753,6 +1755,16 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
         {/* Buttons strip with elegant styling */}
         <div className="flex flex-wrap gap-2.5 pt-2 lg:pt-0">
+          {/* Main Master Attendance & Salary Sheet Button */}
+          <button
+            onClick={() => setIsMasterSheetOpen(true)}
+            className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 hover:from-emerald-500 hover:to-teal-700 text-white text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all shadow-md hover:shadow-lg active:scale-98 border border-emerald-400/30"
+            id="btn-master-attendance-salary-sheet"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+            <span>{language === 'en' ? 'Master Attendance & Salary Sheet (Day-wise + Excel/PDF)' : 'मास्टर अटेंडेंस व सैलरी शीट (डे-वाइज़ + एक्सेल/PDF)'}</span>
+          </button>
+
           <button
             onClick={() => setShowAnalytics(!showAnalytics)}
             className={`px-4 py-2.5 border text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all active:scale-98 ${
@@ -1773,7 +1785,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <span>{language === 'en' ? 'Export Payroll Reports 📊' : 'पेरोल एवं बैंक रिपोर्ट निर्यात'}</span>
               <ChevronDown className="w-3.5 h-3.5 text-indigo-500" />
             </button>
-            <div className="absolute right-0 mt-1 w-64 bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-xl shadow-xl py-2 z-30 hidden group-hover:block hover:block divide-y divide-slate-100 dark:divide-[#1e3a2f]">
+            <div className="absolute right-0 mt-1 w-72 bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-xl shadow-xl py-2 z-30 hidden group-hover:block hover:block divide-y divide-slate-100 dark:divide-[#1e3a2f]">
               
               {/* Section 1: Combined Master Sheet */}
               <div className="px-1 py-1">
@@ -1781,12 +1793,22 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                   {language === 'en' ? 'Combined Master Export' : 'संयुक्त मास्टर रिपोर्ट'}
                 </div>
                 <button 
-                  onClick={handleCombinedExport}
-                  className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-[#183328] rounded-lg font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
+                  onClick={() => setIsMasterSheetOpen(true)}
+                  className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-[#183328] rounded-lg font-bold flex items-center gap-2.5 transition-colors cursor-pointer bg-emerald-50/40"
                 >
                   <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
                   <div>
-                    <div>{language === 'en' ? 'All Modes Master Sheet (.csv)' : 'सभी मोड मास्टर शीट (.csv)'}</div>
+                    <div className="text-emerald-900 font-black">{language === 'en' ? 'Day-Wise Attendance + Salary Sheet' : 'डे-वाइज़ अटेंडेंस + सैलरी शीट'}</div>
+                    <div className="text-[10px] text-emerald-700 font-normal">Custom Columns + Excel (.xlsx) & PDF</div>
+                  </div>
+                </button>
+                <button 
+                  onClick={handleCombinedExport}
+                  className="w-full text-left px-3 py-2 text-xs text-slate-800 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-[#183328] rounded-lg font-bold flex items-center gap-2.5 transition-colors cursor-pointer mt-1"
+                >
+                  <Download className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div>
+                    <div>{language === 'en' ? 'All Modes Master CSV' : 'सभी मोड मास्टर CSV'}</div>
                     <div className="text-[10px] text-slate-400 font-normal">Bank + Cash + Cheque Records</div>
                   </div>
                 </button>
@@ -3007,6 +3029,17 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           variables={waVars}
         />
       )}
+
+      {/* Master Attendance & Salary Sheet Modal */}
+      <MasterAttendanceSalarySheetModal
+        isOpen={isMasterSheetOpen}
+        onClose={() => setIsMasterSheetOpen(false)}
+        employees={employees}
+        attendanceRecords={attendanceRecords}
+        payrollRecords={payrollRecords}
+        initialMonthYear={selectedMonthYear}
+        language={language}
+      />
     </div>
   );
 }
