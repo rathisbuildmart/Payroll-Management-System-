@@ -8,6 +8,12 @@ import { useEffect, useRef } from 'react';
  */
 export function useModalBackHandler(isOpen: boolean, onClose: () => void, modalId: string = 'modal') {
   const isPoppedByBackButton = useRef(false);
+  const onCloseRef = useRef(onClose);
+
+  // Keep onClose ref current without causing effect cleanup
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -21,7 +27,7 @@ export function useModalBackHandler(isOpen: boolean, onClose: () => void, modalI
     const handlePopState = (e: PopStateEvent) => {
       // Set flag so cleanup doesn't call history.back() again
       isPoppedByBackButton.current = true;
-      onClose();
+      onCloseRef.current();
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -35,5 +41,5 @@ export function useModalBackHandler(isOpen: boolean, onClose: () => void, modalI
         window.history.back();
       }
     };
-  }, [isOpen, onClose, modalId]);
+  }, [isOpen, modalId]);
 }
