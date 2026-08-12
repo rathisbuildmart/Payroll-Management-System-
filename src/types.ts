@@ -490,18 +490,54 @@ export interface PerformanceReview {
   status: 'Draft' | 'Submitted' | 'Approved';
 }
 
+export interface AssetMaintenanceLog {
+  id: string;
+  assetId: string;
+  issueDescription: string;
+  loggedDate: string;
+  vendorName?: string;
+  cost?: number;
+  status: 'Open' | 'In Progress' | 'Resolved' | 'Scrapped';
+  resolvedDate?: string;
+  notes?: string;
+}
+
+export interface AssetAllocationHistory {
+  id: string;
+  assetId: string;
+  employeeId: string;
+  employeeName: string;
+  assignedDate: string;
+  returnedDate?: string;
+  assignedCondition: string;
+  returnedCondition?: string;
+  handoverNotes?: string;
+  returnNotes?: string;
+  status: 'Active' | 'Returned';
+}
+
 export interface CompanyAsset {
   id: string;
   assetTag: string;
   name: string;
-  category: 'Laptop' | 'Mobile Phone' | 'Tablet' | 'Vehicle' | 'ID Card / Key' | 'Peripheral' | 'Other';
+  category: 'Laptop' | 'Mobile Phone' | 'Tablet' | 'Vehicle' | 'ID Card / Key' | 'Peripheral' | 'Furniture' | 'Tools / Machinery' | 'Other';
   serialNumber: string;
+  brand?: string;
+  model?: string;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  warrantyExpiryDate?: string;
+  vendorName?: string;
+  branch?: string;
   assignedToEmployeeId?: string;
   assignedToEmployeeName?: string;
   assignedDate?: string;
+  expectedReturnDate?: string;
   condition: 'New' | 'Good' | 'Damaged' | 'In Repair';
   status: 'Available' | 'Assigned' | 'Maintenance' | 'Scrapped';
   notes?: string;
+  maintenanceLogs?: AssetMaintenanceLog[];
+  allocationHistory?: AssetAllocationHistory[];
 }
 
 export interface TransferPromotionRecord {
@@ -566,6 +602,7 @@ export type UserRole =
   | 'super_admin' 
   | 'admin' 
   | 'hr' 
+  | 'asset_manager'
   | 'recruiter' 
   | 'branch_manager' 
   | 'director' 

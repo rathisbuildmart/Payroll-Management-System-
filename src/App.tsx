@@ -42,7 +42,8 @@ import {
   Moon,
   UserPlus,
   Award,
-  UserX
+  UserX,
+  Package
 } from 'lucide-react';
 import { initAuth, googleSignIn, googleSignInRedirect, logout } from './services/auth';
 import { 
@@ -136,7 +137,7 @@ import Dashboard from './components/Dashboard';
 import EmployeeList from './components/EmployeeList';
 import AttendanceTracker from './components/AttendanceTracker';
 import PayrollCalculator from './components/PayrollCalculator';
-import Settings, { INITIAL_ADMIN_SETTINGS } from './components/Settings';
+import Settings, { INITIAL_ADMIN_SETTINGS, DEFAULT_ROLE_PERMISSIONS } from './components/Settings';
 import EmployeePortal from './components/EmployeePortal';
 import LeavesHolidays from './components/LeavesHolidays';
 import EmployeeLedger from './components/EmployeeLedger';
@@ -147,6 +148,7 @@ import AdminWelcomeModal from './components/AdminWelcomeModal';
 import HiringOnboarding from './components/HiringOnboarding';
 import EmployeeLifecycleModule from './components/EmployeeLifecycleModule';
 import ExitManagementModule from './components/ExitManagementModule';
+import AssetManagementModule from './components/AssetManagementModule';
 import { useModalBackHandler } from './utils/useHistoryBackHandler';
 
 //PortalUser imported from ./types
@@ -340,18 +342,19 @@ export default function App() {
     localStorage.setItem('payroll_portal_user', JSON.stringify(updatedUser));
 
     const defaultRolePermissions: Record<string, string[]> = {
-      super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-      admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-      director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-      sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'leaves', 'notices_support'],
-      hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+      admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+      director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'leaves', 'notices_support'],
+      hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      asset_manager: ['dashboard', 'asset_management', 'employees', 'notices_support'],
       recruiter: ['dashboard', 'hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
       branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
       employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
     };
 
     const allowed = (newRole === 'super_admin' || newRole === 'admin')
-      ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
+      ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
       : (adminSettings.rolePermissions?.[newRole] ?? defaultRolePermissions[newRole] ?? []);
 
     if (!allowed.includes(currentTab)) {
@@ -942,12 +945,12 @@ export default function App() {
     };
   }, []);
 
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support' | 'hiring_onboarding' | 'employee_lifecycle' | 'exit_management'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support' | 'hiring_onboarding' | 'employee_lifecycle' | 'asset_management' | 'exit_management'>('dashboard');
   const [activeNoticeSubTab, setActiveNoticeSubTab] = useState<'announcements' | 'passwords' | 'tickets'>('announcements');
 
   //Helper for navigating between tabs with Browser History support (enables Browser Back button)
   const navigateToTab = (
-    tab: 'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support' | 'hiring_onboarding' | 'employee_lifecycle' | 'exit_management',
+    tab: 'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support' | 'hiring_onboarding' | 'employee_lifecycle' | 'asset_management' | 'exit_management',
     noticeSubTab?: 'announcements' | 'passwords' | 'tickets' | 'notices' | string
   ) => {
     const validNoticeSubTab = (noticeSubTab === 'notices' || !noticeSubTab)
@@ -1047,9 +1050,9 @@ export default function App() {
   useEffect(() => {
     if (!portalUser || portalUser.role === 'employee') return;
     
-    const allowed = portalUser.role === 'admin'
-      ? ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin']
-      : adminSettings.rolePermissions?.[portalUser.role] || [];
+    const allowed = (portalUser.role === 'admin' || portalUser.role === 'super_admin')
+      ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
+      : adminSettings.rolePermissions?.[portalUser.role] || DEFAULT_ROLE_PERMISSIONS[portalUser.role] || [];
       
     const hasAccess = portalUser.role === 'admin' || allowed.includes(currentTab) || allowed.some(p => p.startsWith(currentTab + ':'));
     if (!hasAccess && allowed.length > 0) {
@@ -4758,18 +4761,19 @@ export default function App() {
     const showExpanded = isMobile || isSidebarHovered;
     const userRole = portalUser?.role || 'employee';
     const defaultRolePermissions: Record<string, string[]> = {
-      super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-      admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-      director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-      sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'leaves', 'notices_support'],
-      hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+      admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+      director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'leaves', 'notices_support'],
+      hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      asset_manager: ['dashboard', 'asset_management', 'employees', 'notices_support'],
       recruiter: ['dashboard', 'hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
       branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
       employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
     };
 
     const allowedTabs = (userRole === 'super_admin' || userRole === 'admin')
-      ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
+      ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
       : (adminSettings.rolePermissions?.[userRole] ?? defaultRolePermissions[userRole] ?? []);
 
     const isPasswordGatewayAllowed = ['super_admin', 'admin', 'hr', 'sub_admin', 'director'].includes(userRole);
@@ -4783,7 +4787,8 @@ export default function App() {
       { id: 'dashboard' as const, label: uiTexts.dashboard, icon: TrendingUp },
       { id: 'employees' as const, label: uiTexts.employees, icon: Users },
       { id: 'hiring_onboarding' as const, label: 'Hiring & Onboarding', icon: UserPlus },
-      { id: 'employee_lifecycle' as const, label: 'Lifecycle & Assets', icon: Award },
+      { id: 'employee_lifecycle' as const, label: 'Lifecycle', icon: Award },
+      { id: 'asset_management' as const, label: 'Asset Management', icon: Package },
       { id: 'attendance' as const, label: uiTexts.attendance, icon: Calendar },
       { id: 'payroll' as const, label: uiTexts.payroll, icon: CreditCard },
       { id: 'leaves' as const, label: uiTexts.leaves, icon: CalendarDays },
@@ -5044,7 +5049,7 @@ export default function App() {
         <div className={`flex flex-col ${showExpanded ? 'items-start w-full' : 'items-center'} gap-3 w-full`}>
           <div className={`${showExpanded ? 'w-full' : 'w-8'} h-[1px] bg-emerald-950/60 transition-all`} />
 
-          {spreadsheetLink && (
+          {spreadsheetLink && (userRole === 'admin' || userRole === 'super_admin') && (
             <div className="relative group flex items-center justify-start w-full">
               <a
                 href={spreadsheetLink}
@@ -5435,9 +5440,10 @@ export default function App() {
                     <option value="super_admin" className="dark:bg-[#11221b] text-slate-900 dark:text-white">1. Super Admin</option>
                     <option value="admin" className="dark:bg-[#11221b] text-slate-900 dark:text-white">2. Admin</option>
                     <option value="hr" className="dark:bg-[#11221b] text-slate-900 dark:text-white">3. HR</option>
-                    <option value="recruiter" className="dark:bg-[#11221b] text-slate-900 dark:text-white">4. Recruiter</option>
-                    <option value="branch_manager" className="dark:bg-[#11221b] text-slate-900 dark:text-white">5. Branch Manager</option>
-                    <option value="director" className="dark:bg-[#11221b] text-slate-900 dark:text-white">6. Director</option>
+                    <option value="asset_manager" className="dark:bg-[#11221b] text-slate-900 dark:text-white">4. Asset Manager</option>
+                    <option value="recruiter" className="dark:bg-[#11221b] text-slate-900 dark:text-white">5. Recruiter</option>
+                    <option value="branch_manager" className="dark:bg-[#11221b] text-slate-900 dark:text-white">6. Branch Manager</option>
+                    <option value="director" className="dark:bg-[#11221b] text-slate-900 dark:text-white">7. Director</option>
                   </select>
                 </div>
               </div>
@@ -5639,7 +5645,7 @@ export default function App() {
                             {spreadsheetId}
                           </span>
                         </div>
-                        {spreadsheetLink && (
+                        {spreadsheetLink && (portalUser?.role === 'admin' || portalUser?.role === 'super_admin') && (
                           <div className="flex justify-end pt-1">
                             <a
                               href={spreadsheetLink}
@@ -5861,6 +5867,12 @@ export default function App() {
                 <EmployeeLifecycleModule 
                   employees={filteredEmployees}
                   language={language} />
+              )}
+              {currentTab === 'asset_management' && (
+                <AssetManagementModule 
+                  employees={filteredEmployees}
+                  language={language}
+                  userRole={portalUser?.role || 'employee'} />
               )}
               {currentTab === 'exit_management' && (
                 <ExitManagementModule 

@@ -150,6 +150,18 @@ export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
   { id: 'photoUrl', label: 'Profile Photo', group: 'employment', isHidden: false, isMandatory: false },
 ];
 
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+  super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+  admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+  director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+  sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'leaves', 'notices_support'],
+  hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+  asset_manager: ['dashboard', 'asset_management', 'employees', 'notices_support'],
+  recruiter: ['dashboard', 'hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
+  branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
+  employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
+};
+
 export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   companyName: 'Rathi Buildmart',
   companyAddress: 'Karnataka, India',
@@ -220,16 +232,17 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
       name: 'Branch Manager',
       createdAt: '2026-07-15T00:00:00.000Z',
       branch: 'Bangalore HQ'
+    },
+    {
+      id: 'acc-4',
+      username: 'asset_mgr',
+      password: 'asset123',
+      role: 'asset_manager',
+      name: 'Asset & IT Manager',
+      createdAt: '2026-07-15T00:00:00.000Z'
     }
   ],
-  rolePermissions: {
-    admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-    director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-    sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'leaves', 'notices_support'],
-    hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-    branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
-    employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
-  },
+  rolePermissions: DEFAULT_ROLE_PERMISSIONS,
   enableEmployeePayslips: false,
   enableGeofencing: false,
   enableMobileAttendance: true,
@@ -940,20 +953,17 @@ export default function Settings({
   };
 
   const roleAccounts = localSettings.roleAccounts || [];
-  const rolePermissions = localSettings.rolePermissions || {
-    admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-    director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-    sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'leaves', 'notices_support'],
-    hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-    branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
-    employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
+  const rolePermissions = {
+    ...DEFAULT_ROLE_PERMISSIONS,
+    ...(localSettings.rolePermissions || {})
   };
 
   const PERMISSION_MODULES = [
     { id: 'dashboard', labelEn: 'System Dashboard', labelHi: "" },
     { id: 'employees', labelEn: 'Employee Registry', labelHi: "" },
     { id: 'hiring_onboarding', labelEn: 'Hiring & Onboarding', labelHi: "" },
-    { id: 'employee_lifecycle', labelEn: 'Lifecycle & Assets', labelHi: "" },
+    { id: 'employee_lifecycle', labelEn: 'Lifecycle & Progression', labelHi: "" },
+    { id: 'asset_management', labelEn: 'Asset Management', labelHi: "" },
     { id: 'attendance', labelEn: 'Attendance & Logs', labelHi: "" },
     { id: 'payroll', labelEn: 'Payroll & Payslips', labelHi: "" },
     { id: 'leaves', labelEn: 'Leaves & Holidays', labelHi: "" },
@@ -973,7 +983,8 @@ export default function Settings({
       if (modId === 'payroll') label = 'Calculate';
       if (modId === 'leaves') label = 'Add Holiday';
       if (modId === 'hiring_onboarding') label = 'Add Candidate';
-      if (modId === 'employee_lifecycle') label = 'Issue Asset';
+      if (modId === 'employee_lifecycle') label = 'Issue Item';
+      if (modId === 'asset_management') label = 'Add Asset';
       if (modId === 'exit_management') label = 'Add Exit';
       if (modId === 'ledger') label = 'Add Entry';
       if (modId === 'notices_support') label = 'Create Notice';
@@ -986,7 +997,8 @@ export default function Settings({
       if (modId === 'payroll') label = 'Adjust';
       if (modId === 'leaves') label = 'Edit Holiday';
       if (modId === 'hiring_onboarding') label = 'Update Stage';
-      if (modId === 'employee_lifecycle') label = 'Edit Asset';
+      if (modId === 'employee_lifecycle') label = 'Edit Record';
+      if (modId === 'asset_management') label = 'Assign Asset';
       if (modId === 'exit_management') label = 'Clearance';
       if (modId === 'notices_support') label = 'Edit Notice';
       if (modId === 'admin') label = 'Edit Config';
@@ -1000,7 +1012,8 @@ export default function Settings({
       if (modId === 'payroll') label = 'Mark Paid';
       if (modId === 'leaves') label = 'Delete Holiday';
       if (modId === 'hiring_onboarding') { id = 'approve'; label = 'Hire Candidate'; }
-      if (modId === 'employee_lifecycle') label = 'Revoke Asset';
+      if (modId === 'employee_lifecycle') label = 'End Promotion';
+      if (modId === 'asset_management') label = 'Return Asset';
       if (modId === 'exit_management') { id = 'approve'; label = 'Approve Exit'; }
       if (modId === 'notices_support') label = 'Delete Notice';
       if (modId === 'admin') label = 'Clear Logs';
@@ -1011,7 +1024,7 @@ export default function Settings({
 
   const handleToggleFineGrainedPermission = (role: string, modId: string, actionId: string) => {
     const updatedPermissions = { ...rolePermissions };
-    const currentList = [...(updatedPermissions[role] || [])];
+    const currentList = [...(updatedPermissions[role] || DEFAULT_ROLE_PERMISSIONS[role] || [])];
     const permKey = `${modId}:${actionId}`;
 
     let listWithFineGrained = [...currentList];
@@ -1044,8 +1057,29 @@ export default function Settings({
   };
 
   const isPermissionChecked = (role: string, modId: string, actionId: string) => {
-    const list = rolePermissions[role] || [];
+    const list = rolePermissions[role] || DEFAULT_ROLE_PERMISSIONS[role] || [];
     return list.includes(`${modId}:${actionId}`) || list.includes(modId);
+  };
+
+  const handleSelectAllForRole = (role: string) => {
+    const allModuleIds = PERMISSION_MODULES.map(m => m.id);
+    setLocalSettings({
+      ...localSettings,
+      rolePermissions: {
+        ...rolePermissions,
+        [role]: allModuleIds
+      }
+    });
+  };
+
+  const handleResetRolePermissions = (role: string) => {
+    setLocalSettings({
+      ...localSettings,
+      rolePermissions: {
+        ...rolePermissions,
+        [role]: DEFAULT_ROLE_PERMISSIONS[role] || []
+      }
+    });
   };
 
   const handleAddRoleAccount = () => {
@@ -2671,14 +2705,32 @@ export default function Settings({
 
               {/* 1. Permissions Matrix */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs font-sans">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    {'Granular Permission Matrix'}
-                  </h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
-                    {'Select a user role, then toggle checkboxes to configure granular action-level access (View, Add, Edit, Delete/Approve) for each page module.'}
-                  </p>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      {'Granular Permission Matrix'}
+                    </h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                      {'Select a user role, then toggle checkboxes to configure granular action-level access (View, Add, Edit, Delete/Approve) for each page module.'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllForRole(activeConfigRole)}
+                      className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                    >
+                      ✓ Select All Modules
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleResetRolePermissions(activeConfigRole)}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                    >
+                      ↺ Reset to Default
+                    </button>
+                  </div>
                 </div>
 
                 {/* Role Selector Tabs */}
@@ -2687,6 +2739,7 @@ export default function Settings({
                     { id: 'super_admin', label: 'Super Admin' },
                     { id: 'admin', label: 'Admin' },
                     { id: 'hr', label: 'HR Manager' },
+                    { id: 'asset_manager', label: 'Asset Manager' },
                     { id: 'recruiter', label: 'Recruiter' },
                     { id: 'branch_manager', label: 'Branch Manager' },
                     { id: 'director', label: 'Director' },
@@ -3012,9 +3065,10 @@ export default function Settings({
                         <option value="super_admin">{'1. Super Admin'}</option>
                         <option value="admin">{'2. Admin'}</option>
                         <option value="hr">{'3. HR'}</option>
-                        <option value="recruiter">{'4. Recruiter'}</option>
-                        <option value="branch_manager">{'5. Branch Manager'}</option>
-                        <option value="director">{'6. Director'}</option>
+                        <option value="asset_manager">{'4. Asset Manager'}</option>
+                        <option value="recruiter">{'5. Recruiter'}</option>
+                        <option value="branch_manager">{'6. Branch Manager'}</option>
+                        <option value="director">{'7. Director'}</option>
                       </select>
                     </div>
 
