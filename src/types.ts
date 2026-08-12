@@ -198,6 +198,8 @@ export interface AdminSettings {
   paidLeaveStartAfterMonths?: number;
   roleAccounts?: UserRoleAccount[];
   rolePermissions?: Record<string, string[]>;
+  roleColumnPermissions?: Record<string, string[]>;
+  customRoles?: CustomRole[];
   enableEmployeePayslips?: boolean;
   geofenceOutlets?: GeofenceOutlet[];
   enableGeofencing?: boolean;
@@ -598,6 +600,14 @@ export interface ExitRecord {
   createdDate: string;
 }
 
+export interface CustomRole {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  isCustom?: boolean;
+}
+
 export type UserRole = 
   | 'super_admin' 
   | 'admin' 
@@ -607,7 +617,8 @@ export type UserRole =
   | 'branch_manager' 
   | 'director' 
   | 'sub_admin' 
-  | 'employee';
+  | 'employee'
+  | (string & {});
 
 export interface PortalUser {
   id: string;

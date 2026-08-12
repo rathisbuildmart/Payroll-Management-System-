@@ -156,10 +156,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
   sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'leaves', 'notices_support'],
   hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-  asset_manager: ['dashboard', 'asset_management', 'employees', 'notices_support'],
-  recruiter: ['dashboard', 'hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
-  branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
-  employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
+  asset_manager: ['asset_management', 'employees', 'notices_support'],
+  recruiter: ['hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
+  branch_manager: ['employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
+  employee: ['attendance', 'leaves', 'notices_support']
 };
 
 export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
@@ -1103,8 +1103,8 @@ export default function Settings({
       email: newAccEmail.trim() || undefined,
       mobileNo: newAccMobileNo.trim() || undefined,
       role: newAccRole,
-      branch: (newAccRole === 'branch_manager' || newAccRole === 'director' || newAccRole === 'sub_admin') && newAccBranches.length > 0 ? newAccBranches[0] : undefined,
-      branches: (newAccRole === 'branch_manager' || newAccRole === 'director' || newAccRole === 'sub_admin') ? newAccBranches : undefined,
+      branch: newAccBranches.length > 0 ? newAccBranches[0] : undefined,
+      branches: newAccBranches.length > 0 ? newAccBranches : undefined,
       createdAt: new Date().toISOString()
     };
 
@@ -3072,7 +3072,7 @@ export default function Settings({
                       </select>
                     </div>
 
-                    {(newAccRole === 'branch_manager' || newAccRole === 'director' || newAccRole === 'sub_admin') && (
+                    {newAccRole !== 'super_admin' && (
                       <div className="space-y-2 border border-slate-100 p-2.5 rounded-lg bg-slate-50/50">
                         <label className="block text-slate-600 font-bold">
                           {'Restricted Branches'}
@@ -4021,8 +4021,8 @@ export default function Settings({
                         setEditingAccount({
                           ...editingAccount,
                           role: r,
-                          branches: (r === 'branch_manager' || r === 'director' || r === 'sub_admin') ? (editingAccount.branches || []) : undefined,
-                          branch: (r === 'branch_manager' || r === 'director' || r === 'sub_admin') ? (editingAccount.branches?.[0] || '') : undefined
+                          branches: editingAccount.branches || [],
+                          branch: editingAccount.branches?.[0] || ''
                         });
                       }}
                       className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-slate-700"
@@ -4032,10 +4032,12 @@ export default function Settings({
                       <option value="sub_admin">{'Sub Admin'}</option>
                       <option value="hr">{'HR Manager'}</option>
                       <option value="branch_manager">{'Branch Manager'}</option>
+                      <option value="asset_manager">{'Asset Manager'}</option>
+                      <option value="recruiter">{'Recruiter'}</option>
                     </select>
                   </div>
 
-                  {(editingAccount.role === 'branch_manager' || editingAccount.role === 'director' || editingAccount.role === 'sub_admin') && (
+                  {editingAccount.role !== 'super_admin' && (
                     <div className="space-y-2 border border-slate-100 p-2.5 rounded-lg bg-slate-50/50">
                       <label className="block text-slate-600 font-bold">
                         {'Restricted Branches'}

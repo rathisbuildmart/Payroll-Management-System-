@@ -1,4 +1,4 @@
-import { Employee, Attendance, PayrollRecord, AdminSettings, JobPosting, Candidate, CandidateFollowUp } from '../types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, JobPosting, Candidate, CandidateFollowUp, CompanyAsset } from '../types';
 
 const SPREADSHEET_NAME = 'Payroll_Management_System_Data';
 
@@ -764,6 +764,8 @@ export async function saveAdminSettings(spreadsheetId: string, settings: AdminSe
     ['itContactManager', settings.itContactManager || ''],
     ['roleAccounts', JSON.stringify(settings.roleAccounts || [])],
     ['rolePermissions', JSON.stringify(settings.rolePermissions || {})],
+    ['roleColumnPermissions', JSON.stringify(settings.roleColumnPermissions || {})],
+    ['customRoles', JSON.stringify(settings.customRoles || [])],
     ['enableEmployeePayslips', settings.enableEmployeePayslips ? 'TRUE' : 'FALSE'],
     ['enableGeofencing', settings.enableGeofencing ? 'TRUE' : 'FALSE'],
     ['enableMobileAttendance', settings.enableMobileAttendance !== false ? 'TRUE' : 'FALSE'],
@@ -833,7 +835,7 @@ export async function fetchAdminSettings(spreadsheetId: string, token: string): 
   const jsonFields = [
     'departments', 'branches', 'costCenters', 'employeeGroups',
     'workTimings', 'weeklyOffProfiles', 'leaveTypes', 'fields', 'holidays',
-    'roleAccounts', 'rolePermissions', 'geofenceOutlets', 'whatsappTemplates', 'emailTemplates'
+    'roleAccounts', 'rolePermissions', 'roleColumnPermissions', 'customRoles', 'geofenceOutlets', 'whatsappTemplates', 'emailTemplates'
   ];
 
   dataRows.forEach((row: any[]) => {
@@ -1039,5 +1041,145 @@ export async function syncRecruitmentToSheets(
       success: false,
       message: e.message || 'Failed to sync recruitment data to Google Sheets.'
     };
+  }
+}
+
+/**
+ * Company Assets Sheet Sync & Fetch
+ */
+export async function syncAssetsToSheets(
+  spreadsheetId: string,
+  token: string,
+  assets: CompanyAsset[]
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
+    const metaRes = await fetch(metaUrl, { headers: { Authorization: `Bearer ${token}` } });
+    if (!metaRes.ok) {
+      throw new Error('Failed to retrieve spreadsheet metadata');
+    }
+
+    const metaData = await metaRes.json();
+    const existingTitles: string[] = metaData.sheets?.map((s: any) => s.properties?.title) || [];
+
+    if (!existingTitles.includes('Company_Assets')) {
+      const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+      await fetch(updateUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requests: [{ addSheet: { properties: { title: 'Company_Assets' } } }]
+        })
+      });
+    }
+
+    const headers = [
+      'Asset ID', 'Asset Tag Code', 'Asset Name', 'Category', 'Serial Number',
+      'Brand', 'Model', 'Branch Location', 'Assigned Emp ID', 'Assigned Emp Name',
+      'Assigned Date', 'Expected Return Date', 'Condition', 'Status',
+      'Purchase Date', 'Purchase Price', 'Warranty Expiry', 'Vendor Name', 'Notes'
+    ];
+
+    const rows = assets.map(a => [
+      a.id,
+      a.assetTag || '',
+      a.name || '',
+      a.category || '',
+      a.serialNumber || '',
+      a.brand || '',
+      a.model || '',
+      a.branch || 'Head Office',
+      a.assignedToEmployeeId || '',
+      a.assignedToEmployeeName || '',
+      a.assignedDate || '',
+      a.expectedReturnDate || '',
+      a.condition || 'Good',
+      a.status || 'Available',
+      a.purchaseDate || '',
+      a.purchasePrice || 0,
+      a.warrantyExpiryDate || '',
+      a.vendorName || '',
+      a.notes || ''
+    ]);
+
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Company_Assets!A1:Z5000:clear`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`;
+    const payload = {
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        { range: `Company_Assets!A1:S${rows.length + 1}`, values: [headers, ...rows] }
+      ]
+    };
+
+    const saveRes = await fetch(batchUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!saveRes.ok) {
+      const errText = await saveRes.text();
+      throw new Error(`Google Sheets API Error: ${errText}`);
+    }
+
+    return {
+      success: true,
+      message: `Successfully synced ${assets.length} Company Assets to Google Sheet (Company_Assets tab)!`
+    };
+  } catch (e: any) {
+    console.error('Company Assets Google Sheet Sync Error:', e);
+    return {
+      success: false,
+      message: e.message || 'Failed to sync company assets to Google Sheet.'
+    };
+  }
+}
+
+export async function fetchAssetsFromSheets(
+  spreadsheetId: string,
+  token: string
+): Promise<CompanyAsset[]> {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Company_Assets!A2:Z5000`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const rows: string[][] = data.values || [];
+
+    return rows.map((row) => ({
+      id: row[0] || `AST-${Math.floor(Math.random() * 10000)}`,
+      assetTag: row[1] || '',
+      name: row[2] || '',
+      category: (row[3] as any) || 'Other',
+      serialNumber: row[4] || '',
+      brand: row[5] || '',
+      model: row[6] || '',
+      branch: row[7] || '',
+      assignedToEmployeeId: row[8] || undefined,
+      assignedToEmployeeName: row[9] || undefined,
+      assignedDate: row[10] || undefined,
+      expectedReturnDate: row[11] || undefined,
+      condition: (row[12] as any) || 'Good',
+      status: (row[13] as any) || 'Available',
+      purchaseDate: row[14] || undefined,
+      purchasePrice: row[15] ? parseFloat(row[15].replace(/[^0-9.]/g, '')) : undefined,
+      warrantyExpiryDate: row[16] || undefined,
+      vendorName: row[17] || undefined,
+      notes: row[18] || undefined
+    }));
+  } catch (e) {
+    console.error('Failed to fetch assets from Google Sheet:', e);
+    return [];
   }
 }

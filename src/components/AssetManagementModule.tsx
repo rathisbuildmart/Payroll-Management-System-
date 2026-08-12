@@ -33,23 +33,52 @@ import {
   ShieldCheck,
   Check,
   X,
-  Boxes
+  Boxes,
+  Building2
 } from 'lucide-react';
-import { CompanyAsset, Employee, AssetMaintenanceLog, AssetAllocationHistory, UserRole } from '../types';
+import { CompanyAsset, Employee, AssetMaintenanceLog, AssetAllocationHistory, UserRole, PortalUser, AdminSettings } from '../types';
+import { syncAssetsToSheets, fetchAssetsFromSheets } from '../services/sheets';
 
 interface AssetManagementModuleProps {
   employees: Employee[];
   language?: 'en' | 'hi';
   userRole?: UserRole;
+  portalUser?: PortalUser | null;
+  adminSettings?: AdminSettings;
+  spreadsheetId?: string | null;
+  googleToken?: string | null;
 }
 
-export default function AssetManagementModule({ employees, language = 'en', userRole = 'super_admin' }: AssetManagementModuleProps) {
+export default function AssetManagementModule({ 
+  employees, 
+  language = 'en', 
+  userRole = 'super_admin',
+  portalUser,
+  adminSettings,
+  spreadsheetId,
+  googleToken
+}: AssetManagementModuleProps) {
   const [activeTab, setActiveTab] = useState<'inventory' | 'allocations' | 'maintenance' | 'history' | 'analytics'>('inventory');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedCondition, setSelectedCondition] = useState<string>('All');
+  const [selectedBranch, setSelectedBranch] = useState<string>('All');
+  const [isSyncingSheet, setIsSyncingSheet] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
+  // User's restricted branches
+  const userBranches = useMemo(() => {
+    if (!portalUser) return [];
+    if (portalUser.role === 'super_admin' || (portalUser.role === 'admin' && !portalUser.branch && (!portalUser.branches || portalUser.branches.length === 0))) {
+      return [];
+    }
+    if (portalUser.branches && portalUser.branches.length > 0) return portalUser.branches;
+    if (portalUser.branch) return [portalUser.branch];
+    if (portalUser.employee?.branch) return [portalUser.employee.branch];
+    return [];
+  }, [portalUser]);
 
   // Modals state
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -246,6 +275,59 @@ export default function AssetManagementModule({ employees, language = 'en', user
     localStorage.setItem('payroll_company_assets', JSON.stringify(assets));
   }, [assets]);
 
+  // Unique branches list
+  const branchOptions = useMemo(() => {
+    const list = new Set<string>();
+    if (adminSettings?.branches) {
+      adminSettings.branches.forEach(b => list.add(b));
+    }
+    employees.forEach(e => {
+      if (e.branch) list.add(e.branch);
+    });
+    assets.forEach(a => {
+      if (a.branch) list.add(a.branch);
+    });
+    return Array.from(list).sort();
+  }, [adminSettings, employees, assets]);
+
+  // Default selected branch if user has restricted branches
+  useEffect(() => {
+    if (userBranches.length > 0) {
+      setSelectedBranch(userBranches[0]);
+    }
+  }, [userBranches]);
+
+  // Initial fetch from Google Sheet if connected
+  useEffect(() => {
+    if (spreadsheetId && googleToken) {
+      fetchAssetsFromSheets(spreadsheetId, googleToken).then(remoteAssets => {
+        if (remoteAssets && remoteAssets.length > 0) {
+          setAssets(remoteAssets);
+        }
+      }).catch(err => console.error('Error fetching assets from Google Sheet:', err));
+    }
+  }, [spreadsheetId, googleToken]);
+
+  // Google Sheet Sync Handler
+  const handleSyncToGoogleSheet = async () => {
+    if (!spreadsheetId || !googleToken) {
+      alert('Google Sheet is not connected or session expired. Please connect Google Account in settings.');
+      return;
+    }
+    setIsSyncingSheet(true);
+    setSyncStatusMsg('Syncing company assets to Google Sheet...');
+    try {
+      const res = await syncAssetsToSheets(spreadsheetId, googleToken, assets);
+      setSyncStatusMsg(res.message);
+      alert(res.message);
+    } catch (err: any) {
+      setSyncStatusMsg(err.message || 'Sync failed');
+      alert('Error syncing to Google Sheet: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsSyncingSheet(false);
+    }
+  };
+
   // Key Statistics
   const totalAssetsCount = assets.length;
   const totalValuation = assets.reduce((sum, a) => sum + (a.purchasePrice || 0), 0);
@@ -275,9 +357,16 @@ export default function AssetManagementModule({ employees, language = 'en', user
       const matchesStatus = selectedStatus === 'All' || asset.status === selectedStatus;
       const matchesCondition = selectedCondition === 'All' || asset.condition === selectedCondition;
 
-      return matchesSearch && matchesCategory && matchesStatus && matchesCondition;
+      // Branch matching logic
+      const assetBranch = (asset.branch || (asset.assignedToEmployeeId ? employees.find(e => e.id === asset.assignedToEmployeeId)?.branch : '') || 'Head Office').trim();
+      const matchesBranch = selectedBranch === 'All' || assetBranch.toLowerCase() === selectedBranch.trim().toLowerCase();
+
+      // User restricted branches logic
+      const matchesUserBranch = userBranches.length === 0 || userBranches.some(ub => ub.trim().toLowerCase() === assetBranch.toLowerCase());
+
+      return matchesSearch && matchesCategory && matchesStatus && matchesCondition && matchesBranch && matchesUserBranch;
     });
-  }, [assets, searchTerm, selectedCategory, selectedStatus, selectedCondition]);
+  }, [assets, searchTerm, selectedCategory, selectedStatus, selectedCondition, selectedBranch, userBranches, employees]);
 
   // Category Icon helper
   const getCategoryIcon = (category: CompanyAsset['category']) => {
@@ -338,6 +427,7 @@ export default function AssetManagementModule({ employees, language = 'en', user
       serialNumber: newAsset.serialNumber,
       brand: newAsset.brand || '',
       model: newAsset.model || '',
+      branch: newAsset.branch || (userBranches.length > 0 ? userBranches[0] : (branchOptions[0] || 'Head Office')),
       purchaseDate: newAsset.purchaseDate || new Date().toISOString().split('T')[0],
       purchasePrice: Number(newAsset.purchasePrice) || 0,
       warrantyExpiryDate: newAsset.warrantyExpiryDate || '',
@@ -535,6 +625,14 @@ export default function AssetManagementModule({ employees, language = 'en', user
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
+              onClick={handleSyncToGoogleSheet}
+              disabled={isSyncingSheet}
+              className="px-3.5 py-2.5 bg-emerald-700/80 hover:bg-emerald-600 text-white border border-emerald-400/40 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 active:scale-95"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+              {isSyncingSheet ? 'Syncing...' : 'Sync to Google Sheet'}
+            </button>
+            <button
               onClick={exportCSV}
               className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs hover:shadow-md cursor-pointer"
             >
@@ -693,7 +791,7 @@ export default function AssetManagementModule({ employees, language = 'en', user
         {activeTab === 'inventory' && (
           <div className="space-y-4">
             {/* Search & Filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-900/50 p-3.5 rounded-xl border border-slate-100 dark:border-[#1e3a2f]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-slate-50 dark:bg-slate-900/50 p-3.5 rounded-xl border border-slate-100 dark:border-[#1e3a2f]">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                 <input
@@ -703,6 +801,20 @@ export default function AssetManagementModule({ employees, language = 'en', user
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-white dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
                 />
+              </div>
+
+              <div>
+                <select
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  disabled={userBranches.length > 0}
+                  className="w-full px-3 py-2 bg-white dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none disabled:opacity-75 cursor-pointer"
+                >
+                  {userBranches.length === 0 && <option value="All">All Branches</option>}
+                  {(userBranches.length > 0 ? userBranches : branchOptions).map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -790,6 +902,13 @@ export default function AssetManagementModule({ employees, language = 'en', user
 
                       {/* Specs / Meta */}
                       <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800/80 text-[11px] space-y-1.5 font-sans">
+                        <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                          <span>Branch Location:</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            <Building2 className="w-3 h-3 text-emerald-500" />
+                            {asset.branch || (asset.assignedToEmployeeId ? employees.find(e => e.id === asset.assignedToEmployeeId)?.branch : '') || 'Head Office'}
+                          </span>
+                        </div>
                         <div className="flex justify-between text-slate-500 dark:text-slate-400">
                           <span>Serial / IMEI:</span>
                           <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{asset.serialNumber}</span>
@@ -912,6 +1031,7 @@ export default function AssetManagementModule({ employees, language = 'en', user
                   <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 uppercase font-mono text-[10px] tracking-wider border-b border-slate-200 dark:border-[#1e3a2f]">
                     <tr>
                       <th className="py-3.5 px-4">Tag & Name</th>
+                      <th className="py-3.5 px-4">Branch</th>
                       <th className="py-3.5 px-4">Category</th>
                       <th className="py-3.5 px-4">Serial / IMEI</th>
                       <th className="py-3.5 px-4">Valuation</th>
@@ -934,6 +1054,9 @@ export default function AssetManagementModule({ employees, language = 'en', user
                               <span className="font-extrabold text-slate-900 dark:text-slate-100">{asset.name}</span>
                             </div>
                           </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-extrabold text-emerald-600 dark:text-emerald-400">
+                          {asset.branch || (asset.assignedToEmployeeId ? employees.find(e => e.id === asset.assignedToEmployeeId)?.branch : '') || 'Head Office'}
                         </td>
                         <td className="py-3.5 px-4 font-bold text-slate-700 dark:text-slate-300">{asset.category}</td>
                         <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-400">{asset.serialNumber}</td>
@@ -1249,6 +1372,21 @@ export default function AssetManagementModule({ employees, language = 'en', user
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl font-mono font-bold"
                   />
                 </div>
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">Branch Location *</label>
+                  <select
+                    value={newAsset.branch || (userBranches.length > 0 ? userBranches[0] : (branchOptions[0] || 'Head Office'))}
+                    onChange={(e) => setNewAsset({ ...newAsset, branch: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl font-bold"
+                  >
+                    {(userBranches.length > 0 ? userBranches : branchOptions).map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">Asset Category *</label>
                   <select

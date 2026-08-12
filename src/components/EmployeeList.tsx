@@ -53,6 +53,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   };
 
   const isRecruiter = portalUser?.role === 'recruiter';
+  const isAssetManager = portalUser?.role === 'asset_manager';
 
   const hasPermission = (action: 'view' | 'add' | 'edit' | 'delete') => {
     if (isRecruiter && action === 'delete') return false;
@@ -86,21 +87,28 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       { key: 'gpsAndMobile', labelEn: 'GPS & Mobile Attendance', labelHi: "", default: true, restricted: true },
     ];
     if (isRecruiter) {
-      return cols.filter(c => !c.restricted);
+      return cols.filter(c => !['salary', 'paymentMethod', 'status', 'bankDetails', 'identityDetails', 'pfEsicDetails', 'gpsAndMobile'].includes(c.key));
+    }
+    if (isAssetManager) {
+      return cols.filter(c => !['joiningDate', 'salary', 'paymentMethod', 'bankDetails', 'identityDetails', 'pfEsicDetails'].includes(c.key));
     }
     return cols;
-  }, [isRecruiter]);
+  }, [isRecruiter, isAssetManager]);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     ALL_COLUMNS.filter(c => c.default).map(c => c.key)
   );
 
   const activeVisibleColumns = useMemo(() => {
+    let cols = visibleColumns;
     if (isRecruiter) {
-      return visibleColumns.filter(col => !['salary', 'paymentMethod', 'status', 'bankDetails', 'identityDetails', 'pfEsicDetails', 'gpsAndMobile'].includes(col));
+      cols = cols.filter(col => !['salary', 'paymentMethod', 'status', 'bankDetails', 'identityDetails', 'pfEsicDetails', 'gpsAndMobile'].includes(col));
     }
-    return visibleColumns;
-  }, [visibleColumns, isRecruiter]);
+    if (isAssetManager) {
+      cols = cols.filter(col => !['joiningDate', 'salary', 'paymentMethod', 'bankDetails', 'identityDetails', 'pfEsicDetails'].includes(col));
+    }
+    return cols;
+  }, [visibleColumns, isRecruiter, isAssetManager]);
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
 
   //CSV Bulk Import States
@@ -1007,12 +1015,12 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       emp.name || '',
       emp.department || '',
       emp.designation || '',
-      emp.joiningDate || '',
-      emp.basicSalary ?? '',
-      emp.allowances ?? '',
-      emp.deductions ?? '',
-      emp.hourlyRate ?? '',
-      emp.paymentMethod || 'Bank Transfer',
+      isAssetManager ? '' : (emp.joiningDate || ''),
+      isAssetManager || isRecruiter ? '' : (emp.basicSalary ?? ''),
+      isAssetManager || isRecruiter ? '' : (emp.allowances ?? ''),
+      isAssetManager || isRecruiter ? '' : (emp.deductions ?? ''),
+      isAssetManager || isRecruiter ? '' : (emp.hourlyRate ?? ''),
+      isAssetManager || isRecruiter ? '' : (emp.paymentMethod || 'Bank Transfer'),
       emp.isActive !== false ? 'true' : 'false',
       emp.firstName || '',
       emp.lastName || '',
@@ -2530,7 +2538,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5">
                       Employment Detail
                     </h4>
-                    {renderFormInput('joiningDate', t.fieldJoining, 'date')}
+                    {!isAssetManager && renderFormInput('joiningDate', t.fieldJoining, 'date')}
                     {renderFormInput('confirmationDate', 'Confirmation Date', 'date')}
                     {renderFormInput('designation', t.fieldRole)}
                     {renderFormInput('department', t.fieldDept, 'text', adminSettings?.departments || DEPARTMENTS)}
@@ -2546,7 +2554,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                   </div>
 
                   {/* Category Card: Standard Salary & Payroll info */}
-                  {!isRecruiter && (
+                  {!isRecruiter && !isAssetManager && (
                     <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-3">
                       <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5">
                         Salary Structure & Payroll
@@ -2959,9 +2967,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                           <th className="py-2 px-3">{t.colId}</th>
                           <th className="py-2 px-3">{t.colName}</th>
                           <th className="py-2 px-3">{t.colRole}</th>
-                          <th className="py-2 px-3">{t.colJoining}</th>
-                          <th className="py-2 px-3 text-right">{t.colSalary}</th>
-                          <th className="py-2 px-3">{t.colPayment}</th>
+                          {!isAssetManager && <th className="py-2 px-3">{t.colJoining}</th>}
+                          {!isAssetManager && !isRecruiter && <th className="py-2 px-3 text-right">{t.colSalary}</th>}
+                          {!isAssetManager && !isRecruiter && <th className="py-2 px-3">{t.colPayment}</th>}
                           <th className="py-2 px-3 text-center">{t.colStatus}</th>
                         </tr>
                       </thead>
@@ -2973,9 +2981,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                             <td className="py-2 px-3 text-gray-600">
                               {emp.designation} <span className="text-gray-400 text-[10px]">({emp.department})</span>
                             </td>
-                            <td className="py-2 px-3 font-mono text-gray-500 text-[10px]">{emp.joiningDate}</td>
-                            <td className="py-2 px-3 text-right text-gray-900 font-bold">₹{emp.basicSalary.toLocaleString('en-IN')}</td>
-                            <td className="py-2 px-3 text-gray-600">{emp.paymentMethod}</td>
+                            {!isAssetManager && <td className="py-2 px-3 font-mono text-gray-500 text-[10px]">{emp.joiningDate}</td>}
+                            {!isAssetManager && !isRecruiter && <td className="py-2 px-3 text-right text-gray-900 font-bold">₹{emp.basicSalary.toLocaleString('en-IN')}</td>}
+                            {!isAssetManager && !isRecruiter && <td className="py-2 px-3 text-gray-600">{emp.paymentMethod}</td>}
                             <td className="py-2 px-3 text-center">
                               <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
                                 emp.isActive 

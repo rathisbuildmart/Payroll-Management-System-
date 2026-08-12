@@ -7,7 +7,7 @@ import {
   Bell, KeyRound, LifeBuoy, CheckCircle2, Lock, Unlock, UserCheck, UserX, X
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Employee, Attendance, PayrollRecord, FailedLoginAttempt, LeaveRequest, JobPosting, Candidate, OfferLetter, ExitRecord, getCurrentBasicSalary } from '../types';
+import { Employee, Attendance, PayrollRecord, FailedLoginAttempt, LeaveRequest, JobPosting, Candidate, OfferLetter, ExitRecord, getCurrentBasicSalary, PortalUser } from '../types';
 
 interface DashboardProps {
   employees: Employee[];
@@ -23,6 +23,7 @@ interface DashboardProps {
   leaveRequests?: LeaveRequest[];
   onUpdateLeaveRequestStatus?: (id: string, status: 'Approved' | 'Rejected', remarks?: string) => Promise<void> | void;
   userRole?: string;
+  portalUser?: PortalUser | null;
 }
 
 export default function Dashboard({ 
@@ -38,7 +39,8 @@ export default function Dashboard({
   onUpdateEmployee,
   leaveRequests = [],
   onUpdateLeaveRequestStatus,
-  userRole
+  userRole,
+  portalUser
 }: DashboardProps) {
   //Recruitment data for dedicated Recruiter Role Dashboard
   const recruitmentData = useMemo(() => {
@@ -106,11 +108,18 @@ export default function Dashboard({
   //Real-time Dashboard Filters State
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
   const [selectedDept, setSelectedDept] = useState<string>('All');
-  const [selectedBranch, setSelectedBranch] = useState<string>('All');
+  const userBranchDefault = portalUser?.branches?.[0] || portalUser?.branch || portalUser?.employee?.branch || 'All';
+  const [selectedBranch, setSelectedBranch] = useState<string>(userBranchDefault);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('All');
   const [isLeaveApprovalModalOpen, setIsLeaveApprovalModalOpen] = useState(false);
   const [isDeviceApprovalModalOpen, setIsDeviceApprovalModalOpen] = useState(false);
   const [activeDeviceTab, setActiveDeviceTab] = useState<'All' | 'Locks' | 'Registrations' | 'Logins'>('All');
+
+  React.useEffect(() => {
+    if (userBranchDefault && userBranchDefault !== 'All') {
+      setSelectedBranch(userBranchDefault);
+    }
+  }, [userBranchDefault]);
 
   const pendingPasswordReqs = useMemo(() => {
     if (userRole === 'recruiter') {

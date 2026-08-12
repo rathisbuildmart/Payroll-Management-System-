@@ -341,24 +341,18 @@ export default function App() {
     setPortalUser(updatedUser);
     localStorage.setItem('payroll_portal_user', JSON.stringify(updatedUser));
 
-    const defaultRolePermissions: Record<string, string[]> = {
-      super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-      admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-      director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-      sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'leaves', 'notices_support'],
-      hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-      asset_manager: ['dashboard', 'asset_management', 'employees', 'notices_support'],
-      recruiter: ['dashboard', 'hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
-      branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
-      employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
-    };
-
-    const allowed = (newRole === 'super_admin' || newRole === 'admin')
+    const allowed = (newRole === 'super_admin')
       ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
-      : (adminSettings.rolePermissions?.[newRole] ?? defaultRolePermissions[newRole] ?? []);
+      : (adminSettings.rolePermissions?.[newRole] ?? DEFAULT_ROLE_PERMISSIONS[newRole] ?? []);
 
-    if (!allowed.includes(currentTab)) {
-      setCurrentTab((allowed[0] as any) || 'dashboard');
+    const isTabAllowed = (tabId: string) => allowed.includes(tabId) || allowed.includes(`${tabId}:view`);
+
+    if (!isTabAllowed(currentTab)) {
+      const allTabs = ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support', 'admin'] as const;
+      const firstAllowedTab = allTabs.find(tab => isTabAllowed(tab));
+      if (firstAllowedTab) {
+        setCurrentTab(firstAllowedTab);
+      }
     }
   };
 
@@ -1048,16 +1042,18 @@ export default function App() {
 
   //Auto-redirect to first allowed tab based on user role permissions
   useEffect(() => {
-    if (!portalUser || portalUser.role === 'employee') return;
+    if (!portalUser) return;
     
-    const allowed = (portalUser.role === 'admin' || portalUser.role === 'super_admin')
+    const userRole = portalUser.role || 'employee';
+    const allowed = (userRole === 'super_admin')
       ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
-      : adminSettings.rolePermissions?.[portalUser.role] || DEFAULT_ROLE_PERMISSIONS[portalUser.role] || [];
+      : adminSettings.rolePermissions?.[userRole] || DEFAULT_ROLE_PERMISSIONS[userRole] || [];
       
-    const hasAccess = portalUser.role === 'admin' || allowed.includes(currentTab) || allowed.some(p => p.startsWith(currentTab + ':'));
-    if (!hasAccess && allowed.length > 0) {
-      const allTabs = ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin'] as const;
-      const firstAllowedTab = allTabs.find(tab => allowed.includes(tab) || allowed.some(p => p.startsWith(tab + ':')));
+    const isAllowed = (tabId: string) => allowed.includes(tabId) || allowed.includes(`${tabId}:view`);
+    
+    if (!isAllowed(currentTab) && allowed.length > 0) {
+      const allTabs = ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support', 'admin'] as const;
+      const firstAllowedTab = allTabs.find(tab => isAllowed(tab));
       if (firstAllowedTab) {
         setCurrentTab(firstAllowedTab);
       }
@@ -4760,21 +4756,11 @@ export default function App() {
   const renderSidebarContent = (isMobile: boolean) => {
     const showExpanded = isMobile || isSidebarHovered;
     const userRole = portalUser?.role || 'employee';
-    const defaultRolePermissions: Record<string, string[]> = {
-      super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-      admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
-      director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-      sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'leaves', 'notices_support'],
-      hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
-      asset_manager: ['dashboard', 'asset_management', 'employees', 'notices_support'],
-      recruiter: ['dashboard', 'hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
-      branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
-      employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
-    };
-
-    const allowedTabs = (userRole === 'super_admin' || userRole === 'admin')
+    const allowed = (userRole === 'super_admin')
       ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
-      : (adminSettings.rolePermissions?.[userRole] ?? defaultRolePermissions[userRole] ?? []);
+      : (adminSettings.rolePermissions?.[userRole] ?? DEFAULT_ROLE_PERMISSIONS[userRole] ?? []);
+
+    const isTabAllowed = (tabId: string) => allowed.includes(tabId) || allowed.includes(`${tabId}:view`);
 
     const isPasswordGatewayAllowed = ['super_admin', 'admin', 'hr', 'sub_admin', 'director'].includes(userRole);
     const isTicketsAllowed = userRole !== 'recruiter';
@@ -4796,32 +4782,32 @@ export default function App() {
       { id: 'ledger' as const, label: uiTexts.ledger, icon: FileSpreadsheet },
       { id: 'notices_support' as const, label: userRole === 'recruiter' ? ('Company Notices & Circulars') : ('Notices & HR Support Helpdesk'), icon: Megaphone },
       { id: 'admin' as const, label: uiTexts.adminSettings, icon: SettingsIcon },
-    ].filter(item => allowedTabs.includes(item.id) || allowedTabs.some(p => p.startsWith(item.id + ':')));
+    ].filter(item => isTabAllowed(item.id));
 
     return (
       <div className="flex flex-col h-full justify-between w-full select-none">
         <div className={`flex flex-col ${showExpanded ? 'items-start w-full' : 'items-center'}`}>
           {/* Header & Logo */}
-          <div className="flex items-center justify-between w-full mb-8">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 active:scale-95 hover:rotate-3 transition-all duration-300 cursor-pointer relative group border border-emerald-500/20 shadow-emerald-950/20 shrink-0 overflow-hidden">
+          <div className="flex items-center justify-between w-full mb-5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-md transform hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer relative group border border-emerald-500/20 shadow-emerald-950/20 shrink-0 overflow-hidden">
                 <img 
                   src={getDirectImageUrl(adminSettings.companyLogo)} 
                   alt={adminSettings.companyName || 'Rathi Buildmart'} 
                   className="w-full h-full object-cover" 
                   referrerPolicy="no-referrer" />
                 {!showExpanded && (
-                  <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-2 rounded-xl shadow-xl pointer-events-none z-50 text-[11px] font-bold whitespace-nowrap">
+                  <div className="absolute left-14 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 px-2 py-1 rounded-lg shadow-xl pointer-events-none z-50 text-[10px] font-bold whitespace-nowrap">
                     {uiTexts.appName}
                   </div>
                 )}
               </div>
               {showExpanded && (
                 <div className="flex flex-col min-w-0 animate-fadeIn">
-                  <span className="text-[12px] font-black tracking-wider text-white uppercase font-sans truncate">
+                  <span className="text-[11px] font-black tracking-wider text-white uppercase font-sans truncate">
                     {adminSettings.companyName || 'RATHI MART'}
                   </span>
-                  <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest font-mono truncate">
+                  <span className="text-[8.5px] font-bold text-emerald-400 uppercase tracking-widest font-mono truncate">
                     {uiTexts.appName}
                   </span>
                 </div>
@@ -4832,15 +4818,15 @@ export default function App() {
             {isMobile && (
               <button 
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="p-1.5 rounded-xl bg-emerald-950/50 border border-emerald-500/20 text-emerald-400 hover:text-white"
+                className="p-1 rounded-lg bg-emerald-950/50 border border-emerald-500/20 text-emerald-400 hover:text-white cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
           {/* Tabs */}
-          <nav className={`flex flex-col ${showExpanded ? 'items-start w-full gap-2' : 'items-center gap-4'}`}>
+          <nav className={`flex flex-col ${showExpanded ? 'items-start w-full gap-1.5' : 'items-center gap-1.5'}`}>
             {tabs.map((item) => {
               const IconComponent = item.icon;
               const isActive = currentTab === item.id;
@@ -4856,37 +4842,37 @@ export default function App() {
                             setIsMobileMenuOpen(false);
                           }
                         }}
-                        className={`flex items-center rounded-2xl transition-all duration-300 cursor-pointer relative ${
-                          showExpanded ? 'w-full h-11 px-3 justify-start gap-3' : 'w-12 h-12 justify-center'
+                        className={`flex items-center rounded-xl transition-all duration-200 cursor-pointer relative ${
+                          showExpanded ? 'w-full h-9.5 px-2.5 justify-start gap-2.5' : 'w-10 h-10 justify-center'
                         } ${
                           isActive
-                            ? 'bg-emerald-500/15 text-[#10b981] shadow-[0_0_15px_rgba(16,185,129,0.12)] border border-emerald-500/30'
+                            ? 'bg-emerald-500/15 text-[#10b981] shadow-[0_0_12px_rgba(16,185,129,0.12)] border border-emerald-500/30 font-bold'
                             : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
                         }`}
                         id={`tab-${item.id}`}
                       >
                         {isActive && (
-                          <span className={`absolute left-0 w-1 bg-[#10b981] rounded-r-full shadow-[0_0_8px_#10b981] ${
-                            showExpanded ? 'h-4' : 'h-5'
+                          <span className={`absolute left-0 w-1 bg-[#10b981] rounded-r-full shadow-[0_0_6px_#10b981] ${
+                            showExpanded ? 'h-3.5' : 'h-4'
                           }`} />
                         )}
                         <div className="relative flex items-center justify-center shrink-0">
-                          <IconComponent className="w-5 h-5" />
+                          <IconComponent className="w-[18px] h-[18px]" />
                           {!showExpanded && totalPending > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 ring-2 ring-slate-950 flex items-center justify-center text-[8px] text-white font-black animate-pulse">
+                            <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-rose-500 ring-2 ring-slate-950 flex items-center justify-center text-[7.5px] text-white font-black animate-pulse">
                               {totalPending}
                             </span>
                           )}
                         </div>
                         {showExpanded && (
-                          <div className="flex items-center justify-between w-full min-w-0 pr-1 gap-2">
-                            <span className="text-[11px] font-bold tracking-wide whitespace-nowrap animate-fadeIn truncate">
+                          <div className="flex items-center justify-between w-full min-w-0 pr-0.5 gap-2">
+                            <span className="text-[10.5px] font-bold tracking-wide whitespace-nowrap animate-fadeIn truncate">
                               {item.label}
                             </span>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <Bell className={`w-3.5 h-3.5 ${totalPending > 0 ? 'text-rose-500 animate-pulse' : 'text-slate-500'}`} />
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Bell className={`w-3 h-3 ${totalPending > 0 ? 'text-rose-500 animate-pulse' : 'text-slate-500'}`} />
                               {totalPending > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black animate-pulse leading-none">
+                                <span className="px-1.5 py-0.25 rounded-full bg-rose-500 text-white text-[8px] font-black animate-pulse leading-none">
                                   {totalPending}
                                 </span>
                               )}
@@ -4895,7 +4881,7 @@ export default function App() {
                         )}
                       </button>
                       {!showExpanded && (
-                        <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+                        <div className="absolute left-14 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[9.5px] font-bold px-2 py-1 rounded-md whitespace-nowrap shadow-xl pointer-events-none z-50">
                           {item.label}
                         </div>
                       )}
@@ -4903,7 +4889,7 @@ export default function App() {
 
                     {/* SUB-MENU: Only when notices_support and showExpanded */}
                     {showExpanded && (
-                      <div className={`w-full flex-col gap-1.5 pl-4 ml-4.5 border-l border-emerald-500/20 mt-1.5 mb-1.5 animate-fadeIn ${isActive ? 'flex' : 'hidden group-hover:flex'}`}>
+                      <div className={`w-full flex-col gap-1 pl-3 ml-3 border-l border-emerald-500/20 mt-1 mb-1 animate-fadeIn ${isActive ? 'flex' : 'hidden group-hover:flex'}`}>
                         {/* Sub-item: Manage Announcements */}
                         <button
                           onClick={() => {
@@ -4912,19 +4898,19 @@ export default function App() {
                               setIsMobileMenuOpen(false);
                             }
                           }}
-                          className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
+                          className={`flex items-center justify-between w-full h-7.5 px-2 rounded-lg transition-all duration-200 text-left ${
                             isActive && activeNoticeSubTab === 'announcements'
                               ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
                               : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Megaphone className="w-3.5 h-3.5 shrink-0" />
-                            <span className="text-[10px] font-bold truncate">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Megaphone className="w-3 h-3 shrink-0" />
+                            <span className="text-[9.5px] font-semibold truncate">
                               {'Manage Announcements'}
                             </span>
                           </div>
-                          <span className="px-1.5 py-0.25 text-[8px] font-bold rounded-full bg-slate-800 text-slate-300 font-mono">
+                          <span className="px-1.5 py-0.25 text-[7.5px] font-bold rounded-full bg-slate-800 text-slate-300 font-mono">
                             {announcements.length}
                           </span>
                         </button>
@@ -4938,20 +4924,20 @@ export default function App() {
                                 setIsMobileMenuOpen(false);
                               }
                             }}
-                            className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
+                            className={`flex items-center justify-between w-full h-7.5 px-2 rounded-lg transition-all duration-200 text-left ${
                               isActive && activeNoticeSubTab === 'passwords'
                                 ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
                                 : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
                             }`}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <KeyRound className="w-3.5 h-3.5 shrink-0" />
-                              <span className="text-[10px] font-bold truncate">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <KeyRound className="w-3 h-3 shrink-0" />
+                              <span className="text-[9.5px] font-semibold truncate">
                                 {'Forgot Password Gateways'}
                               </span>
                             </div>
                             {pendingPasswordRequests > 0 && (
-                              <span className="px-1.5 py-0.25 text-[8px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
+                              <span className="px-1.5 py-0.25 text-[7.5px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
                                 {pendingPasswordRequests}
                               </span>
                             )}
@@ -4967,20 +4953,20 @@ export default function App() {
                                 setIsMobileMenuOpen(false);
                               }
                             }}
-                            className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
+                            className={`flex items-center justify-between w-full h-7.5 px-2 rounded-lg transition-all duration-200 text-left ${
                               isActive && activeNoticeSubTab === 'tickets'
                                 ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
                                 : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
                             }`}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <LifeBuoy className="w-3.5 h-3.5 shrink-0" />
-                              <span className="text-[10px] font-bold truncate">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <LifeBuoy className="w-3 h-3 shrink-0" />
+                              <span className="text-[9.5px] font-semibold truncate">
                                 {'HR Helpdesk Support Tickets'}
                               </span>
                             </div>
                             {pendingTickets > 0 && (
-                              <span className="px-1.5 py-0.25 text-[8px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
+                              <span className="px-1.5 py-0.25 text-[7.5px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
                                 {pendingTickets}
                               </span>
                             )}
@@ -5001,33 +4987,33 @@ export default function App() {
                         setIsMobileMenuOpen(false);
                       }
                     }}
-                    className={`flex items-center rounded-2xl transition-all duration-300 cursor-pointer relative ${
-                      showExpanded ? 'w-full h-11 px-3 justify-start gap-3' : 'w-12 h-12 justify-center'
+                    className={`flex items-center rounded-xl transition-all duration-200 cursor-pointer relative ${
+                      showExpanded ? 'w-full h-9.5 px-2.5 justify-start gap-2.5' : 'w-10 h-10 justify-center'
                     } ${
                       isActive
-                        ? 'bg-emerald-500/15 text-[#10b981] shadow-[0_0_15px_rgba(16,185,129,0.12)] border border-emerald-500/30'
+                        ? 'bg-emerald-500/15 text-[#10b981] shadow-[0_0_12px_rgba(16,185,129,0.12)] border border-emerald-500/30 font-bold'
                         : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
                     }`}
                     id={`tab-${item.id}`}
                   >
                     {isActive && (
-                      <span className={`absolute left-0 w-1 bg-[#10b981] rounded-r-full shadow-[0_0_8px_#10b981] ${
-                        showExpanded ? 'h-4' : 'h-5'
+                      <span className={`absolute left-0 w-1 bg-[#10b981] rounded-r-full shadow-[0_0_6px_#10b981] ${
+                        showExpanded ? 'h-3.5' : 'h-4'
                       }`} />
                     )}
                     <div className="relative flex items-center justify-center shrink-0">
-                      <IconComponent className="w-5 h-5" />
+                      <IconComponent className="w-[18px] h-[18px]" />
                       {!showExpanded && item.id === 'employees' && employees.filter(emp => emp.isApproved === false).length > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-slate-950 animate-pulse" />
+                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-slate-950 animate-pulse" />
                       )}
                     </div>
                     {showExpanded && (
-                      <div className="flex items-center justify-between w-full min-w-0 pr-1 gap-2">
-                        <span className="text-[11px] font-bold tracking-wide whitespace-nowrap animate-fadeIn truncate">
+                      <div className="flex items-center justify-between w-full min-w-0 pr-0.5 gap-2">
+                        <span className="text-[10.5px] font-bold tracking-wide whitespace-nowrap animate-fadeIn truncate">
                           {item.label}
                         </span>
                         {item.id === 'employees' && employees.filter(emp => emp.isApproved === false).length > 0 && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black animate-pulse leading-none shrink-0">
+                          <span className="px-1.5 py-0.25 rounded-full bg-amber-500 text-slate-950 text-[8px] font-black animate-pulse leading-none shrink-0">
                             {employees.filter(emp => emp.isApproved === false).length}
                           </span>
                         )}
@@ -5035,7 +5021,7 @@ export default function App() {
                     )}
                   </button>
                   {!showExpanded && (
-                    <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+                    <div className="absolute left-14 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[9.5px] font-bold px-2 py-1 rounded-md whitespace-nowrap shadow-xl pointer-events-none z-50">
                       {item.label}
                     </div>
                   )}
@@ -5046,8 +5032,7 @@ export default function App() {
         </div>
 
         {/* Sidebar Footer */}
-        <div className={`flex flex-col ${showExpanded ? 'items-start w-full' : 'items-center'} gap-3 w-full`}>
-          <div className={`${showExpanded ? 'w-full' : 'w-8'} h-[1px] bg-emerald-950/60 transition-all`} />
+        <div className={`flex flex-col ${showExpanded ? 'items-start w-full' : 'items-center'} gap-2 w-full mt-3 pt-2 border-t border-emerald-950/60`}>
 
           {spreadsheetLink && (userRole === 'admin' || userRole === 'super_admin') && (
             <div className="relative group flex items-center justify-start w-full">
@@ -5056,18 +5041,18 @@ export default function App() {
                 target="_blank"
                 rel="noreferrer"
                 className={`flex items-center rounded-xl text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-all ${
-                  showExpanded ? 'w-full h-11 px-3.5 justify-start gap-3.5' : 'w-11 h-11 justify-center'
+                  showExpanded ? 'w-full h-9 px-2.5 justify-start gap-2.5' : 'w-9 h-9 justify-center'
                 }`}
               >
-                <FileSpreadsheet className="w-5 h-5 shrink-0" />
+                <FileSpreadsheet className="w-[18px] h-[18px] shrink-0" />
                 {showExpanded && (
-                  <span className="text-[11px] font-bold whitespace-nowrap animate-fadeIn text-[#cbd5e1]">
+                  <span className="text-[10px] font-bold whitespace-nowrap animate-fadeIn text-[#cbd5e1]">
                     {uiTexts.viewSheets}
                   </span>
                 )}
               </a>
               {!showExpanded && (
-                <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+                <div className="absolute left-14 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[9.5px] font-bold px-2 py-1 rounded-md whitespace-nowrap shadow-xl pointer-events-none z-50">
                   {uiTexts.viewSheets}
                 </div>
               )}
@@ -5079,8 +5064,8 @@ export default function App() {
             onClick={() => setThemeMode(prev => prev === 'light' ? 'dark' : 'light')}
             className={`flex cursor-pointer select-none transition-all duration-200 ${
               showExpanded 
-                ? 'flex-row items-center justify-between w-full px-3.5 py-1.5 rounded-xl hover:bg-emerald-500/10' 
-                : 'flex-col items-center gap-1.5 py-1 px-2 rounded-xl hover:bg-emerald-500/10'
+                ? 'flex-row items-center justify-between w-full px-2.5 py-1 rounded-xl hover:bg-emerald-500/10' 
+                : 'flex-col items-center gap-1 py-1 px-1.5 rounded-xl hover:bg-emerald-500/10'
             }`}
             title={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             id="btn-theme-toggle"
@@ -5088,20 +5073,20 @@ export default function App() {
             <div className="relative group flex items-center">
               <span className={themeMode === 'dark' ? 'text-amber-400' : 'text-emerald-400'}>
                 {themeMode === 'dark' ? (
-                  <Moon className="w-4 h-4 text-amber-300" />
+                  <Moon className="w-3.5 h-3.5 text-amber-300" />
                 ) : (
-                  <Sun className="w-4 h-4 text-emerald-400" />
+                  <Sun className="w-3.5 h-3.5 text-emerald-400" />
                 )}
               </span>
               {showExpanded && (
-                <span className="text-[11px] font-bold text-slate-300 ml-3.5 whitespace-nowrap animate-fadeIn">
+                <span className="text-[10px] font-bold text-slate-300 ml-2.5 whitespace-nowrap animate-fadeIn">
                   {themeMode === 'dark' 
                     ? ('Dark Mode') 
                     : ('Light Mode')}
                 </span>
               )}
               {!showExpanded && (
-                <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+                <div className="absolute left-14 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[9.5px] font-bold px-2 py-1 rounded-md whitespace-nowrap shadow-xl pointer-events-none z-50">
                   {themeMode === 'dark' 
                     ? ('Dark Mode Active') 
                     : ('Light Mode Active')}
@@ -5109,11 +5094,11 @@ export default function App() {
               )}
             </div>
             
-            <div className={`w-8 h-4.5 rounded-full p-[2px] transition-all flex items-center shadow-inner shrink-0 ${
+            <div className={`w-7 h-4 rounded-full p-[2px] transition-all flex items-center shadow-inner shrink-0 ${
               themeMode === 'dark' ? 'bg-amber-500/30 border border-amber-400 justify-end' : 'bg-emerald-950 border border-emerald-900 justify-start'
             }`}>
-              <div className={`w-3.5 h-3.5 rounded-full shadow-md transform transition-all ${
-                themeMode === 'dark' ? 'bg-amber-400' : 'bg-white translate-x-2.5'
+              <div className={`w-3 h-3 rounded-full shadow-md transform transition-all ${
+                themeMode === 'dark' ? 'bg-amber-400' : 'bg-white translate-x-2'
               }`} />
             </div>
           </div>
@@ -5123,54 +5108,54 @@ export default function App() {
             <button
               onClick={handleLogout}
               className={`flex items-center rounded-xl text-red-400/80 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer ${
-                showExpanded ? 'w-full h-11 px-3.5 justify-start gap-3.5' : 'w-11 h-11 justify-center'
+                showExpanded ? 'w-full h-9 px-2.5 justify-start gap-2.5' : 'w-9 h-9 justify-center'
               }`}
               id="btn-signout"
             >
-              <LogOut className="w-5 h-5 shrink-0" />
+              <LogOut className="w-[18px] h-[18px] shrink-0" />
               {showExpanded && (
-                <span className="text-[11px] font-bold whitespace-nowrap animate-fadeIn">
+                <span className="text-[10px] font-bold whitespace-nowrap animate-fadeIn">
                   {uiTexts.signout}
                 </span>
               )}
             </button>
             {!showExpanded && (
-              <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-red-950 text-red-200 border border-red-900/30 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
+              <div className="absolute left-14 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-red-950 text-red-200 border border-red-900/30 text-[9.5px] font-bold px-2 py-1 rounded-md whitespace-nowrap shadow-xl pointer-events-none z-50">
                 {uiTexts.signout}
               </div>
             )}
           </div>
 
           {/* User profile */}
-          <div className={`relative group mt-1 flex items-center justify-start ${showExpanded ? 'w-full px-1.5 gap-3' : ''}`}>
+          <div className={`relative group mt-0.5 flex items-center justify-start ${showExpanded ? 'w-full px-1 gap-2.5' : ''}`}>
             {user?.photoURL ? (
               <img
                 src={user.photoURL}
                 alt="Profile"
-                className="w-10 h-10 rounded-2xl border-2 border-emerald-500/30 object-cover shadow-md hover:border-emerald-400 cursor-pointer transition-all duration-300 shrink-0"
+                className="w-8.5 h-8.5 rounded-xl border-2 border-emerald-500/30 object-cover shadow-md hover:border-emerald-400 cursor-pointer transition-all duration-300 shrink-0"
                 referrerPolicy="no-referrer" />
             ) : (
               <img
                 src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=150&q=80"
                 alt="Premium User"
-                className="w-10 h-10 rounded-2xl border-2 border-emerald-500/30 object-cover shadow-md transition-all duration-300 hover:border-emerald-400 cursor-pointer shrink-0"
+                className="w-8.5 h-8.5 rounded-xl border-2 border-emerald-500/30 object-cover shadow-md transition-all duration-300 hover:border-emerald-400 cursor-pointer shrink-0"
                 referrerPolicy="no-referrer" />
             )}
             {showExpanded && (
               <div className="flex flex-col min-w-0 animate-fadeIn">
-                <p className="text-[11px] font-black text-slate-100 truncate">
+                <p className="text-[10.5px] font-black text-slate-100 truncate">
                   {user?.displayName || 'Admin'}
                 </p>
-                <p className="text-[9px] font-medium text-emerald-400 truncate">
+                <p className="text-[8.5px] font-medium text-emerald-400 truncate">
                   {user?.email || 'admin@rathibuildmart.com'}
                 </p>
               </div>
             )}
             {!showExpanded && (
-              <div className="absolute left-16 bottom-0 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-3 rounded-2xl shadow-2xl pointer-events-none z-50 min-w-[180px]">
-                <p className="font-black text-[9px] text-emerald-400 tracking-wider uppercase mb-1">Active Portal Admin</p>
-                <p className="text-xs font-bold text-slate-200 truncate">{user?.displayName || 'Rathi Build Mart'}</p>
-                <p className="text-[10px] text-slate-400 truncate mt-0.5">{user?.email || 'admin@rathibuildmart.com'}</p>
+              <div className="absolute left-14 bottom-0 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-2.5 rounded-xl shadow-2xl pointer-events-none z-50 min-w-[160px]">
+                <p className="font-black text-[8.5px] text-emerald-400 tracking-wider uppercase mb-0.5">Active Portal User</p>
+                <p className="text-[11px] font-bold text-slate-200 truncate">{user?.displayName || 'Rathi Build Mart'}</p>
+                <p className="text-[9.5px] text-slate-400 truncate mt-0.5">{user?.email || 'admin@rathibuildmart.com'}</p>
               </div>
             )}
           </div>
@@ -5366,8 +5351,8 @@ export default function App() {
       <aside 
         onMouseEnter={() => setIsSidebarHovered(true)}
         onMouseLeave={() => setIsSidebarHovered(false)}
-        className={`my-4 ml-4 mr-2 h-[calc(100vh-2rem)] bg-gradient-to-b from-[#031c12] via-[#02110c] to-[#010906] text-[#cbd5e1] flex flex-col justify-between rounded-[2.25rem] border border-emerald-500/15 shadow-[0_20px_50px_-12px_rgba(2,17,12,0.8)] shrink-0 no-print py-6 transition-all duration-300 ease-in-out relative z-40 hidden md:flex ${
-          isSidebarHovered ? 'w-[240px] px-5 items-start' : 'w-[78px] px-3 items-center'
+        className={`my-3 ml-3 mr-1.5 h-[calc(100vh-1.5rem)] bg-gradient-to-b from-[#031c12] via-[#02110c] to-[#010906] text-[#cbd5e1] flex flex-col justify-between rounded-[2rem] border border-emerald-500/15 shadow-[0_20px_50px_-12px_rgba(2,17,12,0.8)] shrink-0 no-print py-4.5 transition-all duration-300 ease-in-out relative z-40 hidden md:flex ${
+          isSidebarHovered ? 'w-[230px] px-3.5 items-start' : 'w-[64px] px-2 items-center'
         }`}
       >
         {renderSidebarContent(false)}
@@ -5842,7 +5827,8 @@ export default function App() {
                   onUpdateEmployee={handleUpdateEmployee}
                   leaveRequests={leaveRequests}
                   onUpdateLeaveRequestStatus={handleUpdateLeaveRequestStatus}
-                  userRole={portalUser?.role || 'employee'} />
+                  userRole={portalUser?.role || 'employee'}
+                  portalUser={portalUser} />
               )}
               {currentTab === 'employees' && (
                 <EmployeeList 
@@ -5872,7 +5858,11 @@ export default function App() {
                 <AssetManagementModule 
                   employees={filteredEmployees}
                   language={language}
-                  userRole={portalUser?.role || 'employee'} />
+                  userRole={portalUser?.role || 'employee'}
+                  portalUser={portalUser}
+                  adminSettings={adminSettings}
+                  spreadsheetId={spreadsheetId}
+                  googleToken={token} />
               )}
               {currentTab === 'exit_management' && (
                 <ExitManagementModule 
