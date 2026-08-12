@@ -41,7 +41,9 @@ import {
   Sparkles,
   RefreshCcw,
   Info,
-  Crown
+  Crown,
+  UserPlus,
+  Globe
 } from 'lucide-react';
 import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog, TransactionalEmailLog } from '../types';
 import AdminWelcomeModal from './AdminWelcomeModal';
@@ -54,6 +56,7 @@ import {
   DEFAULT_EMAIL_TEMPLATES, 
   buildMessageAutoSenderUrl, 
   buildMessageAutoSenderExcelFormula,
+  buildStandardWhatsAppUrl,
   formatPhoneNumber
 } from '../utils/whatsappHelper';
 
@@ -88,7 +91,7 @@ interface SettingsProps {
 }
 
 export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
-  // Employee Detail
+  //Employee Detail
   { id: 'firstName', label: 'First Name', group: 'detail', isHidden: false, isMandatory: true },
   { id: 'lastName', label: 'Last Name', group: 'detail', isHidden: false, isMandatory: false },
   { id: 'email', label: 'Email', group: 'detail', isHidden: false, isMandatory: true },
@@ -104,7 +107,7 @@ export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
   { id: 'linkUser', label: 'Link User', group: 'detail', isHidden: true, isMandatory: false },
   { id: 'probationDate', label: 'Probation Date', group: 'detail', isHidden: false, isMandatory: false },
 
-  // Residential Address
+  //Residential Address
   { id: 'resLine1', label: 'Residential Line 1', group: 'residential', isHidden: false, isMandatory: false },
   { id: 'resLine2', label: 'Residential Line 2', group: 'residential', isHidden: false, isMandatory: false },
   { id: 'resCountry', label: 'Residential Country', group: 'residential', isHidden: false, isMandatory: false },
@@ -112,7 +115,7 @@ export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
   { id: 'resCity', label: 'Residential City', group: 'residential', isHidden: false, isMandatory: false },
   { id: 'resPinCode', label: 'Residential PIN/ZIP Code', group: 'residential', isHidden: false, isMandatory: false },
 
-  // Permanent Address
+  //Permanent Address
   { id: 'permLine1', label: 'Permanent Line 1', group: 'permanent', isHidden: false, isMandatory: false },
   { id: 'permLine2', label: 'Permanent Line 2', group: 'permanent', isHidden: false, isMandatory: false },
   { id: 'permCountry', label: 'Permanent Country', group: 'permanent', isHidden: false, isMandatory: false },
@@ -120,20 +123,20 @@ export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
   { id: 'permCity', label: 'Permanent City', group: 'permanent', isHidden: false, isMandatory: false },
   { id: 'permPinCode', label: 'Permanent PIN/ZIP Code', group: 'permanent', isHidden: false, isMandatory: false },
 
-  // Bank Detail
+  //Bank Detail
   { id: 'bankAccountNo', label: 'Bank Account No.', group: 'bank', isHidden: false, isMandatory: false },
   { id: 'bankAccountHolderName', label: 'Bank Account Holder name', group: 'bank', isHidden: false, isMandatory: false },
   { id: 'bankName', label: 'Bank Name', group: 'bank', isHidden: false, isMandatory: false },
   { id: 'ifscCode', label: 'IFSC code', group: 'bank', isHidden: false, isMandatory: false },
 
-  // Other Detail
+  //Other Detail
   { id: 'panNo', label: 'PAN No.', group: 'other', isHidden: false, isMandatory: false },
   { id: 'pfAccountNo', label: 'PF Account No.', group: 'other', isHidden: false, isMandatory: false },
   { id: 'esicNo', label: 'ESIC No.', group: 'other', isHidden: false, isMandatory: false },
   { id: 'aadhaarNo', label: 'Aadhaar No.', group: 'other', isHidden: false, isMandatory: false },
   { id: 'uan', label: 'UAN', group: 'other', isHidden: false, isMandatory: false },
 
-  // Employment Detail
+  //Employment Detail
   { id: 'confirmationDate', label: 'Confirmation Date', group: 'employment', isHidden: false, isMandatory: false },
   { id: 'branch', label: 'Branch', group: 'employment', isHidden: false, isMandatory: false },
   { id: 'costCenter', label: 'Cost Center', group: 'employment', isHidden: false, isMandatory: false },
@@ -220,12 +223,12 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
     }
   ],
   rolePermissions: {
-    admin: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin'],
-    director: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
-    sub_admin: ['dashboard', 'employees', 'attendance', 'leaves'],
-    hr: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
-    branch_manager: ['dashboard', 'employees', 'attendance', 'leaves'],
-    employee: []
+    admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+    director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+    sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'leaves', 'notices_support'],
+    hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+    branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
+    employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
   },
   enableEmployeePayslips: false,
   enableGeofencing: false,
@@ -236,6 +239,9 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   smtpPassword: '',
   senderName: 'Rathi LMS System',
   senderEmail: 'rbmlms@rathibuildmart.com',
+  whatsappUsername: 'rathis',
+  whatsappPassword: 'Rathis@ravs#2025!',
+  whatsappSenderNo: '8518880943',
   enablePasswordLoginOtp: false,
   enableAdminWelcomePopup: true
 };
@@ -273,13 +279,14 @@ export default function Settings({
     setLocalSettings(settings);
   }, [settings]);
   
-  // WhatsApp test states
+  //WhatsApp test states
   const [waTestMobile, setWaTestMobile] = useState(() => settings.whatsappSenderNo || '8518880943');
   const [waTestName, setWaTestName] = useState('Rahul Sharma');
   const [copiedWaFormula, setCopiedWaFormula] = useState(false);
   const [formulaMode, setFormulaMode] = useState<'direct' | 'cellRef'>('direct');
+  const [waTestStatus, setWaTestStatus] = useState<string | null>(null);
   
-  // User Roles & Access states
+  //User Roles & Access states
   const [newAccName, setNewAccName] = useState('');
   const [newAccUsername, setNewAccUsername] = useState('');
   const [newAccPassword, setNewAccPassword] = useState('');
@@ -293,18 +300,18 @@ export default function Settings({
   const [editingAccountPassword, setEditingAccountPassword] = useState<string>('');
   const [editingAccount, setEditingAccount] = useState<UserRoleAccount | null>(null);
   const [newMasterVal, setNewMasterVal] = useState<string>('');
-  const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'>>('departments');
-  const [activeConfigRole, setActiveConfigRole] = useState<'director' | 'sub_admin' | 'hr' | 'branch_manager'>('director');
+  const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes' | 'jobOpeningsList'>>('departments');
+  const [activeConfigRole, setActiveConfigRole] = useState<'director' | 'sub_admin' | 'hr' | 'branch_manager' | 'employee'>('director');
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
-  // SMTP Tester states
+  //SMTP Tester states
   const [testRecipient, setTestRecipient] = useState('');
   const [isTestingSmtp, setIsTestingSmtp] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Geofencing Outlet Registration States
+  //Geofencing Outlet Registration States
   const [newOutletName, setNewOutletName] = useState('');
   const [newOutletLat, setNewOutletLat] = useState('');
   const [newOutletLng, setNewOutletLng] = useState('');
@@ -322,7 +329,7 @@ export default function Settings({
 
     const handleFailure = (error: GeolocationPositionError) => {
       console.warn("High accuracy GPS failed, retrying with low accuracy...", error);
-      // Retry with low accuracy
+      //Retry with low accuracy
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setNewOutletLat(position.coords.latitude.toFixed(6));
@@ -331,7 +338,7 @@ export default function Settings({
         },
         (fallbackError) => {
           console.warn("GPS error on fallback:", fallbackError);
-          // Set Bangalore coordinates as fallback instead of failing/crashing
+          //Set Bangalore coordinates as fallback instead of failing/crashing
           setNewOutletLat("12.971600");
           setNewOutletLng("77.594600");
           setIsFetchingAdminCoords(false);
@@ -348,13 +355,13 @@ export default function Settings({
 
   const handleAddGeofenceOutlet = () => {
     if (!newOutletName.trim() || !newOutletLat.trim() || !newOutletLng.trim()) {
-      alert(language === 'en' ? "Please fill in all fields to add a secure outlet!" : "सक्रिय सुरक्षित आउटलेट जोड़ने के लिए कृपया सभी फ़ील्ड भरें!");
+      alert("Please fill in all fields to add a secure outlet!");
       return;
     }
     const latNum = parseFloat(newOutletLat);
     const lngNum = parseFloat(newOutletLng);
     if (isNaN(latNum) || isNaN(lngNum)) {
-      alert(language === 'en' ? "Please enter valid numeric latitude and longitude coordinates." : "कृपया मान्य संख्यात्मक अक्षांश और देशांतर निर्देशांक दर्ज करें।");
+      alert("Please enter valid numeric latitude and longitude coordinates.");
       return;
     }
 
@@ -372,7 +379,7 @@ export default function Settings({
       geofenceOutlets: [...currentOutlets, newOutlet]
     });
 
-    // Reset Form
+    //Reset Form
     setNewOutletName('');
     setNewOutletLat('');
     setNewOutletLng('');
@@ -387,22 +394,22 @@ export default function Settings({
     });
   };
 
-  // Corporate notices & HR Helpdesk management states
+  //Corporate notices & HR Helpdesk management states
   const [newNoticeTitle, setNewNoticeTitle] = useState('');
   const [newNoticeTitleHi, setNewNoticeTitleHi] = useState('');
   const [newNoticeContent, setNewNoticeContent] = useState('');
   const [newNoticeContentHi, setNewNoticeContentHi] = useState('');
   const [newNoticeBadge, setNewNoticeBadge] = useState<'Critical' | 'Holiday' | 'General' | 'Policy'>('General');
 
-  // Security Log Search/Filter States
+  //Security Log Search/Filter States
   const [securitySearch, setSecuritySearch] = useState('');
   const [securityReasonFilter, setSecurityReasonFilter] = useState<'all' | 'Incorrect Password' | 'User ID not found' | 'Admin Incorrect Password'>('all');
 
-  // Audit Logs Search & Filter States
+  //Audit Logs Search & Filter States
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState<'all' | 'create' | 'update' | 'approve' | 'reject'>('all');
 
-  // Database Backup, Sync, and Troubleshoot States
+  //Database Backup, Sync, and Troubleshoot States
   const [importData, setImportData] = useState<any>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<string | null>(null);
@@ -443,7 +450,7 @@ export default function Settings({
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (!parsed || (typeof parsed !== 'object')) {
-          throw new Error(language === 'en' ? "Invalid JSON format." : "अमान्य JSON प्रारूप।");
+          throw new Error("Invalid JSON format.");
         }
         
         const empsCount = Array.isArray(parsed.employees) ? parsed.employees.length : 0;
@@ -451,14 +458,12 @@ export default function Settings({
         const payCount = Array.isArray(parsed.payroll) ? parsed.payroll.length : 0;
         
         if (empsCount === 0 && attCount === 0 && payCount === 0) {
-          throw new Error(language === 'en' ? "Backup file is empty." : "बैकअप फ़ाइल खाली है।");
+          throw new Error("Backup file is empty.");
         }
 
         setImportData(parsed);
         setImportSummary(
-          language === 'en'
-            ? `Backup file verified. It contains: ${empsCount} employees, ${attCount} attendance entries, and ${payCount} payroll records.`
-            : `बैकअप फ़ाइल सत्यापित की गई। इसमें: ${empsCount} कर्मचारी, ${attCount} उपस्थिति रिकॉर्ड, और ${payCount} पेरोल रिकॉर्ड शामिल हैं।`
+          `Backup file verified. It contains: ${empsCount} employees, ${attCount} attendance entries, and ${payCount} payroll records.`
         );
       } catch (err: any) {
         setImportError(err?.message || String(err));
@@ -474,7 +479,7 @@ export default function Settings({
     setImportData(null);
   };
 
-  // Work Timing Specific Builder States
+  //Work Timing Specific Builder States
   const [shiftName, setShiftName] = useState<string>('');
   const [shiftStart, setShiftStart] = useState<string>('09:00');
   const [shiftEnd, setShiftEnd] = useState<string>('18:00');
@@ -493,7 +498,7 @@ export default function Settings({
       tabDatabase: "Database & Backups",
       tabEmailSmtp: "SMTP Email Settings",
       
-      // Company
+      //Company
       compName: "Company Name",
       compAddress: "Company Address",
       currencySymbol: "Currency Symbol",
@@ -501,9 +506,9 @@ export default function Settings({
       saveAll: "Save & Synchronize",
       resetDefault: "Reset to Default",
 
-      // Field Config
+      //Field Config
       fieldColName: "Field Label",
-      fieldColGroup: "Section / Group",
+      fieldColGroup: "SectionGroup",
       fieldColHidden: "Status",
       fieldColMandatory: "Mandatory?",
       mandatoryNote: "Fields set as 'Mandatory' will be validated during Employee Registration.",
@@ -512,16 +517,16 @@ export default function Settings({
       toggleVisibility: "Toggle Visibility",
       toggleMandatory: "Toggle Required Status",
 
-      // Groups
+      //Groups
       groupAll: "All Fields",
       groupDetail: "Employee Details",
       groupResidential: "Residential Address",
       groupPermanent: "Permanent Address",
       groupBank: "Bank Details",
-      groupOther: "Other / Tax Details",
+      groupOther: "OtherTax Details",
       groupEmployment: "Employment Details",
 
-      // Masters
+      //Masters
       masterSelect: "Select List to Manage:",
       masterPlaceholder: "Add new option...",
       masterAdd: "Add Option",
@@ -534,7 +539,7 @@ export default function Settings({
       listWeeklyOff: "Weekly Off Profiles",
       listLeaves: "Leave Types",
 
-      // Policy
+      //Policy
       policyTitle: "Attendance & Payroll Policy",
       defaultShift: "Standard Work Timing",
       checkIn: "Default Check-In",
@@ -555,78 +560,78 @@ export default function Settings({
       employeePortalSettingsTitle: "Employee Portal Control Settings",
     },
     hi: {
-      adminTitle: "एडमिन पैनल और सिस्टम सेटिंग्स",
-      adminSub: "कंपनी नियम, फॉर्म फ़ील्ड्स को दिखाना/छिपाना, अनिवार्य फ़ील्ड्स और ड्रॉपडाउन सूची का प्रबंधन करें।",
-      savedAlert: "सेटिंग्स सफलतापूर्वक सहेज ली गईं! सभी नियम तुरंत लागू हो गए हैं।",
-      tabCompany: "कंपनी प्रोफाइल",
-      tabFields: "फ़ील्ड सेटिंग्स (अनिवार्य/छिपाएं)",
-      tabMasters: "ड्रॉपडाउन मास्टर सूचियाँ",
-      tabPolicy: "नीति और पेरोल नियम",
-      tabSecurity: "लॉगिन सुरक्षा ऑडिट",
-      tabNoticesSupport: "कंपनी नोटिस और हेल्पडेस्क",
-      tabDatabase: "डेटाबेस और बैकअप",
-      tabEmailSmtp: "ईमेल और SMTP सेटिंग्स",
+      adminTitle: "Admin Panel & System Settings",
+      adminSub: "Configure enterprise rules, form field visibility, mandatory fields, and default list options",
+      savedAlert: "Settings saved successfully! Controls updated instantly.",
+      tabCompany: "Company Profile",
+      tabFields: "Field Settings (Mandatory/Hide)",
+      tabMasters: "Dropdown Masters",
+      tabPolicy: "Policy & Payroll Rules",
+      tabSecurity: "Login Security Audit",
+      tabNoticesSupport: "Notices & HR Helpdesk",
+      tabDatabase: "Database & Backups",
+      tabEmailSmtp: "SMTP Email Settings",
       
-      // Company
-      compName: "कंपनी का नाम",
-      compAddress: "कंपनी का पता",
-      currencySymbol: "मुद्रा प्रतीक",
-      logoUrl: "कंपनी लोगो URL (वैकल्पिक)",
-      saveAll: "सहेजें और लागू करें",
-      resetDefault: "डिफ़ॉल्ट पर रीसेट करें",
+      //Company
+      compName: "Company Name",
+      compAddress: "Company Address",
+      currencySymbol: "Currency Symbol",
+      logoUrl: "Company Logo URL (Optional)",
+      saveAll: "Save & Synchronize",
+      resetDefault: "Reset to Default",
 
-      // Field Config
-      fieldColName: "फ़ील्ड नाम",
-      fieldColGroup: "अनुभाग / समूह",
-      fieldColHidden: "स्थिति",
-      fieldColMandatory: "अनिवार्य?",
-      mandatoryNote: "अनिवार्य चिह्नित फ़ील्ड्स कर्मचारी पंजीकरण के समय अनिवार्य रूप से भरे होने चाहिए।",
-      visible: "दिखाई दे रहा है",
-      hidden: "छिपा हुआ है",
-      toggleVisibility: "दृश्यता बदलें",
-      toggleMandatory: "अनिवार्य स्थिति बदलें",
+      //Field Config
+      fieldColName: "Field Label",
+      fieldColGroup: "SectionGroup",
+      fieldColHidden: "Status",
+      fieldColMandatory: "Mandatory?",
+      mandatoryNote: "Fields set as 'Mandatory' will be validated during Employee Registration.",
+      visible: "Visible",
+      hidden: "Hidden",
+      toggleVisibility: "Toggle Visibility",
+      toggleMandatory: "Toggle Required Status",
 
-      // Groups
-      groupAll: "सभी फ़ील्ड्स",
-      groupDetail: "कर्मचारी विवरण",
-      groupResidential: "स्थानीय पता",
-      groupPermanent: "स्थायी पता",
-      groupBank: "बैंक विवरण",
-      groupOther: "अन्य / टैक्स विवरण",
-      groupEmployment: "रोजगार विवरण",
+      //Groups
+      groupAll: "All Fields",
+      groupDetail: "Employee Details",
+      groupResidential: "Residential Address",
+      groupPermanent: "Permanent Address",
+      groupBank: "Bank Details",
+      groupOther: "OtherTax Details",
+      groupEmployment: "Employment Details",
 
-      // Masters
-      masterSelect: "प्रबंधन के लिए सूची चुनें:",
-      masterPlaceholder: "नया विकल्प जोड़ें...",
-      masterAdd: "विकल्प जोड़ें",
-      noOptions: "इस सूची में कोई विकल्प कॉन्फ़िगर नहीं किया गया है।",
-      listDept: "विभाग (Departments)",
-      listBranches: "शाखाएं (Branches)",
-      listCost: "लागत केंद्र (Cost Centers)",
-      listGroups: "कर्मचारी समूह (Employee Groups)",
-      listTimings: "कार्य समय (Work Timings)",
-      listWeeklyOff: "साप्ताहिक अवकाश (Weekly Off Profiles)",
-      listLeaves: "अवकाश के प्रकार (Leave Types)",
+      //Masters
+      masterSelect: "Select List to Manage:",
+      masterPlaceholder: "Add new option...",
+      masterAdd: "Add Option",
+      noOptions: "No options configured in this list.",
+      listDept: "Departments",
+      listBranches: "Branches",
+      listCost: "Cost Centers",
+      listGroups: "Employee Groups",
+      listTimings: "Work Timings",
+      listWeeklyOff: "Weekly Off Profiles",
+      listLeaves: "Leave Types",
 
-      // Policy
-      policyTitle: "उपस्थिति और पेरोल नीति",
-      defaultShift: "मानक कार्य समय विवरण",
-      checkIn: "डिफ़ॉल्ट चेक-इन समय",
-      checkOut: "डिफ़ॉल्ट चेक-आउट समय",
-      overtimeRate: "ओवरटाइम प्रति घंटा दर (₹)",
-      pfRate: "PF कर्मचारी योगदान (%)",
-      esicRate: "ESIC कर्मचारी योगदान (%)",
-      allowancesCalcTitle: "भत्ते और कटौतियां सक्रिय टॉगल",
-      enableHraLabel: "मकान किराया (HRA) गणना चालू करें",
-      enableDaLabel: "महंगाई भत्ता (DA) गणना चालू करें",
-      enableConveyanceLabel: "यातायात भत्ता (Conveyance) गणना चालू करें",
-      enableProfessionalTaxLabel: "व्यावसायिक कर (PT) कटौती चालू करें",
-      enablePaidLeaveLabel: "सवैतनिक अवकाश (Paid Leave / EL) गणना चालू करें",
-      paidLeaveStartAfterLabel: "सवैतनिक अवकाश कितने महीने बाद शुरू हो (सेवा अवधि)",
-      paidLeaveStartImmediately: "शामिल होने के तुरंत बाद शुरू करें",
-      toggleCalcSub: "चुनें कि पेरोल गणना के दौरान कौन से वेतन घटक सक्रिय रूप से संसाधित किए जाते हैं।",
-      enableEmployeePayslipsLabel: "कर्मचारियों के लिए पे-स्लिप देखने और डाउनलोड करने की सुविधा चालू करें",
-      employeePortalSettingsTitle: "कर्मचारी पोर्टल नियंत्रण सेटिंग्स",
+      //Policy
+      policyTitle: "Attendance & Payroll Policy",
+      defaultShift: "Standard Work Timing",
+      checkIn: "Default Check-In",
+      checkOut: "Default Check-Out",
+      overtimeRate: "Overtime Hourly Rate (₹)",
+      pfRate: "PF Employee Contribution (%)",
+      esicRate: "ESIC Contribution (%)",
+      allowancesCalcTitle: "Allowances & Deductions Active Toggles",
+      enableHraLabel: "Enable House Rent Allowance (HRA) Calculation",
+      enableDaLabel: "Enable Dearness Allowance (DA) Calculation",
+      enableConveyanceLabel: "Enable Conveyance Allowance Calculation",
+      enableProfessionalTaxLabel: "Enable Professional Tax (PT) Deduction",
+      enablePaidLeaveLabel: "Enable Paid Leave (PL) & Earned Leave Calculation",
+      paidLeaveStartAfterLabel: "Paid Leave Starts After (Months of Service required)",
+      paidLeaveStartImmediately: "Start Immediately Upon Joining",
+      toggleCalcSub: "Toggle which salary components are dynamically processed in payroll generation.",
+      enableEmployeePayslipsLabel: "Enable Payslip View & Download for Employees",
+      employeePortalSettingsTitle: "Employee Portal Control Settings",
     }
   }[language];
 
@@ -660,7 +665,7 @@ export default function Settings({
     
     if (activeMasterList === 'workTimings') {
       if (!shiftName.trim()) {
-        alert(language === 'en' ? "Please enter a shift name!" : "कृपया शिफ्ट का नाम दर्ज करें!");
+        alert("Please enter a shift name!");
         return;
       }
       const startFormatted = formatTo12Hour(shiftStart);
@@ -673,7 +678,7 @@ export default function Settings({
 
     const currentList = localSettings[activeMasterList] as string[];
     if (currentList.includes(valToAdd)) {
-      alert(language === 'en' ? "Option already exists!" : "यह विकल्प पहले से मौजूद है!");
+      alert("Option already exists!");
       return;
     }
     const updatedList = [...currentList, valToAdd];
@@ -704,14 +709,15 @@ export default function Settings({
     const headers = ['Category', 'Option Name', 'Cost Center ID Prefix (Optional)'];
     const rows: string[][] = [];
 
-    const categories: Array<{ key: keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'>; name: string }> = [
+    const categories: Array<{ key: keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes' | 'jobOpeningsList'>; name: string }> = [
       { key: 'departments', name: 'Departments' },
       { key: 'branches', name: 'Branches' },
       { key: 'costCenters', name: 'Cost Centers' },
       { key: 'employeeGroups', name: 'Employee Groups' },
       { key: 'workTimings', name: 'Work Timings' },
       { key: 'weeklyOffProfiles', name: 'Weekly Off Profiles' },
-      { key: 'leaveTypes', name: 'Leave Types' }
+      { key: 'leaveTypes', name: 'Leave Types' },
+      { key: 'jobOpeningsList', name: 'Job OpeningsPositions' }
     ];
 
     categories.forEach(cat => {
@@ -749,7 +755,8 @@ export default function Settings({
       employeeGroups: 'Employee Groups',
       workTimings: 'Work Timings',
       weeklyOffProfiles: 'Weekly Off Profiles',
-      leaveTypes: 'Leave Types'
+      leaveTypes: 'Leave Types',
+      jobOpeningsList: 'Job OpeningsPositions'
     };
 
     const categoryName = listNameMap[activeMasterList] || activeMasterList;
@@ -818,7 +825,7 @@ export default function Settings({
 
       const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(Boolean);
       if (lines.length === 0) {
-        alert(language === 'en' ? 'CSV file is empty!' : 'CSV फ़ाइल खाली है!');
+        alert('CSV file is empty!');
         return;
       }
 
@@ -919,15 +926,11 @@ export default function Settings({
         updatedSettings.costCenterCodes = updatedCostCenterCodes;
         setLocalSettings(updatedSettings);
         alert(
-          language === 'en'
-            ? `Successfully imported ${addedCount} new dropdown option(s) into Master Lists!`
-            : `सफलतापूर्वक मास्टर सूचियों में ${addedCount} नए विकल्प आयात किए गए!`
+          `Successfully imported ${addedCount} new dropdown option(s) into Master Lists!`
         );
       } else {
         alert(
-          language === 'en'
-            ? 'No new dropdown options were added (items may already exist).'
-            : 'कोई नया विकल्प नहीं जोड़ा गया (वे पहले से मौजूद हो सकते हैं)।'
+          'No new dropdown options were added (items may already exist).'
         );
       }
     };
@@ -938,56 +941,70 @@ export default function Settings({
 
   const roleAccounts = localSettings.roleAccounts || [];
   const rolePermissions = localSettings.rolePermissions || {
-    admin: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin'],
-    director: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
-    sub_admin: ['dashboard', 'employees', 'attendance', 'leaves'],
-    hr: ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger'],
-    branch_manager: ['dashboard', 'employees', 'attendance', 'leaves'],
-    employee: []
+    admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+    director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+    sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'leaves', 'notices_support'],
+    hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+    branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
+    employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
   };
 
   const PERMISSION_MODULES = [
-    { id: 'dashboard', labelEn: 'System Dashboard', labelHi: 'सिस्टम डैशबोर्ड' },
-    { id: 'employees', labelEn: 'Employee Registry', labelHi: 'कर्मचारी सूची' },
-    { id: 'attendance', labelEn: 'Attendance & Logs', labelHi: 'उपस्थिति और लॉग्स' },
-    { id: 'payroll', labelEn: 'Payroll & Payslips', labelHi: 'पेरोल और वेतन पर्ची' },
-    { id: 'leaves', labelEn: 'Leaves & Holidays', labelHi: 'छुट्टियां और अवकाश' },
-    { id: 'ledger', labelEn: 'Employee Ledger', labelHi: 'कर्मचारी बहीखाता (Ledger)' },
-    { id: 'admin', labelEn: 'System Settings', labelHi: 'सिस्टम सेटिंग्स' },
+    { id: 'dashboard', labelEn: 'System Dashboard', labelHi: "" },
+    { id: 'employees', labelEn: 'Employee Registry', labelHi: "" },
+    { id: 'hiring_onboarding', labelEn: 'Hiring & Onboarding', labelHi: "" },
+    { id: 'employee_lifecycle', labelEn: 'Lifecycle & Assets', labelHi: "" },
+    { id: 'attendance', labelEn: 'Attendance & Logs', labelHi: "" },
+    { id: 'payroll', labelEn: 'Payroll & Payslips', labelHi: "" },
+    { id: 'leaves', labelEn: 'Leaves & Holidays', labelHi: "" },
+    { id: 'exit_management', labelEn: 'Exit & Clearance', labelHi: "" },
+    { id: 'ledger', labelEn: 'Employee Ledger', labelHi: "" },
+    { id: 'notices_support', labelEn: 'Notices & HR Helpdesk', labelHi: "" },
+    { id: 'admin', labelEn: 'System Settings', labelHi: "" },
   ];
 
   const getActionForColumn = (modId: string, colIndex: number) => {
     if (colIndex === 0) {
-      return { id: 'view', label: language === 'en' ? 'View' : 'देखें' };
+      return { id: 'view', label: 'View' };
     }
     if (colIndex === 1) {
-      if (['employees', 'attendance', 'payroll', 'leaves'].includes(modId)) {
-        let label = language === 'en' ? 'Add' : 'जोड़ें';
-        if (modId === 'attendance') label = language === 'en' ? 'Bulk Punch' : 'बल्क पंच';
-        if (modId === 'payroll') label = language === 'en' ? 'Calculate' : 'गणना';
-        if (modId === 'leaves') label = language === 'en' ? 'Add Holiday' : 'अवकाश जोड़ें';
-        return { id: 'add', label };
-      }
+      let label = 'Add';
+      if (modId === 'attendance') label = 'Bulk Punch';
+      if (modId === 'payroll') label = 'Calculate';
+      if (modId === 'leaves') label = 'Add Holiday';
+      if (modId === 'hiring_onboarding') label = 'Add Candidate';
+      if (modId === 'employee_lifecycle') label = 'Issue Asset';
+      if (modId === 'exit_management') label = 'Add Exit';
+      if (modId === 'ledger') label = 'Add Entry';
+      if (modId === 'notices_support') label = 'Create Notice';
+      if (modId === 'admin') label = 'Add User';
+      return { id: 'add', label };
     }
     if (colIndex === 2) {
-      if (['employees', 'attendance', 'payroll', 'leaves', 'admin'].includes(modId)) {
-        let label = language === 'en' ? 'Edit' : 'संशोधित';
-        if (modId === 'attendance') label = language === 'en' ? 'Adjust Log' : 'एडजस्ट';
-        if (modId === 'payroll') label = language === 'en' ? 'Adjust' : 'संयोजन';
-        if (modId === 'leaves') label = language === 'en' ? 'Edit Holiday' : 'अवकाश बदलें';
-        return { id: 'edit', label };
-      }
+      let label = 'Edit';
+      if (modId === 'attendance') label = 'Adjust Log';
+      if (modId === 'payroll') label = 'Adjust';
+      if (modId === 'leaves') label = 'Edit Holiday';
+      if (modId === 'hiring_onboarding') label = 'Update Stage';
+      if (modId === 'employee_lifecycle') label = 'Edit Asset';
+      if (modId === 'exit_management') label = 'Clearance';
+      if (modId === 'notices_support') label = 'Edit Notice';
+      if (modId === 'admin') label = 'Edit Config';
+      return { id: 'edit', label };
     }
     if (colIndex === 3) {
-      if (['employees', 'attendance', 'payroll', 'leaves'].includes(modId)) {
-        let id = 'delete';
-        let label = language === 'en' ? 'Delete' : 'हटाएं';
-        if (modId === 'employees') label = language === 'en' ? 'Deactivate' : 'निष्क्रिय करें';
-        if (modId === 'attendance') { id = 'approve'; label = language === 'en' ? 'Approve' : 'स्वीकृत करें'; }
-        if (modId === 'payroll') label = language === 'en' ? 'Mark Paid' : 'भुगतान चिह्नित';
-        if (modId === 'leaves') label = language === 'en' ? 'Delete Holiday' : 'अवकाश हटाएं';
-        return { id, label };
-      }
+      let id = 'delete';
+      let label = 'Delete';
+      if (modId === 'employees') label = 'Deactivate';
+      if (modId === 'attendance') { id = 'approve'; label = 'Approve'; }
+      if (modId === 'payroll') label = 'Mark Paid';
+      if (modId === 'leaves') label = 'Delete Holiday';
+      if (modId === 'hiring_onboarding') { id = 'approve'; label = 'Hire Candidate'; }
+      if (modId === 'employee_lifecycle') label = 'Revoke Asset';
+      if (modId === 'exit_management') { id = 'approve'; label = 'Approve Exit'; }
+      if (modId === 'notices_support') label = 'Delete Notice';
+      if (modId === 'admin') label = 'Clear Logs';
+      return { id, label };
     }
     return null;
   };
@@ -1033,14 +1050,14 @@ export default function Settings({
 
   const handleAddRoleAccount = () => {
     if (!newAccName.trim() || !newAccUsername.trim() || !newAccPassword.trim()) {
-      setRoleFormError(language === 'en' ? 'Please fill in all fields' : 'कृपया सभी फ़ील्ड भरें');
+      setRoleFormError('Please fill in all fields');
       return;
     }
     
-    // Check if username already exists
+    //Check if username already exists
     const exists = roleAccounts.some(acc => acc.username.toLowerCase() === newAccUsername.trim().toLowerCase());
     if (exists || newAccUsername.trim().toLowerCase() === (localSettings.adminUsername || 'admin').toLowerCase()) {
-      setRoleFormError(language === 'en' ? 'Username already exists' : 'उपयोगकर्ता नाम पहले से मौजूद है');
+      setRoleFormError('Username already exists');
       return;
     }
 
@@ -1062,7 +1079,7 @@ export default function Settings({
       roleAccounts: [...roleAccounts, newAcc]
     });
 
-    // Reset form
+    //Reset form
     setNewAccName('');
     setNewAccUsername('');
     setNewAccPassword('');
@@ -1111,7 +1128,7 @@ export default function Settings({
 
   const handleTestSmtp = async () => {
     if (!testRecipient.trim()) {
-      alert(language === 'en' ? "Please enter a valid recipient email address!" : "कृपया एक मान्य प्राप्तकर्ता ईमेल पता दर्ज करें!");
+      alert("Please enter a valid recipient email address!");
       return;
     }
     
@@ -1119,7 +1136,7 @@ export default function Settings({
     setTestResult(null);
     
     try {
-      const response = await fetch('/api/test-smtp', {
+      const response = await fetch(' //api/test-smtp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1140,20 +1157,18 @@ export default function Settings({
       if (resData.success) {
         setTestResult({
           success: true,
-          message: language === 'en' 
-            ? `Live SMTP Dispatch Success! A secure test verification email has been successfully delivered to ${testRecipient.trim()} via ${localSettings.smtpHost}.`
-            : `लाइव SMTP प्रेषण सफल! ${localSettings.smtpHost} के माध्यम से ${testRecipient.trim()} को एक सुरक्षित परीक्षण सत्यापन ईमेल सफलतापूर्वक भेजा गया है।`
+          message: `Live SMTP Dispatch Success! A secure test verification email has been successfully delivered to ${testRecipient.trim()} via ${localSettings.smtpHost}.`
         });
       } else {
         setTestResult({
           success: false,
-          message: resData.error || (language === 'en' ? "SMTP dispatch failed. Please verify credentials." : "SMTP प्रेषण विफल। कृपया क्रेडेंशियल सत्यापित करें।")
+          message: resData.error || ("SMTP dispatch failed. Please verify credentials.")
         });
       }
     } catch (error: any) {
       setTestResult({
         success: false,
-        message: error.message || (language === 'en' ? "Connection timed out or network error." : "कनेक्शन का समय समाप्त या नेटवर्क त्रुटि।")
+        message: error.message || ("Connection timed out or network error.")
       });
     } finally {
       setIsTestingSmtp(false);
@@ -1308,7 +1323,7 @@ export default function Settings({
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5 shrink-0 md:mt-0.5 text-emerald-500" />
-            <span>{language === 'en' ? 'WhatsApp & Email Auto' : 'व्हाट्सएप और ईमेल ऑटो'}</span>
+            <span>{'WhatsApp & Email Auto'}</span>
           </button>
 
           <button
@@ -1320,7 +1335,7 @@ export default function Settings({
             }`}
           >
             <KeyRound className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
-            <span>{language === 'en' ? 'User Roles & Access' : 'भूमिकाएं और अनुमतियां'}</span>
+            <span>{'User Roles & Access'}</span>
           </button>
 
           <button
@@ -1332,7 +1347,7 @@ export default function Settings({
             }`}
           >
             <History className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
-            <span>{language === 'en' ? 'User Audit Report' : 'यूजर ऑडिट रिपोर्ट'}</span>
+            <span>{'User Audit Report'}</span>
           </button>
 
           <button
@@ -1344,7 +1359,7 @@ export default function Settings({
             }`}
           >
             <Mail className="w-3.5 h-3.5 shrink-0 md:mt-0.5 text-blue-500" />
-            <span>{language === 'en' ? 'Email History' : 'ईमेल इतिहास'}</span>
+            <span>{'Email History'}</span>
             {emailLogs.length > 0 && (
               <span className="ml-auto bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.2 text-[9px] font-mono rounded-full font-bold">
                 {emailLogs.length}
@@ -1362,7 +1377,7 @@ export default function Settings({
               }`}
             >
               <Undo className="w-3 h-3" />
-              {confirmReset ? (language === 'en' ? "Confirm Reset!" : "पुष्टि करें!") : t.resetDefault}
+              {confirmReset ? ("Confirm Reset!") : t.resetDefault}
             </button>
           </div>
         </aside>
@@ -1379,8 +1394,7 @@ export default function Settings({
                   type="text" 
                   value={localSettings.companyName}
                   onChange={(e) => setLocalSettings({...localSettings, companyName: e.target.value})}
-                  className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                />
+                  className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
               </div>
 
               <div>
@@ -1389,8 +1403,7 @@ export default function Settings({
                   rows={3}
                   value={localSettings.companyAddress}
                   onChange={(e) => setLocalSettings({...localSettings, companyAddress: e.target.value})}
-                  className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                />
+                  className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -1400,8 +1413,7 @@ export default function Settings({
                     type="text" 
                     value={localSettings.currency}
                     onChange={(e) => setLocalSettings({...localSettings, currency: e.target.value})}
-                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                  />
+                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">{t.logoUrl}</label>
@@ -1410,8 +1422,7 @@ export default function Settings({
                     placeholder="https://example.com/logo.png"
                     value={localSettings.companyLogo || ''}
                     onChange={(e) => setLocalSettings({...localSettings, companyLogo: e.target.value})}
-                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                  />
+                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                 </div>
               </div>
 
@@ -1419,26 +1430,24 @@ export default function Settings({
               <div className="border-t border-dashed border-gray-200 pt-4 mt-4 space-y-4">
                 <h4 className="text-xs font-black text-[#03623c] uppercase tracking-wider flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5" />
-                  Admin Login Credentials (एडमिन क्रेडेंशियल्स)
+                  Admin Login Credentials
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Admin Username (लॉगिन आईडी)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Admin Username</label>
                     <input 
                       type="text" 
                       value={localSettings.adminUsername || 'admin'}
                       onChange={(e) => setLocalSettings({...localSettings, adminUsername: e.target.value})}
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                    />
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Admin Password (पासवर्ड)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Admin Password</label>
                     <input 
                       type="text" 
                       value={localSettings.adminPassword || 'admin123'}
                       onChange={(e) => setLocalSettings({...localSettings, adminPassword: e.target.value})}
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                    />
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-400 font-medium">Use these credentials on the portal login screen to sign in as the System Administrator.</p>
@@ -1448,115 +1457,106 @@ export default function Settings({
               <div className="border-t border-dashed border-gray-200 pt-4 mt-4 space-y-4">
                 <h4 className="text-xs font-black text-[#03623c] uppercase tracking-wider flex items-center gap-1.5">
                   <Megaphone className="w-3.5 h-3.5" />
-                  Login Info Desk Settings (लॉगिन पेज हेल्पडेस्क और नियम)
+                  Login Info Desk Settings
                 </h4>
                 
                 <div className="space-y-2">
                   <span className="text-[11px] font-black uppercase text-[#03623c] tracking-wider block">
-                    1. HR Helpdesk Contact (एचआर हेल्पलाइन व संपर्क)
+                    1. HR Helpdesk Contact
                   </span>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Manager / Desk (एचआर प्रमुख)</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Manager / Desk</label>
                       <input 
                         type="text" 
                         value={localSettings.hrContactManager || ''}
                         onChange={(e) => setLocalSettings({...localSettings, hrContactManager: e.target.value})}
                         placeholder="e.g. Rathi HR Desk"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Email (एचआर ईमेल)</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Email</label>
                       <input 
                         type="email" 
                         value={localSettings.hrContactEmail || ''}
                         onChange={(e) => setLocalSettings({...localSettings, hrContactEmail: e.target.value})}
                         placeholder="e.g. hr@rathibuildmart.com"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Phone (एचआर फोन नंबर)</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">HR Phone</label>
                       <input 
                         type="text" 
                         value={localSettings.hrContactPhone || ''}
                         onChange={(e) => setLocalSettings({...localSettings, hrContactPhone: e.target.value})}
                         placeholder="e.g. +91 91111 22222"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2 border-t border-gray-200/80 pt-3">
                   <span className="text-[11px] font-black uppercase text-teal-700 tracking-wider block">
-                    2. IT Management & Tech Support (आईटी प्रबंधन व टेक डेस्क)
+                    2. IT Management & Tech Support
                   </span>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">IT Manager / Desk (आईटी प्रमुख)</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">IT Manager / Desk</label>
                       <input 
                         type="text" 
                         value={localSettings.itContactManager || ''}
                         onChange={(e) => setLocalSettings({...localSettings, itContactManager: e.target.value})}
                         placeholder="e.g. IT & System Management Desk"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">IT Email (आईटी ईमेल)</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">IT Email</label>
                       <input 
                         type="email" 
                         value={localSettings.itContactEmail || ''}
                         onChange={(e) => setLocalSettings({...localSettings, itContactEmail: e.target.value})}
                         placeholder="e.g. it.support@rathibuildmart.com"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1.5">IT Phone (आईटी फोन नंबर)</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">IT Phone</label>
                       <input 
                         type="text" 
                         value={localSettings.itContactPhone || ''}
                         onChange={(e) => setLocalSettings({...localSettings, itContactPhone: e.target.value})}
                         placeholder="e.g. +91 98888 77777"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Standard Shift (मानक पाली समय)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Standard Shift</label>
                     <input 
                       type="text" 
                       value={localSettings.rulesShiftTiming || ''}
                       onChange={(e) => setLocalSettings({...localSettings, rulesShiftTiming: e.target.value})}
                       placeholder="e.g. 09:30 AM - 06:30 PM"
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                    />
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Half-Day Limit (हाफ-डे सीमा समय)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Half-Day Limit</label>
                     <input 
                       type="text" 
                       value={localSettings.rulesHalfDaySlot || ''}
                       onChange={(e) => setLocalSettings({...localSettings, rulesHalfDaySlot: e.target.value})}
                       placeholder="e.g. Before 01:30 PM"
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                    />
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Late Mark Grace (लेट मार्क छूट समय)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Late Mark Grace</label>
                     <input 
                       type="text" 
                       value={localSettings.rulesLatePunchGrace || ''}
                       onChange={(e) => setLocalSettings({...localSettings, rulesLatePunchGrace: e.target.value})}
                       placeholder="e.g. 09:45 AM"
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                    />
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-400 font-medium">These details appear dynamically on the portal login screen notices under "HR & Mgmt" and "Timings" tabs.</p>
@@ -1659,7 +1659,7 @@ export default function Settings({
                               title={f.isHidden ? "Hidden fields cannot be mandatory" : t.toggleMandatory}
                             >
                               {f.isMandatory ? <Lock className="w-3 h-3" /> : null}
-                              {f.isMandatory ? (language === 'en' ? 'Required' : 'अनिवार्य') : (language === 'en' ? 'Optional' : 'वैकल्पिक')}
+                              {f.isMandatory ? ('Required') : ('Optional')}
                             </button>
                           </td>
                         </tr>
@@ -1680,12 +1680,10 @@ export default function Settings({
                   <div className="space-y-0.5">
                     <h4 className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
                       <Upload className="w-4 h-4 text-emerald-700" />
-                      {language === 'en' ? 'Bulk Master Options Upload & Export (CSV)' : 'ड्रॉपडाउन मास्टर थोक आयात और एक्सपोर्ट (CSV)'}
+                      {'Bulk Master Options Upload & Export (CSV)'}
                     </h4>
                     <p className="text-[11px] text-emerald-700 font-medium">
-                      {language === 'en'
-                        ? 'Download current dropdown options, edit in Excel/CSV, and re-upload to update all master lists in bulk.'
-                        : 'मौजूदा ड्रॉपडाउन विकल्पों को डाउनलोड करें, एक्सेल में संपादित करें और थोक में अपडेट करने के लिए दोबारा अपलोड करें।'}
+                      {'Download current dropdown options, edit in Excel/CSV, and re-upload to update all master lists in bulk.'}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1694,15 +1692,14 @@ export default function Settings({
                       ref={masterFileInputRef}
                       onChange={handleMasterCSVUpload}
                       accept=".csv,.txt"
-                      className="hidden"
-                    />
+                      className="hidden" />
                     <button
                       type="button"
                       onClick={() => masterFileInputRef.current?.click()}
                       className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#03623c] hover:bg-[#024d2e] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-3xs"
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      {language === 'en' ? 'Bulk Upload CSV' : 'थोक में अपलोड करें (CSV)'}
+                      {'Bulk Upload CSV'}
                     </button>
                     <button
                       type="button"
@@ -1711,7 +1708,7 @@ export default function Settings({
                       title="Export all 7 master dropdown lists to a single CSV"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      {language === 'en' ? 'Export All Masters' : 'सभी मास्टर एक्सपोर्ट करें'}
+                      {'Export All Masters'}
                     </button>
                     <button
                       type="button"
@@ -1720,7 +1717,7 @@ export default function Settings({
                       title="Export selected list to CSV"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      {language === 'en' ? 'Export Current List' : 'वर्तमान सूची एक्सपोर्ट'}
+                      {'Export Current List'}
                     </button>
                     <button
                       type="button"
@@ -1728,7 +1725,7 @@ export default function Settings({
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 rounded-lg transition-colors cursor-pointer"
                     >
                       <FileSpreadsheet className="w-3.5 h-3.5 text-gray-500" />
-                      {language === 'en' ? 'Sample Template' : 'नमूना टेम्पलेट'}
+                      {'Sample Template'}
                     </button>
                   </div>
                 </div>
@@ -1736,7 +1733,7 @@ export default function Settings({
                 {/* CSV Format Quick Guide */}
                 <div className="bg-white/80 rounded-lg p-2.5 border border-emerald-100/60 text-[11px] text-emerald-950 space-y-1">
                   <div className="font-bold flex items-center gap-1 text-emerald-900">
-                    <span>💡 {language === 'en' ? 'How to fill data in Excel/CSV:' : 'एक्सेल/CSV में डेटा कैसे भरें:'}</span>
+                    <span>💡 {'How to fill data in Excel/CSV:'}</span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 font-mono text-[10px]">
                     <div className="bg-emerald-50/50 p-1.5 rounded border border-emerald-100">
@@ -1769,6 +1766,7 @@ export default function Settings({
                   <option value="workTimings">{t.listTimings}</option>
                   <option value="weeklyOffProfiles">{t.listWeeklyOff}</option>
                   <option value="leaveTypes">{t.listLeaves}</option>
+                  <option value="jobOpeningsList">{'Job OpeningsRecruitment Positions'}</option>
                 </select>
               </div>
 
@@ -1777,48 +1775,45 @@ export default function Settings({
                 {activeMasterList === 'workTimings' ? (
                   <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-3 shadow-3xs">
                     <div className="font-extrabold text-[11px] text-[#03623c] uppercase tracking-wider">
-                      {language === 'en' ? 'Shift Timing Builder' : 'शिफ्ट समय निर्माता'}
+                      {'Shift Timing Builder'}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                          {language === 'en' ? 'Shift Name' : 'शिफ्ट का नाम'}
+                          {'Shift Name'}
                         </label>
                         <input
                           type="text"
                           value={shiftName}
-                          placeholder={language === 'en' ? "e.g. General Shift, Night Shift" : "जैसे सामान्य शिफ्ट"}
+                          placeholder={"e.g. General Shift, Night Shift"}
                           onChange={(e) => setShiftName(e.target.value)}
-                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800"
-                        />
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                          {language === 'en' ? 'Check-In Time' : 'आगमन समय'}
+                          {'Check-In Time'}
                         </label>
                         <input
                           type="time"
                           value={shiftStart}
                           onChange={(e) => setShiftStart(e.target.value)}
-                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800"
-                        />
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                          {language === 'en' ? 'Check-Out Time' : 'प्रस्थान समय'}
+                          {'Check-Out Time'}
                         </label>
                         <input
                           type="time"
                           value={shiftEnd}
                           onChange={(e) => setShiftEnd(e.target.value)}
-                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800"
-                        />
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800" />
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-gray-100">
                       <div className="text-[11px] text-gray-500 font-semibold">
-                        <span>{language === 'en' ? 'Compiled Preview:' : 'संकलित पूर्वावलोकन:'} </span>
+                        <span>{'Compiled Preview:'} </span>
                         <code className="bg-[#03623c]/5 px-2 py-0.5 rounded font-mono font-bold text-[#03623c] text-xs">
                           {shiftName.trim() || 'Shift'} ({formatTo12Hour(shiftStart)} - {formatTo12Hour(shiftEnd)})
                         </code>
@@ -1828,7 +1823,7 @@ export default function Settings({
                         className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-3xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        {language === 'en' ? 'Add Shift' : 'शिफ्ट जोड़ें'}
+                        {'Add Shift'}
                       </button>
                     </div>
                   </div>
@@ -1840,8 +1835,7 @@ export default function Settings({
                       placeholder={t.masterPlaceholder}
                       onChange={(e) => setNewMasterVal(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddMasterItem()}
-                      className="flex-1 border border-gray-200 px-3 py-1.5 rounded text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                    />
+                      className="flex-1 border border-gray-200 px-3 py-1.5 rounded text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                     <button
                       onClick={handleAddMasterItem}
                       className="bg-[#03623c] hover:bg-[#024d2e] text-white px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
@@ -1901,8 +1895,7 @@ export default function Settings({
                     type="time" 
                     value={localSettings.defaultCheckIn}
                     onChange={(e) => setLocalSettings({...localSettings, defaultCheckIn: e.target.value})}
-                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                  />
+                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">{t.checkOut}</label>
@@ -1910,8 +1903,7 @@ export default function Settings({
                     type="time" 
                     value={localSettings.defaultCheckOut}
                     onChange={(e) => setLocalSettings({...localSettings, defaultCheckOut: e.target.value})}
-                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                  />
+                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                 </div>
               </div>
 
@@ -1922,8 +1914,7 @@ export default function Settings({
                     type="number" 
                     value={localSettings.defaultOvertimeRate}
                     onChange={(e) => setLocalSettings({...localSettings, defaultOvertimeRate: Number(e.target.value) || 0})}
-                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                  />
+                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">{t.pfRate}</label>
@@ -1932,8 +1923,7 @@ export default function Settings({
                     step="0.01"
                     value={localSettings.pfContributionRate}
                     onChange={(e) => setLocalSettings({...localSettings, pfContributionRate: Number(e.target.value) || 0})}
-                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                  />
+                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">{t.esicRate}</label>
@@ -1942,8 +1932,7 @@ export default function Settings({
                     step="0.01"
                     value={localSettings.esicContributionRate}
                     onChange={(e) => setLocalSettings({...localSettings, esicContributionRate: Number(e.target.value) || 0})}
-                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                  />
+                    className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
                 </div>
               </div>
 
@@ -1957,11 +1946,10 @@ export default function Settings({
                       type="checkbox"
                       checked={localSettings.enableHra !== false}
                       onChange={(e) => setLocalSettings({...localSettings, enableHra: e.target.checked})}
-                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                    />
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded" />
                     <div>
                       <span className="block text-xs font-bold text-gray-800">{t.enableHraLabel}</span>
-                      <span className="text-[10px] text-gray-400 font-medium">HRA (मकान किराया)</span>
+                      <span className="text-[10px] text-gray-400 font-medium">HRA</span>
                     </div>
                   </label>
 
@@ -1970,11 +1958,10 @@ export default function Settings({
                       type="checkbox"
                       checked={localSettings.enableDa !== false}
                       onChange={(e) => setLocalSettings({...localSettings, enableDa: e.target.checked})}
-                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                    />
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded" />
                     <div>
                       <span className="block text-xs font-bold text-gray-800">{t.enableDaLabel}</span>
-                      <span className="text-[10px] text-gray-400 font-medium">Dearness (DA भत्ता)</span>
+                      <span className="text-[10px] text-gray-400 font-medium">Dearness (DA Allowance)</span>
                     </div>
                   </label>
 
@@ -1983,11 +1970,10 @@ export default function Settings({
                       type="checkbox"
                       checked={localSettings.enableConveyance !== false}
                       onChange={(e) => setLocalSettings({...localSettings, enableConveyance: e.target.checked})}
-                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                    />
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded" />
                     <div>
                       <span className="block text-xs font-bold text-gray-800">{t.enableConveyanceLabel}</span>
-                      <span className="text-[10px] text-gray-400 font-medium">Conveyance (यातायात)</span>
+                      <span className="text-[10px] text-gray-400 font-medium">Conveyance</span>
                     </div>
                   </label>
 
@@ -1996,8 +1982,7 @@ export default function Settings({
                       type="checkbox"
                       checked={localSettings.enableProfessionalTax !== false}
                       onChange={(e) => setLocalSettings({...localSettings, enableProfessionalTax: e.target.checked})}
-                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                    />
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded" />
                     <div>
                       <span className="block text-xs font-bold text-gray-800">{t.enableProfessionalTaxLabel}</span>
                       <span className="text-[10px] text-gray-400 font-medium">Professional Tax (PT)</span>
@@ -2009,8 +1994,7 @@ export default function Settings({
                       type="checkbox"
                       checked={localSettings.enablePaidLeaveCalculation !== false}
                       onChange={(e) => setLocalSettings({...localSettings, enablePaidLeaveCalculation: e.target.checked})}
-                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-                    />
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded" />
                     <div>
                       <span className="block text-xs font-bold text-gray-800">{t.enablePaidLeaveLabel}</span>
                       <span className="text-[10px] text-gray-400 font-medium">Paid Leave (PL)</span>
@@ -2023,7 +2007,7 @@ export default function Settings({
                 <div className="border-t border-gray-100 pt-4 mt-4 bg-emerald-50/20 p-3 rounded-lg border border-emerald-100/50">
                   <h4 className="text-xs font-bold text-emerald-900 mb-1 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block"></span>
-                    {language === 'en' ? "Paid Leave Policy Settings" : "सवैतनिक अवकाश नीति सेटिंग्स"}
+                    {"Paid Leave Policy Settings"}
                   </h4>
                   <div className="mt-3 max-w-md">
                     <label className="block text-xs font-bold text-gray-700 mb-1">{t.paidLeaveStartAfterLabel}</label>
@@ -2033,16 +2017,14 @@ export default function Settings({
                       className="w-full border border-gray-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-[#03623c] focus:outline-none bg-white"
                     >
                       <option value={0}>{t.paidLeaveStartImmediately}</option>
-                      <option value={1}>{language === 'en' ? "After 1 Month of Service" : "1 महीने की सेवा के बाद"}</option>
-                      <option value={2}>{language === 'en' ? "After 2 Months of Service" : "2 महीने की सेवा के बाद"}</option>
-                      <option value={3}>{language === 'en' ? "After 3 Months (Standard Probation)" : "3 महीने बाद (मानक परिवीक्षा)"}</option>
-                      <option value={6}>{language === 'en' ? "After 6 Months of Service" : "6 महीने की सेवा के बाद"}</option>
-                      <option value={12}>{language === 'en' ? "After 1 Year of Service" : "1 वर्ष की सेवा के बाद"}</option>
+                      <option value={1}>{"After 1 Month of Service"}</option>
+                      <option value={2}>{"After 2 Months of Service"}</option>
+                      <option value={3}>{"After 3 Months (Standard Probation)"}</option>
+                      <option value={6}>{"After 6 Months of Service"}</option>
+                      <option value={12}>{"After 1 Year of Service"}</option>
                     </select>
                     <p className="text-[10px] text-gray-400 font-medium mt-1">
-                      {language === 'en' 
-                        ? "Paid Leave (Earned Leave) will only be credited/applicable if employee's tenure (joining date) meets this waiting period."
-                        : "सवैतनिक अवकाश (अर्जित अवकाश) केवल तभी लागू/जमा होगा जब कर्मचारी का कार्यकाल (शामिल होने की तिथि) इस प्रतीक्षा अवधि को पूरा करता है।"}
+                      {"Paid Leave (Earned Leave) will only be credited/applicable if employee's tenure (joining date) meets this waiting period."}
                     </p>
                   </div>
                 </div>
@@ -2055,9 +2037,7 @@ export default function Settings({
                   {t.employeePortalSettingsTitle}
                 </h4>
                 <p className="text-[10px] text-gray-400 font-medium mb-3">
-                  {language === 'en' 
-                    ? "Configure feature visibility and permissions for logged-in employees."
-                    : "लॉग इन किए गए कर्मचारियों के लिए फीचर दृश्यता और अनुमतियों को कॉन्फ़िगर करें।"}
+                  {"Configure feature visibility and permissions for logged-in employees."}
                 </p>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
@@ -2066,14 +2046,11 @@ export default function Settings({
                       type="checkbox"
                       checked={localSettings.enableEmployeePayslips === true}
                       onChange={(e) => setLocalSettings({...localSettings, enableEmployeePayslips: e.target.checked})}
-                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
-                    />
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer" />
                     <div>
                       <span className="block text-xs font-bold text-gray-800">{t.enableEmployeePayslipsLabel}</span>
                       <span className="text-[9px] text-slate-400 font-medium block mt-0.5">
-                        {language === 'en'
-                          ? "Currently: " + (localSettings.enableEmployeePayslips ? "ON" : "OFF (Deactivated for Employees)")
-                          : "वर्तमान स्थिति: " + (localSettings.enableEmployeePayslips ? "सक्रिय (ON)" : "निष्क्रिय (OFF - कर्मचारियों के लिए बंद)")}
+                        {"Currently: " + (localSettings.enableEmployeePayslips ? "Active (ON)" : "Disabled (OFF - Hidden for Employees)")}
                       </span>
                     </div>
                   </label>
@@ -2083,16 +2060,13 @@ export default function Settings({
                       type="checkbox"
                       checked={localSettings.enableMobileAttendance !== false}
                       onChange={(e) => setLocalSettings({...localSettings, enableMobileAttendance: e.target.checked})}
-                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
-                    />
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer" />
                     <div>
                       <span className="block text-xs font-bold text-gray-800">
-                        {language === 'en' ? "Enable Mobile Attendance & Punching" : "कर्मचारी मोबाइल स्व-उपस्थिति सक्षम करें"}
+                        {"Enable Mobile Attendance & Punching"}
                       </span>
                       <span className="text-[9px] text-slate-400 font-medium block mt-0.5">
-                        {language === 'en'
-                          ? "Currently: " + (localSettings.enableMobileAttendance !== false ? "ON" : "OFF (Disabled for Employees)")
-                          : "वर्तमान स्थिति: " + (localSettings.enableMobileAttendance !== false ? "सक्रिय (ON)" : "निष्क्रिय (OFF - बंद)")}
+                        {"Currently: " + (localSettings.enableMobileAttendance !== false ? "Active (ON)" : "Disabled (OFF)")}
                       </span>
                     </div>
                   </label>
@@ -2102,16 +2076,13 @@ export default function Settings({
                       type="checkbox"
                       checked={localSettings.enablePasswordLoginOtp === true}
                       onChange={(e) => setLocalSettings({...localSettings, enablePasswordLoginOtp: e.target.checked})}
-                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
-                    />
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer" />
                     <div>
                       <span className="block text-xs font-bold text-gray-800">
-                        {language === 'en' ? "2FA Password Login OTP" : "पासवर्ड लॉगिन पर 2FA ओटीपी"}
+                        {"2FA Password Login OTP"}
                       </span>
                       <span className="text-[9px] text-slate-400 font-medium block mt-0.5">
-                        {language === 'en'
-                          ? "Currently: " + (localSettings.enablePasswordLoginOtp ? "ON (Mandatory OTP)" : "OFF (Password Only)")
-                          : "वर्तमान स्थिति: " + (localSettings.enablePasswordLoginOtp ? "चालू (ओटीपी जरूरी)" : "बंद (केवल पासवर्ड)")}
+                        {"Currently: " + (localSettings.enablePasswordLoginOtp ? "Active (ON - Mandatory OTP)" : "Disabled (OFF)")}
                       </span>
                     </div>
                   </label>
@@ -2123,17 +2094,14 @@ export default function Settings({
                         checked={localSettings.enableAdminWelcomePopup !== false}
                         onChange={(e) => setLocalSettings({...localSettings, enableAdminWelcomePopup: e.target.checked})}
                         className="w-4 h-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded cursor-pointer"
-                        id="chk-enable-admin-welcome-popup"
-                      />
+                        id="chk-enable-admin-welcome-popup" />
                       <div>
                         <span className="block text-xs font-bold text-gray-900 flex items-center gap-1">
                           <Crown className="w-3.5 h-3.5 text-amber-500" />
-                          {language === 'en' ? "Admin 'Welcome Boss' Animation Popup" : "एडमिन 'Welcome Boss' एनिमेटेड पॉपअप"}
+                          {"Admin 'Welcome Boss' Animation Popup"}
                         </span>
                         <span className="text-[9px] text-slate-500 font-medium block mt-0.5">
-                          {language === 'en'
-                            ? "Currently: " + (localSettings.enableAdminWelcomePopup !== false ? "ON (Auto Good Morning/Evening Greeting)" : "OFF (Disabled)")
-                            : "वर्तमान स्थिति: " + (localSettings.enableAdminWelcomePopup !== false ? "सक्रिय (ON - समय अनुसार ग्रीटिंग)" : "निष्क्रिय (OFF)")}
+                          {"Currently: " + (localSettings.enableAdminWelcomePopup !== false ? "Active (ON - Greeting Enabled)" : "Disabled (OFF)")}
                         </span>
                       </div>
                     </label>
@@ -2144,7 +2112,7 @@ export default function Settings({
                       id="btn-preview-welcome-popup"
                     >
                       <Sparkles className="w-3 h-3 text-amber-600" />
-                      {language === 'en' ? "Preview Animation" : "एनिमेशन टेस्ट करें"}
+                      {"Preview Animation"}
                     </button>
                   </div>
                 </div>
@@ -2155,12 +2123,10 @@ export default function Settings({
                     <div>
                       <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <MapPin className="w-4 h-4 text-emerald-600" />
-                        {language === 'en' ? "Secure Mobile Geofencing & Location Lock" : "सुरक्षित मोबाइल जियोफेंसिंग और लोकेशन लॉक"}
+                        {"Secure Mobile Geofencing & Location Lock"}
                       </h5>
                       <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                        {language === 'en' 
-                          ? "Restrict employee attendance marking to designated office branches or outlet geofences."
-                          : "कर्मचारी उपस्थिति दर्ज करने की प्रक्रिया को केवल नामित कार्यालय शाखाओं या आउटलेट जियोफेंस तक सीमित करें।"}
+                        {"Restrict employee attendance marking to designated office branches or outlet geofences."}
                       </p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -2168,11 +2134,10 @@ export default function Settings({
                         type="checkbox" 
                         checked={localSettings.enableGeofencing === true}
                         onChange={(e) => setLocalSettings({...localSettings, enableGeofencing: e.target.checked})}
-                        className="sr-only peer"
-                      />
+                        className="sr-only peer" />
                       <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
                       <span className="ml-2 text-xs font-bold text-slate-700">
-                        {localSettings.enableGeofencing ? (language === 'en' ? "ACTIVE" : "सक्रिय") : (language === 'en' ? "INACTIVE" : "निष्क्रिय")}
+                        {localSettings.enableGeofencing ? ("ACTIVE") : ("INACTIVE")}
                       </span>
                     </label>
                   </div>
@@ -2182,13 +2147,13 @@ export default function Settings({
                       {/* Register New Branch Form */}
                       <div className="bg-slate-50/70 p-3 rounded-lg border border-slate-150">
                         <span className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-2.5">
-                          {language === 'en' ? "Register Secure Branch Geofence" : "नया सुरक्षित जियोफेंस शाखा पंजीकृत करें"}
+                          {"Register Secure Branch Geofence"}
                         </span>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              {language === 'en' ? "Branch Name" : "शाखा का नाम"}
+                              {"Branch Name"}
                             </label>
                             <div className="space-y-1.5">
                               <select
@@ -2203,11 +2168,11 @@ export default function Settings({
                                 }}
                                 className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                               >
-                                <option value="">{language === 'en' ? "-- Select Registered Branch --" : "-- पंजीकृत शाखा चुनें --"}</option>
+                                <option value="">{"-- Select Registered Branch --"}</option>
                                 {(localSettings.branches || []).map((b) => (
                                   <option key={b} value={b}>{b}</option>
                                 ))}
-                                <option value="custom">{language === 'en' ? "Other / Custom Branch..." : "अन्य / कस्टम शाखा..."}</option>
+                                <option value="custom">{"OtherCustom Branch..."}</option>
                               </select>
                               
                               {(!localSettings.branches || localSettings.branches.length === 0 || !(localSettings.branches || []).includes(newOutletName)) && (
@@ -2215,25 +2180,24 @@ export default function Settings({
                                   type="text"
                                   value={newOutletName}
                                   onChange={(e) => setNewOutletName(e.target.value)}
-                                  placeholder={language === 'en' ? "Type branch name manually..." : "शाखा का नाम टाइप करें..."}
-                                  className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                                />
+                                  placeholder={"Type branch name manually..."}
+                                  className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
                               )}
                             </div>
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              {language === 'en' ? "Geofence Radius (Meters)" : "अनुमत जियोफेंस दायरा (मीटर)"}
+                              {"Geofence Radius (Meters)"}
                             </label>
                             <select
                               value={newOutletRadius}
                               onChange={(e) => setNewOutletRadius(Number(e.target.value) || 100)}
                               className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                             >
-                              <option value={50}>50 {language === 'en' ? "Meters (High Security / Inside Office Only)" : "मीटर (उच्च सुरक्षा - केवल ऑफिस के अंदर)"}</option>
-                              <option value={100}>100 {language === 'en' ? "Meters (Recommended Office Standard)" : "मीटर (अनुशंसित मानक)"}</option>
-                              <option value={200}>200 {language === 'en' ? "Meters (Large Facility / Compound)" : "मीटर (बड़ा परिसर/फैक्ट्री)"}</option>
-                              <option value={500}>500 {language === 'en' ? "Meters (Wider Area Boundary)" : "मीटर (विस्तृत क्षेत्र)"}</option>
+                              <option value={50}>50 {"Meters (High SecurityInside Office Only)"}</option>
+                              <option value={100}>100 {"Meters (Recommended Office Standard)"}</option>
+                              <option value={200}>200 {"Meters (Large FacilityCompound)"}</option>
+                              <option value={500}>500 {"Meters (Wider Area Boundary)"}</option>
                             </select>
                           </div>
                         </div>
@@ -2241,19 +2205,18 @@ export default function Settings({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                           <div>
                             <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              {language === 'en' ? "Latitude (e.g., 21.2514)" : "अक्षांश (Latitude - जैसे, 21.2514)"}
+                              {"Latitude (e.g., 21.2514)"}
                             </label>
                             <input 
                               type="text"
                               value={newOutletLat}
                               onChange={(e) => setNewOutletLat(e.target.value)}
                               placeholder="e.g. 21.251412"
-                              className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-mono font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                            />
+                              className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-mono font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              {language === 'en' ? "Longitude (e.g., 81.6296)" : "देशांतर (Longitude - जैसे, 81.6296)"}
+                              {"Longitude (e.g., 81.6296)"}
                             </label>
                             <div className="flex gap-2">
                               <input 
@@ -2261,17 +2224,16 @@ export default function Settings({
                                 value={newOutletLng}
                                 onChange={(e) => setNewOutletLng(e.target.value)}
                                 placeholder="e.g. 81.629615"
-                                className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-mono font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                              />
+                                className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded text-xs font-mono font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
                               <button
                                 type="button"
                                 onClick={fetchAdminLocation}
                                 disabled={isFetchingAdminCoords}
                                 className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 border border-slate-250 text-slate-700 text-xs font-bold rounded flex items-center gap-1 cursor-pointer transition-colors shrink-0"
-                                title={language === 'en' ? "Capture current GPS location" : "वर्तमान स्थान का जीपीएस कैप्चर करें"}
+                                title={"Capture current GPS location"}
                               >
                                 <Locate className={`w-3.5 h-3.5 ${isFetchingAdminCoords ? 'animate-spin text-emerald-600' : ''}`} />
-                                <span>{isFetchingAdminCoords ? "..." : (language === 'en' ? "Get GPS" : "स्थान प्राप्त करें")}</span>
+                                <span>{isFetchingAdminCoords ? "..." : ("Get GPS")}</span>
                               </button>
                             </div>
                           </div>
@@ -2284,7 +2246,7 @@ export default function Settings({
                             className="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-4 py-2 rounded-md shadow-2xs flex items-center gap-1 cursor-pointer transition-colors"
                           >
                             <Plus className="w-3.5 h-3.5" />
-                            <span>{language === 'en' ? "Lock Location & Save" : "लोकेशन लॉक करें और जोड़ें"}</span>
+                            <span>{"Lock Location & Save"}</span>
                           </button>
                         </div>
                       </div>
@@ -2292,24 +2254,22 @@ export default function Settings({
                       {/* Registered Locations List */}
                       <div>
                         <span className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
-                          {language === 'en' ? "Active Safe Geofences" : "सक्रिय सुरक्षित जियोफेंस सूची"}
+                          {"Active Safe Geofences"}
                         </span>
 
                         {(!localSettings.geofenceOutlets || localSettings.geofenceOutlets.length === 0) ? (
                           <div className="text-center py-6 px-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs font-medium">
-                            {language === 'en' 
-                              ? "No location geofences configured. Register at least one branch coordinates above to activate mobile punch restrictions." 
-                              : "कोई जियोफेंस कॉन्फ़िगर नहीं किया गया है। मोबाइल उपस्थिति को लॉक करने के लिए ऊपर शाखा कोऑर्डिनेट्स जोड़ें।"}
+                            {"No location geofences configured. Register at least one branch coordinates above to activate mobile punch restrictions."}
                           </div>
                         ) : (
                           <div className="overflow-x-auto border border-slate-150 rounded-lg">
                             <table className="w-full text-left text-xs">
                               <thead className="bg-slate-55 border-b border-slate-150 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
                                 <tr>
-                                  <th className="px-3 py-2">{language === 'en' ? "Branch Name" : "शाखा का नाम"}</th>
-                                  <th className="px-3 py-2">{language === 'en' ? "GPS Coordinates" : "जीपीएस कोऑर्डिनेट्स"}</th>
-                                  <th className="px-3 py-2">{language === 'en' ? "Safe Radius" : "सुरक्षित दायरा"}</th>
-                                  <th className="px-3 py-2 text-right">{language === 'en' ? "Action" : "कार्रवाई"}</th>
+                                  <th className="px-3 py-2">{"Branch Name"}</th>
+                                  <th className="px-3 py-2">{"GPS Coordinates"}</th>
+                                  <th className="px-3 py-2">{"Safe Radius"}</th>
+                                  <th className="px-3 py-2 text-right">{"Action"}</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -2329,7 +2289,7 @@ export default function Settings({
                                         type="button"
                                         onClick={() => handleRemoveGeofenceOutlet(outlet.id)}
                                         className="text-red-600 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer transition-colors inline-flex"
-                                        title={language === 'en' ? "Delete branch geofence lock" : "शाखा जियोफेंस लॉक हटाएं"}
+                                        title={"Delete branch geofence lock"}
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
@@ -2353,12 +2313,10 @@ export default function Settings({
               <div className="border-b border-gray-150 dark:border-[#1e3a2f] pb-4">
                 <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 text-rose-500 dark:text-rose-400" />
-                  {language === 'en' ? 'Portal Security Audit Log' : 'पोर्टल सुरक्षा ऑडिट लॉग'}
+                  {'Portal Security Audit Log'}
                 </h3>
                 <p className="text-[11px] text-gray-500 dark:text-slate-400 font-medium mt-1">
-                  {language === 'en' 
-                    ? 'Monitor failed login attempts to recognize potential security breaches, unauthorized entry attempts, or employees struggling with forgotten passwords.'
-                    : 'भूले हुए पासवर्ड या संभावित अनधिकृत पहुंच का पता लगाने के लिए असफल लॉगिन प्रयासों की निगरानी करें।'}
+                  {'Monitor failed login attempts to recognize potential security breaches, unauthorized entry attempts, or employees struggling with forgotten passwords.'}
                 </p>
               </div>
 
@@ -2366,48 +2324,48 @@ export default function Settings({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-[#11221b] flex flex-col justify-between shadow-xs">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
-                    {language === 'en' ? 'Total Unsuccessful Attempts' : 'कुल असफल प्रयास'}
+                    {'Total Unsuccessful Attempts'}
                   </span>
                   <div className="flex items-baseline gap-2 mt-2">
                     <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
                       {failedLogins.length}
                     </span>
                     <span className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold font-mono">
-                      {language === 'en' ? 'logs' : 'लॉग'}
+                      {'logs'}
                     </span>
                   </div>
                 </div>
 
                 <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-white dark:bg-[#11221b] flex flex-col justify-between shadow-xs">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                    {language === 'en' ? 'Unique IDs Targeted' : 'लक्षित विशिष्ट आईडी'}
+                    {'Unique IDs Targeted'}
                   </span>
                   <div className="flex items-baseline gap-2 mt-2">
                     <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
                       {new Set(failedLogins.map(l => l.enteredId.toLowerCase())).size}
                     </span>
                     <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold font-mono">
-                      {language === 'en' ? 'user IDs' : 'उपयोगकर्ता आईडी'}
+                      {'user IDs'}
                     </span>
                   </div>
                 </div>
 
                 <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-white dark:bg-[#11221b] flex flex-col justify-between shadow-xs">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                    {language === 'en' ? 'System Audit Status' : 'सिस्टम ऑडिट स्थिति'}
+                    {'System Audit Status'}
                   </span>
                   <div className="flex items-center gap-2 mt-2">
                     {failedLogins.length >= 8 ? (
                       <span className="inline-flex items-center gap-1 text-xs font-black text-rose-700 dark:text-rose-200 bg-rose-100 dark:bg-rose-950/80 px-2.5 py-1 rounded-full animate-pulse border border-rose-200 dark:border-rose-800">
-                        ⚠️ {language === 'en' ? 'High Fail Rate' : 'उच्च विफलता दर'}
+                        ⚠️ {'High Fail Rate'}
                       </span>
                     ) : failedLogins.length > 0 ? (
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-800">
-                        ℹ️ {language === 'en' ? 'Minor Incidents' : 'मामूली घटनाएं'}
+                        ℹ️ {'Minor Incidents'}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
-                        ✓ {language === 'en' ? 'Secure & Stable' : 'सुरक्षित और स्थिर'}
+                        ✓ {'Secure & Stable'}
                       </span>
                     )}
                   </div>
@@ -2429,17 +2387,15 @@ export default function Settings({
                       <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                       <div className="space-y-1">
                         <h4 className="text-xs font-black text-amber-900 dark:text-amber-300 uppercase tracking-wide">
-                          {language === 'en' ? 'Security Action Warning Required' : 'सुरक्षा चेतावनी - ध्यान दें'}
+                          {'Security Action Warning Required'}
                         </h4>
                         <p className="text-[10px] text-amber-800 dark:text-amber-200 font-semibold leading-relaxed">
-                          {language === 'en' 
-                            ? 'The following User/Employee IDs have 3 or more unsuccessful login attempts. This could suggest forgotten passwords or unauthorized brute-forcing attempts:' 
-                            : 'निम्नलिखित उपयोगकर्ता/कर्मचारी आईडी पर 3 या अधिक असफल प्रयास दर्ज किए गए हैं:'}
+                          {'The following User/Employee IDs have 3 or more unsuccessful login attempts. This could suggest forgotten passwords or unauthorized brute-forcing attempts:'}
                         </p>
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {flaggedIds.map(([id, count]) => (
                             <span key={id} className="inline-flex items-center bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 text-[10px] font-black px-2.5 py-1 rounded-md font-mono border border-amber-300 dark:border-amber-700 shadow-xs">
-                              {id} ({count} {language === 'en' ? 'fails' : 'प्रयास'})
+                              {id} ({count} {'fails'})
                             </span>
                           ))}
                         </div>
@@ -2458,11 +2414,10 @@ export default function Settings({
                     <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input 
                       type="text"
-                      placeholder={language === 'en' ? 'Search Employee ID...' : 'कर्मचारी आईडी खोजें...'}
+                      placeholder={'Search Employee ID...'}
                       value={securitySearch}
                       onChange={(e) => setSecuritySearch(e.target.value)}
-                      className="pl-9 pr-4 py-1.5 border border-gray-200 dark:border-[#1e3a2f] bg-white dark:bg-[#11221b] text-slate-800 dark:text-slate-100 rounded-lg text-xs font-bold w-full sm:w-48 focus:outline-none focus:ring-1 focus:ring-[#03623c] font-mono shadow-2xs"
-                    />
+                      className="pl-9 pr-4 py-1.5 border border-gray-200 dark:border-[#1e3a2f] bg-white dark:bg-[#11221b] text-slate-800 dark:text-slate-100 rounded-lg text-xs font-bold w-full sm:w-48 focus:outline-none focus:ring-1 focus:ring-[#03623c] font-mono shadow-2xs" />
                   </div>
 
                   {/* Filter Reason dropdown */}
@@ -2473,10 +2428,10 @@ export default function Settings({
                       onChange={(e: any) => setSecurityReasonFilter(e.target.value)}
                       className="text-xs font-bold text-gray-700 dark:text-slate-200 bg-transparent border-none focus:outline-none focus:ring-0 cursor-pointer"
                     >
-                      <option value="all" className="dark:bg-[#11221b]">{language === 'en' ? 'All Reasons' : 'सभी कारण'}</option>
-                      <option value="Incorrect Password" className="dark:bg-[#11221b]">{language === 'en' ? 'Incorrect Password' : 'गलत पासवर्ड'}</option>
-                      <option value="User ID not found" className="dark:bg-[#11221b]">{language === 'en' ? 'ID Not Found' : 'आईडी नहीं मिली'}</option>
-                      <option value="Admin Incorrect Password" className="dark:bg-[#11221b]">{language === 'en' ? 'Admin Bad Password' : 'एडमिन गलत पासवर्ड'}</option>
+                      <option value="all" className="dark:bg-[#11221b]">{'All Reasons'}</option>
+                      <option value="Incorrect Password" className="dark:bg-[#11221b]">{'Incorrect Password'}</option>
+                      <option value="User ID not found" className="dark:bg-[#11221b]">{'ID Not Found'}</option>
+                      <option value="Admin Incorrect Password" className="dark:bg-[#11221b]">{'Admin Bad Password'}</option>
                     </select>
                   </div>
                 </div>
@@ -2485,19 +2440,19 @@ export default function Settings({
                 {failedLogins.length > 0 && onClearFailedLogins && (
                   <button
                     onClick={() => {
-                      if (window.confirm(language === 'en' ? 'Are you sure you want to permanently clear all unsuccessful login attempts logs?' : 'क्या आप स्थायी रूप से सभी असफल लॉगिन लॉग साफ़ करना चाहते हैं?')) {
+                      if (window.confirm('Are you sure you want to permanently clear all unsuccessful login attempts logs?')) {
                         onClearFailedLogins();
                       }
                     }}
                     className="text-xs font-black text-rose-600 dark:text-rose-400 hover:text-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-3 py-1.5 rounded-lg border border-rose-200/50 dark:border-rose-900/50 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-97"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    {language === 'en' ? 'Clear Security Log' : 'सुरक्षा लॉग साफ़ करें'}
+                    {'Clear Security Log'}
                   </button>
                 )}
               </div>
 
-              {/* Log Table / List */}
+              {/* Log TableList */}
               {(() => {
                 const filteredLogs = failedLogins.filter(log => {
                   const matchesSearch = log.enteredId.toLowerCase().includes(securitySearch.toLowerCase());
@@ -2509,7 +2464,7 @@ export default function Settings({
                   return (
                     <div className="border border-dashed border-gray-250 dark:border-[#1e3a2f] rounded-2xl p-10 text-center font-sans">
                       <p className="text-sm text-gray-500 dark:text-slate-400 italic">
-                        {language === 'en' ? 'No failed login attempts found.' : 'कोई असफल लॉगिन प्रयास नहीं मिला।'}
+                        {'No failed login attempts found.'}
                       </p>
                     </div>
                   );
@@ -2520,11 +2475,11 @@ export default function Settings({
                     <table className="w-full text-left border-collapse text-xs font-sans">
                       <thead className="bg-slate-50 dark:bg-[#0f2b20] border-b border-gray-200 dark:border-[#1e3a2f] text-slate-600 dark:text-slate-300 font-black uppercase text-[10px] tracking-wider sticky top-0 z-10">
                         <tr>
-                          <th className="p-3">{language === 'en' ? 'Entered ID' : 'दर्ज की गई आईडी'}</th>
-                          <th className="p-3">{language === 'en' ? 'Timestamp' : 'समय और तारीख'}</th>
-                          <th className="p-3">{language === 'en' ? 'Failure Reason' : 'विफलता का कारण'}</th>
-                          <th className="p-3">{language === 'en' ? 'IP Address' : 'आईपी पता'}</th>
-                          <th className="p-3">{language === 'en' ? 'Browser Details' : 'ब्राउज़र विवरण'}</th>
+                          <th className="p-3">{'Entered ID'}</th>
+                          <th className="p-3">{'Timestamp'}</th>
+                          <th className="p-3">{'Failure Reason'}</th>
+                          <th className="p-3">{'IP Address'}</th>
+                          <th className="p-3">{'Browser Details'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-[#1e3a2f] font-semibold text-slate-700 dark:text-slate-200">
@@ -2562,12 +2517,10 @@ export default function Settings({
               <div>
                 <h3 className="text-xs font-bold text-gray-800 border-b border-gray-100 pb-2 flex items-center gap-1.5">
                   <Database className="w-4 h-4 text-slate-600" />
-                  {language === 'en' ? 'Database Synchronization & Session Management' : 'डेटाबेस सिंक्रनाइज़ेशन और सत्र प्रबंधन'}
+                  {'Database Synchronization & Session Management'}
                 </h3>
                 <p className="text-[10px] text-gray-500 mt-1 leading-normal font-sans">
-                  {language === 'en' 
-                    ? 'Manage your cloud storage connections, monitor live storage consumption (KB/MB), troubleshoot Google Sheets sync errors, or backup and restore your complete HRMS database.' 
-                    : 'अपने क्लाउड स्टोरेज कनेक्शन प्रबंधित करें, लाइव स्टोरेज (केबी/एमबी) उपयोग की निगरानी करें, Google Sheets सिंक त्रुटियों को दूर करें, या संपूर्ण डेटाबेस बैकअप लें।'}
+                  {'Manage your cloud storage connections, monitor live storage consumption (KB/MB), troubleshoot Google Sheets sync errors, or backup and restore your complete HRMS database.'}
                 </p>
               </div>
 
@@ -2585,8 +2538,7 @@ export default function Settings({
                 passwordRequests={passwordRequests}
                 auditLogs={auditLogs}
                 onClearEmailLogs={onClearEmailLogs}
-                onClearAuditLogs={onClearAuditLogs}
-              />
+                onClearAuditLogs={onClearAuditLogs} />
 
               {/* Troubleshooting Card */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs font-sans">
@@ -2596,12 +2548,10 @@ export default function Settings({
                   </div>
                   <div className="space-y-1">
                     <h4 className="text-xs font-bold text-slate-800">
-                      {language === 'en' ? 'Troubleshoot "Failed to Fetch" Sync Errors' : '"Failed to Fetch" सिंक त्रुटियों का समाधान करें'}
+                      {'Troubleshoot "Failed to Fetch" Sync Errors'}
                     </h4>
                     <p className="text-[10px] text-slate-500 leading-normal font-semibold">
-                      {language === 'en'
-                        ? 'If you are seeing a persistent Google Sheets sync error or "Failed to Fetch", it is typically caused by cookie tracking protection, local ad-blockers, or an expired/invalid Google OAuth token. Clearing your Google Sheets credentials cache allows you to log back in cleanly and recreate the connection.'
-                        : 'यदि आप लगातार Google Sheets सिंक त्रुटि या "Failed to Fetch" देख रहे हैं, तो यह आमतौर पर कुकी ट्रैकिंग सुरक्षा, स्थानीय विज्ञापन-अवरोधकों (ad-blockers), या एक समाप्त/अमान्य Google OAuth टोकन के कारण होता है। अपने Google Sheets क्रेडेंशियल कैश को साफ़ करने से आप आसानी से दोबारा लॉग इन कर सकते हैं।'}
+                      {'If you are seeing a persistent Google Sheets sync error or "Failed to Fetch", it is typically caused by cookie tracking protection, local ad-blockers, or an expired/invalid Google OAuth token. Clearing your Google Sheets credentials cache allows you to log back in cleanly and recreate the connection.'}
                     </p>
                   </div>
                 </div>
@@ -2612,15 +2562,13 @@ export default function Settings({
                     onClick={() => {
                       if (onClearSheetsSession) {
                         onClearSheetsSession();
-                        alert(language === 'en' 
-                          ? 'Google Sheets token cache cleared. Please refresh the page and authorize Google Sheets again.' 
-                          : 'Google Sheets टोकन कैश साफ़ कर दिया गया है। कृपया पृष्ठ को रीफ़्रेश करें और Google Sheets को फिर से अधिकृत करें।');
+                        alert('Google Sheets token cache cleared. Please refresh the page and authorize Google Sheets again.');
                       }
                     }}
                     className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    {language === 'en' ? 'Clear Google Sheets Cache & Reset Session' : 'Google Sheets कैश साफ़ करें और सत्र रीसेट करें'}
+                    {'Clear Google Sheets Cache & Reset Session'}
                   </button>
                 </div>
               </div>
@@ -2633,12 +2581,10 @@ export default function Settings({
                   </div>
                   <div className="space-y-1">
                     <h4 className="text-xs font-bold text-slate-800">
-                      {language === 'en' ? 'JSON Database Backup & Direct Instance Syncing' : 'JSON डेटाबेस बैकअप और डायरेक्ट इंस्टेंस सिंकिंग'}
+                      {'JSON Database Backup & Direct Instance Syncing'}
                     </h4>
                     <p className="text-[10px] text-slate-500 leading-normal font-semibold">
-                      {language === 'en'
-                        ? 'Want to transfer your live production data from https://hrmsrbm.onrender.com/ into this development workspace? You can export the whole database in 1-click as a JSON backup file from your live instance, and import it here. The data will merge cleanly and automatically synchronize to your active Cloud Firestore.'
-                        : 'क्या आप https://hrmsrbm.onrender.com/ से अपने वास्तविक लाइव डेटा को इस विकास कार्यक्षेत्र में स्थानांतरित करना चाहते हैं? आप अपने लाइव इंस्टेंस से संपूर्ण डेटाबेस को 1-क्लिक में JSON बैकअप फ़ाइल के रूप में निर्यात कर सकते हैं, और इसे यहाँ आयात कर सकते हैं। डेटा आसानी से मर्ज हो जाएगा और आपके सक्रिय क्लाउड फायरस्टोर में स्वतः सिंक्रनाइज़ हो जाएगा।'}
+                      {'Want to transfer your live production data from https://hrmsrbm.onrender.cominto this development workspace? You can export the whole database in 1-click as a JSON backup file from your live instance, and import it here. The data will merge cleanly and automatically synchronize to your active Cloud Firestore.'}
                     </p>
                   </div>
                 </div>
@@ -2648,12 +2594,10 @@ export default function Settings({
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between space-y-3">
                     <div>
                       <h5 className="text-[11px] font-bold text-slate-800 mb-1">
-                        {language === 'en' ? 'Export Database' : 'डेटाबेस निर्यात करें'}
+                        {'Export Database'}
                       </h5>
                       <p className="text-[9px] text-slate-500 leading-normal">
-                        {language === 'en'
-                          ? 'Download all employees, attendance archives, payroll records, and customized settings configuration as a local JSON backup.'
-                          : 'सभी कर्मचारियों, उपस्थिति अभिलेखागार, पेरोल रिकॉर्ड और अनुकूलित सेटिंग्स कॉन्फ़िगरेशन को स्थानीय JSON बैकअप के रूप में डाउनलोड करें।'}
+                        {'Download all employees, attendance archives, payroll records, and customized settings configuration as a local JSON backup.'}
                       </p>
                     </div>
                     <button
@@ -2662,7 +2606,7 @@ export default function Settings({
                       className="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 text-[10px] font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-slate-300"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      {language === 'en' ? 'Download JSON Backup' : 'JSON बैकअप डाउनलोड करें'}
+                      {'Download JSON Backup'}
                     </button>
                   </div>
 
@@ -2670,12 +2614,10 @@ export default function Settings({
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between space-y-3">
                     <div>
                       <h5 className="text-[11px] font-bold text-slate-800 mb-1">
-                        {language === 'en' ? 'Import Database' : 'डेटाबेस आयात करें'}
+                        {'Import Database'}
                       </h5>
                       <p className="text-[9px] text-slate-500 leading-normal">
-                        {language === 'en'
-                          ? 'Upload a previously exported JSON backup file to overwrite current workspace records and sync to Cloud Firestore.'
-                          : 'वर्तमान कार्यक्षेत्र रिकॉर्ड को अधिलेखित करने और क्लाउड फायरस्टोर से सिंक करने के लिए पहले निर्यात की गई JSON बैकअप फ़ाइल अपलोड करें।'}
+                        {'Upload a previously exported JSON backup file to overwrite current workspace records and sync to Cloud Firestore.'}
                       </p>
                     </div>
                     
@@ -2686,8 +2628,7 @@ export default function Settings({
                           type="file"
                           accept=".json"
                           onChange={handleFileChange}
-                          className="block w-full text-[9px] text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[9px] file:font-black file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-                        />
+                          className="block w-full text-[9px] text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[9px] file:font-black file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer" />
                       </label>
 
                       {importError && (
@@ -2705,7 +2646,7 @@ export default function Settings({
                             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black py-1.5 rounded transition-all cursor-pointer flex items-center justify-center gap-1"
                           >
                             <Upload className="w-3 h-3" />
-                            {language === 'en' ? 'Confirm Overwrite & Import Now' : 'अधिलेखन की पुष्टि करें और अभी आयात करें'}
+                            {'Confirm Overwrite & Import Now'}
                           </button>
                         </div>
                       )}
@@ -2721,12 +2662,10 @@ export default function Settings({
               <div>
                 <h3 className="text-xs font-bold text-gray-800 border-b border-gray-100 pb-2 flex items-center gap-1.5">
                   <KeyRound className="w-4 h-4 text-emerald-600" />
-                  {language === 'en' ? 'User Roles & Access Permissions' : 'मल्टी-यूज़र भूमिकाएं और अनुमतियां'}
+                  {'User Roles & Access Permissions'}
                 </h3>
                 <p className="text-[10px] text-gray-500 mt-1 leading-normal font-sans">
-                  {language === 'en'
-                    ? 'Define custom login accounts for different stakeholders (Admin, Director, HR, Branch Manager) and configure which dashboard modules they are allowed to access.'
-                    : 'विभिन्न हितधारकों (एडमिन, डायरेक्टर, एचआर, ब्रांच मैनेजर) के लिए लॉगिन खाते परिभाषित करें और कॉन्फ़िगर करें कि उन्हें किन डैशबोर्ड मॉड्यूल तक पहुंचने की अनुमति है।'}
+                  {'Define custom login accounts for different stakeholders (Admin, Director, HR, Branch Manager) and configure which dashboard modules they are allowed to access.'}
                 </p>
               </div>
 
@@ -2735,22 +2674,23 @@ export default function Settings({
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    {language === 'en' ? 'Granular Permission Matrix' : 'विस्तृत अनुमति नियंत्रण मैट्रिक्स'}
+                    {'Granular Permission Matrix'}
                   </h4>
                   <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
-                    {language === 'en'
-                      ? 'Select a user role, then toggle checkboxes to configure granular action-level access (View, Add, Edit, Delete/Approve) for each page module.'
-                      : 'उपयोगकर्ता भूमिका चुनें, फिर प्रत्येक पृष्ठ मॉड्यूल के लिए विस्तृत कार्रवाई-स्तरीय पहुंच (देखें, जोड़ें, संपादित करें, हटाएं / स्वीकृत करें) कॉन्फ़िगर करने के लिए चेकबॉक्स पर क्लिक करें।'}
+                    {'Select a user role, then toggle checkboxes to configure granular action-level access (View, Add, Edit, Delete/Approve) for each page module.'}
                   </p>
                 </div>
 
                 {/* Role Selector Tabs */}
                 <div className="flex flex-wrap gap-2 p-1.5 bg-slate-150/50 rounded-xl border border-slate-200">
                   {[
-                    { id: 'director', label: language === 'en' ? 'Director' : 'डायरेक्टर' },
-                    { id: 'sub_admin', label: language === 'en' ? 'Sub Admin' : 'सब एडमिन' },
-                    { id: 'hr', label: language === 'en' ? 'HR Manager' : 'एचआर मैनेजर' },
-                    { id: 'branch_manager', label: language === 'en' ? 'Branch Manager' : 'शाखा प्रबंधक' },
+                    { id: 'super_admin', label: 'Super Admin' },
+                    { id: 'admin', label: 'Admin' },
+                    { id: 'hr', label: 'HR Manager' },
+                    { id: 'recruiter', label: 'Recruiter' },
+                    { id: 'branch_manager', label: 'Branch Manager' },
+                    { id: 'director', label: 'Director' },
+                    { id: 'employee', label: 'Employee' },
                   ].map(roleItem => (
                     <button
                       key={roleItem.id}
@@ -2771,11 +2711,11 @@ export default function Settings({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold text-[10px] uppercase tracking-wider">
-                        <th className="p-3.5 font-black">{language === 'en' ? 'Module Name' : 'मॉड्यूल का नाम'}</th>
-                        <th className="p-3.5 text-center">{language === 'en' ? '1. View / Access' : '1. देखें / पहुंच'}</th>
-                        <th className="p-3.5 text-center">{language === 'en' ? '2. Add / Create' : '2. जोड़ें / बनाएं'}</th>
-                        <th className="p-3.5 text-center">{language === 'en' ? '3. Edit / Modify' : '3. बदलें / संशोधित'}</th>
-                        <th className="p-3.5 text-center">{language === 'en' ? '4. Delete / Action' : '4. हटाएं / कार्रवाई'}</th>
+                        <th className="p-3.5 font-black">{'Module Name'}</th>
+                        <th className="p-3.5 text-center">{'1. ViewAccess'}</th>
+                        <th className="p-3.5 text-center">{'2. AddCreate'}</th>
+                        <th className="p-3.5 text-center">{'3. EditModify'}</th>
+                        <th className="p-3.5 text-center">{'4. DeleteAction'}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -2796,8 +2736,7 @@ export default function Settings({
                                       type="checkbox"
                                       checked={isPermissionChecked(activeConfigRole, mod.id, act.id)}
                                       onChange={() => handleToggleFineGrainedPermission(activeConfigRole, mod.id, act.id)}
-                                      className="w-4.5 h-4.5 rounded-md text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all focus:scale-105"
-                                    />
+                                      className="w-4.5 h-4.5 rounded-md text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all focus:scale-105" />
                                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">
                                       {act.label}
                                     </span>
@@ -2814,9 +2753,7 @@ export default function Settings({
                   </table>
                 </div>
                 <div className="text-[9px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg border border-amber-200">
-                  {language === 'en'
-                    ? '* Note: System Administrator ("admin") always has permanent access to all sections and cannot be restricted.'
-                    : '* ध्यान दें: सिस्टम एडमिनिस्ट्रेटर ("admin") के पास हमेशा सभी अनुभागों के लिए स्थायी पहुंच होती है और इसे प्रतिबंधित नहीं किया जा सकता है।'}
+                  {'* Note: System Administrator ("admin") always has permanent access to all sections and cannot be restricted.'}
                 </div>
               </div>
 
@@ -2825,24 +2762,24 @@ export default function Settings({
                 {/* Accounts list table */}
                 <div className="lg:col-span-2 space-y-3">
                   <h4 className="text-xs font-bold text-slate-800">
-                    {language === 'en' ? 'Active Multi-User Accounts' : 'सक्रिय मल्टी-यूज़र खाते'}
+                    {'Active Multi-User Accounts'}
                   </h4>
                   
                   <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-2xs">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold text-[10px] uppercase">
-                          <th className="p-3">{language === 'en' ? 'User Details' : 'विवरण'}</th>
-                          <th className="p-3">{language === 'en' ? 'Role' : 'भूमिका'}</th>
-                          <th className="p-3">{language === 'en' ? 'Branch' : 'शाखा'}</th>
-                          <th className="p-3 text-right">{language === 'en' ? 'Action' : 'कार्रवाई'}</th>
+                          <th className="p-3">{'User Details'}</th>
+                          <th className="p-3">{'Role'}</th>
+                          <th className="p-3">{'Branch'}</th>
+                          <th className="p-3 text-right">{'Action'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                         {/* Always show the main admin */}
                         <tr className="bg-emerald-50/20">
                           <td className="p-3">
-                            <p className="font-extrabold text-slate-900">{language === 'en' ? 'Primary Administrator' : 'मुख्य एडमिन'}</p>
+                            <p className="font-extrabold text-slate-900">{'Primary Administrator'}</p>
                             <p className="text-[10px] text-slate-400 font-mono">@{localSettings.adminUsername || 'admin'}</p>
                             
                             {editingAccountId === 'admin' ? (
@@ -2852,8 +2789,7 @@ export default function Settings({
                                   value={editingAccountPassword}
                                   onChange={(e) => setEditingAccountPassword(e.target.value)}
                                   className="border border-emerald-300 px-2 py-0.5 rounded text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28 bg-white"
-                                  placeholder={language === 'en' ? 'New password' : 'नया पासवर्ड'}
-                                />
+                                  placeholder={'New password'} />
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2867,14 +2803,14 @@ export default function Settings({
                                   }}
                                   className="bg-emerald-600 text-white text-[9px] font-bold px-2 py-1 rounded hover:bg-emerald-700 cursor-pointer"
                                 >
-                                  {language === 'en' ? 'Save' : 'सहेजें'}
+                                  {'Save'}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => { setEditingAccountId(null); setEditingAccountPassword(''); }}
                                   className="text-slate-400 hover:text-slate-600 text-[9px] font-bold px-1.5 py-1 rounded hover:bg-slate-100 cursor-pointer"
                                 >
-                                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                                  {'Cancel'}
                                 </button>
                               </div>
                             ) : (
@@ -2890,7 +2826,7 @@ export default function Settings({
                                   }}
                                   className="text-emerald-600 hover:text-emerald-700 text-[10px] font-black underline cursor-pointer hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all"
                                 >
-                                  {language === 'en' ? 'Edit Pass' : 'पासवर्ड बदलें'}
+                                  {'Edit Pass'}
                                 </button>
                               </div>
                             )}
@@ -2902,14 +2838,14 @@ export default function Settings({
                           </td>
                           <td className="p-3 text-slate-400 text-[10px] font-medium">-</td>
                           <td className="p-3 text-right text-slate-400 text-[10px] font-medium">
-                            {language === 'en' ? 'System Default' : 'सिस्टम डिफॉल्ट'}
+                            {'System Default'}
                           </td>
                         </tr>
 
                         {roleAccounts.length === 0 ? (
                           <tr>
                             <td colSpan={4} className="p-6 text-center text-slate-400 text-[10px] font-medium">
-                              {language === 'en' ? 'No additional user accounts configured.' : 'कोई अन्य उपयोगकर्ता खाता कॉन्फ़िगर नहीं किया गया है।'}
+                              {'No additional user accounts configured.'}
                             </td>
                           </tr>
                         ) : (
@@ -2933,7 +2869,7 @@ export default function Settings({
                                     onClick={() => setEditingAccount(acc)}
                                     className="text-emerald-600 hover:text-emerald-700 text-[10px] font-black underline cursor-pointer hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all"
                                   >
-                                    {language === 'en' ? 'Edit Details' : 'विवरण/शाखा संपादित करें'}
+                                    {'Edit Details'}
                                   </button>
                                 </div>
                               </td>
@@ -2966,7 +2902,7 @@ export default function Settings({
                                     {acc.branch}
                                   </span>
                                 ) : (
-                                  <span className="text-slate-400 font-medium">{language === 'en' ? 'All Branches' : 'सभी शाखाएं'}</span>
+                                  <span className="text-slate-400 font-medium">{'All Branches'}</span>
                                 )}
                               </td>
                               <td className="p-3 text-right">
@@ -2975,7 +2911,7 @@ export default function Settings({
                                     type="button"
                                     onClick={() => setEditingAccount(acc)}
                                     className="text-emerald-600 hover:text-emerald-800 p-1 rounded-md hover:bg-emerald-50 cursor-pointer animate-fadeIn"
-                                    title={language === 'en' ? 'Edit Account' : 'खाता संपादित करें'}
+                                    title={'Edit Account'}
                                   >
                                     <Edit2 className="w-4 h-4 inline" />
                                   </button>
@@ -2983,7 +2919,7 @@ export default function Settings({
                                     type="button"
                                     onClick={() => handleDeleteRoleAccount(acc.id)}
                                     className="text-rose-600 hover:text-rose-800 p-1 rounded-md hover:bg-rose-50 cursor-pointer animate-fadeIn"
-                                    title={language === 'en' ? 'Delete Account' : 'खाता हटाएं'}
+                                    title={'Delete Account'}
                                   >
                                     <Trash2 className="w-4 h-4 inline" />
                                   </button>
@@ -3000,7 +2936,7 @@ export default function Settings({
                 {/* Form to add new account */}
                 <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs">
                   <h4 className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-2">
-                    {language === 'en' ? 'Create User Account' : 'नया लॉगिन खाता बनाएं'}
+                    {'Create User Account'}
                   </h4>
 
                   {roleFormError && (
@@ -3011,62 +2947,57 @@ export default function Settings({
 
                   <div className="space-y-3 text-xs font-semibold">
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Full Name' : 'पूरा नाम'}</label>
+                      <label className="block text-slate-600 font-bold mb-1">{'Full Name'}</label>
                       <input
                         type="text"
                         value={newAccName}
                         onChange={(e) => setNewAccName(e.target.value)}
                         placeholder="Rahul Sharma"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Login Username' : 'लॉगिन आईडी (Username)'}</label>
+                      <label className="block text-slate-600 font-bold mb-1">{'Login Username'}</label>
                       <input
                         type="text"
                         value={newAccUsername}
                         onChange={(e) => setNewAccUsername(e.target.value)}
                         placeholder="rahul_hr"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800" />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Password' : 'पासवर्ड'}</label>
+                      <label className="block text-slate-600 font-bold mb-1">{'Password'}</label>
                       <input
                         type="text"
                         value={newAccPassword}
                         onChange={(e) => setNewAccPassword(e.target.value)}
                         placeholder="hr1234"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800" />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Email ID' : 'ईमेल आईडी'}</label>
+                      <label className="block text-slate-600 font-bold mb-1">{'Email ID'}</label>
                       <input
                         type="email"
                         value={newAccEmail}
                         onChange={(e) => setNewAccEmail(e.target.value)}
                         placeholder="rahul@rathi.com"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Mobile No.' : 'मोबाइल नंबर'}</label>
+                      <label className="block text-slate-600 font-bold mb-1">{'Mobile No.'}</label>
                       <input
                         type="text"
                         value={newAccMobileNo}
                         onChange={(e) => setNewAccMobileNo(e.target.value)}
                         placeholder="9876543210"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
-                      />
+                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Assigned Role' : 'सौंपी गई भूमिका'}</label>
+                      <label className="block text-slate-600 font-bold mb-1">{'Assigned Role'}</label>
                       <select
                         value={newAccRole}
                         onChange={(e: any) => {
@@ -3078,18 +3009,19 @@ export default function Settings({
                         }}
                         className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-slate-700"
                       >
-                        <option value="admin">{language === 'en' ? 'System Admin (सह-प्रशासक)' : 'सिस्टम एडमिन (सह-प्रशासक)'}</option>
-                        <option value="director">{language === 'en' ? 'Director (डायरेक्टर)' : 'डायरेक्टर'}</option>
-                        <option value="sub_admin">{language === 'en' ? 'Sub Admin (सब एडमिन)' : 'सब एडमिन'}</option>
-                        <option value="hr">{language === 'en' ? 'HR Manager (एचआर मैनेजर)' : 'एचआर मैनेजर'}</option>
-                        <option value="branch_manager">{language === 'en' ? 'Branch Manager (ब्रांच मैनेजर)' : 'ब्रांच मैनेजर'}</option>
+                        <option value="super_admin">{'1. Super Admin'}</option>
+                        <option value="admin">{'2. Admin'}</option>
+                        <option value="hr">{'3. HR'}</option>
+                        <option value="recruiter">{'4. Recruiter'}</option>
+                        <option value="branch_manager">{'5. Branch Manager'}</option>
+                        <option value="director">{'6. Director'}</option>
                       </select>
                     </div>
 
                     {(newAccRole === 'branch_manager' || newAccRole === 'director' || newAccRole === 'sub_admin') && (
                       <div className="space-y-2 border border-slate-100 p-2.5 rounded-lg bg-slate-50/50">
                         <label className="block text-slate-600 font-bold">
-                          {language === 'en' ? 'Restricted Branches' : 'शाखा प्रतिबंध'}
+                          {'Restricted Branches'}
                         </label>
                         
                         <div className="max-h-28 overflow-y-auto space-y-1.5 p-1.5 bg-white border border-slate-200 rounded">
@@ -3110,8 +3042,7 @@ export default function Settings({
                                         setNewAccBranches([...newAccBranches, br]);
                                       }
                                     }}
-                                    className="w-3.5 h-3.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
-                                  />
+                                    className="w-3.5 h-3.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer" />
                                   <span>{br}</span>
                                 </label>
                               );
@@ -3119,9 +3050,7 @@ export default function Settings({
                           )}
                         </div>
                         <p className="text-[9px] text-slate-400 mt-1 leading-normal">
-                          {language === 'en'
-                            ? 'Check the branch(es) this manager is allowed to see. Leave all unchecked to allow viewing ALL branches.'
-                            : 'उन शाखाओं को चेक करें जिन्हें यह मैनेजर देख सकता है। सभी शाखाओं को देखने की अनुमति देने के लिए सभी को अनचेक छोड़ दें।'}
+                          {'Check the branch(es) this manager is allowed to see. Leave all unchecked to allow viewing ALL branches.'}
                         </p>
                       </div>
                     )}
@@ -3132,7 +3061,7 @@ export default function Settings({
                       className="w-full bg-[#03623c] hover:bg-[#024d2e] text-white text-xs font-black py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs mt-2"
                     >
                       <Plus className="w-4 h-4" />
-                      {language === 'en' ? 'Add User Account' : 'खाता जोड़ें'}
+                      {'Add User Account'}
                     </button>
                   </div>
                 </div>
@@ -3145,12 +3074,10 @@ export default function Settings({
               <div className="bg-slate-100/50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <h3 className="font-extrabold text-gray-900 text-sm">
-                    {language === 'en' ? 'User Audit Log Report' : 'यूजर ऑडिट लॉग रिपोर्ट'}
+                    {'User Audit Log Report'}
                   </h3>
                   <p className="text-xs text-slate-500 leading-normal font-medium">
-                    {language === 'en'
-                      ? 'Detailed history of all modifications, entries, and approval events.'
-                      : 'सभी संशोधनों, प्रविष्टियों और अनुमोदन घटनाओं का विस्तृत इतिहास।'}
+                    {'Detailed history of all modifications, entries, and approval events.'}
                   </p>
                 </div>
                 
@@ -3159,20 +3086,20 @@ export default function Settings({
                   {portalUser?.role === 'admin' ? (
                     <button
                       onClick={() => {
-                        if (confirm(language === 'en' ? 'Are you sure you want to permanently clear all audit logs?' : 'क्या आप वाकई सभी ऑडिट लॉग को स्थायी रूप से हटाना चाहते हैं?')) {
+                        if (confirm('Are you sure you want to permanently clear all audit logs?')) {
                           if (onClearAuditLogs) onClearAuditLogs();
                         }
                       }}
                       className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-3xs"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>{language === 'en' ? 'Clear Audit Logs' : 'ऑडिट लॉग साफ़ करें'}</span>
+                      <span>{'Clear Audit Logs'}</span>
                     </button>
                   ) : (
                     <div className="text-right">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 border border-gray-200 text-gray-500 rounded-xl text-[10px] font-bold">
                         <Lock className="w-3 h-3 text-gray-400" />
-                        <span>{language === 'en' ? 'Admin only can clear logs' : 'केवल एडमिन लॉग साफ़ कर सकते हैं'}</span>
+                        <span>{'Admin only can clear logs'}</span>
                       </span>
                     </div>
                   )}
@@ -3204,9 +3131,8 @@ export default function Settings({
                           type="text"
                           value={auditSearchQuery}
                           onChange={(e) => setAuditSearchQuery(e.target.value)}
-                          placeholder={language === 'en' ? 'Search by actor, employee, field...' : 'खोजें: अभिनेता, कर्मचारी, क्षेत्र...'}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#03623c] bg-white font-medium"
-                        />
+                          placeholder={'Search by actor, employee, field...'}
+                          className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#03623c] bg-white font-medium" />
                       </div>
                       <div className="flex items-center gap-2">
                         <Filter className="w-4 h-4 text-gray-400 shrink-0" />
@@ -3215,11 +3141,11 @@ export default function Settings({
                           onChange={(e: any) => setAuditActionFilter(e.target.value as any)}
                           className="border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:outline-none bg-white font-bold"
                         >
-                          <option value="all">{language === 'en' ? 'All Actions' : 'सभी क्रियाएं'}</option>
-                          <option value="create">{language === 'en' ? 'Creates' : 'नई प्रविष्टियां'}</option>
-                          <option value="update">{language === 'en' ? 'Updates' : 'संशोधन'}</option>
-                          <option value="approve">{language === 'en' ? 'Approvals' : 'स्वीकृति'}</option>
-                          <option value="reject">{language === 'en' ? 'Rejections' : 'अस्वीकृति'}</option>
+                          <option value="all">{'All Actions'}</option>
+                          <option value="create">{'Creates'}</option>
+                          <option value="update">{'Updates'}</option>
+                          <option value="approve">{'Approvals'}</option>
+                          <option value="reject">{'Rejections'}</option>
                         </select>
                       </div>
                     </div>
@@ -3231,18 +3157,18 @@ export default function Settings({
                           <table className="w-full text-left border-collapse text-xs">
                             <thead>
                               <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                                <th className="py-4 px-6">{language === 'en' ? 'Timestamp' : 'समय सीमा'}</th>
-                                <th className="py-4 px-6">{language === 'en' ? 'Actor' : 'कर्ता'}</th>
-                                <th className="py-4 px-6">{language === 'en' ? 'Target' : 'लक्ष्य'}</th>
-                                <th className="py-4 px-6 text-center">{language === 'en' ? 'Action' : 'क्रिया'}</th>
-                                <th className="py-4 px-6">{language === 'en' ? 'Changes' : 'बदलाव'}</th>
+                                <th className="py-4 px-6">{'Timestamp'}</th>
+                                <th className="py-4 px-6">{'Actor'}</th>
+                                <th className="py-4 px-6">{'Target'}</th>
+                                <th className="py-4 px-6 text-center">{'Action'}</th>
+                                <th className="py-4 px-6">{'Changes'}</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 font-medium">
                               {filtered.map((log) => (
                                 <tr key={log.id} className="hover:bg-gray-50/25 transition-colors">
                                   <td className="py-4 px-6 whitespace-nowrap font-mono text-gray-400 text-xxs font-bold">
-                                    {new Date(log.timestamp).toLocaleString(language === 'en' ? 'en-US' : 'hi-IN')}
+                                    {new Date(log.timestamp).toLocaleString('en-US')}
                                   </td>
                                   <td className="py-4 px-6 whitespace-nowrap">
                                     <div className="flex items-center gap-1.5">
@@ -3278,7 +3204,7 @@ export default function Settings({
                                   <td className="py-4 px-6">
                                     <div className="space-y-1 max-w-[320px]">
                                       <div className="text-xxs text-slate-400">
-                                        {language === 'en' ? 'Field: ' : 'क्षेत्र: '}
+                                        {'Field: '}
                                         <span className="font-bold text-slate-700 font-mono bg-slate-100 px-1 py-0.5 rounded">
                                           {log.fieldChanged}
                                         </span>
@@ -3308,7 +3234,7 @@ export default function Settings({
                         <div className="text-center py-16 text-gray-400">
                           <AlertCircle className="w-12 h-12 mx-auto text-gray-200 mb-2" />
                           <p className="text-xs font-bold">
-                            {language === 'en' ? 'No audit records matching filters.' : 'फ़िल्टर से मेल खाते कोई ऑडिट रिकॉर्ड नहीं मिले।'}
+                            {'No audit records matching filters.'}
                           </p>
                         </div>
                       )}
@@ -3327,8 +3253,7 @@ export default function Settings({
               language={language}
               adminSettings={localSettings}
               onSendTestEmail={onSendTestEmail}
-              onResendEmail={onResendEmail}
-            />
+              onResendEmail={onResendEmail} />
           )}
 
           {/* Sub Tab: SMTP Custom Email Server Settings */}
@@ -3344,14 +3269,10 @@ export default function Settings({
                     </div>
                     <div>
                       <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
-                        {language === 'en' 
-                          ? 'PART 4: SMTP EMAIL SERVER & SENDER ALIAS SETTINGS' 
-                          : 'भाग 4: SMTP ईमेल सर्वर और प्रेषक उपनाम सेटिंग्स'}
+                        {'PART 4: SMTP EMAIL SERVER & SENDER ALIAS SETTINGS'}
                       </h3>
                       <p className="text-[11px] text-slate-500 font-semibold mt-1 max-w-2xl leading-relaxed">
-                        {language === 'en'
-                          ? 'Configure custom SMTP connection details to send 2-Step Verification and passkey reset emails to Trainees directly through your corporate mail server using a custom sender alias name.'
-                          : 'अपने कॉर्पोरेट मेल सर्वर का उपयोग करके सीधे प्रशिक्षुओं को 2-चरण सत्यापन और पासकी रीसेट ईमेल भेजने के लिए कस्टम SMTP कनेक्शन विवरण कॉन्फ़िगर करें।'}
+                        {'Configure custom SMTP connection details to send 2-Step Verification and passkey reset emails to Trainees directly through your corporate mail server using a custom sender alias name.'}
                       </p>
                     </div>
                   </div>
@@ -3360,7 +3281,7 @@ export default function Settings({
                   <div className="self-start md:self-auto flex items-center gap-2 bg-slate-100 border border-slate-200/60 px-3 py-1 rounded-full shrink-0">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-[10px] font-black uppercase text-slate-600 tracking-wider font-mono">
-                      {language === 'en' ? 'Live Delivery Gateway' : 'लाइव डिलीवरी गेटवे'}
+                      {'Live Delivery Gateway'}
                     </span>
                   </div>
                 </div>
@@ -3370,7 +3291,7 @@ export default function Settings({
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
-                    {language === 'en' ? 'SMTP Outbound Host' : 'SMTP आउटबाउंड होस्ट'}
+                    {'SMTP Outbound Host'}
                   </label>
                   <input
                     type="text"
@@ -3386,47 +3307,43 @@ export default function Settings({
                       }
                       setLocalSettings({ ...localSettings, smtpHost: val });
                     }}
-                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
-                  />
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs" />
                 </div>
                 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
-                    {language === 'en' ? 'SMTP Port' : 'SMTP पोर्ट'}
+                    {'SMTP Port'}
                   </label>
                   <input
                     type="number"
                     value={localSettings.smtpPort ?? ''}
                     placeholder="e.g. 587"
                     onChange={(e) => setLocalSettings({ ...localSettings, smtpPort: e.target.value ? Number(e.target.value) : undefined })}
-                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
-                  />
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs" />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
-                    {language === 'en' ? 'SMTP Password' : 'SMTP पासवर्ड'}
+                    {'SMTP Password'}
                   </label>
                   <input
                     type="password"
                     value={localSettings.smtpPassword || ''}
                     placeholder="••••••••••••••••"
                     onChange={(e) => setLocalSettings({ ...localSettings, smtpPassword: e.target.value })}
-                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs font-mono"
-                  />
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs font-mono" />
                 </div>
 
                 <div className="md:col-span-4">
                   <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
-                    {language === 'en' ? 'SMTP Username' : 'SMTP यूज़रनेम (ईमेल)'}
+                    {'SMTP Username'}
                   </label>
                   <input
                     type="text"
                     value={localSettings.smtpUsername || ''}
                     placeholder="e.g. misrpr@rathibuildmart.com"
                     onChange={(e) => setLocalSettings({ ...localSettings, smtpUsername: e.target.value })}
-                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
-                  />
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs" />
                 </div>
               </div>
 
@@ -3436,12 +3353,10 @@ export default function Settings({
                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
                     <h4 className="font-extrabold text-amber-900 text-xs mb-1">
-                      {language === 'en' ? 'Gmail/Google Workspace SMTP Configuration Notice:' : 'जीमेल/गूगल वर्कस्पेस SMTP कॉन्फ़िगरेशन सूचना:'}
+                      {'Gmail/Google Workspace SMTP Configuration Notice:'}
                     </h4>
                     <p className="font-medium text-slate-600 leading-relaxed">
-                      {language === 'en'
-                        ? 'If you are using Google Mail (smtp.gmail.com) as your host, ensure 2-Step Verification is ON under your Google Account Security, generate a 16-character App Password (without spaces), and paste it into the SMTP Password field above.'
-                        : 'यदि आप होस्ट के रूप में गूगल मेल (smtp.gmail.com) का उपयोग कर रहे हैं, तो सुनिश्चित करें कि आपके गूगल खाता सुरक्षा के तहत 2-चरण सत्यापन चालू है, एक 16-अक्षर का ऐप पासवर्ड (बिना रिक्त स्थान के) जेनरेट करें, और उसे ऊपर SMTP पासवर्ड फ़ील्ड में पेस्ट करें।'}
+                      {'If you are using Google Mail (smtp.gmail.com) as your host, ensure 2-Step Verification is ON under your Google Account Security, generate a 16-character App Password (without spaces), and paste it into the SMTP Password field above.'}
                     </p>
                   </div>
                 </div>
@@ -3451,28 +3366,26 @@ export default function Settings({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
-                    {language === 'en' ? 'Sender Display Name (Alias)' : 'प्रेषक का नाम (Sender Name)'}
+                    {'Sender Display Name (Alias)'}
                   </label>
                   <input
                     type="text"
                     value={localSettings.senderName || ''}
                     placeholder="e.g. Rathi LMS System"
                     onChange={(e) => setLocalSettings({ ...localSettings, senderName: e.target.value })}
-                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
-                  />
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs" />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wide">
-                    {language === 'en' ? 'Sender Email Address' : 'प्रेषक का ईमेल (Sender Email)'}
+                    {'Sender Email Address'}
                   </label>
                   <input
                     type="email"
                     value={localSettings.senderEmail || ''}
                     placeholder="e.g. rbmlms@rathibuildmart.com"
                     onChange={(e) => setLocalSettings({ ...localSettings, senderEmail: e.target.value })}
-                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs"
-                  />
+                    className="w-full border border-gray-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 transition-all bg-white shadow-2xs" />
                 </div>
               </div>
 
@@ -3483,14 +3396,14 @@ export default function Settings({
                   onClick={handleResetSmtpToDefaults}
                   className="bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-3xs"
                 >
-                  {language === 'en' ? 'Reset Defaults' : 'डिफ़ॉल्ट रीसेट करें'}
+                  {'Reset Defaults'}
                 </button>
                 <button
                   type="button"
                   onClick={handleSave}
                   className="bg-[#03623c] hover:bg-[#024d2e] text-white px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-2xs"
                 >
-                  {language === 'en' ? 'Save SMTP Configurations' : 'SMTP कॉन्फ़िगरेशन सहेजें'}
+                  {'Save SMTP Configurations'}
                 </button>
               </div>
 
@@ -3502,14 +3415,12 @@ export default function Settings({
                     <span className="font-extrabold uppercase tracking-widest text-[9px] font-mono">LIVE</span>
                   </span>
                   <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest font-mono">
-                    {language === 'en' ? 'LIVE SMTP GATEWAY DISPATCH TESTER' : 'लाइव SMTP गेटवे प्रेषण परीक्षक'}
+                    {'LIVE SMTP GATEWAY DISPATCH TESTER'}
                   </h4>
                 </div>
                 
                 <p className="text-[11px] text-slate-500 font-semibold leading-relaxed">
-                  {language === 'en'
-                    ? 'Enter any recipient email to instantly test the configured SMTP routing and sender name alias.'
-                    : 'कॉन्फ़िगर किए गए SMTP रूटिंग और प्रेषक नाम उपनाम का तुरंत परीक्षण करने के लिए कोई भी प्राप्तकर्ता ईमेल दर्ज करें।'}
+                  {'Enter any recipient email to instantly test the configured SMTP routing and sender name alias.'}
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
@@ -3518,8 +3429,7 @@ export default function Settings({
                     value={testRecipient}
                     placeholder="Enter recipient email address..."
                     onChange={(e) => setTestRecipient(e.target.value)}
-                    className="flex-1 border border-gray-200 px-4 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none text-slate-800 transition-all bg-white"
-                  />
+                    className="flex-1 border border-gray-200 px-4 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:outline-none text-slate-800 transition-all bg-white" />
                   <button
                     type="button"
                     onClick={handleTestSmtp}
@@ -3529,12 +3439,12 @@ export default function Settings({
                     {isTestingSmtp ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        {language === 'en' ? 'Dispatching...' : 'भेजा जा रहा है...'}
+                        {'Dispatching...'}
                       </>
                     ) : (
                       <>
                         <Send className="w-3.5 h-3.5" />
-                        {language === 'en' ? 'Dispatch Test' : 'परीक्षण भेजें'}
+                        {'Dispatch Test'}
                       </>
                     )}
                   </button>
@@ -3554,7 +3464,7 @@ export default function Settings({
                         <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                       )}
                       <div>
-                        <p className="font-bold">{testResult.success ? "SUCCESS" : "ERROR / FAILURE"}</p>
+                        <p className="font-bold">{testResult.success ? "SUCCESS" : "ERRORFAILURE"}</p>
                         <p className="mt-0.5 text-slate-600 font-medium">{testResult.message}</p>
                       </div>
                     </div>
@@ -3578,14 +3488,10 @@ export default function Settings({
                     </div>
                     <div>
                       <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">
-                        {language === 'en' 
-                          ? 'PART 5: WHATSAPP (MessageAutoSender) & EMAIL AUTOMATION' 
-                          : 'भाग 5: व्हाट्सएप (MessageAutoSender) और ईमेल ऑटोमेशन'}
+                        {'PART 5: WHATSAPP (MessageAutoSender) & EMAIL AUTOMATION'}
                       </h3>
                       <p className="text-[11px] text-slate-500 dark:text-slate-300 font-semibold mt-1 max-w-2xl leading-relaxed">
-                        {language === 'en'
-                          ? 'Set up API connection details for MessageAutoSender to send automated WhatsApp payslips, miss punch alerts, leave updates, and late warnings directly to employees.'
-                          : 'कर्मचारियों को सीधे स्वचालित व्हाट्सएप वेतन पर्ची, मिस पंच अलर्ट, छुट्टी अपडेट और देर से आने की चेतावनी भेजने के लिए MessageAutoSender के लिए API कनेक्शन विवरण सेट करें।'}
+                        {'Set up API connection details for MessageAutoSender to send automated WhatsApp payslips, miss punch alerts, leave updates, and late warnings directly to employees.'}
                       </p>
                     </div>
                   </div>
@@ -3612,8 +3518,7 @@ export default function Settings({
                       type="checkbox"
                       checked={localSettings.enableWhatsappAutomation ?? true}
                       onChange={(e) => setLocalSettings({ ...localSettings, enableWhatsappAutomation: e.target.checked })}
-                      className="sr-only peer"
-                    />
+                      className="sr-only peer" />
                     <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#03623c]"></div>
                     <span className="ml-2 text-xs font-bold text-slate-700 dark:text-slate-300">Enable Automation</span>
                   </label>
@@ -3629,8 +3534,7 @@ export default function Settings({
                       value={localSettings.whatsappUsername || ''}
                       placeholder="e.g. centraldata@rathibuildmart.com"
                       onChange={(e) => setLocalSettings({ ...localSettings, whatsappUsername: e.target.value })}
-                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]"
-                    />
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]" />
                   </div>
 
                   <div>
@@ -3642,26 +3546,29 @@ export default function Settings({
                       value={localSettings.whatsappPassword || ''}
                       placeholder="••••••••••••"
                       onChange={(e) => setLocalSettings({ ...localSettings, whatsappPassword: e.target.value })}
-                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]"
-                    />
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]" />
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
-                        Default Sender Mobile No / Channel
+                        Default Sender Mobile NoChannel
                       </label>
                       <button
                         type="button"
                         onClick={() => {
-                          if (localSettings.whatsappSenderNo) {
-                            setWaTestMobile(localSettings.whatsappSenderNo);
+                          const targetNum = localSettings.whatsappSenderNo || '8518880943';
+                          if (!localSettings.whatsappSenderNo) {
+                            setLocalSettings(prev => ({ ...prev, whatsappSenderNo: targetNum }));
                           }
+                          setWaTestMobile(targetNum);
+                          setWaTestStatus(`Default sender number (${targetNum}) set for test receiver!`);
+                          setTimeout(() => setWaTestStatus(null), 4000);
                         }}
-                        className="text-[10px] text-emerald-700 dark:text-emerald-400 hover:underline font-bold flex items-center gap-1 cursor-pointer"
-                        title="Copy sender number to test box"
+                        className="text-[10px] text-[#03623c] dark:text-emerald-400 hover:underline font-bold flex items-center gap-1 cursor-pointer bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60 transition-all hover:bg-emerald-100"
+                        title="Copy default sender number to test receiver box"
                       >
-                        <RefreshCcw className="w-3 h-3" />
+                        <RefreshCcw className="w-3 h-3 text-[#03623c] dark:text-emerald-400" />
                         <span>Use for Test</span>
                       </button>
                     </div>
@@ -3674,10 +3581,30 @@ export default function Settings({
                         setLocalSettings({ ...localSettings, whatsappSenderNo: val });
                         setWaTestMobile(val);
                       }}
-                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]"
-                    />
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]" />
                   </div>
                 </div>
+
+                {/* HTTP 401 Guidance Box */}
+                <div className="p-3.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs space-y-1">
+                  <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Info className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>MessageAutoSender Gateway authentication:</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Ensure your valid registered <strong>User ID</strong> and <strong>Password</strong> are entered above. If MessageAutoSender displays <em>"HTTP Status 401 - Full authentication is required"</em>, it indicates invalid or expired credentials on <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded font-mono">app.messageautosender.com</code>.
+                  </p>
+                </div>
+
+                {waTestStatus && (
+                  <div className="bg-emerald-50 dark:bg-emerald-950/90 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs">
+                    <span className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      {waTestStatus}
+                    </span>
+                    <button type="button" onClick={() => setWaTestStatus(null)} className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 font-black text-sm px-1 cursor-pointer">×</button>
+                  </div>
+                )}
               </div>
 
               {/* Excel HYPERLINK Formula & Live Test Component */}
@@ -3694,13 +3621,20 @@ export default function Settings({
                       type="button"
                       onClick={() => {
                         const sender = localSettings.whatsappSenderNo || '8518880943';
+                        if (!localSettings.whatsappUsername) {
+                          setLocalSettings(prev => ({ ...prev, whatsappUsername: 'rathis', whatsappPassword: 'Rathis@ravs#2025!', whatsappSenderNo: sender }));
+                        } else if (!localSettings.whatsappSenderNo) {
+                          setLocalSettings(prev => ({ ...prev, whatsappSenderNo: sender }));
+                        }
                         setWaTestMobile(sender);
                         setWaTestName('Rahul Sharma');
+                        setWaTestStatus(`Sample receiver & default sender synced (${sender})!`);
+                        setTimeout(() => setWaTestStatus(null), 4000);
                       }}
                       className="bg-amber-100 dark:bg-amber-950/80 hover:bg-amber-200 text-amber-900 dark:text-amber-200 px-3 py-1 rounded-lg text-xs font-bold border border-amber-300 dark:border-amber-800 flex items-center gap-1.5 cursor-pointer transition-all active:scale-98"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                      <span>Fill Test Sample Data (डिफ़ॉल्ट प्रेषक भरें)</span>
+                      <span>Fill Test Sample Data</span>
                     </button>
                     <span className="text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold px-2.5 py-1 rounded-md border border-amber-300/60 font-mono">
                       =HYPERLINK Formula
@@ -3732,8 +3666,7 @@ export default function Settings({
                       value={waTestMobile}
                       onChange={(e) => setWaTestMobile(e.target.value)}
                       placeholder="e.g. 8518880943"
-                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-slate-50 dark:bg-[#11221b] text-slate-800 dark:text-slate-100"
-                    />
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-slate-50 dark:bg-[#11221b] text-slate-800 dark:text-slate-100" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Test Receiver Name:</label>
@@ -3742,8 +3675,7 @@ export default function Settings({
                       value={waTestName}
                       onChange={(e) => setWaTestName(e.target.value)}
                       placeholder="e.g. Rahul Sharma"
-                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-50 dark:bg-[#11221b] text-slate-800 dark:text-slate-100"
-                    />
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-50 dark:bg-[#11221b] text-slate-800 dark:text-slate-100" />
                   </div>
                 </div>
 
@@ -3774,8 +3706,8 @@ export default function Settings({
                       type="button"
                       onClick={() => {
                         const targetMobile = formatPhoneNumber(waTestMobile || localSettings.whatsappSenderNo || '8518880943');
-                        const targetUser = localSettings.whatsappUsername || 'rathi';
-                        const targetPass = localSettings.whatsappPassword || 'Password';
+                        const targetUser = localSettings.whatsappUsername || 'rathis';
+                        const targetPass = localSettings.whatsappPassword || 'Rathis@ravs#2025!';
                         
                         const formStr = formulaMode === 'direct'
                           ? `=HYPERLINK("https://app.messageautosender.com/message/new?username=${targetUser}&password=${targetPass}&receiverMobileNo=${targetMobile}&receiverName=${encodeURIComponent(waTestName || 'test')}&message=MESSAGETEST", "Manual Test Send")`
@@ -3801,7 +3733,7 @@ export default function Settings({
 
                   <div className="p-3 bg-slate-900 text-emerald-400 rounded-xl font-mono text-xs overflow-x-auto border border-slate-800 shadow-inner select-all leading-relaxed">
                     {formulaMode === 'direct'
-                      ? `=HYPERLINK("https://app.messageautosender.com/message/new?username=${localSettings.whatsappUsername || 'rathi'}&password=${localSettings.whatsappPassword || 'Password'}&receiverMobileNo=${formatPhoneNumber(waTestMobile || localSettings.whatsappSenderNo || '8518880943')}&receiverName=${encodeURIComponent(waTestName || 'test')}&message=MESSAGETEST", "Manual Test Send")`
+                      ? `=HYPERLINK("https://app.messageautosender.com/message/new?username=${localSettings.whatsappUsername || 'rathis'}&password=${localSettings.whatsappPassword || 'Rathis@ravs#2025!'}&receiverMobileNo=${formatPhoneNumber(waTestMobile || localSettings.whatsappSenderNo || '8518880943')}&receiverName=${encodeURIComponent(waTestName || 'test')}&message=MESSAGETEST", "Manual Test Send")`
                       : buildMessageAutoSenderExcelFormula(
                           'User',
                           'Password',
@@ -3814,29 +3746,126 @@ export default function Settings({
                   </div>
                 </div>
 
+                {/* Live Generated API URL Display Box */}
+                <div className="p-3 bg-slate-900 text-slate-100 rounded-xl space-y-1.5 border border-slate-800 shadow-inner">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-emerald-400">
+                    <span className="flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Live Direct API Request URL Preview:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const liveUrl = buildMessageAutoSenderUrl(
+                          localSettings.whatsappUsername || 'rathis',
+                          localSettings.whatsappPassword || 'Rathis@ravs#2025!',
+                          waTestMobile || localSettings.whatsappSenderNo || '8518880943',
+                          waTestName || 'Test User',
+                          `Test WhatsApp Notification from ${localSettings.companyName || 'Rathi Buildmart'} HR`
+                        );
+                        navigator.clipboard.writeText(liveUrl);
+                        setWaTestStatus('Live API URL copied to clipboard!');
+                        setTimeout(() => setWaTestStatus(null), 3000);
+                      }}
+                      className="text-emerald-400 hover:text-emerald-300 font-medium text-[10px] flex items-center gap-1 cursor-pointer bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700 transition-all hover:bg-slate-700"
+                    >
+                      <Copy className="w-3 h-3 text-emerald-400" />
+                      <span>Copy URL</span>
+                    </button>
+                  </div>
+                  <div className="text-[11px] font-mono break-all text-emerald-300 bg-slate-950/90 p-2.5 rounded-lg border border-slate-800 select-all leading-relaxed">
+                    {buildMessageAutoSenderUrl(
+                      localSettings.whatsappUsername || 'rathis',
+                      localSettings.whatsappPassword || 'Rathis@ravs#2025!',
+                      waTestMobile || localSettings.whatsappSenderNo || '8518880943',
+                      waTestName || 'Test User',
+                      `Test WhatsApp Notification from ${localSettings.companyName || 'Rathi Buildmart'} HR`
+                    )}
+                  </div>
+                </div>
+
                 {/* Launch Test Action */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
                   <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                     Direct API URL Target Mobile: <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono text-emerald-800 dark:text-emerald-300">{formatPhoneNumber(waTestMobile || localSettings.whatsappSenderNo || '8518880943')}</code>
                   </span>
-                  <button
-                    type="button"
+                  <a
+                    href={buildMessageAutoSenderUrl(
+                      localSettings.whatsappUsername || 'rathis',
+                      localSettings.whatsappPassword || 'Rathis@ravs#2025!',
+                      waTestMobile || localSettings.whatsappSenderNo || '8518880943',
+                      waTestName || 'Test User',
+                      `Test WhatsApp Notification from ${localSettings.companyName || 'Rathi Buildmart'} HR`
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     onClick={() => {
                       const targetMobile = waTestMobile || localSettings.whatsappSenderNo || '8518880943';
-                      const testUrl = buildMessageAutoSenderUrl(
-                        localSettings.whatsappUsername || 'rathi',
-                        localSettings.whatsappPassword || 'Password',
-                        targetMobile,
-                        waTestName || 'Test User',
-                        `Test WhatsApp Notification from ${localSettings.companyName || 'Rathi Buildmart'} HR`
-                      );
-                      window.open(testUrl, '_blank', 'noopener,noreferrer');
+                      setWaTestStatus(`MessageAutoSender test launched for ${targetMobile}! Check the opened tab.`);
+                      setTimeout(() => setWaTestStatus(null), 5000);
                     }}
-                    className="bg-[#03623c] hover:bg-[#024d2e] text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs transition-all active:scale-98"
+                    className="bg-[#03623c] hover:bg-[#024d2e] text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs transition-all active:scale-98 inline-flex"
                   >
                     <ExternalLink className="w-4 h-4" />
                     <span>Launch Live WhatsApp Test</span>
-                  </button>
+                  </a>
+                </div>
+              </div>
+
+              {/* Recruitment & Hiring WhatsApp Automation Settings */}
+              <div className="bg-white dark:bg-[#11221b] border border-amber-200 dark:border-amber-900/60 rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#1e3a2f] pb-3">
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                        {'Recruitment & Interview Automation Settings'}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                        {'Configure default interview venue, times, and stage change WhatsApp & Email dispatch options.'}
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={localSettings.recruitmentAutoNotify ?? true}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setLocalSettings({ ...localSettings, recruitmentAutoNotify: val });
+                        localStorage.setItem('recruitment_auto_notify_enabled', String(val));
+                      }}
+                      className="sr-only peer" />
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+                    <span className="ml-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {'Auto Send WhatsApp on Stage Move'}
+                    </span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5 uppercase tracking-wide">
+                      {'Default Interview VenueLink'}
+                    </label>
+                    <input
+                      type="text"
+                      value={localSettings.defaultInterviewVenue ?? 'Rathi Buildmart HQ, Raipur'}
+                      placeholder="e.g. Rathi Buildmart HQ, Raipur"
+                      onChange={(e) => setLocalSettings({ ...localSettings, defaultInterviewVenue: e.target.value })}
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]" />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5 uppercase tracking-wide">
+                      {'Default Interview Time'}
+                    </label>
+                    <input
+                      type="time"
+                      value={localSettings.defaultInterviewTime ?? '11:00'}
+                      onChange={(e) => setLocalSettings({ ...localSettings, defaultInterviewTime: e.target.value })}
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-[#0b1812]" />
+                  </div>
                 </div>
               </div>
 
@@ -3845,8 +3874,7 @@ export default function Settings({
                 language={language}
                 settings={localSettings}
                 onUpdateSettings={(updated) => setLocalSettings(updated)}
-                onSaveAll={handleSave}
-              />
+                onSaveAll={handleSave} />
             </div>
           )}
 
@@ -3871,7 +3899,7 @@ export default function Settings({
                 {/* Modal Header */}
                 <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50 rounded-t-2xl shrink-0">
                   <h3 className="text-sm font-bold text-gray-900 font-display">
-                    {language === 'en' ? 'Edit User Account' : 'खाता विवरण व शाखा संपादित करें'}
+                    {'Edit User Account'}
                   </h3>
                   <button 
                     onClick={() => setEditingAccount(null)}
@@ -3884,59 +3912,54 @@ export default function Settings({
                 {/* Modal Form */}
                 <div className="p-5 overflow-y-auto space-y-4 text-xs font-semibold">
                   <div>
-                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Full Name' : 'पूरा नाम'}</label>
+                    <label className="block text-slate-600 font-bold mb-1">{'Full Name'}</label>
                     <input
                       type="text"
                       value={editingAccount.name}
                       onChange={(e) => setEditingAccount({ ...editingAccount, name: e.target.value })}
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
-                    />
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
                   </div>
 
                   <div>
-                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Login Username' : 'लॉगिन आईडी (Username)'}</label>
+                    <label className="block text-slate-600 font-bold mb-1">{'Login Username'}</label>
                     <input
                       type="text"
                       value={editingAccount.username}
                       onChange={(e) => setEditingAccount({ ...editingAccount, username: e.target.value })}
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800"
-                    />
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800" />
                   </div>
 
                   <div>
-                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Email ID' : 'ईमेल आईडी'}</label>
+                    <label className="block text-slate-600 font-bold mb-1">{'Email ID'}</label>
                     <input
                       type="email"
                       value={editingAccount.email || ''}
                       onChange={(e) => setEditingAccount({ ...editingAccount, email: e.target.value })}
                       className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
-                      placeholder="example@rathi.com"
-                    />
+                      placeholder="example@rathi.com" />
                   </div>
 
                   <div>
-                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Mobile No.' : 'मोबाइल नंबर'}</label>
+                    <label className="block text-slate-600 font-bold mb-1">{'Mobile No.'}</label>
                     <input
                       type="text"
                       value={editingAccount.mobileNo || ''}
                       onChange={(e) => setEditingAccount({ ...editingAccount, mobileNo: e.target.value })}
                       className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800"
-                      placeholder="9876543210"
-                    />
+                      placeholder="9876543210" />
                   </div>
 
                   <div>
-                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Password' : 'पासवर्ड'}</label>
+                    <label className="block text-slate-600 font-bold mb-1">{'Password'}</label>
                     <input
                       type="text"
                       value={editingAccount.password || ''}
                       onChange={(e) => setEditingAccount({ ...editingAccount, password: e.target.value })}
-                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800"
-                    />
+                      className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800" />
                   </div>
 
                   <div>
-                    <label className="block text-slate-600 font-bold mb-1">{language === 'en' ? 'Assigned Role' : 'सौंपी गई भूमिका'}</label>
+                    <label className="block text-slate-600 font-bold mb-1">{'Assigned Role'}</label>
                     <select
                       value={editingAccount.role}
                       onChange={(e: any) => {
@@ -3950,18 +3973,18 @@ export default function Settings({
                       }}
                       className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-slate-700"
                     >
-                      <option value="admin">{language === 'en' ? 'System Admin (सह-प्रशासक)' : 'सिस्टम एडमिन (सह-प्रशासक)'}</option>
-                      <option value="director">{language === 'en' ? 'Director (डायरेक्टर)' : 'डायरेक्टर'}</option>
-                      <option value="sub_admin">{language === 'en' ? 'Sub Admin (सब एडमिन)' : 'सब एडमिन'}</option>
-                      <option value="hr">{language === 'en' ? 'HR Manager (एचआर मैनेजर)' : 'एचआर मैनेजर'}</option>
-                      <option value="branch_manager">{language === 'en' ? 'Branch Manager (ब्रांच मैनेजर)' : 'ब्रांच मैनेजर'}</option>
+                      <option value="admin">{'System Admin'}</option>
+                      <option value="director">{'Director'}</option>
+                      <option value="sub_admin">{'Sub Admin'}</option>
+                      <option value="hr">{'HR Manager'}</option>
+                      <option value="branch_manager">{'Branch Manager'}</option>
                     </select>
                   </div>
 
                   {(editingAccount.role === 'branch_manager' || editingAccount.role === 'director' || editingAccount.role === 'sub_admin') && (
                     <div className="space-y-2 border border-slate-100 p-2.5 rounded-lg bg-slate-50/50">
                       <label className="block text-slate-600 font-bold">
-                        {language === 'en' ? 'Restricted Branches' : 'शाखा प्रतिबंध (चुनें)'}
+                        {'Restricted Branches'}
                       </label>
                       
                       <div className="max-h-28 overflow-y-auto space-y-1.5 p-1.5 bg-white border border-slate-200 rounded">
@@ -3989,8 +4012,7 @@ export default function Settings({
                                       branch: updated[0] || ''
                                     });
                                   }}
-                                  className="w-3.5 h-3.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
-                                />
+                                  className="w-3.5 h-3.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer" />
                                 <span>{br}</span>
                               </label>
                             );
@@ -4008,13 +4030,13 @@ export default function Settings({
                     onClick={() => setEditingAccount(null)}
                     className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer"
                   >
-                    {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                    {'Cancel'}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       if (!editingAccount.name.trim() || !editingAccount.username.trim()) {
-                        alert(language === 'en' ? 'Name and username are required' : 'नाम और उपयोगकर्ता नाम आवश्यक हैं');
+                        alert('Name and username are required');
                         return;
                       }
                       const updated = roleAccounts.map(acc => acc.id === editingAccount.id ? editingAccount : acc);
@@ -4026,7 +4048,7 @@ export default function Settings({
                     }}
                     className="px-4 py-2 text-xs font-bold text-white bg-[#03623c] hover:bg-[#024d2e] rounded-xl cursor-pointer"
                   >
-                    {language === 'en' ? 'Save Changes' : 'बदलाव सहेजें'}
+                    {'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -4041,8 +4063,7 @@ export default function Settings({
               adminName={portalUser?.name || 'Boss'}
               role={portalUser?.role || 'admin'}
               language={language}
-              companyName={localSettings.companyName}
-            />
+              companyName={localSettings.companyName} />
           )}
 
         </div>

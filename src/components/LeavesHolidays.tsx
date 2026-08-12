@@ -21,100 +21,100 @@ interface LeavesHolidaysProps {
   onUpdateLeaveRequestStatus?: (id: string, status: 'Approved' | 'Rejected', remarks?: string) => Promise<void> | void;
 }
 
-// Current year helper
+//Current year helper
 const CURRENT_YEAR = new Date().getFullYear();
 
-// Holidays list from Rathi's Build Mart Official Calendar
+//Holidays list from Rathi's Build Mart Official Calendar
 export const HOLIDAYS_2026 = [
   {
     occasion: "Republic Day",
-    hindiOccasion: "गणतंत्र दिवस",
+    hindiOccasion: "",
     type: "National Holiday",
-    hindiType: "राष्ट्रीय अवकाश",
+    hindiType: "",
     date: `January 26, ${CURRENT_YEAR}`,
     duration: "1 Day",
-    hindiDuration: "1 दिन",
+    hindiDuration: "",
     imgUrl: "🇮🇳"
   },
   {
     occasion: "Holi",
-    hindiOccasion: "होली",
+    hindiOccasion: "",
     type: "Festival Leave",
-    hindiType: "त्योहार अवकाश",
+    hindiType: "",
     date: `March 4, ${CURRENT_YEAR}`,
     duration: "1 Day",
-    hindiDuration: "1 दिन",
+    hindiDuration: "",
     imgUrl: "🎨"
   },
   {
     occasion: "Eid-ul-Fitr",
-    hindiOccasion: "ईद-उल-फितर",
+    hindiOccasion: "",
     type: "Religious Leave (Muslim Community)",
-    hindiType: "धार्मिक अवकाश (मुस्लिम समाज)",
+    hindiType: "",
     date: `March 20, ${CURRENT_YEAR}`,
     duration: "1 Day",
-    hindiDuration: "1 दिन",
+    hindiDuration: "",
     imgUrl: "🌙"
   },
   {
     occasion: "Independence Day",
-    hindiOccasion: "स्वतंत्रता दिवस",
+    hindiOccasion: "",
     type: "National Holiday",
-    hindiType: "राष्ट्रीय अवकाश",
+    hindiType: "",
     date: `August 15, ${CURRENT_YEAR}`,
     duration: "1 Day",
-    hindiDuration: "1 दिन",
+    hindiDuration: "",
     imgUrl: "🇮🇳"
   },
   {
     occasion: "Dussehra",
-    hindiOccasion: "दशहरा",
+    hindiOccasion: "",
     type: "Festival Leave",
-    hindiType: "त्योहार अवकाश",
+    hindiType: "",
     date: `October 20, ${CURRENT_YEAR}`,
     duration: "Half Day",
-    hindiDuration: "आधा दिन",
+    hindiDuration: "",
     imgUrl: "🏹"
   },
   {
     occasion: "Diwali",
-    hindiOccasion: "दीपावली",
+    hindiOccasion: "",
     type: "Festival Leave",
-    hindiType: "त्योहार अवकाश",
+    hindiType: "",
     date: `November 7, November 8, November 9, ${CURRENT_YEAR}`,
     duration: "3 Days",
-    hindiDuration: "3 दिन",
+    hindiDuration: "",
     imgUrl: "🪔"
   },
   {
     occasion: "Christmas",
-    hindiOccasion: "क्रिसमस",
+    hindiOccasion: "",
     type: "Religious Leave (Christian Community)",
-    hindiType: "धार्मिक अवकाश (ईसाई समाज)",
+    hindiType: "",
     date: `December 25, ${CURRENT_YEAR}`,
     duration: "1 Day",
-    hindiDuration: "1 दिन",
+    hindiDuration: "",
     imgUrl: "🎄"
   }
 ];
 
 const HOLIDAY_TYPES_MAP: Record<string, string> = {
-  "National Holiday": "राष्ट्रीय अवकाश",
-  "Festival Leave": "त्योहार अवकाश",
-  "Religious Leave (Muslim Community)": "धार्मिक अवकाश (मुस्लिम समाज)",
-  "Religious Leave (Christian Community)": "धार्मिक अवकाश (ईसाई समाज)",
-  "Religious Leave (Hindu Community)": "धार्मिक अवकाश (हिंदू समाज)",
-  "Religious Leave": "धार्मिक अवकाश",
-  "Other": "अन्य अवकाश"
+  "National Holiday": "National Holiday",
+  "Festival Leave": "Festival Leave",
+  "Religious Leave (Muslim Community)": "Religious Leave",
+  "Religious Leave (Christian Community)": "Religious Leave",
+  "Religious Leave (Hindu Community)": "Religious Leave",
+  "Religious Leave": "Religious Leave",
+  "Other": "Other"
 };
 
 const DURATIONS_MAP: Record<string, string> = {
-  "1 Day": "1 दिन",
-  "Half Day": "आधा दिन",
-  "2 Days": "2 दिन",
-  "3 Days": "3 दिन",
-  "4 Days": "4 दिन",
-  "5 Days": "5 दिन"
+  "1 Day": "1 Day",
+  "Half Day": "Half Day",
+  "2 Days": "2 Days",
+  "3 Days": "3 Days",
+  "4 Days": "4 Days",
+  "5 Days": "5 Days"
 };
 
 export default function LeavesHolidays({ 
@@ -142,13 +142,13 @@ export default function LeavesHolidays({
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All');
 
-  // WhatsApp modal state
+  //WhatsApp modal state
   const [waModalOpen, setWaModalOpen] = useState(false);
   const [waRecipient, setWaRecipient] = useState<{ name: string; mobileNo?: string; email?: string }>({ name: '' });
   const [waCategory, setWaCategory] = useState<'leaveStatus' | 'customNotice'>('leaveStatus');
   const [waVars, setWaVars] = useState<Record<string, string | number | undefined>>({});
 
-  // Leave Request Form States
+  //Leave Request Form States
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [applyLeaveType, setApplyLeaveType] = useState<'Vacation' | 'Sick' | 'Casual' | 'Half Day (Before Lunch)' | 'Half Day (After Lunch)' | 'Late Coming' | 'Early Going'>('Vacation');
   const [applyStartDate, setApplyStartDate] = useState('');
@@ -156,19 +156,19 @@ export default function LeavesHolidays({
   const [applyReason, setApplyReason] = useState('');
   const [applyEmployeeId, setApplyEmployeeId] = useState(employeeId || '');
 
-  // Admin Approval State
+  //Admin Approval State
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   const [approvalAction, setApprovalAction] = useState<'Approved' | 'Rejected' | null>(null);
   const [approvalRemarks, setApprovalRemarks] = useState('');
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
 
-  // Leaves Filter States
+  //Leaves Filter States
   const [filterLeaveStatus, setFilterLeaveStatus] = useState<string>('All');
   const [filterLeaveType, setFilterLeaveType] = useState<string>('All');
 
   const getCalculatedDuration = (): number => {
     if (applyLeaveType.startsWith('Half Day')) return 0.5;
-    if (applyLeaveType === 'Late Coming' || applyLeaveType === 'Early Going') return 0; // exceptions
+    if (applyLeaveType === 'Late Coming' || applyLeaveType === 'Early Going') return 0; //exceptions
     if (!applyStartDate) return 0;
     if (!applyEndDate) return 1;
     
@@ -189,7 +189,7 @@ export default function LeavesHolidays({
     const targetEmpId = isEmployeeView ? (employeeId || '') : applyEmployeeId;
     const emp = employees.find(emp => emp.id === targetEmpId);
     if (!emp) {
-      alert(language === 'en' ? 'Employee not found!' : 'कर्मचारी नहीं मिला!');
+      alert('Employee not found!');
       return;
     }
     
@@ -210,7 +210,7 @@ export default function LeavesHolidays({
     onAddLeaveRequest(newReq);
     setIsLeaveModalOpen(false);
     
-    // Reset form
+    //Reset form
     setApplyReason('');
     setApplyStartDate('');
     setApplyEndDate('');
@@ -234,7 +234,7 @@ export default function LeavesHolidays({
     setApprovalAction(null);
   };
 
-  // Custom Holidays list state synced with Admin Settings / Google Sheets / localStorage
+  //Custom Holidays list state synced with Admin SettingsGoogle SheetslocalStorage
   const [holidays, setHolidays] = useState<Holiday[]>(() => {
     if (adminSettings?.holidays && adminSettings.holidays.length > 0) {
       return adminSettings.holidays;
@@ -248,28 +248,28 @@ export default function LeavesHolidays({
     return HOLIDAYS_2026;
   });
 
-  // Keep holidays list in sync when adminSettings updates
+  //Keep holidays list in sync when adminSettings updates
   useEffect(() => {
     if (adminSettings?.holidays && adminSettings.holidays.length > 0) {
       setHolidays(adminSettings.holidays);
     }
   }, [adminSettings?.holidays]);
 
-  // Holiday Editor Modal States
+  //Holiday Editor Modal States
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
   const [editingHolidayIndex, setEditingHolidayIndex] = useState<number | null>(null);
 
-  // Form states for adding/editing holiday
+  //Form states for adding/editing holiday
   const [holidayOccasion, setHolidayOccasion] = useState('');
   const [holidayHindiOccasion, setHolidayHindiOccasion] = useState('');
   const [holidayType, setHolidayType] = useState('Festival Leave');
-  const [holidayHindiType, setHolidayHindiType] = useState('त्योहार अवकाश');
+  const [holidayHindiType, setHolidayHindiType] = useState('Festival Leave');
   const [holidayDate, setHolidayDate] = useState('');
   const [holidayDuration, setHolidayDuration] = useState('1 Day');
-  const [holidayHindiDuration, setHolidayHindiDuration] = useState('1 दिन');
+  const [holidayHindiDuration, setHolidayHindiDuration] = useState('1 Day');
   const [holidayImgUrl, setHolidayImgUrl] = useState('📅');
 
-  // Save changes handler
+  //Save changes handler
   const handleSaveHolidaysList = (updatedHolidays: Holiday[]) => {
     setHolidays(updatedHolidays);
     localStorage.setItem('payroll_custom_holidays', JSON.stringify(updatedHolidays));
@@ -283,24 +283,24 @@ export default function LeavesHolidays({
 
   const handleOpenAddHolidayModal = () => {
     if (!hasPermission('add')) {
-      alert(language === 'en' ? 'You do not have permission to add holidays.' : 'आपके पास अवकाश जोड़ने की अनुमति नहीं है।');
+      alert('You do not have permission to add holidays.');
       return;
     }
     setEditingHolidayIndex(null);
     setHolidayOccasion('');
     setHolidayHindiOccasion('');
     setHolidayType('Festival Leave');
-    setHolidayHindiType('त्योहार अवकाश');
+    setHolidayHindiType('Festival Leave');
     setHolidayDate('');
     setHolidayDuration('1 Day');
-    setHolidayHindiDuration('1 दिन');
+    setHolidayHindiDuration('1 Day');
     setHolidayImgUrl('📅');
     setIsHolidayModalOpen(true);
   };
 
   const handleOpenEditHolidayModal = (h: Holiday, index: number) => {
     if (!hasPermission('edit')) {
-      alert(language === 'en' ? 'You do not have permission to edit holidays.' : 'आपके पास अवकाश संशोधित करने की अनुमति नहीं है।');
+      alert('You do not have permission to edit holidays.');
       return;
     }
     setEditingHolidayIndex(index);
@@ -341,28 +341,28 @@ export default function LeavesHolidays({
 
   const handleDeleteHoliday = (indexToDelete: number) => {
     if (!hasPermission('delete')) {
-      alert(language === 'en' ? 'You do not have permission to delete holidays.' : 'आपके पास अवकाश हटाने की अनुमति नहीं है।');
+      alert('You do not have permission to delete holidays.');
       return;
     }
-    if (window.confirm(language === 'en' ? 'Are you sure you want to delete this holiday?' : 'क्या आप वाकई इस छुट्टी को हटाना चाहते हैं?')) {
+    if (window.confirm('Are you sure you want to delete this holiday?')) {
       const updatedList = holidays.filter((_, idx) => idx !== indexToDelete);
       handleSaveHolidaysList(updatedList);
     }
   };
 
-  // Helper to calculate accumulated months since joining
+  //Helper to calculate accumulated months since joining
   const calculateTenureMonths = (joiningDateStr: string): number => {
     if (!joiningDateStr) return 0;
     const joinDate = new Date(joiningDateStr);
     const now = new Date();
     if (isNaN(joinDate.getTime())) return 0;
     
-    // Difference in months inclusive of starting and ending months
+    //Difference in months inclusive of starting and ending months
     const diff = (now.getFullYear() - joinDate.getFullYear()) * 12 + (now.getMonth() - joinDate.getMonth()) + 1;
     return Math.max(0, diff);
   };
 
-  // Helper to get all Leave days marked in attendance for an employee
+  //Helper to get all Leave days marked in attendance for an employee
   const getUsedLeavesCount = (empId: string): number => {
     return attendance.filter(r => r.employeeId === empId && r.status === 'Leave').length;
   };
@@ -371,30 +371,24 @@ export default function LeavesHolidays({
     const isEnabled = adminSettings?.enablePaidLeaveCalculation !== false;
     const probationMonths = adminSettings?.paidLeaveStartAfterMonths || 0;
     if (!isEnabled) {
-      return language === 'en' 
-        ? "Paid Leave (EL) calculation is currently disabled in company policy."
-        : "सवैतनिक अवकाश (EL) गणना वर्तमान में कंपनी की नीति में बंद है।";
+      return "Paid Leave (EL) calculation is currently disabled in company policy.";
     }
     if (probationMonths > 0) {
-      return language === 'en'
-        ? `One Paid Leave day is provided each month after completing a waiting period of ${probationMonths} month(s) of service.`
-        : `${probationMonths} महीने की सेवा की प्रतीक्षा अवधि पूरी करने के बाद हर महीने एक दिन का सवेतन अवकाश (Paid Leave) दिया जाता है।`;
+      return `One Paid Leave day is provided each month after completing a waiting period of ${probationMonths} month(s) of service.`;
     }
-    return language === 'en'
-      ? "One Paid Leave day is provided in each month as Earned Leave (EL) starting immediately upon joining."
-      : "शामिल होने के तुरंत बाद प्रत्येक माह में एक दिन का सवेतन अवकाश (Paid Leave) अर्जित अवकाश (EL) के रूप में प्रदान किया जाता है।";
+    return "One Paid Leave day is provided in each month as Earned Leave (EL) starting immediately upon joining.";
   };
 
-  // Extract unique departments for filtering
+  //Extract unique departments for filtering
   const departments = ['All', ...Array.from(new Set(employees.map(e => e.department).filter(Boolean)))];
 
-  // Map employee and compute leave balances
+  //Map employee and compute leave balances
   const leaveDataList = employees.map(emp => {
     const openingEL = emp.elBalance || 0;
     const openingCL = emp.clBalance || 0;
     const tenureMonths = calculateTenureMonths(emp.joiningDate);
     
-    // Calculate accumulated EL taking into account policy settings
+    //Calculate accumulated EL taking into account policy settings
     const isPaidLeaveEnabled = adminSettings?.enablePaidLeaveCalculation !== false && emp.isPaidLeaveApplicable !== false;
     const probationMonths = adminSettings?.paidLeaveStartAfterMonths || 0;
     const accumulatedEL = isPaidLeaveEnabled ? Math.max(0, tenureMonths - probationMonths) : 0;
@@ -418,7 +412,7 @@ export default function LeavesHolidays({
     };
   });
 
-  // Filtered lists
+  //Filtered lists
   const filteredLeaveList = leaveDataList.filter(item => {
     const emp = employees.find(e => e.id === item.id);
     if (emp && emp.isActive === false) return false;
@@ -428,7 +422,7 @@ export default function LeavesHolidays({
     return matchesSearch && matchesDept;
   });
 
-  // If viewing as a single employee (Employee Portal)
+  //If viewing as a single employee (Employee Portal)
   const employeeLeaveData = employeeId ? leaveDataList.find(d => d.id.toLowerCase() === employeeId.toLowerCase()) : null;
 
   const t = {
@@ -461,42 +455,42 @@ export default function LeavesHolidays({
       totalUsed: "Paid Leaves Used",
       availableBal: "Current Available Balance",
       brandTitle: "RATHI'S BUILD MART",
-      brandSub: "नींव से निर्माण तक",
+      brandSub: "From Foundation to Construction",
       branches: "Raipur | Jagdalpur | Bilaspur",
       trust: "BUILDING TRUST. BUILDING FUTURE."
     },
     hi: {
-      leaveBalanceReport: "अर्जित अवकाश एवं शेष रिपोर्ट",
-      holidayCalendar: `त्योहारों का कैलेंडर ${CURRENT_YEAR}`,
-      leavesBalance: "छुट्टियों का रिकॉर्ड (बैलेंस)",
-      officialCalendar: "आधिकारिक अवकाश तालिका",
-      searchEmp: "कर्मचारी का नाम या आईडी खोजें...",
-      dept: "विभाग",
-      allDepts: "सभी विभाग",
-      empId: "कर्मचारी आईडी",
-      empName: "कर्मचारी का नाम",
-      joinDate: "शामिल होने की तिथि",
-      openingEL: "शुरुआती बैलेंस",
-      monthlyEL: "मासिक अर्जित",
-      totalGranted: "कुल स्वीकृत",
-      usedLeaves: "उपयोग की गई छुट्टियां",
-      remainingEL: "शेष बैलेंस",
-      clBalance: "CL बैलेंस",
-      summary: "संक्षिप्त विवरण",
-      notes: "महत्वपूर्ण निर्देश एवं अवकाश नीतियां",
-      note1: "केवल रविवार को ही साप्ताहिक अवकाश (WO) माना जाता है।",
-      note2: "प्रति माह एक दिन का सवेतन अवकाश (Paid Leave) अर्जित अवकाश (EL) के रूप में प्रदान किया जाता है।",
-      note3: "अन्य कोई अवकाश प्रकार लागू नहीं हैं।",
-      myLeaveReport: "मेरा अवकाश रिकॉर्ड और कैलेंडर",
-      startingBal: "शुरुआती बैलेंस (Opening)",
-      monthlyEarned: "मासिक संचय (1 दिन/माह)",
-      totalAccumulated: "कुल स्वीकृत छुट्टियां",
-      totalUsed: "उपयोग की गई छुट्टियां",
-      availableBal: "वर्तमान शेष बैलेंस",
-      brandTitle: "राठीज़ बिल्डमार्ट",
-      brandSub: "नींव से निर्माण तक",
-      branches: "रायपुर | जगदलपुर | बिलासपुर",
-      trust: "विश्वास की नींव, भविष्य का निर्माण।"
+      leaveBalanceReport: "Paid Leaves & Balance Report",
+      holidayCalendar: `Holiday Calendar ${CURRENT_YEAR}`,
+      leavesBalance: "Leaves Balance",
+      officialCalendar: "Official Holiday Calendar",
+      searchEmp: "Search employee name or ID...",
+      dept: "Department",
+      allDepts: "All Departments",
+      empId: "Employee ID",
+      empName: "Employee Name",
+      joinDate: "Joining Date",
+      openingEL: "Opening Balance",
+      monthlyEL: "Monthly Earned",
+      totalGranted: "Total Granted",
+      usedLeaves: "Leaves Used",
+      remainingEL: "Available Balance",
+      clBalance: "CL Balance",
+      summary: "Summary",
+      notes: "Important Notes & Leave Policies",
+      note1: "Only Sundays are considered as Week Off (WO).",
+      note2: "One Paid Leave day is provided in each month as Earned Leave (EL).",
+      note3: "No other leave types are applicable.",
+      myLeaveReport: "My Leave Balance & Holidays",
+      startingBal: "Starting (Opening) Balance",
+      monthlyEarned: "Monthly Accumulation",
+      totalAccumulated: "Total Allocated Leaves",
+      totalUsed: "Paid Leaves Used",
+      availableBal: "Current Available Balance",
+      brandTitle: "RATHI'S BUILD MART",
+      brandSub: "From Foundation to Construction",
+      branches: "Raipur | Jagdalpur | Bilaspur",
+      trust: "BUILDING TRUST. BUILDING FUTURE."
     }
   }[language];
 
@@ -514,7 +508,7 @@ export default function LeavesHolidays({
             }`}
           >
             <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-center truncate w-full sm:w-auto">{language === 'en' ? 'Balance' : 'शेष'}</span>
+            <span className="text-center truncate w-full sm:w-auto">{'Balance'}</span>
           </button>
           <button
             onClick={() => setSubTab('requests')}
@@ -525,7 +519,7 @@ export default function LeavesHolidays({
             }`}
           >
             <Clock className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-center truncate w-full sm:w-auto">{language === 'en' ? 'Workflow' : 'आवेदन'}</span>
+            <span className="text-center truncate w-full sm:w-auto">{'Workflow'}</span>
           </button>
           <button
             onClick={() => setSubTab('calendar')}
@@ -536,13 +530,13 @@ export default function LeavesHolidays({
             }`}
           >
             <Calendar className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-center truncate w-full sm:w-auto">{language === 'en' ? 'Holidays' : 'अवकाश'}</span>
+            <span className="text-center truncate w-full sm:w-auto">{'Holidays'}</span>
           </button>
         </div>
  
         <div className="text-[9.5px] sm:text-[11px] font-bold text-slate-500 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 px-2 py-1.5 rounded-lg flex items-center justify-center sm:justify-start gap-1 w-full sm:w-auto">
           <Info className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span className="text-center sm:text-left">{language === 'en' ? "1 Paid Leave Added Automatically Each Month" : "प्रति माह 1 दिन सवेतन अवकाश जुड़ता है"}</span>
+          <span className="text-center sm:text-left">{"1 Paid Leave Added Automatically Each Month"}</span>
         </div>
       </div>
 
@@ -550,8 +544,8 @@ export default function LeavesHolidays({
       {subTab === 'balance' && (
         <div className="space-y-6">
           {isEmployeeView && employeeLeaveData ? (
-            /* INDIVIDUAL EMPLOYEE VIEW */
             <div className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl p-6 shadow-xs space-y-6">
+              {/* INDIVIDUAL EMPLOYEE VIEW */}
               <div className="flex items-center gap-3 border-b border-slate-150 dark:border-[#1e3a2f] pb-4">
                 <div className="bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-800">
                   <User className="w-5 h-5" />
@@ -604,8 +598,8 @@ export default function LeavesHolidays({
               )}
             </div>
           ) : (
-            /* ADMIN COMPREHENSIVE TABLE VIEW */
             <div className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl overflow-hidden shadow-xs">
+              {/* ADMIN COMPREHENSIVE TABLE VIEW */}
               
               {/* Header Filters */}
               <div className="p-4 bg-slate-50 dark:bg-[#0c1a14] border-b border-slate-200 dark:border-[#1e3a2f] flex flex-col md:flex-row gap-3 items-center justify-between">
@@ -625,8 +619,7 @@ export default function LeavesHolidays({
                       placeholder={t.searchEmp}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 border border-slate-200 dark:border-[#1e3a2f] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 font-medium"
-                    />
+                      className="w-full pl-9 pr-3 py-1.5 border border-slate-200 dark:border-[#1e3a2f] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 font-medium" />
                   </div>
 
                   {/* Department Filter */}
@@ -724,7 +717,7 @@ export default function LeavesHolidays({
         </div>
       )}
 
-      {/* LEAVE REQUESTS / APPLICATIONS TAB */}
+      {/* LEAVE REQUESTSAPPLICATIONS TAB */}
       {subTab === 'requests' && (
         <div className="space-y-6">
           <div className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl p-6 shadow-xs space-y-6">
@@ -732,12 +725,12 @@ export default function LeavesHolidays({
               <div>
                 <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
                   <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>{language === 'en' ? 'Leave Applications & Workflow' : 'छुट्टी के आवेदन और कार्यप्रवाह'}</span>
+                  <span>{'Leave Applications & Workflow'}</span>
                 </h3>
                 <p className="text-[11px] font-bold text-slate-400 dark:text-slate-400 mt-0.5">
                   {isEmployeeView 
-                    ? (language === 'en' ? 'Apply and monitor your leave status below.' : 'नीचे अपनी छुट्टी का स्टेटस सबमिट और ट्रैक करें।')
-                    : (language === 'en' ? 'Review, approve or reject staff leave applications.' : 'कर्मचारियों की छुट्टी के आवेदनों की समीक्षा और निर्णय लें।')}
+                    ? ('Apply and monitor your leave status below.')
+                    : ('Review, approve or reject staff leave applications.')}
                 </p>
               </div>
 
@@ -757,7 +750,7 @@ export default function LeavesHolidays({
                   className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer transform hover:scale-[1.01]"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>{language === 'en' ? 'Apply for Leave' : 'छुट्टी के लिए आवेदन'}</span>
+                  <span>{'Apply for Leave'}</span>
                 </button>
               )}
             </div>
@@ -768,7 +761,7 @@ export default function LeavesHolidays({
               {!isEmployeeView ? (
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    {language === 'en' ? 'Search Employee' : 'कर्मचारी खोजें'}
+                    {'Search Employee'}
                   </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 pointer-events-none">
@@ -776,17 +769,16 @@ export default function LeavesHolidays({
                     </span>
                     <input
                       type="text"
-                      placeholder={language === 'en' ? 'Name or ID...' : 'नाम या आईडी...'}
+                      placeholder={'Name or ID...'}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 border border-slate-200 dark:border-[#1e3a2f] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 font-semibold"
-                    />
+                      className="w-full pl-9 pr-3 py-1.5 border border-slate-200 dark:border-[#1e3a2f] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 font-semibold" />
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center">
                   <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                    {language === 'en' ? 'Showing your personal leave records' : 'आपके व्यक्तिगत अवकाश रिकॉर्ड दिखाए जा रहे हैं'}
+                    {'Showing your personal leave records'}
                   </span>
                 </div>
               )}
@@ -794,38 +786,38 @@ export default function LeavesHolidays({
               {/* Status Filter */}
               <div>
                 <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                  {language === 'en' ? 'Status' : 'स्थिति'}
+                  {'Status'}
                 </label>
                 <select
                   value={filterLeaveStatus}
                   onChange={(e) => setFilterLeaveStatus(e.target.value)}
                   className="w-full border border-slate-200 dark:border-[#1e3a2f] rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 cursor-pointer"
                 >
-                  <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Statuses' : 'सभी स्थितियां'}</option>
-                  <option value="Pending" className="dark:bg-[#11221b]">{language === 'en' ? 'Pending' : 'लंबित'}</option>
-                  <option value="Approved" className="dark:bg-[#11221b]">{language === 'en' ? 'Approved' : 'स्वीकृत'}</option>
-                  <option value="Rejected" className="dark:bg-[#11221b]">{language === 'en' ? 'Rejected' : 'अस्वीकृत'}</option>
+                  <option value="All" className="dark:bg-[#11221b]">{'All Statuses'}</option>
+                  <option value="Pending" className="dark:bg-[#11221b]">{'Pending'}</option>
+                  <option value="Approved" className="dark:bg-[#11221b]">{'Approved'}</option>
+                  <option value="Rejected" className="dark:bg-[#11221b]">{'Rejected'}</option>
                 </select>
               </div>
 
               {/* Type Filter */}
               <div>
                 <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                  {language === 'en' ? 'Leave/Exception Type' : 'अवकाश का प्रकार'}
+                  {'Leave/Exception Type'}
                 </label>
                 <select
                   value={filterLeaveType}
                   onChange={(e) => setFilterLeaveType(e.target.value)}
                   className="w-full border border-slate-200 dark:border-[#1e3a2f] rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none bg-white dark:bg-[#0b1812] text-slate-800 dark:text-slate-100 cursor-pointer"
                 >
-                  <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Types' : 'सभी प्रकार'}</option>
-                  <option value="Vacation" className="dark:bg-[#11221b]">{language === 'en' ? 'Vacation' : 'वार्षिक छुट्टी (Vacation)'}</option>
-                  <option value="Sick" className="dark:bg-[#11221b]">{language === 'en' ? 'Sick' : 'बीमारी छुट्टी (Sick)'}</option>
-                  <option value="Casual" className="dark:bg-[#11221b]">{language === 'en' ? 'Casual' : 'आकस्मिक छुट्टी (Casual)'}</option>
-                  <option value="Half Day (Before Lunch)" className="dark:bg-[#11221b]">{language === 'en' ? 'Half Day (Before Lunch)' : 'आधा दिन (लंच से पहले)'}</option>
-                  <option value="Half Day (After Lunch)" className="dark:bg-[#11221b]">{language === 'en' ? 'Half Day (After Lunch)' : 'आधा दिन (लंच के बाद)'}</option>
-                  <option value="Late Coming" className="dark:bg-[#11221b]">{language === 'en' ? 'Late Coming' : 'देर से आना (Late Coming)'}</option>
-                  <option value="Early Going" className="dark:bg-[#11221b]">{language === 'en' ? 'Early Going' : 'जल्दी जाना (Early Going)'}</option>
+                  <option value="All" className="dark:bg-[#11221b]">{'All Types'}</option>
+                  <option value="Vacation" className="dark:bg-[#11221b]">{'Vacation'}</option>
+                  <option value="Sick" className="dark:bg-[#11221b]">{'Sick'}</option>
+                  <option value="Casual" className="dark:bg-[#11221b]">{'Casual'}</option>
+                  <option value="Half Day (Before Lunch)" className="dark:bg-[#11221b]">{'Half Day (Before Lunch)'}</option>
+                  <option value="Half Day (After Lunch)" className="dark:bg-[#11221b]">{'Half Day (After Lunch)'}</option>
+                  <option value="Late Coming" className="dark:bg-[#11221b]">{'Late Coming'}</option>
+                  <option value="Early Going" className="dark:bg-[#11221b]">{'Early Going'}</option>
                 </select>
               </div>
             </div>
@@ -837,12 +829,12 @@ export default function LeavesHolidays({
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-100 dark:bg-[#0c1a14] border-b border-slate-200 dark:border-[#1e3a2f] text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                      {!isEmployeeView && <th className="py-3 px-4">{language === 'en' ? 'Employee' : 'कर्मचारी'}</th>}
-                      <th className="py-3 px-4">{language === 'en' ? 'Type' : 'प्रकार'}</th>
-                      <th className="py-3 px-4">{language === 'en' ? 'Duration / Dates' : 'अवधि / तिथियां'}</th>
-                      <th className="py-3 px-4">{language === 'en' ? 'Reason' : 'कारण'}</th>
-                      <th className="py-3 px-4 text-center">{language === 'en' ? 'Status' : 'स्थिति'}</th>
-                      <th className="py-3 px-4 text-center">{language === 'en' ? 'Details / Actions' : 'कार्रवाई / टिप्पणी'}</th>
+                      {!isEmployeeView && <th className="py-3 px-4">{'Employee'}</th>}
+                      <th className="py-3 px-4">{'Type'}</th>
+                      <th className="py-3 px-4">{'DurationDates'}</th>
+                      <th className="py-3 px-4">{'Reason'}</th>
+                      <th className="py-3 px-4 text-center">{'Status'}</th>
+                      <th className="py-3 px-4 text-center">{'DetailsActions'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-[#1e3a2f] font-medium text-slate-800 dark:text-slate-200">
@@ -865,7 +857,7 @@ export default function LeavesHolidays({
                         return (
                           <tr>
                             <td colSpan={isEmployeeView ? 5 : 6} className="py-12 text-center text-slate-400 font-bold">
-                              {language === 'en' ? 'No leave requests found matching filters.' : 'फ़िल्टर के अनुकूल कोई छुट्टी आवेदन नहीं मिला।'}
+                              {'No leave requests found matching filters.'}
                             </td>
                           </tr>
                         );
@@ -894,7 +886,7 @@ export default function LeavesHolidays({
                                 {req.startDate} {req.endDate && req.endDate !== req.startDate ? ` to ${req.endDate}` : ''}
                               </div>
                               <div className="text-[10px] text-slate-400 font-bold mt-0.5">
-                                {req.durationDays} {req.durationDays === 1 ? (language === 'en' ? 'Day' : 'दिन') : (language === 'en' ? 'Days' : 'दिन')}
+                                {req.durationDays} {req.durationDays === 1 ? ('Day') : ('Days')}
                               </div>
                             </td>
                             <td className="py-3.5 px-4 text-slate-600 max-w-xs truncate" title={req.reason}>
@@ -911,10 +903,10 @@ export default function LeavesHolidays({
                                 {isApproved && <CheckCircle className="w-3 h-3 text-emerald-600" />}
                                 <span>
                                   {req.status === 'Pending' 
-                                    ? (language === 'en' ? 'Pending' : 'लंबित') 
+                                    ? ('Pending') 
                                     : req.status === 'Approved'
-                                      ? (language === 'en' ? 'Approved' : 'स्वीकृत')
-                                      : (language === 'en' ? 'Rejected' : 'अस्वीकृत')}
+                                      ? ('Approved')
+                                      : ('Rejected')}
                                 </span>
                               </span>
                             </td>
@@ -926,14 +918,14 @@ export default function LeavesHolidays({
                                     onClick={() => handleOpenApprovalModal(req.id, 'Approved')}
                                     className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] rounded-lg transition-all shadow-3xs cursor-pointer"
                                   >
-                                    {language === 'en' ? 'Approve' : 'मंजूर'}
+                                    {'Approve'}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleOpenApprovalModal(req.id, 'Rejected')}
                                     className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[10px] rounded-lg transition-all shadow-3xs cursor-pointer"
                                   >
-                                    {language === 'en' ? 'Reject' : 'अस्वीकार'}
+                                    {'Reject'}
                                   </button>
                                 </div>
                               ) : (
@@ -941,13 +933,13 @@ export default function LeavesHolidays({
                                   <div>
                                     {req.approvedBy && (
                                       <div>
-                                        <span className="font-extrabold text-slate-600">{language === 'en' ? 'Processed by:' : 'द्वारा प्रोसेस:'} </span>
+                                        <span className="font-extrabold text-slate-600">{'Processed by:'} </span>
                                         {req.approvedBy}
                                       </div>
                                     )}
                                     {req.remarks && (
                                       <div className="italic mt-0.5">
-                                        <span className="font-extrabold text-slate-600">{language === 'en' ? 'Remarks:' : 'टिप्पणी:'} </span>
+                                        <span className="font-extrabold text-slate-600">{'Remarks:'} </span>
                                         "{req.remarks}"
                                       </div>
                                     )}
@@ -1014,7 +1006,7 @@ export default function LeavesHolidays({
                   if (filtered.length === 0) {
                     return (
                       <div className="py-8 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                        {language === 'en' ? 'No leave requests found.' : 'कोई छुट्टी आवेदन नहीं मिला।'}
+                        {'No leave requests found.'}
                       </div>
                     );
                   }
@@ -1045,10 +1037,10 @@ export default function LeavesHolidays({
                             {isApproved && <CheckCircle className="w-2.5 h-2.5 text-emerald-600" />}
                             <span>
                               {req.status === 'Pending' 
-                                ? (language === 'en' ? 'Pending' : 'लंबित') 
+                                ? ('Pending') 
                                 : req.status === 'Approved'
-                                  ? (language === 'en' ? 'Approved' : 'स्वीकृत')
-                                  : (language === 'en' ? 'Rejected' : 'अस्वीकृत')}
+                                  ? ('Approved')
+                                  : ('Rejected')}
                             </span>
                           </span>
                         </div>
@@ -1057,7 +1049,7 @@ export default function LeavesHolidays({
                         <div className="flex items-center justify-between gap-1 font-mono text-slate-700 font-bold mt-0.5">
                           <span>{req.startDate} {req.endDate && req.endDate !== req.startDate ? ` → ${req.endDate}` : ''}</span>
                           <span className="text-slate-400 font-sans text-[9px] font-black uppercase">
-                            {req.durationDays} {req.durationDays === 1 ? (language === 'en' ? 'Day' : 'दिन') : (language === 'en' ? 'Days' : 'दिन')}
+                            {req.durationDays} {req.durationDays === 1 ? ('Day') : ('Days')}
                           </span>
                         </div>
 
@@ -1070,7 +1062,7 @@ export default function LeavesHolidays({
 
                         {/* Row 4: Reason */}
                         <div className="text-slate-600 font-bold break-words pr-2 mt-0.5">
-                          <span className="text-slate-400 font-black uppercase text-[8px] mr-1">{language === 'en' ? 'Reason:' : 'कारण:'}</span>
+                          <span className="text-slate-400 font-black uppercase text-[8px] mr-1">{'Reason:'}</span>
                           {req.reason}
                         </div>
 
@@ -1082,14 +1074,14 @@ export default function LeavesHolidays({
                               onClick={() => handleOpenApprovalModal(req.id, 'Approved')}
                               className="flex-1 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[9px] rounded-md transition-all text-center cursor-pointer"
                             >
-                              {language === 'en' ? 'Approve' : 'मंजूर'}
+                              {'Approve'}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleOpenApprovalModal(req.id, 'Rejected')}
                               className="flex-1 py-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[9px] rounded-md transition-all text-center cursor-pointer"
                             >
-                              {language === 'en' ? 'Reject' : 'अस्वीकार'}
+                              {'Reject'}
                             </button>
                           </div>
                         ) : (
@@ -1097,12 +1089,12 @@ export default function LeavesHolidays({
                             <div className="text-[8.5px] text-slate-500 font-bold border-t border-slate-200/50 pt-1 mt-0.5 leading-tight">
                               {req.approvedBy && (
                                 <div>
-                                  <span className="text-slate-400 font-black uppercase text-[7.5px]">{language === 'en' ? 'By:' : 'द्वारा:'}</span> {req.approvedBy}
+                                  <span className="text-slate-400 font-black uppercase text-[7.5px]">{'By:'}</span> {req.approvedBy}
                                 </div>
                               )}
                               {req.remarks && (
                                 <div className="italic mt-0.5">
-                                  <span className="text-slate-400 font-black uppercase text-[7.5px] not-italic">{language === 'en' ? 'Remarks:' : 'टिप्पणी:'}</span> "{req.remarks}"
+                                  <span className="text-slate-400 font-black uppercase text-[7.5px] not-italic">{'Remarks:'}</span> "{req.remarks}"
                                 </div>
                               )}
                             </div>
@@ -1148,7 +1140,7 @@ export default function LeavesHolidays({
 
               {/* Calendar Title */}
               <h1 className="text-3xl font-black text-white tracking-wider mt-1 uppercase font-display">
-                {language === 'en' ? 'HOLIDAY CALENDAR' : 'अवकाश कैलेंडर'} <span className="text-amber-500 font-mono">{CURRENT_YEAR}</span>
+                {'HOLIDAY CALENDAR'} <span className="text-amber-500 font-mono">{CURRENT_YEAR}</span>
               </h1>
               <p className="text-[10px] text-slate-300 tracking-widest uppercase font-black mt-1">
                 {t.trust}
@@ -1161,7 +1153,7 @@ export default function LeavesHolidays({
                   className="mt-5 flex items-center gap-1.5 px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl shadow-md border border-amber-400 transition-all cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] tracking-wider font-mono uppercase"
                 >
                   <Plus className="w-4 h-4 text-slate-950 stroke-[3]" />
-                  {language === 'en' ? 'Add Holiday' : 'नया अवकाश जोड़ें'}
+                  {'Add Holiday'}
                 </button>
               )}
             </div>
@@ -1174,12 +1166,12 @@ export default function LeavesHolidays({
                   <thead>
                     <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider">
                       <th className="py-3 px-4 text-center w-16">#</th>
-                      <th className="py-3 px-4">{language === 'en' ? 'OCCASION / LEAVE' : 'अवकाश / अवसर'}</th>
-                      <th className="py-3 px-4">{language === 'en' ? 'TYPE' : 'प्रकार'}</th>
-                      <th className="py-3 px-4">{language === 'en' ? 'DATE' : 'दिनांक'}</th>
-                      <th className="py-3 px-4 text-center">{language === 'en' ? 'DURATION' : 'अवधि'}</th>
+                      <th className="py-3 px-4">{'OCCASIONLEAVE'}</th>
+                      <th className="py-3 px-4">{'TYPE'}</th>
+                      <th className="py-3 px-4">{'DATE'}</th>
+                      <th className="py-3 px-4 text-center">{'DURATION'}</th>
                       {!isEmployeeView && (
-                        <th className="py-3 px-4 text-center w-24">{language === 'en' ? 'ACTIONS' : 'कार्रवाई'}</th>
+                        <th className="py-3 px-4 text-center w-24">{'ACTIONS'}</th>
                       )}
                     </tr>
                   </thead>
@@ -1213,14 +1205,14 @@ export default function LeavesHolidays({
                               <button
                                 onClick={() => handleOpenEditHolidayModal(h, idx)}
                                 className="p-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-lg transition-all cursor-pointer"
-                                title={language === 'en' ? 'Edit Holiday' : 'अवकाश संपादित करें'}
+                                title={'Edit Holiday'}
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteHoliday(idx)}
                                 className="p-1.5 text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-all cursor-pointer"
-                                title={language === 'en' ? 'Delete Holiday' : 'अवकाश हटाएं'}
+                                title={'Delete Holiday'}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1273,14 +1265,14 @@ export default function LeavesHolidays({
                           <button
                             onClick={() => handleOpenEditHolidayModal(h, idx)}
                             className="p-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-md transition-all cursor-pointer"
-                            title={language === 'en' ? 'Edit' : 'संपादित करें'}
+                            title={'Edit'}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteHoliday(idx)}
                             className="p-1 text-rose-600 dark:text-rose-400 hover:text-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-md transition-all cursor-pointer"
-                            title={language === 'en' ? 'Delete' : 'हटाएं'}
+                            title={'Delete'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1328,7 +1320,7 @@ export default function LeavesHolidays({
         </div>
       )}
 
-      {/* Add / Edit Holiday Modal */}
+      {/* AddEdit Holiday Modal */}
       {isHolidayModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in duration-200">
@@ -1337,8 +1329,8 @@ export default function LeavesHolidays({
                 <Calendar className="w-5 h-5 text-amber-500" />
                 <h3 className="text-sm font-black uppercase tracking-wider font-mono">
                   {editingHolidayIndex !== null 
-                    ? (language === 'en' ? 'Edit Holiday' : 'अवकाश संपादित करें')
-                    : (language === 'en' ? 'Add New Holiday' : 'नया अवकाश जोड़ें')}
+                    ? ('Edit Holiday')
+                    : ('Add New Holiday')}
                 </h3>
               </div>
               <button 
@@ -1350,7 +1342,7 @@ export default function LeavesHolidays({
             </div>
 
             <form onSubmit={handleSaveHolidayForm} className="p-6 space-y-4 font-sans text-xs">
-              {/* Occasion / Leave Name */}
+              {/* OccasionLeave Name */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
@@ -1362,20 +1354,17 @@ export default function LeavesHolidays({
                     value={holidayOccasion}
                     onChange={(e) => setHolidayOccasion(e.target.value)}
                     placeholder="e.g. Holi"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                  />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    अवसर / अवकाश (हिंदी)
-                  </label>
+                    Occasion</label>
                   <input
                     type="text"
                     value={holidayHindiOccasion}
                     onChange={(e) => setHolidayHindiOccasion(e.target.value)}
-                    placeholder="जैसे: होली"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                  />
+                    placeholder="e.g. Festival Leave / Holiday"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white" />
                 </div>
               </div>
 
@@ -1391,12 +1380,11 @@ export default function LeavesHolidays({
                     value={holidayDate}
                     onChange={(e) => setHolidayDate(e.target.value)}
                     placeholder={`e.g. March 4, ${CURRENT_YEAR}`}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                  />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    Icon / Emoji
+                    IconEmoji
                   </label>
                   <div className="flex gap-2">
                     <select
@@ -1421,8 +1409,7 @@ export default function LeavesHolidays({
                       value={holidayImgUrl}
                       onChange={(e) => setHolidayImgUrl(e.target.value)}
                       placeholder="Custom Emoji"
-                      className="w-16 bg-slate-50 border border-slate-200 rounded-lg text-center py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600"
-                    />
+                      className="w-16 bg-slate-50 border border-slate-200 rounded-lg text-center py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600" />
                   </div>
                 </div>
               </div>
@@ -1455,15 +1442,14 @@ export default function LeavesHolidays({
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    अवकाश प्रकार (हिंदी)
+                    Leave Type
                   </label>
                   <input
                     type="text"
                     value={holidayHindiType}
                     onChange={(e) => setHolidayHindiType(e.target.value)}
-                    placeholder="जैसे: त्योहार अवकाश"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                  />
+                    placeholder="e.g. Festival Leave / Holiday"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white" />
                 </div>
               </div>
 
@@ -1494,15 +1480,14 @@ export default function LeavesHolidays({
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    अवधि (हिंदी)
+                    Duration
                   </label>
                   <input
                     type="text"
                     value={holidayHindiDuration}
                     onChange={(e) => setHolidayHindiDuration(e.target.value)}
-                    placeholder="जैसे: 1 दिन"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                  />
+                    placeholder="e.g. Festival Leave / Holiday"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white" />
                 </div>
               </div>
 
@@ -1520,7 +1505,7 @@ export default function LeavesHolidays({
                   className="flex items-center gap-1.5 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-lg shadow-sm transition-all cursor-pointer"
                 >
                   <Save className="w-4 h-4 text-amber-500" />
-                  {language === 'en' ? 'Save Holiday' : 'अवकाश सुरक्षित करें'}
+                  {'Save Holiday'}
                 </button>
               </div>
             </form>
@@ -1536,7 +1521,7 @@ export default function LeavesHolidays({
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-emerald-500" />
                 <h3 className="text-sm font-black uppercase tracking-wider font-mono">
-                  {language === 'en' ? 'Apply for Leave' : 'छुट्टी के लिए आवेदन'}
+                  {'Apply for Leave'}
                 </h3>
               </div>
               <button 
@@ -1552,7 +1537,7 @@ export default function LeavesHolidays({
               {!isEmployeeView ? (
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    {language === 'en' ? 'Apply For Employee *' : 'कर्मचारी का चयन करें *'}
+                    {'Apply For Employee *'}
                   </label>
                   <select
                     required
@@ -1570,7 +1555,7 @@ export default function LeavesHolidays({
               ) : (
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    {language === 'en' ? 'Applying As' : 'आवेदन करने वाले'}
+                    {'Applying As'}
                   </label>
                   <div className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-700">
                     {employees.find(emp => emp.id.toLowerCase() === (employeeId || '').toLowerCase())?.name || employeeId}
@@ -1581,20 +1566,20 @@ export default function LeavesHolidays({
               {/* Leave Type Selector */}
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                  {language === 'en' ? 'Leave / Exception Type *' : 'छुट्टी / अपवाद का प्रकार *'}
+                  {'LeaveException Type *'}
                 </label>
                 <select
                   value={applyLeaveType}
                   onChange={(e) => setApplyLeaveType(e.target.value as any)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
                 >
-                  <option value="Vacation">{language === 'en' ? 'Vacation' : 'वार्षिक छुट्टी (Vacation)'}</option>
-                  <option value="Sick">{language === 'en' ? 'Sick' : 'बीमारी छुट्टी (Sick)'}</option>
-                  <option value="Casual">{language === 'en' ? 'Casual' : 'आकस्मिक छुट्टी (Casual)'}</option>
-                  <option value="Half Day (Before Lunch)">{language === 'en' ? 'Half Day (Before Lunch)' : 'आधा दिन (लंच से पहले)'}</option>
-                  <option value="Half Day (After Lunch)">{language === 'en' ? 'Half Day (After Lunch)' : 'आधा दिन (लंच के बाद)'}</option>
-                  <option value="Late Coming">{language === 'en' ? 'Late Coming Permission' : 'देर से आने की अनुमति'}</option>
-                  <option value="Early Going">{language === 'en' ? 'Early Going Permission' : 'जल्दी जाने की अनुमति'}</option>
+                  <option value="Vacation">{'Vacation'}</option>
+                  <option value="Sick">{'Sick'}</option>
+                  <option value="Casual">{'Casual'}</option>
+                  <option value="Half Day (Before Lunch)">{'Half Day (Before Lunch)'}</option>
+                  <option value="Half Day (After Lunch)">{'Half Day (After Lunch)'}</option>
+                  <option value="Late Coming">{'Late Coming Permission'}</option>
+                  <option value="Early Going">{'Early Going Permission'}</option>
                 </select>
               </div>
 
@@ -1602,19 +1587,18 @@ export default function LeavesHolidays({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    {language === 'en' ? 'Start Date *' : 'प्रारंभ तिथि *'}
+                    {'Start Date *'}
                   </label>
                   <input
                     type="date"
                     required
                     value={applyStartDate}
                     onChange={(e) => setApplyStartDate(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                  />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    {language === 'en' ? 'End Date *' : 'अंतिम तिथि *'}
+                    {'End Date *'}
                   </label>
                   <input
                     type="date"
@@ -1622,31 +1606,29 @@ export default function LeavesHolidays({
                     disabled={applyLeaveType.startsWith('Half Day') || applyLeaveType === 'Late Coming' || applyLeaveType === 'Early Going'}
                     value={applyLeaveType.startsWith('Half Day') || applyLeaveType === 'Late Coming' || applyLeaveType === 'Early Going' ? applyStartDate : applyEndDate}
                     onChange={(e) => setApplyEndDate(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400"
-                  />
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white disabled:bg-slate-100 disabled:text-slate-400" />
                 </div>
               </div>
 
-              {/* Reason / Remarks */}
+              {/* ReasonRemarks */}
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                  {language === 'en' ? 'Reason for Leave *' : 'अवकाश का कारण *'}
+                  {'Reason for Leave *'}
                 </label>
                 <textarea
                   required
                   rows={3}
                   value={applyReason}
                   onChange={(e) => setApplyReason(e.target.value)}
-                  placeholder={language === 'en' ? 'e.g. Family function / Not feeling well...' : 'जैसे: पारिवारिक समारोह / तबीयत ठीक नहीं है...'}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                />
+                  placeholder={'e.g. Family functionNot feeling well...'}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white" />
               </div>
 
               {/* Duration Preview */}
               <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-emerald-900 font-extrabold flex justify-between items-center">
-                <span>{language === 'en' ? 'Estimated Duration:' : 'अनुमानित अवधि:'}</span>
+                <span>{'Estimated Duration:'}</span>
                 <span className="text-sm font-black text-emerald-700 bg-emerald-100/50 px-2.5 py-0.5 rounded-lg">
-                  {getCalculatedDuration()} {getCalculatedDuration() === 1 ? (language === 'en' ? 'Day' : 'दिन') : (language === 'en' ? 'Days' : 'दिन')}
+                  {getCalculatedDuration()} {getCalculatedDuration() === 1 ? ('Day') : ('Days')}
                 </span>
               </div>
 
@@ -1657,14 +1639,14 @@ export default function LeavesHolidays({
                   onClick={() => setIsLeaveModalOpen(false)}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-lg transition-colors cursor-pointer"
                 >
-                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                  {'Cancel'}
                 </button>
                 <button
                   type="submit"
                   className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg shadow-sm transition-all cursor-pointer"
                 >
                   <Save className="w-4 h-4 text-emerald-200" />
-                  {language === 'en' ? 'Submit Application' : 'आवेदन सबमिट करें'}
+                  {'Submit Application'}
                 </button>
               </div>
             </form>
@@ -1680,7 +1662,7 @@ export default function LeavesHolidays({
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-amber-500" />
                 <h3 className="text-sm font-black uppercase tracking-wider font-mono">
-                  {language === 'en' ? 'Review Application' : 'आवेदन की समीक्षा'}
+                  {'Review Application'}
                 </h3>
               </div>
               <button 
@@ -1695,28 +1677,27 @@ export default function LeavesHolidays({
               <div className="text-slate-700 text-center font-bold text-sm">
                 {approvalAction === 'Approved' ? (
                   <span className="text-emerald-700">
-                    {language === 'en' ? 'Are you sure you want to APPROVE this leave request?' : 'क्या आप वाकई इस छुट्टी को मंजूर करना चाहते हैं?'}
+                    {'Are you sure you want to APPROVE this leave request?'}
                   </span>
                 ) : (
                   <span className="text-rose-700">
-                    {language === 'en' ? 'Are you sure you want to REJECT this leave request?' : 'क्या आप वाकई इस छुट्टी को अस्वीकृत करना चाहते हैं?'}
+                    {'Are you sure you want to REJECT this leave request?'}
                   </span>
                 )}
               </div>
 
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                  {language === 'en' ? 'Remarks / Reason (Optional)' : 'टिप्पणी / कारण (वैकल्पिक)'}
+                  {'RemarksReason (Optional)'}
                 </label>
                 <textarea
                   rows={3}
                   value={approvalRemarks}
                   onChange={(e) => setApprovalRemarks(e.target.value)}
-                  placeholder={language === 'en' ? 'e.g. Approved. Please handover your work.' : 'जैसे: स्वीकृत। कृपया अपना काम हैंडओवर करें।'}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                />
+                  placeholder={'e.g. Approved. Please handover your work.'}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white" />
                 <p className="text-[10px] text-slate-400 mt-1 font-bold">
-                  {language === 'en' ? '* This remark will be sent in the email notification to the employee.' : '* यह टिप्पणी कर्मचारी को ईमेल नोटिफिकेशन में भेजी जाएगी।'}
+                  {'* This remark will be sent in the email notification to the employee.'}
                 </p>
               </div>
 
@@ -1727,7 +1708,7 @@ export default function LeavesHolidays({
                   onClick={() => setIsApprovalModalOpen(false)}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-lg transition-colors cursor-pointer"
                 >
-                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                  {'Cancel'}
                 </button>
                 <button
                   type="submit"
@@ -1736,7 +1717,7 @@ export default function LeavesHolidays({
                   }`}
                 >
                   <Save className="w-4 h-4 text-white/80" />
-                  {language === 'en' ? 'Confirm Decision' : 'निर्णय सुरक्षित करें'}
+                  {'Confirm Decision'}
                 </button>
               </div>
             </form>
@@ -1752,8 +1733,7 @@ export default function LeavesHolidays({
           settings={adminSettings}
           recipient={waRecipient}
           defaultCategory={waCategory}
-          variables={waVars}
-        />
+          variables={waVars} />
       )}
     </div>
   );

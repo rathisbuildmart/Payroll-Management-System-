@@ -26,18 +26,18 @@ interface EmployeeLedgerProps {
 }
 
 export default function EmployeeLedger({ employees, payrollRecords, language, adminSettings }: EmployeeLedgerProps) {
-  // Filters State
+  //Filters State
   const [selectedBranch, setSelectedBranch] = useState<string>('All');
   const [selectedDept, setSelectedDept] = useState<string>('All');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('All');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('All');
   const [monthFilter, setMonthFilter] = useState<string>('All');
   
-  // Pagination State (Show Entries default to 10)
+  //Pagination State (Show Entries default to 10)
   const [pageSize, setPageSize] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  // Translations
+  //Translations
   const t = {
     en: {
       title: "Employee Ledger Report",
@@ -52,7 +52,7 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
       all: "All",
       tableMonth: "Month",
       tableEmp: "Employee Detail",
-      tableBranch: "Branch / Dept",
+      tableBranch: "BranchDept",
       tableBasic: "Basic Salary",
       tableGross: "Gross Salary",
       tableDeduction: "Deductions",
@@ -77,45 +77,45 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
       currency: "₹",
     },
     hi: {
-      title: "कर्मचारी लेजर रिपोर्ट",
-      subtitle: "महीने-दर-महीने वेतन और वित्तीय लेनदेन का विस्तृत इतिहास",
-      filterBranch: "शाखा चयन",
-      filterDept: "विभाग खंड",
-      filterEmployee: "कर्मचारी आईडी और नाम",
-      filterStatus: "भुगतान की स्थिति",
-      filterMonth: "वेतन महीना",
-      showEntries: "प्रविष्टियाँ दिखाएं",
-      searchPlaceholder: "आईडी या नाम खोजें...",
-      all: "सभी",
-      tableMonth: "महीना",
-      tableEmp: "कर्मचारी विवरण",
-      tableBranch: "शाखा / विभाग",
-      tableBasic: "मूल वेतन",
-      tableGross: "सकल वेतन",
-      tableDeduction: "कटौती",
-      tableNet: "निवल देय",
-      tableStatus: "स्थिति",
-      tableAction: "कार्रवाई",
-      paid: "भुगतान किया गया",
-      pending: "लंबित",
-      totalGross: "कुल सकल राशि",
-      totalDeductions: "कुल कटौती",
-      totalNet: "कुल निवल वितरित",
-      totalRecords: "कुल लेनदेन",
-      showing: "दिखाया जा रहा है",
-      to: "से",
-      of: "का",
-      entries: "प्रविष्टियां",
-      prev: "पिछला",
-      next: "अगला",
-      print: "लेजर प्रिंट करें",
-      exportCSV: "सीएसवी डाउनलोड",
-      emptyState: "वर्तमान फ़िल्टर चयन से कोई लेजर लेनदेन मेल नहीं खाता।",
+      title: "Employee Ledger Report",
+      subtitle: "Comprehensive month-by-month payroll & transaction history",
+      filterBranch: "Branch Selector",
+      filterDept: "Department Segment",
+      filterEmployee: "Employee ID & Name",
+      filterStatus: "Payment Status",
+      filterMonth: "Payroll Month",
+      showEntries: "Show Entries",
+      searchPlaceholder: "Search ID or Name...",
+      all: "All",
+      tableMonth: "Month",
+      tableEmp: "Employee Detail",
+      tableBranch: "BranchDept",
+      tableBasic: "Basic Salary",
+      tableGross: "Gross Salary",
+      tableDeduction: "Deductions",
+      tableNet: "Net Payable",
+      tableStatus: "Status",
+      tableAction: "Actions",
+      paid: "Paid",
+      pending: "Pending",
+      totalGross: "Total Gross Pool",
+      totalDeductions: "Total Deductions",
+      totalNet: "Total Net Disbursed",
+      totalRecords: "Total Transactions",
+      showing: "Showing",
+      to: "to",
+      of: "of",
+      entries: "entries",
+      prev: "Previous",
+      next: "Next",
+      print: "Print Ledger",
+      exportCSV: "Export CSV",
+      emptyState: "No ledger transactions match the current filter selection.",
       currency: "₹",
     }
   }[language];
 
-  // Unique Options lists
+  //Unique Options lists
   const branchOptions = useMemo(() => {
     const branches = new Set<string>();
     employees.forEach(emp => {
@@ -144,36 +144,36 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
     return employees.map(emp => ({
       id: emp.id,
       name: emp.name,
-      display: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${language === 'en' ? 'Inactive' : 'निष्क्रिय'}`
+      display: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${'Inactive'}`
     }));
   }, [employees, language]);
 
-  // Bidirectional Filter Logic
+  //Bidirectional Filter Logic
   const filteredLedger = useMemo(() => {
     return payrollRecords.filter(rec => {
       const emp = employees.find(e => e.id.trim().toLowerCase() === rec.employeeId.trim().toLowerCase());
       if (!emp) return false;
 
-      // Filter by Branch
+      //Filter by Branch
       const matchesBranch = selectedBranch === t.all || emp.branch === selectedBranch;
       
-      // Filter by Department
+      //Filter by Department
       const matchesDept = selectedDept === t.all || emp.department === selectedDept;
       
-      // Filter by Employee ID & Name Selection
+      //Filter by Employee ID & Name Selection
       const matchesEmployee = selectedEmployeeId === t.all || rec.employeeId === selectedEmployeeId;
 
-      // Filter by Payment Status
+      //Filter by Payment Status
       const matchesStatus = paymentStatusFilter === t.all || rec.paymentStatus === paymentStatusFilter;
 
-      // Filter by Month
+      //Filter by Month
       const matchesMonth = monthFilter === t.all || rec.monthYear === monthFilter;
 
       return matchesBranch && matchesDept && matchesEmployee && matchesStatus && matchesMonth;
     });
   }, [payrollRecords, employees, selectedBranch, selectedDept, selectedEmployeeId, paymentStatusFilter, monthFilter, t.all]);
 
-  // Statistics Totals
+  //Statistics Totals
   const totals = useMemo(() => {
     return filteredLedger.reduce((acc, curr) => {
       acc.gross += curr.totalSalary || 0;
@@ -183,27 +183,27 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
     }, { gross: 0, deductions: 0, net: 0 });
   }, [filteredLedger]);
 
-  // Paginated Ledger Data
+  //Paginated Ledger Data
   const paginatedLedger = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return filteredLedger.slice(startIndex, startIndex + pageSize);
   }, [filteredLedger, currentPage, pageSize]);
 
-  // Total Pages
-  const totalPages = Math.ceil(filteredLedger.length / pageSize) || 1;
+  //Total Pages
+  const totalPages = Math.ceil(filteredLedger.lengthpageSize) || 1;
 
-  // Handle page size change reset to page 1
+  //Handle page size change reset to page 1
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setPageSize(Number(e.target.value));
     setCurrentPage(1);
   };
 
-  // Helper to trigger print view
+  //Helper to trigger print view
   const handlePrint = () => {
     window.print();
   };
 
-  // CSV Exporter
+  //CSV Exporter
   const handleExportCSV = () => {
     const headers = [
       "Month",
@@ -246,7 +246,7 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
     document.body.removeChild(link);
   };
 
-  // Prettier Month Name formatter
+  //Prettier Month Name formatter
   const formatMonthName = (m: string) => {
     if (m === t.all) return t.all;
     const [year, month] = m.split('-');
@@ -336,7 +336,7 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
         <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
           <div className="flex items-center gap-1.5 text-slate-800 font-black text-[10px] uppercase tracking-wider">
             <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{language === 'en' ? 'Report Parameters & Filters' : 'रिपोर्ट पैरामीटर और फ़िल्टर'}</span>
+            <span>{'Report Parameters & Filters'}</span>
           </div>
           <div className="text-[10px] text-slate-500 font-bold">
             {t.showing} <span className="text-slate-800">{filteredLedger.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> {t.to} <span className="text-slate-800">{Math.min(currentPage * pageSize, filteredLedger.length)}</span> {t.of} <span className="text-slate-800">{filteredLedger.length}</span> {t.entries}
@@ -531,7 +531,7 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
               <tfoot>
                 <tr className="bg-slate-50/50 border-t border-slate-200 font-extrabold text-slate-900 text-xs">
                   <td colSpan={3} className="px-5 py-4 text-left uppercase tracking-wider font-display font-black">
-                    {language === 'en' ? 'Report Total Summary' : 'रिपोर्ट कुल सारांश'}
+                    {'Report Total Summary'}
                   </td>
                   <td className="px-5 py-4 text-right font-mono text-slate-800">
                     {t.currency}{filteredLedger.reduce((acc, c) => acc + c.basicSalary, 0).toLocaleString('en-IN')}
@@ -554,7 +554,7 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
 
         {/* Printable Footer */}
         <div className="hidden print:block text-right mt-16 p-6 text-xs text-slate-500">
-          <p className="font-semibold">{language === 'en' ? 'Authorized Signature' : 'अधिकृत हस्ताक्षर'}</p>
+          <p className="font-semibold">{'Authorized Signature'}</p>
           <div className="mt-12 border-t border-slate-300 w-48 inline-block" />
         </div>
 

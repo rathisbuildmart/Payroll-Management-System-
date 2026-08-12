@@ -30,28 +30,23 @@ export const AdminWelcomeModal: React.FC<AdminWelcomeModalProps> = ({
   // Time-of-day calculation
   const hour = currentTime.getHours();
   let greetingEn = 'Good Morning';
-  let greetingHi = 'सुप्रभात';
   let TimeIcon = Sunrise;
   let bgGradient = 'from-amber-500/20 via-emerald-500/10 to-blue-500/20';
 
   if (hour >= 5 && hour < 12) {
     greetingEn = 'Good Morning';
-    greetingHi = 'सुप्रभात';
     TimeIcon = Sunrise;
     bgGradient = 'from-amber-500/25 via-[#03623c]/20 to-emerald-600/20';
   } else if (hour >= 12 && hour < 17) {
     greetingEn = 'Good Afternoon';
-    greetingHi = 'शुभ दोपहर';
     TimeIcon = Sun;
     bgGradient = 'from-blue-500/25 via-emerald-600/20 to-teal-500/20';
   } else if (hour >= 17 && hour < 22) {
     greetingEn = 'Good Evening';
-    greetingHi = 'शुभ संध्या';
     TimeIcon = Sunset;
     bgGradient = 'from-indigo-600/25 via-purple-600/20 to-[#03623c]/20';
   } else {
     greetingEn = 'Good Night / Working Late';
-    greetingHi = 'शुभ रात्रि / देर रात कार्य';
     TimeIcon = Moon;
     bgGradient = 'from-[#0a192f] via-slate-900 to-[#03623c]/30';
   }
@@ -89,7 +84,7 @@ export const AdminWelcomeModal: React.FC<AdminWelcomeModalProps> = ({
   if (!isOpen) return null;
 
   const formattedTime = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const formattedDate = currentTime.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', {
+  const formattedDate = currentTime.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
@@ -97,10 +92,10 @@ export const AdminWelcomeModal: React.FC<AdminWelcomeModalProps> = ({
   });
 
   const displayRoleTitle = role === 'admin' 
-    ? (language === 'hi' ? 'मुख्य प्रशासक (Super Admin)' : 'System Administrator')
+    ? 'System Administrator'
     : role === 'director' 
-    ? (language === 'hi' ? 'निदेशक (Director)' : 'Executive Director')
-    : (language === 'hi' ? 'प्रबंधक (Manager)' : 'Manager');
+    ? 'Executive Director'
+    : 'Manager';
 
   return (
     <AnimatePresence>
@@ -165,7 +160,7 @@ export const AdminWelcomeModal: React.FC<AdminWelcomeModalProps> = ({
               className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-400/30 text-amber-300 text-xs font-semibold mb-3 shadow-inner"
             >
               <TimeIcon className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
-              <span>{language === 'hi' ? `${greetingHi}, ${companyName}` : `${greetingEn}, ${companyName}`}</span>
+              <span>{`${greetingEn}, ${companyName}`}</span>
             </motion.div>
 
             {/* Main Welcome Headline */}
@@ -175,7 +170,7 @@ export const AdminWelcomeModal: React.FC<AdminWelcomeModalProps> = ({
               transition={{ delay: 0.3 }}
               className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-200 via-white to-emerald-200 bg-clip-text text-transparent mb-1"
             >
-              {language === 'hi' ? `स्वागत है बॉस! 👑` : `Welcome Boss! 👑`}
+              Welcome Boss! 👑
             </motion.h2>
 
             <motion.p
@@ -244,7 +239,7 @@ export const AdminWelcomeModal: React.FC<AdminWelcomeModalProps> = ({
               id="btn-close-admin-welcome-modal"
             >
               <CheckCircle2 className="w-4 h-4" />
-              {language === 'hi' ? 'कार्य शुरू करें (Let\'s Work) 🚀' : 'Let\'s Get to Work Boss 🚀'}
+              Let's Get to Work Boss 🚀
             </motion.button>
           </div>
         </motion.div>

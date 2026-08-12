@@ -7,14 +7,14 @@ import {
   Bell, KeyRound, LifeBuoy, CheckCircle2, Lock, Unlock, UserCheck, UserX, X
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Employee, Attendance, PayrollRecord, FailedLoginAttempt, LeaveRequest, getCurrentBasicSalary } from '../types';
+import { Employee, Attendance, PayrollRecord, FailedLoginAttempt, LeaveRequest, JobPosting, Candidate, OfferLetter, ExitRecord, getCurrentBasicSalary } from '../types';
 
 interface DashboardProps {
   employees: Employee[];
   attendance: Attendance[];
   payroll: PayrollRecord[];
   language: 'en' | 'hi';
-  onNavigate?: (tab: 'dashboard' | 'employees' | 'attendance' | 'payroll' | 'notices_support' | 'admin') => void;
+  onNavigate?: (tab: 'dashboard' | 'employees' | 'attendance' | 'payroll' | 'notices_support' | 'admin' | 'hiring_onboarding' | 'exit_management') => void;
   passwordRequests?: any[];
   hrTickets?: any[];
   onNavigateNoticeSubTab?: (subTab: 'passwords' | 'tickets' | 'notices') => void;
@@ -22,6 +22,7 @@ interface DashboardProps {
   onUpdateEmployee?: (updated: Employee) => Promise<void> | void;
   leaveRequests?: LeaveRequest[];
   onUpdateLeaveRequestStatus?: (id: string, status: 'Approved' | 'Rejected', remarks?: string) => Promise<void> | void;
+  userRole?: string;
 }
 
 export default function Dashboard({ 
@@ -36,9 +37,57 @@ export default function Dashboard({
   failedLogins = [],
   onUpdateEmployee,
   leaveRequests = [],
-  onUpdateLeaveRequestStatus
+  onUpdateLeaveRequestStatus,
+  userRole
 }: DashboardProps) {
-  // Format current month string (YYYY-MM) in local timezone to avoid offset issues
+  //Recruitment data for dedicated Recruiter Role Dashboard
+  const recruitmentData = useMemo(() => {
+    let jobs: JobPosting[] = [];
+    let candidates: Candidate[] = [];
+    let offers: OfferLetter[] = [];
+    let exits: ExitRecord[] = [];
+
+    try {
+      const savedJobs = localStorage.getItem('payroll_jobs');
+      if (savedJobs) jobs = JSON.parse(savedJobs);
+    } catch (e) {}
+
+    try {
+      const savedCandidates = localStorage.getItem('payroll_candidates');
+      if (savedCandidates) candidates = JSON.parse(savedCandidates);
+    } catch (e) {}
+
+    try {
+      const savedOffers = localStorage.getItem('payroll_offers');
+      if (savedOffers) offers = JSON.parse(savedOffers);
+    } catch (e) {}
+
+    try {
+      const savedExits = localStorage.getItem('payroll_exit_records');
+      if (savedExits) exits = JSON.parse(savedExits);
+    } catch (e) {}
+
+    return { jobs, candidates, offers, exits };
+  }, []);
+
+  const recruitmentStats = useMemo(() => {
+    const openJobsCount = recruitmentData.jobs.filter(j => j.status === 'Open').length;
+    const candidatesCount = recruitmentData.candidates.length;
+    const offersCount = recruitmentData.offers.length;
+    const activeExitsCount = recruitmentData.exits.filter(e => e.status !== 'Relieved' && e.status !== 'Rejected').length;
+
+    return { openJobsCount, candidatesCount, offersCount, activeExitsCount };
+  }, [recruitmentData]);
+
+  const recruitmentChartData = useMemo(() => {
+    return [
+      { category: 'Open Jobs', count: recruitmentStats.openJobsCount },
+      { category: 'Applicants', count: recruitmentStats.candidatesCount },
+      { category: 'Offers Issued', count: recruitmentStats.offersCount },
+      { category: 'Exit Clearances', count: recruitmentStats.activeExitsCount }
+    ];
+  }, [recruitmentStats, language]);
+  //Format current month string (YYYY-MM) in local timezone to avoid offset issues
   const currentMonthStr = useMemo(() => {
     const d = new Date();
     const year = d.getFullYear();
@@ -54,7 +103,7 @@ export default function Dashboard({
     return `${year}-${month}-${day}`;
   }, []);
 
-  // Real-time Dashboard Filters State
+  //Real-time Dashboard Filters State
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
   const [selectedDept, setSelectedDept] = useState<string>('All');
   const [selectedBranch, setSelectedBranch] = useState<string>('All');
@@ -64,7 +113,278 @@ export default function Dashboard({
   const [activeDeviceTab, setActiveDeviceTab] = useState<'All' | 'Locks' | 'Registrations' | 'Logins'>('All');
 
   const pendingPasswordReqs = useMemo(() => {
-    return (passwordRequests || []).filter((r: any) => r.status === 'Pending');
+    if (userRole === 'recruiter') {
+    return (
+      <div className="space-y-6 animate-fadeIn pb-12 font-sans">
+        {/* Recruiter Header Banner */}
+        <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-emerald-800/40 relative overflow-hidden">
+          <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-10 pointer-events-none">
+            <Users className="w-64 h-64 text-white" />
+          </div>
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider mb-2">
+                <Briefcase className="w-3.5 h-3.5" />
+                <span>{'Recruiter Control Hub'}</span>
+              </div>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">
+                {'Recruitment & Exit Operations Dashboard'}
+              </h1>
+              <p className="text-xs text-emerald-100/80 mt-1 max-w-2xl leading-relaxed">
+                {'Manage end-to-end recruitment pipelines, open job postings, candidate scorecards, offer letters, onboarding progress, resignations, and No-Dues clearances.'}
+              </p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                onClick={() => onNavigate?.('hiring_onboarding')}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>{'Hiring & Onboarding Hub'}</span>
+              </button>
+              <button
+                onClick={() => onNavigate?.('exit_management')}
+                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserX className="w-4 h-4 text-rose-400" />
+                <span>{'Exit & Clearance Hub'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Recruiter Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                {'Open Job Postings'}
+              </span>
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                <Briefcase className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono">
+              {recruitmentStats.openJobsCount}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
+              {'Active hiring drives across branches'}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                {'Candidate Pipeline'}
+              </span>
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono">
+              {recruitmentStats.candidatesCount}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
+              {'Applicants in screening & interview'}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                {'Offers & Onboarding'}
+              </span>
+              <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                <UserCheck className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono">
+              {recruitmentStats.offersCount}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
+              {'Issued offers and onboarding tasks'}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                {'Exit Clearances'}
+              </span>
+              <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                <UserX className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono">
+              {recruitmentStats.activeExitsCount}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
+              {'Resignations & No-Dues in clearance'}
+            </div>
+          </div>
+        </div>
+
+        {/* Two Main Functional Workflows: 1. Hiring & Onboarding, 2. Exit & Clearance */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Module 1: Hiring & Onboarding Hub */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl font-black">
+                  1
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {'Hiring & Onboarding Management'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {'Open jobs, applicant stages & onboarding checklists'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => onNavigate?.('hiring_onboarding')}
+                className="text-xs font-black text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-all"
+              >
+                <span>{'Open Module'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Open Jobs List Preview */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
+                {'Active Job Openings'}
+              </span>
+              {recruitmentData.jobs.length === 0 ? (
+                <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 italic">
+                  {'No active job postings created yet.'}
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {recruitmentData.jobs.slice(0, 4).map((job: any) => (
+                    <div key={job.id} className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 flex items-center justify-between transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-extrabold text-slate-900">{job.title}</span>
+                          <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-mono">
+                            {job.openings} {'Openings'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                          📍 {job.location} • 🏢 {job.department} • 📅 {job.postedDate}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase font-mono ${
+                        job.status === 'Open' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {job.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Module 2: Exit & Clearance Hub */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-rose-100 text-rose-800 rounded-xl font-black">
+                  2
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {'Exit & No-Dues Clearance'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {'Resignations, department clearances & final settlements'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => onNavigate?.('exit_management')}
+                className="text-xs font-black text-rose-700 hover:text-rose-800 flex items-center gap-1 cursor-pointer bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-100 transition-all"
+              >
+                <span>{'Open Module'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Exit Records List Preview */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
+                {'Active Resignations & Clearances'}
+              </span>
+              {recruitmentData.exits.length === 0 ? (
+                <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 italic">
+                  {'No exit or resignation requests recorded.'}
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {recruitmentData.exits.slice(0, 4).map((ext: any) => (
+                    <div key={ext.id} className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 flex items-center justify-between transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-extrabold text-slate-900">{ext.employeeName}</span>
+                          <span className="text-[9px] font-mono text-slate-500 font-bold">({ext.employeeId})</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                          🏢 {ext.department} • 📅 Last Day: {ext.lastWorkingDay}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase font-mono ${
+                        ext.status === 'Relieved' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {ext.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Recruitment & Separation Analytics Chart */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                {'Hiring vs Separation Trends'}
+              </h3>
+              <p className="text-[10px] text-slate-400 font-medium">
+                {'Visual overview of candidate sourcing, hires & staff exits'}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs font-bold font-mono">
+              <span className="flex items-center gap-1 text-emerald-600">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span>
+                {'Overview'}
+              </span>
+            </div>
+          </div>
+
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={recruitmentChartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="category" tick={{ fontSize: 11, fontWeight: 700 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }} />
+                <Bar dataKey="count" fill="#10b981" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (passwordRequests || []).filter((r: any) => r.status === 'Pending');
   }, [passwordRequests]);
 
   const pendingHrTkts = useMemo(() => {
@@ -105,7 +425,7 @@ export default function Dashboard({
 
   const totalPending = pendingPasswordReqs.length + pendingHrTkts.length + deviceLockAlerts.length + pendingApprovalAlerts.length + pendingDeviceApprovals.length + pendingLeaves.length;
 
-  // List of unique months available in system
+  //List of unique months available in system
   const monthOptions = useMemo(() => {
     const months = new Set<string>();
     months.add(currentMonthStr);
@@ -123,7 +443,7 @@ export default function Dashboard({
     return Array.from(months).filter(Boolean).sort().reverse();
   }, [payroll, attendance, currentMonthStr]);
 
-  // List of unique departments
+  //List of unique departments
   const departmentOptions = useMemo(() => {
     const depts = new Set<string>();
     employees.forEach(emp => {
@@ -132,7 +452,7 @@ export default function Dashboard({
     return ['All', ...Array.from(depts)];
   }, [employees]);
 
-  // List of unique branches
+  //List of unique branches
   const branchOptions = useMemo(() => {
     const branches = new Set<string>();
     employees.forEach(emp => {
@@ -141,15 +461,15 @@ export default function Dashboard({
     return ['All', ...Array.from(branches)];
   }, [employees]);
 
-  // List of employees for selection
+  //List of employees for selection
   const employeeOptions = useMemo(() => {
     return employees.map(emp => ({
       id: emp.id,
-      name: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${language === 'en' ? 'Inactive' : 'निष्क्रिय'}`
+      name: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${'Inactive'}`
     }));
   }, [employees, language]);
 
-  // Dynamic filtered datasets based on Month + Department + Branch + Employee filters
+  //Dynamic filtered datasets based on Month + Department + Branch + Employee filters
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
@@ -164,7 +484,7 @@ export default function Dashboard({
   }, [filteredEmployees]);
 
   const todayAvailability = useMemo(() => {
-    // Get all active employees under selected department and branch filters
+    //Get all active employees under selected department and branch filters
     const activeStaff = employees.filter(e => {
       if (e.isActive === false) return false;
       const matchesDept = selectedDept === 'All' || e.department === selectedDept;
@@ -178,10 +498,10 @@ export default function Dashboard({
     const absentList: { employee: Employee }[] = [];
 
     activeStaff.forEach(emp => {
-      // Check attendance record first
+      //Check attendance record first
       const attRecord = attendance.find(a => a.date === todayStr && a.employeeId === emp.id);
       
-      // Check approved leave request covering today
+      //Check approved leave request covering today
       const activeLeave = (leaveRequests || []).find(req => {
         if (req.employeeId !== emp.id || req.status !== 'Approved') return false;
         const start = req.startDate;
@@ -221,7 +541,7 @@ export default function Dashboard({
     };
   }, [employees, attendance, leaveRequests, todayStr, selectedDept, selectedBranch, selectedEmployeeId]);
 
-  // Attendance statistics for selected month / day
+  //Attendance statistics for selected monthday
   const monthlyAttendance = useMemo(() => {
     return attendance.filter(a => {
       const matchesMonth = a.date.startsWith(selectedMonth);
@@ -252,7 +572,7 @@ export default function Dashboard({
     if (todayAttendance.length > 0) {
       return Math.round((presentTodayCount / todayAttendance.length) * 100);
     }
-    // Fallback: use monthly attendance average
+    //Fallback: use monthly attendance average
     if (monthlyAttendance.length > 0) {
       const presentCount = monthlyAttendance.filter(a => a.status === 'Present' || a.status === 'Half Day').length;
       return Math.round((presentCount / monthlyAttendance.length) * 100);
@@ -260,7 +580,7 @@ export default function Dashboard({
     return 100;
   }, [todayAttendance, monthlyAttendance, presentTodayCount]);
 
-  // Payroll calculations based on filtered month, department, branch, and employee
+  //Payroll calculations based on filtered month, department, branch, and employee
   const filteredPayroll = useMemo(() => {
     return payroll.filter(p => {
       const matchesMonth = p.monthYear === selectedMonth;
@@ -290,7 +610,7 @@ export default function Dashboard({
     return Math.round((paidCount / filteredPayroll.length) * 100);
   }, [filteredPayroll]);
 
-  // Department-wise breakdown statistics (using filteredEmployees to respect search & filter settings)
+  //Department-wise breakdown statistics (using filteredEmployees to respect search & filter settings)
   const deptChartData = useMemo(() => {
     const deptMap: { [key: string]: { count: number; salary: number; active: number } } = {};
     filteredEmployees.forEach(emp => {
@@ -314,7 +634,7 @@ export default function Dashboard({
     }));
   }, [filteredEmployees]);
 
-  // Attendance trends for last 7 calendar days in local timezone
+  //Attendance trends for last 7 calendar days in local timezone
   const last7DaysData = useMemo(() => {
     const days = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
@@ -337,7 +657,7 @@ export default function Dashboard({
       
       const total = dayAttendance.length;
       const present = dayAttendance.filter(a => a.status === 'Present' || a.status === 'Half Day').length;
-      const rate = total > 0 ? Math.round((present / total) * 100) : 0; // Default to 0 instead of 100 so empty days have visual differentiation
+      const rate = total > 0 ? Math.round((present / total) * 100) : 0; //Default to 0 instead of 100 so empty days have visual differentiation
       
       const parts = date.split('-');
       const label = `${parts[2]}/${parts[1]}`;
@@ -350,15 +670,15 @@ export default function Dashboard({
     });
   }, [attendance, selectedDept, selectedBranch, selectedEmployeeId, employees]);
 
-  // Payroll status pie dataset
+  //Payroll status pie dataset
   const pieData = useMemo(() => {
     return [
-      { name: language === 'en' ? 'Paid' : 'भुगतान हुआ', value: paidPayrollExpense, color: '#10b981' },
-      { name: language === 'en' ? 'Pending' : 'लंबित', value: pendingPayrollExpense || (paidPayrollExpense === 0 ? 0.01 : 0), color: '#f59e0b' },
+      { name: 'Paid', value: paidPayrollExpense, color: '#10b981' },
+      { name: 'Pending', value: pendingPayrollExpense || (paidPayrollExpense === 0 ? 0.01 : 0), color: '#f59e0b' },
     ];
   }, [paidPayrollExpense, pendingPayrollExpense, language]);
 
-  // Translation configuration
+  //Translation configuration
   const t = {
     en: {
       dashboardCockpit: "Analytics Cockpit",
@@ -397,44 +717,44 @@ export default function Dashboard({
       viewReport: "Open Live Sheet"
     },
     hi: {
-      dashboardCockpit: "एनालिटिक्स कॉकपिट",
-      realtimeInsights: "वास्तविक समय सिस्टम इनसाइट्स",
-      filterMonth: "पेरोल महीना चुनें",
-      filterDept: "विभाग फ़िल्टर",
-      statsTitle: "सिस्टम मुख्य मेट्रिक्स",
-      totalEmp: "कुल कर्मचारी",
-      activeEmp: "सक्रिय स्टाफ",
-      presentToday: "आज की उपस्थिति",
-      attendanceRate: "उपस्थिति दर",
-      monthExpense: "मासिक पेरोल बजट",
-      paid: "भुगतान हुआ वेतन",
-      pending: "लंबित वेतन",
-      deptDist: "विभाग अनुसार संसाधन आवंटन",
-      trendTitle: "उपस्थिति रुझान (पिछले 7 दिन)",
-      breakdown: "पेरोल अनुपालन और वॉल्यूम",
+      dashboardCockpit: "Analytics Cockpit",
+      realtimeInsights: "Real-Time System Insights",
+      filterMonth: "Select Payroll Month",
+      filterDept: "Department Segment",
+      statsTitle: "Overview Metrics",
+      totalEmp: "Registered Force",
+      activeEmp: "Active Staff",
+      presentToday: "Attendance Pulse",
+      attendanceRate: "Attendance Ratio",
+      monthExpense: "Monthly Payroll Pool",
+      paid: "Disbursed Salary",
+      pending: "Pending Approval",
+      deptDist: "Departmental Resource Distribution",
+      trendTitle: "Attendance Velocity (Last 7 Days)",
+      breakdown: "Payroll Compliance & Volume",
       currency: "₹",
-      headcount: "कर्मचारी संख्या",
-      salaryPool: "मूल वेतन बजट (₹)",
-      ratePercent: "उपस्थिति दर (%)",
-      activeStatus: "सक्रिय",
-      inactiveStatus: "निष्क्रिय",
-      complianceLabel: "अनुपालन",
-      quickActions: "ऑपरेशंस लॉन्चपैड",
-      actionAddEmp: "नया कर्मचारी जोड़ें",
-      actionMarkAtt: "दैनिक उपस्थिति दर्ज करें",
-      actionCalcPay: "मासिक वेतन गणना करें",
-      liveHighlights: "इंटेलिजेंट अलर्ट",
-      highlightActiveRatio: "स्टाफ उपयोग",
-      highlightPayrollRun: "संवितरण प्रगति",
-      highlightAttendance: "उपस्थिति की जांच",
-      goodStanding: "सभी प्रणालियां सुचारू रूप से कार्यरत हैं",
-      pendingAlert: "लंबित भुगतान पर ध्यान देने की आवश्यकता है",
-      noRecords: "इस फ़िल्टर कॉम्बिनेशन के लिए कोई रिकॉर्ड उपलब्ध नहीं है।",
-      viewReport: "लाइव शीट खोलें"
+      headcount: "Staff count",
+      salaryPool: "Basic Salary Pool (₹)",
+      ratePercent: "Attendance Rate (%)",
+      activeStatus: "Active",
+      inactiveStatus: "Inactive",
+      complianceLabel: "Compliance",
+      quickActions: "Operations Launchpad",
+      actionAddEmp: "Enlist New Employee",
+      actionMarkAtt: "Log Daily Attendance",
+      actionCalcPay: "Disburse Monthly Salaries",
+      liveHighlights: "Intelligent Alerts",
+      highlightActiveRatio: "Staff Utilization",
+      highlightPayrollRun: "Disbursement Progress",
+      highlightAttendance: "Presence Check",
+      goodStanding: "All systems operational",
+      pendingAlert: "Pending transactions need approval",
+      noRecords: "No system transactions recorded for this combination.",
+      viewReport: "Open Live Sheet"
     }
   }[language];
 
-  // Animated Container Varients
+  //Animated Container Varients
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -449,6 +769,277 @@ export default function Dashboard({
     hidden: { opacity: 0, y: 12 },
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
   };
+
+  if (userRole === 'recruiter') {
+    return (
+      <div className="space-y-6 animate-fadeIn pb-12 font-sans">
+        {/* Recruiter Header Banner */}
+        <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-emerald-800/40 relative overflow-hidden">
+          <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-10 pointer-events-none">
+            <Users className="w-64 h-64 text-white" />
+          </div>
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider mb-2">
+                <Briefcase className="w-3.5 h-3.5" />
+                <span>{'Recruiter Control Hub'}</span>
+              </div>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">
+                {'Recruitment & Exit Operations Dashboard'}
+              </h1>
+              <p className="text-xs text-emerald-100/80 mt-1 max-w-2xl leading-relaxed">
+                {'Manage end-to-end recruitment pipelines, open job postings, candidate scorecards, offer letters, onboarding progress, resignations, and No-Dues clearances.'}
+              </p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                onClick={() => onNavigate?.('hiring_onboarding')}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>{'Hiring & Onboarding Hub'}</span>
+              </button>
+              <button
+                onClick={() => onNavigate?.('exit_management')}
+                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserX className="w-4 h-4 text-rose-400" />
+                <span>{'Exit & Clearance Hub'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Recruiter Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                {'Open Job Postings'}
+              </span>
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                <Briefcase className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono">
+              {recruitmentStats.openJobsCount}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
+              {'Active hiring drives across branches'}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                {'Candidate Pipeline'}
+              </span>
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono">
+              {recruitmentStats.candidatesCount}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
+              {'Applicants in screening & interview'}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                {'Offers & Onboarding'}
+              </span>
+              <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                <UserCheck className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono">
+              {recruitmentStats.offersCount}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
+              {'Issued offers and onboarding tasks'}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                {'Exit Clearances'}
+              </span>
+              <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                <UserX className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 font-mono">
+              {recruitmentStats.activeExitsCount}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
+              {'Resignations & No-Dues in clearance'}
+            </div>
+          </div>
+        </div>
+
+        {/* Two Main Functional Workflows: 1. Hiring & Onboarding, 2. Exit & Clearance */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Module 1: Hiring & Onboarding Hub */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl font-black">
+                  1
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {'Hiring & Onboarding Management'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {'Open jobs, applicant stages & onboarding checklists'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => onNavigate?.('hiring_onboarding')}
+                className="text-xs font-black text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-all"
+              >
+                <span>{'Open Module'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Open Jobs List Preview */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
+                {'Active Job Openings'}
+              </span>
+              {recruitmentData.jobs.length === 0 ? (
+                <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 italic">
+                  {'No active job postings created yet.'}
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {recruitmentData.jobs.slice(0, 4).map((job: any) => (
+                    <div key={job.id} className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 flex items-center justify-between transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-extrabold text-slate-900">{job.title}</span>
+                          <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-mono">
+                            {job.openings} {'Openings'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                          📍 {job.location} • 🏢 {job.department} • 📅 {job.postedDate}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase font-mono ${
+                        job.status === 'Open' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {job.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Module 2: Exit & Clearance Hub */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-rose-100 text-rose-800 rounded-xl font-black">
+                  2
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {'Exit & No-Dues Clearance'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {'Resignations, department clearances & final settlements'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => onNavigate?.('exit_management')}
+                className="text-xs font-black text-rose-700 hover:text-rose-800 flex items-center gap-1 cursor-pointer bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-100 transition-all"
+              >
+                <span>{'Open Module'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Exit Records List Preview */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
+                {'Active Resignations & Clearances'}
+              </span>
+              {recruitmentData.exits.length === 0 ? (
+                <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 italic">
+                  {'No exit or resignation requests recorded.'}
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {recruitmentData.exits.slice(0, 4).map((ext: any) => (
+                    <div key={ext.id} className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 flex items-center justify-between transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-extrabold text-slate-900">{ext.employeeName}</span>
+                          <span className="text-[9px] font-mono text-slate-500 font-bold">({ext.employeeId})</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                          🏢 {ext.department} • 📅 Last Day: {ext.lastWorkingDay}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase font-mono ${
+                        ext.status === 'Relieved' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {ext.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Recruitment & Separation Analytics Chart */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                {'Hiring vs Separation Trends'}
+              </h3>
+              <p className="text-[10px] text-slate-400 font-medium">
+                {'Visual overview of candidate sourcing, hires & staff exits'}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs font-bold font-mono">
+              <span className="flex items-center gap-1 text-emerald-600">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span>
+                {'Overview'}
+              </span>
+            </div>
+          </div>
+
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={recruitmentChartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="category" tick={{ fontSize: 11, fontWeight: 700 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }} />
+                <Bar dataKey="count" fill="#10b981" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -475,7 +1066,7 @@ export default function Dashboard({
               className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2 py-1 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer"
             >
               {monthOptions.map(m => {
-                // Prettier formatting
+                //Prettier formatting
                 const [year, month] = m.split('-');
                 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                 const formattedName = monthNames[parseInt(month) - 1] ? `${monthNames[parseInt(month) - 1]} ${year}` : m;
@@ -503,7 +1094,7 @@ export default function Dashboard({
           {/* Branch Picker */}
           <div className="flex items-center gap-1">
             <span className="text-[9px] font-extrabold text-gray-700 uppercase font-mono">
-              {language === 'en' ? 'Branch' : 'शाखा'}:
+              {'Branch'}:
             </span>
             <select
               value={selectedBranch}
@@ -519,14 +1110,14 @@ export default function Dashboard({
           {/* Employee Picker */}
           <div className="flex items-center gap-1">
             <span className="text-[9px] font-extrabold text-gray-700 uppercase font-mono">
-              {language === 'en' ? 'Employee' : 'कर्मचारी'}:
+              {'Employee'}:
             </span>
             <select
               value={selectedEmployeeId}
               onChange={(e) => setSelectedEmployeeId(e.target.value)}
               className="bg-gray-50 border border-gray-200 text-xs font-semibold text-gray-700 px-2 py-1 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer max-w-[140px]"
             >
-              <option value="All">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+              <option value="All">{'All Employees'}</option>
               {employeeOptions.map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.name}</option>
               ))}
@@ -549,16 +1140,14 @@ export default function Dashboard({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-[11px] font-black tracking-tight text-slate-900 uppercase">
-                    {language === 'en' ? 'Urgent Actions Required' : 'त्वरित कार्रवाई आवश्यक'}
+                    {'Urgent Actions Required'}
                   </h3>
                   <span className="bg-rose-100 text-rose-700 text-[9px] font-black px-1.5 py-0.25 rounded-md font-mono animate-bounce">
-                    {totalPending} {language === 'en' ? 'Pending' : 'लंबित'}
+                    {totalPending} {'Pending'}
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-500 font-semibold leading-none mt-0.5 hidden md:block">
-                  {language === 'en' 
-                    ? `Unresolved login/security or leave applications awaiting administrator decision.`
-                    : `आपके निर्णय की प्रतीक्षा में सुरक्षा या अवकाश आवेदन लंबित हैं।`}
+                  {`Unresolved login/security or leave applications awaiting administrator decision.`}
                 </p>
               </div>
             </div>
@@ -570,7 +1159,7 @@ export default function Dashboard({
                   className="bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black px-2.5 py-1 rounded-lg transition-all shadow-3xs flex items-center gap-1 uppercase tracking-wider cursor-pointer"
                 >
                   <Calendar className="w-3 h-3" />
-                  <span>{language === 'en' ? 'Approve Leaves' : 'छुट्टियां स्वीकृत करें'} ({pendingLeaves.length})</span>
+                  <span>{'Approve Leaves'} ({pendingLeaves.length})</span>
                 </button>
               )}
               {deviceLockAlerts.length + pendingApprovalAlerts.length + pendingDeviceApprovals.length > 0 && (
@@ -579,7 +1168,7 @@ export default function Dashboard({
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-black px-2.5 py-1 rounded-lg transition-all shadow-3xs flex items-center gap-1 uppercase tracking-wider cursor-pointer"
                 >
                   <Lock className="w-3 h-3" />
-                  <span>{language === 'en' ? 'Approve Devices' : 'डिवाइस स्वीकृत करें'} ({deviceLockAlerts.length + pendingApprovalAlerts.length + pendingDeviceApprovals.length})</span>
+                  <span>{'Approve Devices'} ({deviceLockAlerts.length + pendingApprovalAlerts.length + pendingDeviceApprovals.length})</span>
                 </button>
               )}
             </div>
@@ -599,14 +1188,10 @@ export default function Dashboard({
                     </div>
                     <div className="min-w-0">
                       <p className="text-[11px] font-black text-slate-800 leading-none">
-                        {language === 'en' 
-                          ? `Device & Account Security Approvals (${deviceLockAlerts.length + pendingApprovalAlerts.length + pendingDeviceApprovals.length})` 
-                          : `डिवाइस और खाता सुरक्षा स्वीकृतियां (${deviceLockAlerts.length + pendingApprovalAlerts.length + pendingDeviceApprovals.length})`}
+                        {`Device & Account Security Approvals (${deviceLockAlerts.length + pendingApprovalAlerts.length + pendingDeviceApprovals.length})`}
                       </p>
                       <p className="text-[9.5px] text-slate-505 font-semibold truncate mt-0.5 leading-none">
-                        {language === 'en'
-                          ? `Includes ${deviceLockAlerts.length} device locks, ${pendingApprovalAlerts.length} registrations, and ${pendingDeviceApprovals.length} logins.`
-                          : `इसमें ${deviceLockAlerts.length} डिवाइस लॉक, ${pendingApprovalAlerts.length} पंजीकरण, और ${pendingDeviceApprovals.length} लॉगिन शामिल हैं।`}
+                        {`Includes ${deviceLockAlerts.length} device locks, ${pendingApprovalAlerts.length} registrations, and ${pendingDeviceApprovals.length} logins.`}
                       </p>
                     </div>
                   </div>
@@ -614,7 +1199,7 @@ export default function Dashboard({
                     onClick={() => setIsDeviceApprovalModalOpen(true)}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-black px-2.5 py-1 rounded-md transition-all shadow-3xs flex items-center gap-1 cursor-pointer shrink-0"
                   >
-                    <span>{language === 'en' ? 'Review & Approve' : 'समीक्षा और स्वीकृत करें'}</span>
+                    <span>{'Review & Approve'}</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
@@ -631,14 +1216,10 @@ export default function Dashboard({
                     </div>
                     <div className="min-w-0">
                       <p className="text-[11px] font-black text-slate-800 leading-none">
-                        {language === 'en' 
-                          ? `Pending Leave Applications (${pendingLeaves.length})` 
-                          : `लंबित अवकाश आवेदन (${pendingLeaves.length})`}
+                        {`Pending Leave Applications (${pendingLeaves.length})`}
                       </p>
                       <p className="text-[9.5px] text-slate-505 font-semibold truncate mt-0.5 leading-none">
-                        {language === 'en'
-                          ? `There are ${pendingLeaves.length} leave application(s) awaiting decision.`
-                          : `निर्णय की प्रतीक्षा में ${pendingLeaves.length} अवकाश आवेदन हैं।`}
+                        {`There are ${pendingLeaves.length} leave application(s) awaiting decision.`}
                       </p>
                     </div>
                   </div>
@@ -646,7 +1227,7 @@ export default function Dashboard({
                     onClick={() => setIsLeaveApprovalModalOpen(true)}
                     className="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-black px-2.5 py-1 rounded-md transition-all shadow-3xs flex items-center gap-1 cursor-pointer shrink-0"
                   >
-                    <span>{language === 'en' ? 'Review & Approve' : 'समीक्षा और स्वीकृत करें'}</span>
+                    <span>{'Review & Approve'}</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
@@ -717,8 +1298,7 @@ export default function Dashboard({
                 <span className="text-2xl font-extrabold text-gray-900 font-display leading-none tracking-tight">
                   {todayAttendance.length > 0 ? presentTodayCount : '-'}
                 </span>
-                <span className="text-xs font-extrabold text-gray-600">
-                  / {todayAttendance.length > 0 ? todayAttendance.length : activeEmployees.length}
+                <span className="text-xs font-extrabold text-gray-600">{todayAttendance.length > 0 ? todayAttendance.length : activeEmployees.length}
                 </span>
               </div>
               <p className="text-[9px] text-gray-600 font-extrabold uppercase mt-0.5 tracking-wider">{t.attendanceRate}</p>
@@ -732,8 +1312,7 @@ export default function Dashboard({
                   strokeWidth="3.5"
                   stroke="currentColor"
                   fill="transparent"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                 <path
                   className="text-emerald-500 transition-all duration-1000 ease-out"
                   strokeDasharray={`${attendanceRate}, 100`}
@@ -741,8 +1320,7 @@ export default function Dashboard({
                   strokeLinecap="round"
                   stroke="currentColor"
                   fill="transparent"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-[9px] font-black font-mono text-gray-950">{attendanceRate}%</span>
@@ -837,8 +1415,8 @@ export default function Dashboard({
               <BarChart data={last7DaysData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorAttendance" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#03623c" stopOpacity={0.9}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.4}/>
+                    <stop offset="5%" stopColor="#03623c" stopOpacity={0.9} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.4} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -860,21 +1438,20 @@ export default function Dashboard({
                                 Attendance: {data.rate}%
                               </p>
                               <p className="text-gray-500 font-medium">
-                                Present: {data.present} / {data.total}
+                                Present: {data.present}{data.total}
                               </p>
                             </>
                           ) : (
                             <p className="text-amber-600 font-semibold flex items-center gap-1">
                               <span className="w-1 bg-amber-500 rounded-full h-1 animate-pulse"></span>
-                              {language === 'en' ? 'No Records Marked' : 'कोई रिकॉर्ड दर्ज नहीं'}
+                              {'No Records Marked'}
                             </p>
                           )}
                         </div>
                       );
                     }
                     return null;
-                  }}
-                />
+                  }} />
                 <Bar dataKey="rate" fill="url(#colorAttendance)" radius={[4, 4, 0, 0]} barSize={24} />
               </BarChart>
             </ResponsiveContainer>
@@ -922,8 +1499,7 @@ export default function Dashboard({
                           );
                         }
                         return null;
-                      }}
-                    />
+                      }} />
                   </PieChart>
                 </ResponsiveContainer>
                 {/* Visual center labels */}
@@ -946,7 +1522,7 @@ export default function Dashboard({
             <div className="flex items-center justify-between text-[11px] font-extrabold">
               <span className="flex items-center text-gray-800">
                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5"></span>
-                {language === 'en' ? 'Disbursed' : 'भुगतान हुआ'}
+                {'Disbursed'}
               </span>
               <span className="font-extrabold text-gray-950 font-mono">
                 {t.currency}{paidPayrollExpense.toLocaleString('en-IN')}
@@ -955,7 +1531,7 @@ export default function Dashboard({
             <div className="flex items-center justify-between text-[11px] font-extrabold">
               <span className="flex items-center text-gray-800">
                 <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-1.5"></span>
-                {language === 'en' ? 'Pending Disbursal' : 'लंबित वेतन'}
+                {'Pending Disbursal'}
               </span>
               <span className="font-extrabold text-gray-950 font-mono">
                 {t.currency}{pendingPayrollExpense.toLocaleString('en-IN')}
@@ -986,12 +1562,12 @@ export default function Dashboard({
                 <BarChart data={deptChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorSalary" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.9}/>
-                      <stop offset="95%" stopColor="#059669" stopOpacity={0.4}/>
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.9} />
+                      <stop offset="95%" stopColor="#059669" stopOpacity={0.4} />
                     </linearGradient>
                     <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#03623c" stopOpacity={0.9}/>
-                      <stop offset="95%" stopColor="#024d2e" stopOpacity={0.4}/>
+                      <stop offset="5%" stopColor="#03623c" stopOpacity={0.9} />
+                      <stop offset="95%" stopColor="#024d2e" stopOpacity={0.4} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -1011,11 +1587,10 @@ export default function Dashboard({
                         );
                       }
                       return null;
-                    }}
-                  />
+                    }} />
                   <Legend verticalAlign="top" height={24} iconType="circle" wrapperStyle={{ fontSize: 9, fontWeight: 600 }} />
-                  <Bar yAxisId="left" dataKey="employees" name={language === 'en' ? "Total Staff" : "कर्मचारी"} fill="url(#colorCount)" radius={[3, 3, 0, 0]} barSize={12} />
-                  <Bar yAxisId="right" dataKey="salary" name={language === 'en' ? "Basic Salary Budget" : "कुल मूल वेतन"} fill="url(#colorSalary)" radius={[3, 3, 0, 0]} barSize={12} />
+                  <Bar yAxisId="left" dataKey="employees" name={"Total Staff"} fill="url(#colorCount)" radius={[3, 3, 0, 0]} barSize={12} />
+                  <Bar yAxisId="right" dataKey="salary" name={"Basic Salary Budget"} fill="url(#colorSalary)" radius={[3, 3, 0, 0]} barSize={12} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -1026,7 +1601,7 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Interactive Launchpad / Operations Column */}
+        {/* Interactive LaunchpadOperations Column */}
         <div className="space-y-3 flex flex-col no-print">
           
           {/* Quick Actions Panel */}
@@ -1102,7 +1677,7 @@ export default function Dashboard({
                   <div>
                     <p className="font-black text-gray-950 leading-none mb-0.5">{t.highlightActiveRatio}</p>
                     <p className="text-gray-650 text-[9.5px] font-bold leading-tight">
-                      {activeEmployees.length}/{filteredEmployees.length} active staff.
+                      {activeEmployees.length} //{filteredEmployees.length} active staff.
                     </p>
                   </div>
                 </div>
@@ -1137,7 +1712,7 @@ export default function Dashboard({
 
             {/* Micro Badge */}
             <div className="mt-2 text-[8px] font-black text-gray-700 uppercase text-center tracking-widest leading-none bg-gray-50 py-1 rounded border border-gray-200/60 font-mono">
-              {language === 'en' ? "RATHI BUILDMART PORTAL" : "राठी बिल्डमार्ट पोर्टल"}
+              {"RATHI BUILDMART PORTAL"}
             </div>
           </div>
 
@@ -1154,28 +1729,26 @@ export default function Dashboard({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
-              <span>{language === 'en' ? "Today's Live Staff Radar" : "आज का लाइव स्टाफ रडार"}</span>
+              <span>{"Today's Live Staff Radar"}</span>
             </h4>
             <p className="text-[10px] text-gray-500 font-bold leading-tight">
-              {language === 'en' 
-                ? "Real-time presence monitoring based on check-ins and approved leaves."
-                : "चेक-इन और स्वीकृत छुट्टियों के आधार पर रियल-टाइम प्रेजेंस मॉनिटरिंग।"}
+              {"Real-time presence monitoring based on check-ins and approved leaves."}
             </p>
           </div>
           <div className="flex items-center gap-1 font-mono text-[9px] font-extrabold text-slate-500 bg-slate-50 border border-slate-150 px-2 py-0.5 rounded-lg">
-            <span>📅 {language === 'en' ? "DATE:" : "तारीख:"}</span>
+            <span>📅 {"DATE:"}</span>
             <span className="text-slate-950 font-black">{todayStr}</span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           
-          {/* Column 1: Available / Present Today */}
+          {/* Column 1: AvailablePresent Today */}
           <div className="bg-emerald-50/40 rounded-xl p-2.5 border border-emerald-100/60 space-y-2">
             <div className="flex items-center justify-between border-b border-emerald-100/50 pb-1.5">
               <span className="text-[11px] font-black text-emerald-800 uppercase tracking-wide flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                {language === 'en' ? 'Available Today' : 'आज उपस्थित/उपलब्ध'}
+                {'Available Today'}
               </span>
               <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.25 rounded-full font-mono">
                 {todayAvailability.present.length}
@@ -1185,7 +1758,7 @@ export default function Dashboard({
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               {todayAvailability.present.length === 0 ? (
                 <div className="py-6 text-center text-[10px] text-emerald-600/60 font-bold">
-                  {language === 'en' ? 'No check-ins logged yet.' : 'अभी तक कोई चेक-इन नहीं मिला।'}
+                  {'No check-ins logged yet.'}
                 </div>
               ) : (
                 todayAvailability.present.map(({ employee, record }) => (
@@ -1210,7 +1783,7 @@ export default function Dashboard({
             <div className="flex items-center justify-between border-b border-amber-100/50 pb-1.5">
               <span className="text-[11px] font-black text-amber-800 uppercase tracking-wide flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
-                {language === 'en' ? 'On Leave Today' : 'आज छुट्टी पर'}
+                {'On Leave Today'}
               </span>
               <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.25 rounded-full font-mono">
                 {todayAvailability.onLeave.length}
@@ -1220,7 +1793,7 @@ export default function Dashboard({
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               {todayAvailability.onLeave.length === 0 ? (
                 <div className="py-6 text-center text-[10px] text-amber-600/60 font-bold">
-                  {language === 'en' ? 'No leaves scheduled today.' : 'आज कोई छुट्टी पर नहीं है।'}
+                  {'No leaves scheduled today.'}
                 </div>
               ) : (
                 todayAvailability.onLeave.map(({ employee, reason, request }) => (
@@ -1247,12 +1820,12 @@ export default function Dashboard({
             </div>
           </div>
 
-          {/* Column 3: Absent / Not Checked In */}
+          {/* Column 3: AbsentNot Checked In */}
           <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/60 space-y-2">
             <div className="flex items-center justify-between border-b border-slate-200/50 pb-1.5">
               <span className="text-[11px] font-black text-slate-700 uppercase tracking-wide flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-rose-400 rounded-full animate-pulse"></span>
-                {language === 'en' ? 'Absent / Not Checked-In' : 'अनुपस्थित / कोई लॉग नहीं'}
+                {'AbsentNot Checked-In'}
               </span>
               <span className="bg-slate-150 text-slate-700 text-[9px] font-black px-1.5 py-0.25 rounded-full font-mono">
                 {todayAvailability.absent.length}
@@ -1262,7 +1835,7 @@ export default function Dashboard({
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               {todayAvailability.absent.length === 0 ? (
                 <div className="py-6 text-center text-[10px] text-slate-500/60 font-bold">
-                  {language === 'en' ? 'All active staff have logged presence.' : 'सभी कर्मचारियों का प्रेजेंस लॉग है।'}
+                  {'All active staff have logged presence.'}
                 </div>
               ) : (
                 todayAvailability.absent.map(({ employee }) => (
@@ -1272,7 +1845,7 @@ export default function Dashboard({
                       <div className="text-[9px] text-slate-400 font-mono font-bold uppercase truncate">{employee.id} • {employee.department}</div>
                     </div>
                     <span className="text-[8px] font-black font-mono bg-rose-50 text-rose-600 px-1 py-0.25 rounded border border-rose-100 uppercase shrink-0">
-                      {language === 'en' ? 'Unreported' : 'रिपोर्ट नहीं'}
+                      {'Unreported'}
                     </span>
                   </div>
                 ))
@@ -1294,16 +1867,14 @@ export default function Dashboard({
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-rose-600" />
                   <span>
-                    {language === 'en' ? 'Pending Leave Applications' : 'लंबित अवकाश आवेदन'}
+                    {'Pending Leave Applications'}
                   </span>
                   <span className="bg-rose-100 text-rose-700 text-xs font-black px-2 py-0.5 rounded-full font-mono">
                     {pendingLeaves.length}
                   </span>
                 </h3>
                 <p className="text-[11px] text-gray-500 font-bold mt-0.5">
-                  {language === 'en' 
-                    ? 'Review, add remarks, and approve or reject employee leave requests.'
-                    : 'कर्मचारी अवकाश अनुरोधों की समीक्षा करें, टिप्पणी जोड़ें और स्वीकृत या अस्वीकृत करें।'}
+                  {'Review, add remarks, and approve or reject employee leave requests.'}
                 </p>
               </div>
               <button 
@@ -1322,10 +1893,10 @@ export default function Dashboard({
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <h4 className="text-xs font-black text-slate-800">
-                    {language === 'en' ? 'All Clear!' : 'सब ठीक है!'}
+                    {'All Clear!'}
                   </h4>
                   <p className="text-[11px] text-gray-500 font-bold mt-1">
-                    {language === 'en' ? 'No pending leave applications to process.' : 'प्रक्रिया के लिए कोई लंबित अवकाश आवेदन नहीं है।'}
+                    {'No pending leave applications to process.'}
                   </p>
                 </div>
               ) : (
@@ -1348,11 +1919,11 @@ export default function Dashboard({
                             {req.leaveType}
                           </span>
                           <span className="text-[10px] font-extrabold text-slate-500">
-                            ({req.durationDays} {req.durationDays === 1 ? (language === 'en' ? 'Day' : 'दिन') : (language === 'en' ? 'Days' : 'दिन')})
+                            ({req.durationDays} {req.durationDays === 1 ? ('Day') : ('Days')})
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-750 font-black mt-1.5 font-mono">
-                          📅 {req.startDate} {req.endDate && req.endDate !== req.startDate ? ` ${language === 'en' ? 'to' : 'से'} ${req.endDate}` : ''}
+                          📅 {req.startDate} {req.endDate && req.endDate !== req.startDate ? ` ${'to'} ${req.endDate}` : ''}
                         </p>
                         <p className="text-[11px] text-slate-600 font-semibold italic mt-1 bg-slate-50/50 p-2 rounded border border-slate-100">
                           "{req.reason}"
@@ -1365,10 +1936,9 @@ export default function Dashboard({
                       <div className="flex-1">
                         <input 
                           type="text"
-                          placeholder={language === 'en' ? 'Remarks (optional)...' : 'टिप्पणी (वैकल्पिक)...'}
+                          placeholder={'Remarks (optional)...'}
                           id={`modal-remarks-${req.id}`}
-                          className="px-3 py-2 text-[11px] border border-gray-200 bg-white rounded-lg font-semibold focus:outline-none focus:border-[#03623c] w-full shadow-3xs"
-                        />
+                          className="px-3 py-2 text-[11px] border border-gray-200 bg-white rounded-lg font-semibold focus:outline-none focus:border-[#03623c] w-full shadow-3xs" />
                       </div>
                       <div className="flex gap-2 justify-end shrink-0">
                         <button
@@ -1382,7 +1952,7 @@ export default function Dashboard({
                           className="bg-[#03623c] hover:bg-[#02492d] text-white text-[10px] font-black px-4 py-2 rounded-lg transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
-                          <span>{language === 'en' ? 'Approve' : 'स्वीकार करें'}</span>
+                          <span>{'Approve'}</span>
                         </button>
                         <button
                           onClick={async () => {
@@ -1395,7 +1965,7 @@ export default function Dashboard({
                           className="bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black px-4 py-2 rounded-lg transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5 text-rose-200" />
-                          <span>{language === 'en' ? 'Reject' : 'अस्वीकार'}</span>
+                          <span>{'Reject'}</span>
                         </button>
                       </div>
                     </div>
@@ -1407,15 +1977,13 @@ export default function Dashboard({
             {/* Modal Footer */}
             <div className="p-3.5 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
               <span className="text-[10px] text-gray-500 font-bold">
-                {language === 'en' 
-                  ? `Showing ${pendingLeaves.length} unresolved request(s).` 
-                  : `कुल ${pendingLeaves.length} लंबित अनुरोध प्रदर्शित हैं।`}
+                {`Showing ${pendingLeaves.length} unresolved request(s).`}
               </span>
               <button
                 onClick={() => setIsLeaveApprovalModalOpen(false)}
                 className="bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-black px-4 py-2 rounded-lg cursor-pointer"
               >
-                {language === 'en' ? 'Close' : 'बंद करें'}
+                {'Close'}
               </button>
             </div>
 
@@ -1434,16 +2002,14 @@ export default function Dashboard({
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <Lock className="w-4 h-4 text-indigo-600" />
                   <span>
-                    {language === 'en' ? 'Device & Account Security Approvals' : 'डिवाइस और खाता सुरक्षा स्वीकृतियां'}
+                    {'Device & Account Security Approvals'}
                   </span>
                   <span className="bg-indigo-100 text-indigo-700 text-xs font-black px-2 py-0.5 rounded-full font-mono">
                     {deviceLockAlerts.length + pendingApprovalAlerts.length + pendingDeviceApprovals.length}
                   </span>
                 </h3>
                 <p className="text-[11px] text-gray-500 font-bold mt-0.5">
-                  {language === 'en' 
-                    ? 'Review, reset device locks, approve registrations, and issue OTPs.'
-                    : 'समीक्षा करें, डिवाइस लॉक रीसेट करें, पंजीकरण स्वीकृत करें और ओटीपी जारी करें।'}
+                  {'Review, reset device locks, approve registrations, and issue OTPs.'}
                 </p>
               </div>
               <button 
@@ -1464,7 +2030,7 @@ export default function Dashboard({
                     : 'border-transparent text-gray-500 hover:text-gray-800'
                 }`}
               >
-                <span>{language === 'en' ? 'All' : 'सभी'}</span>
+                <span>{'All'}</span>
                 <span className="bg-slate-200 text-slate-800 text-[9px] font-bold px-1.5 py-0.25 rounded-full font-mono">
                   {deviceLockAlerts.length + pendingApprovalAlerts.length + pendingDeviceApprovals.length}
                 </span>
@@ -1478,7 +2044,7 @@ export default function Dashboard({
                     : 'border-transparent text-gray-500 hover:text-gray-800'
                 }`}
               >
-                <span>{language === 'en' ? 'Locks' : 'डिवाइस लॉक'}</span>
+                <span>{'Locks'}</span>
                 {deviceLockAlerts.length > 0 && (
                   <span className="bg-rose-100 text-rose-700 text-[9px] font-black px-1.5 py-0.25 rounded-full font-mono">
                     {deviceLockAlerts.length}
@@ -1494,7 +2060,7 @@ export default function Dashboard({
                     : 'border-transparent text-gray-500 hover:text-gray-800'
                 }`}
               >
-                <span>{language === 'en' ? 'Registrations' : 'नए पंजीकरण'}</span>
+                <span>{'Registrations'}</span>
                 {pendingApprovalAlerts.length > 0 && (
                   <span className="bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 py-0.25 rounded-full font-mono">
                     {pendingApprovalAlerts.length}
@@ -1510,7 +2076,7 @@ export default function Dashboard({
                     : 'border-transparent text-gray-500 hover:text-gray-800'
                 }`}
               >
-                <span>{language === 'en' ? 'Logins / OTP' : 'लॉगिन / ओटीपी'}</span>
+                <span>{'LoginsOTP'}</span>
                 {pendingDeviceApprovals.length > 0 && (
                   <span className="bg-amber-100 text-amber-700 text-[9px] font-black px-1.5 py-0.25 rounded-full font-mono">
                     {pendingDeviceApprovals.length}
@@ -1527,10 +2093,10 @@ export default function Dashboard({
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <h4 className="text-xs font-black text-slate-800">
-                    {language === 'en' ? 'Security Cleared!' : 'सुरक्षा संबंधी सब ठीक है!'}
+                    {'Security Cleared!'}
                   </h4>
                   <p className="text-[11px] text-gray-500 font-bold mt-1">
-                    {language === 'en' ? 'No pending device locks or account security requests.' : 'कोई लंबित डिवाइस लॉक या खाता सुरक्षा अनुरोध नहीं है।'}
+                    {'No pending device locks or account security requests.'}
                   </p>
                 </div>
               ) : (
@@ -1540,7 +2106,7 @@ export default function Dashboard({
                     <div className="space-y-3">
                       {(activeDeviceTab === 'All') && (
                         <h4 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest font-mono">
-                          ⚠️ {language === 'en' ? 'Active Device Lockouts' : 'सक्रिय डिवाइस लॉकआउट'} ({deviceLockAlerts.length})
+                          ⚠️ {'Active Device Lockouts'} ({deviceLockAlerts.length})
                         </h4>
                       )}
                       {deviceLockAlerts.map(({ logId, employee, timestamp }) => (
@@ -1563,9 +2129,7 @@ export default function Dashboard({
                                 </span>
                               </div>
                               <p className="text-[11px] text-rose-600 font-semibold mt-1">
-                                {language === 'en' 
-                                  ? `Device lockout active. Tried to login from another device at ${timestamp}.`
-                                  : `डिवाइस लॉकआउट सक्रिय है। ${timestamp} पर किसी अन्य डिवाइस से लॉगिन करने का प्रयास किया गया था।`}
+                                {`Device lockout active. Tried to login from another device at ${timestamp}.`}
                               </p>
                             </div>
                           </div>
@@ -1580,7 +2144,7 @@ export default function Dashboard({
                               }}
                               className="bg-[#03623c] hover:bg-[#02492d] text-white text-[10px] font-black px-3 py-2 rounded-lg transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
                             >
-                              <span>🔄 {language === 'en' ? 'Reset Device Lock' : 'डिवाइस लॉक अनलॉक'}</span>
+                              <span>🔄 {'Reset Device Lock'}</span>
                             </button>
                             <button
                               onClick={async () => {
@@ -1590,7 +2154,7 @@ export default function Dashboard({
                               }}
                               className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black px-3 py-2 rounded-lg transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
                             >
-                              <span>📱 {language === 'en' ? 'Allow Multi-Device' : 'मल्टी-डिवाइस अनुमति दें'}</span>
+                              <span>📱 {'Allow Multi-Device'}</span>
                             </button>
                             <button
                               onClick={async () => {
@@ -1600,7 +2164,7 @@ export default function Dashboard({
                               }}
                               className="bg-rose-50 hover:bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-200/60 px-3 py-2 rounded-lg transition-all cursor-pointer"
                             >
-                              <span>⚠️ {language === 'en' ? 'Reset Account' : 'खाता रीसेट करें'}</span>
+                              <span>⚠️ {'Reset Account'}</span>
                             </button>
                           </div>
                         </div>
@@ -1613,7 +2177,7 @@ export default function Dashboard({
                     <div className="space-y-3 pt-2">
                       {(activeDeviceTab === 'All') && (
                         <h4 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest font-mono">
-                          👤 {language === 'en' ? 'Pending Registrations' : 'लंबित पंजीकरण'} ({pendingApprovalAlerts.length})
+                          👤 {'Pending Registrations'} ({pendingApprovalAlerts.length})
                         </h4>
                       )}
                       {pendingApprovalAlerts.map((employee) => (
@@ -1636,9 +2200,7 @@ export default function Dashboard({
                                 </span>
                               </div>
                               <p className="text-[11px] text-indigo-600 font-semibold mt-1">
-                                {language === 'en' 
-                                  ? `New employee registration requires administrator approval before first login.`
-                                  : `नए कर्मचारी के पंजीकरण के लिए पहले लॉगिन से पहले एडमिनिस्ट्रेटर की स्वीकृति की आवश्यकता होती है।`}
+                                {`New employee registration requires administrator approval before first login.`}
                               </p>
                             </div>
                           </div>
@@ -1654,7 +2216,7 @@ export default function Dashboard({
                               className="bg-[#03623c] hover:bg-[#02492d] text-white text-[10px] font-black px-4 py-2 rounded-lg transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
-                              <span>{language === 'en' ? 'Approve Now' : 'तुरंत मंजूर करें'}</span>
+                              <span>{'Approve Now'}</span>
                             </button>
                             <button
                               onClick={async () => {
@@ -1665,7 +2227,7 @@ export default function Dashboard({
                               className="bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black px-4 py-2 rounded-lg transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                               <X className="w-3.5 h-3.5 text-rose-200" />
-                              <span>{language === 'en' ? 'Reject & Reset' : 'अस्वीकृत और रीसेट'}</span>
+                              <span>{'Reject & Reset'}</span>
                             </button>
                           </div>
                         </div>
@@ -1673,12 +2235,12 @@ export default function Dashboard({
                     </div>
                   )}
 
-                  {/* Category 3: Pending logins / OTP list */}
+                  {/* Category 3: Pending loginsOTP list */}
                   {(activeDeviceTab === 'All' || activeDeviceTab === 'Logins') && pendingDeviceApprovals.length > 0 && (
                     <div className="space-y-3 pt-2">
                       {(activeDeviceTab === 'All') && (
                         <h4 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest font-mono">
-                          🔑 {language === 'en' ? 'Device Login & OTP Requests' : 'डिवाइस लॉगिन और ओटीपी अनुरोध'} ({pendingDeviceApprovals.length})
+                          🔑 {'Device Login & OTP Requests'} ({pendingDeviceApprovals.length})
                         </h4>
                       )}
                       {pendingDeviceApprovals.map((employee) => (
@@ -1701,9 +2263,7 @@ export default function Dashboard({
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-700 font-semibold mt-1">
-                                {language === 'en' 
-                                  ? `Device Request Code: `
-                                  : `डिवाइस अनुरोध कोड: `}
+                                {`Device Request Code: `}
                                 <span className="font-mono font-black text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded text-[10.5px]">
                                   {employee.pendingDeviceApprovalCode}
                                 </span>
@@ -1712,14 +2272,14 @@ export default function Dashboard({
                                 <p className="text-[11px] font-bold text-amber-800 flex items-center gap-1.5">
                                   <span>ℹ️</span>
                                   <span>
-                                    {language === 'en' ? 'Active OTP: ' : 'सक्रिय ओटीपी: '}
+                                    {'Active OTP: '}
                                     {employee.pendingDeviceApprovalOtp ? (
                                       <strong className="font-mono font-black text-sm text-slate-900 tracking-wider bg-white px-2 py-0.5 rounded border border-amber-200">
                                         {employee.pendingDeviceApprovalOtp}
                                       </strong>
                                     ) : (
                                       <em className="text-slate-500 font-medium">
-                                        {language === 'en' ? 'No OTP generated' : 'ओटीपी जनरेट नहीं किया गया'}
+                                        {'No OTP generated'}
                                       </em>
                                     )}
                                   </span>
@@ -1743,7 +2303,7 @@ export default function Dashboard({
                                 }}
                                 className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black px-3 py-2 rounded-lg transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
                               >
-                                <span>🔄 {language === 'en' ? 'Generate OTP' : 'ओटीपी जनरेट करें'}</span>
+                                <span>🔄 {'Generate OTP'}</span>
                               </button>
                             ) : (
                               <button
@@ -1758,7 +2318,7 @@ export default function Dashboard({
                                 }}
                                 className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-black px-3 py-2 rounded-lg transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer border border-slate-300/60"
                               >
-                                <span>🔄 {language === 'en' ? 'Regenerate OTP' : 'ओटीपी पुनः जनरेट करें'}</span>
+                                <span>🔄 {'Regenerate OTP'}</span>
                               </button>
                             )}
                             <button
@@ -1775,7 +2335,7 @@ export default function Dashboard({
                               className="bg-[#03623c] hover:bg-[#02492d] text-white text-[10px] font-black px-4 py-2 rounded-lg transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
-                              <span>{language === 'en' ? 'Approve Directly' : 'सीधे मंजूर करें'}</span>
+                              <span>{'Approve Directly'}</span>
                             </button>
                           </div>
                         </div>
@@ -1789,15 +2349,13 @@ export default function Dashboard({
             {/* Modal Footer */}
             <div className="p-3.5 bg-gray-50 border-t border-gray-200 flex justify-between items-center shrink-0">
               <span className="text-[10px] text-gray-500 font-bold">
-                {language === 'en' 
-                  ? `Showing security items across selected categories.` 
-                  : `चयनित श्रेणियों में सुरक्षा आइटम प्रदर्शित हैं।`}
+                {`Showing security items across selected categories.`}
               </span>
               <button
                 onClick={() => setIsDeviceApprovalModalOpen(false)}
                 className="bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-black px-4 py-2 rounded-lg cursor-pointer"
               >
-                {language === 'en' ? 'Close' : 'बंद करें'}
+                {'Close'}
               </button>
             </div>
 

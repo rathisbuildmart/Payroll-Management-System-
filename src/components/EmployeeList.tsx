@@ -33,7 +33,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   const [resetQuickSearchId, setResetQuickSearchId] = useState('');
   const [activeAccessMenuId, setActiveAccessMenuId] = useState<string | null>(null);
 
-  // Sorting state for table
+  //Sorting state for table
   const [sortField, setSortField] = useState<'id' | 'name' | 'department' | 'joiningDate' | 'basicSalary' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -52,7 +52,10 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     setCurrentPage(1);
   };
 
+  const isRecruiter = portalUser?.role === 'recruiter';
+
   const hasPermission = (action: 'view' | 'add' | 'edit' | 'delete') => {
+    if (isRecruiter && action === 'delete') return false;
     if (!portalUser) return true;
     if (portalUser.role === 'admin') return true;
     const permissions = adminSettings?.rolePermissions?.[portalUser.role] || [];
@@ -60,34 +63,47 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     return permissions.includes(`employees:${action}`);
   };
 
-  // Column visibility options for directory
-  const ALL_COLUMNS = useMemo(() => [
-    { key: 'id', labelEn: 'Employee ID', labelHi: 'आईडी', default: true },
-    { key: 'name', labelEn: 'Name & Email', labelHi: 'नाम और ईमेल', default: true },
-    { key: 'role', labelEn: 'Role & Department', labelHi: 'पद और विभाग', default: true },
-    { key: 'joiningDate', labelEn: 'Joining Date', labelHi: 'ज्वाइनिंग तिथि', default: true },
-    { key: 'salary', labelEn: 'Monthly Salary', labelHi: 'मासिक वेतन', default: true },
-    { key: 'paymentMethod', labelEn: 'Payment Method', labelHi: 'भुगतान विधि', default: true },
-    { key: 'status', labelEn: 'Status', labelHi: 'स्थिति', default: true },
-    { key: 'mobileNo', labelEn: 'Mobile No', labelHi: 'मोबाइल नंबर', default: false },
-    { key: 'personalMobileNo', labelEn: 'Personal Mobile', labelHi: 'व्यक्तिगत मोबाइल', default: false },
-    { key: 'personalEmail', labelEn: 'Personal Email', labelHi: 'व्यक्तिगत ईमेल', default: false },
-    { key: 'dob', labelEn: 'Date of Birth (DOB)', labelHi: 'जन्म तिथि', default: false },
-    { key: 'gender', labelEn: 'Gender', labelHi: 'लिंग', default: false },
-    { key: 'bloodGroup', labelEn: 'Blood Group', labelHi: 'ब्लड ग्रुप', default: false },
-    { key: 'emergencyContactNo', labelEn: 'Emergency Contact', labelHi: 'आपातकालीन संपर्क', default: false },
-    { key: 'bankDetails', labelEn: 'Bank Account Details', labelHi: 'बैंक विवरण', default: false },
-    { key: 'identityDetails', labelEn: 'Aadhaar / PAN', labelHi: 'आधार / पैन कार्ड', default: false },
-    { key: 'pfEsicDetails', labelEn: 'PF / ESIC Account Numbers', labelHi: 'पीएफ / ईएसआईसी नंबर', default: false },
-    { key: 'gpsAndMobile', labelEn: 'GPS & Mobile Attendance', labelHi: 'जीपीएस और मोबाइल अटेंडेंस', default: true },
-  ], []);
+  //Column visibility options for directory
+  const ALL_COLUMNS = useMemo(() => {
+    const cols = [
+      { key: 'id', labelEn: 'Employee ID', labelHi: "", default: true },
+      { key: 'name', labelEn: 'Name & Email', labelHi: "", default: true },
+      { key: 'role', labelEn: 'Role & Department', labelHi: "", default: true },
+      { key: 'joiningDate', labelEn: 'Joining Date', labelHi: "", default: true },
+      { key: 'salary', labelEn: 'Monthly Salary', labelHi: "", default: true, restricted: true },
+      { key: 'paymentMethod', labelEn: 'Payment Method', labelHi: "", default: true, restricted: true },
+      { key: 'status', labelEn: 'Status', labelHi: "", default: true, restricted: true },
+      { key: 'mobileNo', labelEn: 'Mobile No', labelHi: "", default: false },
+      { key: 'personalMobileNo', labelEn: 'Personal Mobile', labelHi: "", default: false },
+      { key: 'personalEmail', labelEn: 'Personal Email', labelHi: "", default: false },
+      { key: 'dob', labelEn: 'Date of Birth (DOB)', labelHi: "", default: false },
+      { key: 'gender', labelEn: 'Gender', labelHi: "", default: false },
+      { key: 'bloodGroup', labelEn: 'Blood Group', labelHi: "", default: false },
+      { key: 'emergencyContactNo', labelEn: 'Emergency Contact', labelHi: "", default: false },
+      { key: 'bankDetails', labelEn: 'Bank Account Details', labelHi: "", default: false, restricted: true },
+      { key: 'identityDetails', labelEn: 'AadhaarPAN', labelHi: "", default: false, restricted: true },
+      { key: 'pfEsicDetails', labelEn: 'PFESIC Account Numbers', labelHi: "", default: false, restricted: true },
+      { key: 'gpsAndMobile', labelEn: 'GPS & Mobile Attendance', labelHi: "", default: true, restricted: true },
+    ];
+    if (isRecruiter) {
+      return cols.filter(c => !c.restricted);
+    }
+    return cols;
+  }, [isRecruiter]);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     ALL_COLUMNS.filter(c => c.default).map(c => c.key)
   );
+
+  const activeVisibleColumns = useMemo(() => {
+    if (isRecruiter) {
+      return visibleColumns.filter(col => !['salary', 'paymentMethod', 'status', 'bankDetails', 'identityDetails', 'pfEsicDetails', 'gpsAndMobile'].includes(col));
+    }
+    return visibleColumns;
+  }, [visibleColumns, isRecruiter]);
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
 
-  // CSV Bulk Import States
+  //CSV Bulk Import States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importedEmployees, setImportedEmployees] = useState<Employee[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -95,10 +111,10 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sub Tab Selector State
+  //Sub Tab Selector State
   const [activeSubTab, setActiveSubTab] = useState<'directory' | 'increments'>('directory');
 
-  // Salary Increment Tracker States
+  //Salary Increment Tracker States
   const [selectedEmployeeForIncrement, setSelectedEmployeeForIncrement] = useState<Employee | null>(null);
   const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] = useState<Employee | null>(null);
   const [incDate, setIncDate] = useState(new Date().toISOString().split('T')[0]);
@@ -108,7 +124,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   const [incRemarks, setIncRemarks] = useState<string>('');
   const [isSavingIncrement, setIsSavingIncrement] = useState(false);
 
-  // Form states with all custom sub-fields
+  //Form states with all custom sub-fields
   const [formData, setFormData] = useState<Partial<Employee>>({
     id: '',
     name: '',
@@ -184,7 +200,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       filterDept: "All Departments",
       colId: "ID",
       colName: "Name",
-      colRole: "Role / Department",
+      colRole: "RoleDepartment",
       colJoining: "Joining Date",
       colSalary: "Monthly Salary",
       colPayment: "Payment Method",
@@ -215,7 +231,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       confirmDeactivate: "Are you sure you want to deactivate this employee?",
       confirmActivate: "Are you sure you want to reactivate this employee?",
       
-      // Bulk CSV Import Keys
+      //Bulk CSV Import Keys
       bulkImportBtn: "Bulk Import (CSV)",
       bulkImportTitle: "Bulk Import Employee Details",
       exportDataBtn: "Export All Data (CSV)",
@@ -234,64 +250,64 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       requiredHeaderWarning: "Required columns (marked with *): Employee ID *, Full Name *. Other columns are optional."
     },
     hi: {
-      title: "कर्मचारी निर्देशिका",
-      addBtn: "नया कर्मचारी जोड़ें",
-      searchPlaceholder: "नाम या आईडी से खोजें...",
-      filterDept: "सभी विभाग",
-      colId: "आईडी",
-      colName: "नाम",
-      colRole: "पद / विभाग",
-      colJoining: "शामिल होने की तिथि",
-      colSalary: "मासिक वेतन",
-      colPayment: "भुगतान का प्रकार",
-      colStatus: "स्थिति",
-      colActions: "कार्रवाई",
-      active: "सक्रिय",
-      inactive: "निष्क्रिय",
-      editTitle: "कर्मचारी विवरण संपादित करें",
-      newTitle: "नए कर्मचारी का पंजीकरण",
-      cancel: "रद्द करें",
-      save: "सुरक्षित और सिंक करें",
-      saving: "शीट्स के साथ सिंक हो रहा है...",
-      deactivate: "निष्क्रिय करें",
-      activate: "सक्रिय करें",
-      fieldId: "कर्मचारी आईडी (यूनिक)",
-      fieldName: "पूरा नाम",
-      fieldDept: "विभाग",
-      fieldRole: "पद / डिज़ाइनेशन",
-      fieldJoining: "शामिल होने की तिथि",
-      fieldSalary: "मूल वेतन (₹)",
-      fieldAllowances: "भत्ते / Allowances (₹)",
-      fieldDeductions: "कटौती / Deductions (₹)",
-      fieldHourly: "ओवरटाइम प्रति घंटा दर (₹)",
-      fieldPayment: "भुगतान का प्रकार",
-      fieldActive: "कर्मचारी सक्रिय है",
-      successMsg: "सफलतापूर्वक सिंक किया गया!",
-      noEmployees: "कोई कर्मचारी नहीं मिला। शुरू करने के लिए एक बनाएं!",
-      confirmDeactivate: "क्या आप वाकई इस कर्मचारी को निष्क्रिय करना चाहते हैं?",
-      confirmActivate: "क्या आप वाकई इस कर्मचारी को फिर से सक्रिय करना चाहते हैं?",
-
-      // Bulk CSV Import Keys
-      bulkImportBtn: "थोक आयात (CSV)",
-      bulkImportTitle: "CSV फ़ाइल से थोक कर्मचारी डेटा आयात करें",
-      exportDataBtn: "सभी डेटा एक्सपोर्ट करें (CSV)",
-      exportExistingBtn: "मौजूदा कर्मचारियों का डेटा एक्सपोर्ट करें ({count})",
-      downloadTemplate: "नमूना CSV टेम्पलेट डाउनलोड करें",
-      dragDropText: "अपनी CSV फ़ाइल यहाँ ड्रैग और ड्रॉप करें, या ब्राउज़ करने के लिए क्लिक करें",
-      selectFile: "CSV फ़ाइल चुनें",
-      invalidCsv: "अमान्य CSV प्रारूप या हेडर गायब हैं।",
-      noRowsFound: "CSV में कोई डेटा नहीं मिला।",
-      previewTitle: "आयात करने से पहले डेटा का पूर्वावलोकन",
-      importSuccess: "सफलतापूर्वक {count} कर्मचारियों का डेटा आयात करने के लिए तैयार है!",
-      importErrors: "कुछ पंक्तियों में त्रुटियां थीं और उन्हें छोड़ दिया जाएगा:",
-      btnConfirmImport: "पुष्टि करें और {count} कर्मचारियों को सिंक करें",
-      colStatusValid: "सही",
-      colStatusError: "त्रुटि",
-      requiredHeaderWarning: "आवश्यक कॉलम (* से चिह्नित): कर्मचारी आईडी (Employee ID *), पूरा नाम (Full Name *)। अन्य कॉलम वैकल्पिक हैं।"
+      title: "Employee Directory",
+      addBtn: "Add New Employee",
+      searchPlaceholder: "Search by Name or ID...",
+      filterDept: "All Departments",
+      colId: "ID",
+      colName: "Name",
+      colRole: "RoleDepartment",
+      colJoining: "Joining Date",
+      colSalary: "Monthly Salary",
+      colPayment: "Payment Method",
+      colStatus: "Status",
+      colActions: "Actions",
+      active: "Active",
+      inactive: "Inactive",
+      editTitle: "Edit Employee Details",
+      newTitle: "Register New Employee",
+      cancel: "Cancel",
+      save: "Save & Sync",
+      saving: "Syncing with Sheets...",
+      deactivate: "Deactivate",
+      activate: "Activate",
+      fieldId: "Employee ID (Unique)",
+      fieldName: "Full Name",
+      fieldDept: "Department",
+      fieldRole: "Designation",
+      fieldJoining: "Joining Date",
+      fieldSalary: "Basic Salary (₹)",
+      fieldAllowances: "Allowances (₹)",
+      fieldDeductions: "Deductions (₹)",
+      fieldHourly: "Overtime Hourly Rate (₹)",
+      fieldPayment: "Payment Method",
+      fieldActive: "Employee is Active",
+      successMsg: "Synchronized successfully!",
+      noEmployees: "No employees found. Create one to get started!",
+      confirmDeactivate: "Are you sure you want to deactivate this employee?",
+      confirmActivate: "Are you sure you want to reactivate this employee?",
+      
+      //Bulk CSV Import Keys
+      bulkImportBtn: "Bulk Import (CSV)",
+      bulkImportTitle: "Bulk Import Employee Details",
+      exportDataBtn: "Export All Data (CSV)",
+      exportExistingBtn: "Export Existing Employees Data ({count})",
+      downloadTemplate: "Download Sample Template",
+      dragDropText: "Drag and drop your CSV file here, or click to browse",
+      selectFile: "Select CSV File",
+      invalidCsv: "Invalid CSV format or missing headers.",
+      noRowsFound: "No valid data rows found in CSV.",
+      previewTitle: "Preview Data to Import",
+      importSuccess: "Ready to import {count} employees!",
+      importErrors: "Some rows had errors and will be skipped:",
+      btnConfirmImport: "Confirm & Sync {count} Employees",
+      colStatusValid: "Valid",
+      colStatusError: "Error",
+      requiredHeaderWarning: "Required columns (marked with *): Employee ID *, Full Name *. Other columns are optional."
     }
   }[language];
 
-  // Unique Branches and Employees for dropdowns
+  //Unique Branches and Employees for dropdowns
   const branchOptions = useMemo(() => {
     const branches = new Set<string>();
     employees.forEach(emp => {
@@ -311,18 +327,18 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       })
       .map(emp => ({
         id: emp.id,
-        name: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${language === 'en' ? 'Inactive' : 'निष्क्रिय'}`
+        name: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${'Inactive'}`
       }));
   }, [employees, selectedStatus, language]);
 
-  // Reset selected employee filter if it is not present in the current options (e.g. status changed)
+  //Reset selected employee filter if it is not present in the current options (e.g. status changed)
   useEffect(() => {
     if (selectedEmployeeId !== 'All' && !employeeOptions.some(opt => opt.id === selectedEmployeeId)) {
       setSelectedEmployeeId('All');
     }
   }, [selectedStatus, employeeOptions, selectedEmployeeId]);
 
-  // Filter & Search & Sorting logic
+  //Filter & Search & Sorting logic
   const filteredEmployees = useMemo(() => {
     let result = employees.filter(emp => {
       const term = searchTerm.toLowerCase().trim();
@@ -376,15 +392,15 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     return result;
   }, [employees, searchTerm, selectedDept, selectedBranch, selectedEmployeeId, selectedStatus, sortField, sortDirection]);
 
-  // Paginated Sliced list
+  //Paginated Sliced list
   const paginatedEmployees = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredEmployees.slice(start, start + pageSize);
   }, [filteredEmployees, currentPage, pageSize]);
 
-  const totalPages = Math.ceil(filteredEmployees.length / pageSize) || 1;
+  const totalPages = Math.ceil(filteredEmployees.lengthpageSize) || 1;
 
-  // CSV Utility functions
+  //CSV Utility functions
   const parseCSV = (text: string) => {
     const result: string[][] = [];
     let row: string[] = [];
@@ -443,79 +459,79 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       const { headers, rows } = parseCSV(text);
       
       const findIndex = (aliases: string[]): number => {
-        return headers.findIndex(h => aliases.includes(h.toLowerCase().replace(/[\s_*()-]/g, '')));
+        return headers.findIndex(h => aliases.includes(h.toLowerCase().replace(/[\s_*()-] /g, '')));
       };
 
-      const idIdx = findIndex(['id', 'employeeid', 'empid', 'आईडी']);
-      const nameIdx = findIndex(['name', 'fullname', 'employeename', 'नाम', 'पूरानाम']);
-      const deptIdx = findIndex(['department', 'dept', 'विभाग']);
-      const desigIdx = findIndex(['designation', 'role', 'title', 'designationrole', 'पद', 'डिज़ाइनेशन']);
-      const dateIdx = findIndex(['joiningdate', 'dateofjoining', 'doj', 'शामिलहोनेकीतिथि']);
-      const salaryIdx = findIndex(['basicsalary', 'basic', 'salary', 'मूलवेतन']);
-      const allowanceIdx = findIndex(['allowances', 'allowance', 'भत्ते']);
-      const deductionIdx = findIndex(['deductions', 'deduction', 'कटौती']);
-      const hourlyIdx = findIndex(['overtimehourlyrate', 'hourlyrate', 'overtimerate', 'ओवरटाइमप्रतिघंटादर']);
-      const paymentIdx = findIndex(['paymentmethod', 'payment', 'भुगतानकाप्रकार']);
-      const activeIdx = findIndex(['isactive', 'active', 'सक्रिय']);
+      const idIdx = findIndex(['id', 'employeeid', 'empid', '']);
+      const nameIdx = findIndex(['name', 'fullname', 'employeename', '', '']);
+      const deptIdx = findIndex(['department', 'dept', '']);
+      const desigIdx = findIndex(['designation', 'role', 'title', 'designationrole', '', '']);
+      const dateIdx = findIndex(['joiningdate', 'dateofjoining', 'doj', '']);
+      const salaryIdx = findIndex(['basicsalary', 'basic', 'salary', '']);
+      const allowanceIdx = findIndex(['allowances', 'allowance', '']);
+      const deductionIdx = findIndex(['deductions', 'deduction', '']);
+      const hourlyIdx = findIndex(['overtimehourlyrate', 'hourlyrate', 'overtimerate', '']);
+      const paymentIdx = findIndex(['paymentmethod', 'payment', '']);
+      const activeIdx = findIndex(['isactive', 'active', '']);
 
-      const firstNameIdx = findIndex(['firstname', 'first', 'पहलानाम']);
-      const lastNameIdx = findIndex(['lastname', 'last', 'अंतिमनाम']);
-      const emailIdx = findIndex(['email', 'emailid', 'ईमेल']);
-      const mobileNoIdx = findIndex(['mobileno', 'mobile', 'phone', 'phoneno', 'मोबाइल']);
-      const personalMobileNoIdx = findIndex(['personalmobileno', 'personalmobile', 'पर्सनलमोबाइल']);
-      const personalEmailIdx = findIndex(['personalemail', 'पर्सनलईमेल']);
-      const dobIdx = findIndex(['dob', 'dateofbirth', 'जन्मतिथि']);
-      const bloodGroupIdx = findIndex(['bloodgroup', 'blood', 'रक्तसमूह']);
-      const emergencyContactNoIdx = findIndex(['emergencycontactno', 'emergencycontact', 'आपातकालीनसंपर्क']);
-      const ctcOfferedIdx = findIndex(['ctcoffered', 'ctc', 'सीटीसी']);
-      const genderIdx = findIndex(['gender', 'sex', 'लिंग']);
-      const employmentTypeIdx = findIndex(['employmenttype', 'type', 'रोजगारकाप्रकार']);
-      const probationDateIdx = findIndex(['probationdate', 'probation', 'परिवीक्षाअवधि']);
+      const firstNameIdx = findIndex(['firstname', 'first', '']);
+      const lastNameIdx = findIndex(['lastname', 'last', '']);
+      const emailIdx = findIndex(['email', 'emailid', '']);
+      const mobileNoIdx = findIndex(['mobileno', 'mobile', 'phone', 'phoneno', '']);
+      const personalMobileNoIdx = findIndex(['personalmobileno', 'personalmobile', '']);
+      const personalEmailIdx = findIndex(['personalemail', '']);
+      const dobIdx = findIndex(['dob', 'dateofbirth', '']);
+      const bloodGroupIdx = findIndex(['bloodgroup', 'blood', '']);
+      const emergencyContactNoIdx = findIndex(['emergencycontactno', 'emergencycontact', '']);
+      const ctcOfferedIdx = findIndex(['ctcoffered', 'ctc', '']);
+      const genderIdx = findIndex(['gender', 'sex', '']);
+      const employmentTypeIdx = findIndex(['employmenttype', 'type', '']);
+      const probationDateIdx = findIndex(['probationdate', 'probation', '']);
       
-      const resLine1Idx = findIndex(['resline1', 'residentialaddressline1', 'आवासीयपता१']);
-      const resLine2Idx = findIndex(['resline2', 'residentialaddressline2', 'आवासीयपता२']);
-      const resCountryIdx = findIndex(['rescountry', 'residentialcountry', 'देश']);
-      const resStateIdx = findIndex(['resstate', 'residentialstate', 'राज्य']);
-      const resCityIdx = findIndex(['rescity', 'residentialcity', 'शहर']);
-      const resPinCodeIdx = findIndex(['respincode', 'residentialpincode', 'पिनकोड']);
+      const resLine1Idx = findIndex(['resline1', 'residentialaddressline1', '']);
+      const resLine2Idx = findIndex(['resline2', 'residentialaddressline2', '']);
+      const resCountryIdx = findIndex(['rescountry', 'residentialcountry', '']);
+      const resStateIdx = findIndex(['resstate', 'residentialstate', '']);
+      const resCityIdx = findIndex(['rescity', 'residentialcity', '']);
+      const resPinCodeIdx = findIndex(['respincode', 'residentialpincode', '']);
       
-      const permLine1Idx = findIndex(['permline1', 'permanentaddressline1', 'स्थायीपता१']);
-      const permLine2Idx = findIndex(['permline2', 'permanentaddressline2', 'स्थायीपता२']);
+      const permLine1Idx = findIndex(['permline1', 'permanentaddressline1', '']);
+      const permLine2Idx = findIndex(['permline2', 'permanentaddressline2', '']);
       const permCountryIdx = findIndex(['permcountry', 'permanentcountry']);
       const permStateIdx = findIndex(['permstate', 'permanentstate']);
       const permCityIdx = findIndex(['permcity', 'permanentcity']);
       const permPinCodeIdx = findIndex(['permpincode', 'permanentpincode']);
       
-      const bankAccountNoIdx = findIndex(['bankaccountno', 'accountno', 'bankaccount', 'खातासंख्या']);
-      const bankAccountHolderNameIdx = findIndex(['bankaccountholdername', 'accountholdername', 'खाताधारककानाम']);
-      const bankNameIdx = findIndex(['bankname', 'bank', 'बैंककानाम']);
-      const ifscCodeIdx = findIndex(['ifsccode', 'ifsc', 'आईएफएससी']);
+      const bankAccountNoIdx = findIndex(['bankaccountno', 'accountno', 'bankaccount', '']);
+      const bankAccountHolderNameIdx = findIndex(['bankaccountholdername', 'accountholdername', '']);
+      const bankNameIdx = findIndex(['bankname', 'bank', '']);
+      const ifscCodeIdx = findIndex(['ifsccode', 'ifsc', '']);
       
-      const panNoIdx = findIndex(['panno', 'pan', 'पैननंबर']);
-      const pfAccountNoIdx = findIndex(['pfaccountno', 'pfno', 'पीएफनंबर']);
-      const esicNoIdx = findIndex(['esicno', 'esic', 'ईएसआईसीनंबर']);
-      const aadhaarNoIdx = findIndex(['aadhaarno', 'aadhaar', 'आधारनंबर']);
-      const uanIdx = findIndex(['uan', 'यूएएन']);
+      const panNoIdx = findIndex(['panno', 'pan', '']);
+      const pfAccountNoIdx = findIndex(['pfaccountno', 'pfno', '']);
+      const esicNoIdx = findIndex(['esicno', 'esic', '']);
+      const aadhaarNoIdx = findIndex(['aadhaarno', 'aadhaar', '']);
+      const uanIdx = findIndex(['uan', '']);
       
-      const confirmationDateIdx = findIndex(['confirmationdate', 'confirmation', 'पुष्टिथिति']);
-      const branchIdx = findIndex(['branch', 'शाखा']);
-      const costCenterIdx = findIndex(['costcenter', 'लागतकेंद्र']);
-      const reportingToIdx = findIndex(['reportingto', 'reportto', 'रिपोर्टिंगअधिकारी']);
-      const noticePeriodIdx = findIndex(['noticeperiod', 'नोटिसअवधि']);
-      const workTimingIdx = findIndex(['worktiming', 'कार्यसमय']);
-      const employeeGroupIdx = findIndex(['employeegroup', 'कर्मचारीसमूह']);
-      const weeklyOffProfileIdx = findIndex(['weeklyoffprofile', 'साप्ताहिकअवकाश']);
-      const leaveTypeIdx = findIndex(['leavetype', 'छुट्टीकाप्रकार']);
-      const referenceNumberIdx = findIndex(['referencenumber', 'reference', 'संदर्भसंख्या']);
-      const passwordIdx = findIndex(['password', 'pass', 'पासवर्ड']);
+      const confirmationDateIdx = findIndex(['confirmationdate', 'confirmation', '']);
+      const branchIdx = findIndex(['branch', '']);
+      const costCenterIdx = findIndex(['costcenter', '']);
+      const reportingToIdx = findIndex(['reportingto', 'reportto', '']);
+      const noticePeriodIdx = findIndex(['noticeperiod', '']);
+      const workTimingIdx = findIndex(['worktiming', '']);
+      const employeeGroupIdx = findIndex(['employeegroup', '']);
+      const weeklyOffProfileIdx = findIndex(['weeklyoffprofile', '']);
+      const leaveTypeIdx = findIndex(['leavetype', '']);
+      const referenceNumberIdx = findIndex(['referencenumber', 'reference', '']);
+      const passwordIdx = findIndex(['password', 'pass', '']);
 
-      const hraIdx = findIndex(['hra', 'हाउसरेन्टअलाउंस']);
-      const daIdx = findIndex(['da', 'महंगाईभत्ता']);
-      const conveyanceAllowanceIdx = findIndex(['conveyanceallowance', 'conveyance', 'यातायातभत्ता']);
-      const advanceSalaryBalanceIdx = findIndex(['advancesalarybalance', 'advancebalance', 'ऋणशेष']);
-      const advanceSalaryDeductionIdx = findIndex(['advancesalarydeduction', 'advancededuction', 'ऋणकटौती']);
-      const clBalanceIdx = findIndex(['clbalance', 'cl', 'आकस्मिकअवकाशशेष']);
-      const elBalanceIdx = findIndex(['elbalance', 'el', 'अर्जितअवकाशशेष']);
+      const hraIdx = findIndex(['hra', '']);
+      const daIdx = findIndex(['da', '']);
+      const conveyanceAllowanceIdx = findIndex(['conveyanceallowance', 'conveyance', '']);
+      const advanceSalaryBalanceIdx = findIndex(['advancesalarybalance', 'advancebalance', '']);
+      const advanceSalaryDeductionIdx = findIndex(['advancesalarydeduction', 'advancededuction', '']);
+      const clBalanceIdx = findIndex(['clbalance', 'cl', '']);
+      const elBalanceIdx = findIndex(['elbalance', 'el', '']);
 
       const isPfApplicableIdx = findIndex(['ispfapplicable', 'pfapplicable']);
       const isEsicApplicableIdx = findIndex(['isesicapplicable', 'esicapplicable']);
@@ -541,13 +557,13 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
         };
         const getFloat = (idx: number, defVal = 0): number => {
           if (idx === -1 || idx >= row.length) return defVal;
-          const cleaned = row[idx].replace(/[^0-9.]/g, '');
+          const cleaned = row[idx].replace(/[^0-9.] /g, '');
           return parseFloat(cleaned) || defVal;
         };
         const getBool = (idx: number, defVal = true): boolean => {
           if (idx === -1 || idx >= row.length) return defVal;
           const lower = row[idx].trim().toLowerCase();
-          return !(lower === 'false' || lower === '0' || lower === 'no' || lower === 'inactive' || lower === 'निष्क्रिय');
+          return !(lower === 'false' || lower === '0' || lower === 'no' || lower === 'inactive' || lower === '');
         };
 
         const id = getVal(idIdx).trim();
@@ -572,7 +588,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
           return;
         }
 
-        // Validate department
+        //Validate department
         let department = 'Engineering';
         const matchedDept = DEPARTMENTS.find(d => d.toLowerCase() === departmentRaw.toLowerCase());
         if (matchedDept) {
@@ -581,7 +597,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
           department = departmentRaw;
         }
 
-        // Standardize date
+        //Standardize date
         if (!joiningDate) {
           joiningDate = new Date().toISOString().split('T')[0];
         } else {
@@ -606,7 +622,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
           }
         }
 
-        // Validate paymentMethod
+        //Validate paymentMethod
         let paymentMethod: Employee['paymentMethod'] = 'Bank Transfer';
         const payLower = paymentMethodRaw.toLowerCase();
         if (payLower.includes('cash')) {
@@ -626,9 +642,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
         const emergencyContactNo = getVal(emergencyContactNoIdx).trim();
         const ctcOffered = getFloat(ctcOfferedIdx, basicSalary * 12);
         const genderRaw = getVal(genderIdx, 'Male').trim();
-        const gender = (genderRaw.toLowerCase() === 'female' || genderRaw === 'महिला') ? 'Female' : (genderRaw.toLowerCase() === 'other' || genderRaw === 'अन्य') ? 'Other' : 'Male';
+        const gender = (genderRaw.toLowerCase() === 'female' || genderRaw === '') ? 'Female' : (genderRaw.toLowerCase() === 'other' || genderRaw === '') ? 'Other' : 'Male';
         const employmentTypeRaw = getVal(employmentTypeIdx, 'Fresher').trim();
-        const employmentType = (employmentTypeRaw.toLowerCase() === 'experienced' || employmentTypeRaw === 'अनुभवी') ? 'Experienced' : 'Fresher';
+        const employmentType = (employmentTypeRaw.toLowerCase() === 'experienced' || employmentTypeRaw === '') ? 'Experienced' : 'Fresher';
         const probationDate = getVal(probationDateIdx).trim();
 
         const resLine1 = getVal(resLine1Idx).trim();
@@ -1061,7 +1077,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ...rows.map(row => row.map(val => `"${String(val).replace(/" /g, '""')}"`).join(','))
     ].join('\n');
 
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1095,7 +1111,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   };
 
   const openAddModal = () => {
-    // Auto generate next ID based on Cost Center series
+    //Auto generate next ID based on Cost Center series
     const defaultCostCenter = adminSettings?.costCenters?.[0] || '';
     const nextId = generateNextEmployeeId(defaultCostCenter, employees, adminSettings?.costCenterCodes);
 
@@ -1223,7 +1239,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       isPaidLeaveApplicable: emp.isPaidLeaveApplicable !== false,
       enableGeofencing: !!emp.enableGeofencing,
       enableMobileAttendance: !!emp.enableMobileAttendance,
-      isApproved: emp.isApproved !== false, // Default to true if not explicitly false (helps old employees)
+      isApproved: emp.isApproved !== false, //Default to true if not explicitly false (helps old employees)
       allowMultipleDevices: !!emp.allowMultipleDevices,
       approvedDeviceId: emp.approvedDeviceId || '',
 
@@ -1294,7 +1310,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
           ...prev,
           [name]: type === 'number' ? Number(value) : value
         };
-        // Auto regenerate Employee ID when Cost Center changes for new employees
+        //Auto regenerate Employee ID when Cost Center changes for new employees
         if (name === 'costCenter' && !editingEmployee && typeof value === 'string') {
           updated.id = generateNextEmployeeId(value, employees, adminSettings?.costCenterCodes);
         }
@@ -1335,9 +1351,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   };
 
   const handleDeleteEmployeeRecord = async (emp: Employee) => {
-    const confirmMsg = language === 'en'
-      ? `Are you sure you want to permanently delete employee "${emp.name}" (${emp.id})? This will free up Employee ID ${emp.id}.`
-      : `क्या आप वाकई कर्मचारी "${emp.name}" (${emp.id}) को स्थायी रूप से हटाना चाहते हैं? इससे Employee ID ${emp.id} पुनः उपयोग के लिए खाली हो जाएगा।`;
+    const confirmMsg = `Are you sure you want to permanently delete employee "${emp.name}" (${emp.id})? This will free up Employee ID ${emp.id}.`;
     if (window.confirm(confirmMsg)) {
       if (onDeleteEmployee) {
         await onDeleteEmployee(emp.id);
@@ -1370,7 +1384,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       await onUpdateEmployee(updatedEmployee);
       alert('Salary increment successfully recorded and synced to Google Sheets!');
       setSelectedEmployeeForIncrement(null);
-      // Reset values
+      //Reset values
       setIncAmount(0);
       setIncNewSalary(0);
       setIncNextDate('');
@@ -1384,6 +1398,11 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   };
 
   const getFieldMeta = (fieldId: keyof Employee) => {
+    if (isRecruiter) {
+      if (['basicSalary', 'allowances', 'deductions', 'hourlyRate', 'ctcOffered', 'bankAccountNo', 'bankAccountHolderName', 'bankName', 'ifscCode', 'panNo', 'pfAccountNo', 'esicNo', 'aadhaarNo', 'uan'].includes(fieldId)) {
+        return { isHidden: true, isMandatory: false };
+      }
+    }
     if (['id', 'name', 'department', 'designation', 'joiningDate', 'basicSalary', 'allowances', 'deductions', 'hourlyRate', 'paymentMethod'].includes(fieldId)) {
       return { isHidden: false, isMandatory: true };
     }
@@ -1425,8 +1444,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
             required={meta.isMandatory}
             disabled={fieldId === 'id' && !!editingEmployee && !unlockEmployeeIdEdit}
             placeholder={`Enter ${label}`}
-            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-medium disabled:bg-gray-50 disabled:text-gray-400"
-          />
+            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-medium disabled:bg-gray-50 disabled:text-gray-400" />
         )}
         {fieldId === 'id' && editingEmployee && (
           <div className="mt-1.5 space-y-1">
@@ -1437,15 +1455,13 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
             >
               <Key className="w-3 h-3 text-amber-600" />
               {unlockEmployeeIdEdit
-                ? (language === 'en' ? '🔒 Lock Employee ID Field' : '🔒 कर्मचारी आईडी फील्ड लॉक करें')
-                : (language === 'en' ? '🔓 Change / Edit Employee ID' : '🔓 कर्मचारी आईडी बदलने हेतु अनलॉक करें')
+                ? ('🔒 Lock Employee ID Field')
+                : ('🔓 ChangeEdit Employee ID')
               }
             </button>
             {unlockEmployeeIdEdit && (
               <p className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded p-1.5 font-semibold">
-                {language === 'en'
-                  ? '⚠️ Notice: Changing Employee ID will automatically migrate all linked attendance, payroll, and leave records to the new ID.'
-                  : '⚠️ सूचना: कर्मचारी आईडी बदलने पर इस कर्मचारी से जुड़े सभी पुराने अटेंडेंस, पेरोल और लीव रिकॉर्ड्स नए ID पर ऑटो-शिफ्ट हो जाएंगे।'}
+                {'⚠️ Notice: Changing Employee ID will automatically migrate all linked attendance, payroll, and leave records to the new ID.'}
               </p>
             )}
           </div>
@@ -1485,30 +1501,32 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     <div className="space-y-6">
       
       {/* 2026 Admin Navigation Tabs for Employee Section */}
-      <div className="flex border-b border-gray-200 bg-white p-1 rounded-xl border shadow-xs">
-        <button
-          onClick={() => setActiveSubTab('directory')}
-          className={`flex-1 md:flex-initial text-center py-2 px-6 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-            activeSubTab === 'directory'
-              ? 'bg-[#03623c] text-white shadow-sm'
-              : 'text-gray-500 hover:text-gray-950 hover:bg-gray-50'
-          }`}
-        >
-          {language === 'en' ? 'Employee Directory' : 'कर्मचारी सूची'}
-        </button>
-        <button
-          onClick={() => setActiveSubTab('increments')}
-          className={`flex-1 md:flex-initial text-center py-2 px-6 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-            activeSubTab === 'increments'
-              ? 'bg-[#03623c] text-white shadow-sm'
-              : 'text-gray-500 hover:text-gray-950 hover:bg-gray-50'
-          }`}
-        >
-          {language === 'en' ? 'Salary Increments Report' : 'वेतन वृद्धि इतिहास'}
-        </button>
-      </div>
+      {!isRecruiter && (
+        <div className="flex border-b border-gray-200 bg-white p-1 rounded-xl border shadow-xs">
+          <button
+            onClick={() => setActiveSubTab('directory')}
+            className={`flex-1 md:flex-initial text-center py-2 px-6 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeSubTab === 'directory'
+                ? 'bg-[#03623c] text-white shadow-sm'
+                : 'text-gray-500 hover:text-gray-950 hover:bg-gray-50'
+            }`}
+          >
+            {'Employee Directory'}
+          </button>
+          <button
+            onClick={() => setActiveSubTab('increments')}
+            className={`flex-1 md:flex-initial text-center py-2 px-6 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeSubTab === 'increments'
+                ? 'bg-[#03623c] text-white shadow-sm'
+                : 'text-gray-500 hover:text-gray-950 hover:bg-gray-50'
+            }`}
+          >
+            {'Salary Increments Report'}
+          </button>
+        </div>
+      )}
 
-      {activeSubTab === 'directory' ? (
+      {(activeSubTab === 'directory' || isRecruiter) ? (
         <>
           {/* Device & Login Status Summary Stats Card */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -1518,53 +1536,57 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
               </div>
               <div>
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {language === 'en' ? 'Total Employees' : 'कुल कर्मचारी'}
+                  {'Total Employees'}
                 </div>
                 <div className="text-xl font-black text-slate-800">{employees.length}</div>
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
-              <div className="p-3 bg-purple-50 text-purple-700 rounded-xl">
-                <Smartphone className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {language === 'en' ? 'Locked Devices' : 'लॉक्ड डिवाइस'}
+            {!isRecruiter && (
+              <>
+                <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
+                  <div className="p-3 bg-purple-50 text-purple-700 rounded-xl">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {'Locked Devices'}
+                    </div>
+                    <div className="text-xl font-black text-purple-700">
+                      {employees.filter(e => e.approvedDeviceId).length}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xl font-black text-purple-700">
-                  {employees.filter(e => e.approvedDeviceId).length}
-                </div>
-              </div>
-            </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
-              <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl">
-                <Sliders className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {language === 'en' ? 'Multi-Device Allowed' : 'मल्टी-डिवाइस अनुमति'}
+                <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
+                  <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl">
+                    <Sliders className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {'Multi-Device Allowed'}
+                    </div>
+                    <div className="text-xl font-black text-indigo-700">
+                      {employees.filter(e => e.allowMultipleDevices).length}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xl font-black text-indigo-700">
-                  {employees.filter(e => e.allowMultipleDevices).length}
-                </div>
-              </div>
-            </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
-              <div className="p-3 bg-rose-50 text-rose-700 rounded-xl">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {language === 'en' ? 'Pending Approval' : 'लंबित स्वीकृतियां'}
+                <div className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xxs flex items-center gap-3.5">
+                  <div className="p-3 bg-rose-50 text-rose-700 rounded-xl">
+                    <AlertCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {'Pending Approval'}
+                    </div>
+                    <div className="text-xl font-black text-rose-700">
+                      {employees.filter(e => e.isApproved === false).length}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xl font-black text-rose-700">
-                  {employees.filter(e => e.isApproved === false).length}
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
           {/* Search and Filters panel */}
@@ -1577,15 +1599,14 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
             </span>
             <input
               type="text"
-              placeholder={language === 'en' ? "Search by Name, ID, Department, Designation or Phone..." : "नाम, आईडी, विभाग, पद या फोन से खोजें..."}
+              placeholder={"Search by Name, ID, Department, Designation or Phone..."}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
               className="w-full pl-10 pr-9 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm"
-              id="emp-search"
-            />
+              id="emp-search" />
             {searchTerm && (
               <button
                 type="button"
@@ -1630,7 +1651,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
               className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
               id="branch-filter"
             >
-              <option value="All">{language === 'en' ? 'All Branches' : 'सभी शाखाएं'}</option>
+              <option value="All">{'All Branches'}</option>
               {branchOptions.filter(b => b !== 'All').map(b => (
                 <option key={b} value={b}>{b}</option>
               ))}
@@ -1648,7 +1669,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
               className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
               id="emp-filter"
             >
-              <option value="All">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+              <option value="All">{'All Employees'}</option>
               {employeeOptions.map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.name}</option>
               ))}
@@ -1666,9 +1687,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
               className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
               id="status-filter"
             >
-              <option value="Active">{language === 'en' ? 'Active Employees' : 'सक्रिय कर्मचारी'}</option>
-              <option value="Inactive">{language === 'en' ? 'Left / Inactive' : 'छोड़ चुके / निष्क्रिय'}</option>
-              <option value="All">{language === 'en' ? 'All (Active & Left)' : 'सभी (सक्रिय और निष्क्रिय)'}</option>
+              <option value="Active">{'Active Employees'}</option>
+              <option value="Inactive">{'LeftInactive'}</option>
+              <option value="All">{'All (Active & Left)'}</option>
             </select>
           </div>
         </div>
@@ -1684,9 +1705,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
               id="btn-column-selector"
             >
               <Sliders className="w-4 h-4 text-[#03623c]" />
-              <span>{language === 'en' ? 'Columns' : 'कॉलम चुनें'}</span>
+              <span>{'Columns'}</span>
               <span className="bg-emerald-50 text-[#03623c] font-bold text-[10px] px-1.5 py-0.2 rounded-full border border-emerald-100">
-                {visibleColumns.length}
+                {activeVisibleColumns.length}
               </span>
             </button>
 
@@ -1694,26 +1715,25 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
               <>
                 <div 
                   className="fixed inset-0 z-10" 
-                  onClick={() => setShowColumnDropdown(false)}
-                />
+                  onClick={() => setShowColumnDropdown(false)} />
                 <div className="absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-20 p-3 space-y-2">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                      {language === 'en' ? 'Show / Hide Columns' : 'कॉलम दिखाएं या छिपाएं'}
+                      {'ShowHide Columns'}
                     </span>
                     <button
                       onClick={() => {
-                        // Reset to default columns
+                        //Reset to default columns
                         setVisibleColumns(ALL_COLUMNS.filter(c => c.default).map(c => c.key));
                       }}
                       className="text-[10px] text-blue-600 hover:underline font-bold"
                     >
-                      {language === 'en' ? 'Reset' : 'रीसेट करें'}
+                      {'Reset'}
                     </button>
                   </div>
                   <div className="space-y-1.5">
                     {ALL_COLUMNS.map(col => {
-                      const isVisible = visibleColumns.includes(col.key);
+                      const isVisible = activeVisibleColumns.includes(col.key);
                       return (
                         <label 
                           key={col.key} 
@@ -1728,14 +1748,12 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                               if (e.target.checked) {
                                 setVisibleColumns([...visibleColumns, col.key]);
                               } else {
-                                // Keep at least one column visible to avoid completely empty table
                                 if (visibleColumns.length > 1) {
                                   setVisibleColumns(visibleColumns.filter(k => k !== col.key));
                                 }
                               }
                             }}
-                            className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer"
-                          />
+                            className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer" />
                           <span>{language === 'en' ? col.labelEn : col.labelHi}</span>
                         </label>
                       );
@@ -1748,17 +1766,17 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
 
           {hasPermission('add') && (
             <>
-              {/* Export Inactive / Left Employees Backup CSV Button */}
+              {/* Export InactiveLeft Employees Backup CSV Button */}
               {inactiveEmps.length > 0 && (
                 <button
                   type="button"
                   onClick={() => exportEmployeesCSV(inactiveEmps, 'inactive_employees_backup')}
                   className="border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xxs"
-                  title={language === 'en' ? `Export backup CSV for ${inactiveEmps.length} inactive/left employees` : `${inactiveEmps.length} निष्क्रीय कर्मचारियों की जानकारी CSV में डाउनलोड करें`}
+                  title={`Export backup CSV for ${inactiveEmps.length} inactive/left employees`}
                   id="btn-export-inactive-csv"
                 >
                   <Download className="w-3.5 h-3.5 text-amber-700" />
-                  {language === 'en' ? `Export Inactive (${inactiveEmps.length})` : `निष्क्रिय बैकअप (${inactiveEmps.length})`}
+                  {`Export Inactive (${inactiveEmps.length})`}
                 </button>
               )}
 
@@ -1767,7 +1785,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                 type="button"
                 onClick={() => exportEmployeesCSV(employees)}
                 className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-                title={language === 'en' ? 'Export all employee records for bulk editing' : 'सभी कर्मचारियों का डेटा CSV में डाउनलोड/एक्सपोर्ट करें'}
+                title={'Export all employee records for bulk editing'}
                 id="btn-export-csv-trigger"
               >
                 <Download className="w-4 h-4 text-emerald-700" />
@@ -1806,11 +1824,11 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {visibleColumns.includes('id') && (
+                  {activeVisibleColumns.includes('id') && (
                     <th 
                       onClick={() => handleSort('id')}
                       className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
-                      title={language === 'en' ? 'Click to sort by Employee ID' : 'कर्मचारी आईडी से सॉर्ट करें'}
+                      title={'Click to sort by Employee ID'}
                     >
                       <div className="flex items-center gap-1.5">
                         <span>{t.colId}</span>
@@ -1824,11 +1842,11 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       </div>
                     </th>
                   )}
-                  {visibleColumns.includes('name') && (
+                  {activeVisibleColumns.includes('name') && (
                     <th 
                       onClick={() => handleSort('name')}
                       className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
-                      title={language === 'en' ? 'Click to sort by Name' : 'नाम से सॉर्ट करें'}
+                      title={'Click to sort by Name'}
                     >
                       <div className="flex items-center gap-1.5">
                         <span>{t.colName}</span>
@@ -1842,11 +1860,11 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       </div>
                     </th>
                   )}
-                  {visibleColumns.includes('role') && (
+                  {activeVisibleColumns.includes('role') && (
                     <th 
                       onClick={() => handleSort('department')}
                       className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
-                      title={language === 'en' ? 'Click to sort by Department' : 'विभाग से सॉर्ट करें'}
+                      title={'Click to sort by Department'}
                     >
                       <div className="flex items-center gap-1.5">
                         <span>{t.colRole}</span>
@@ -1860,11 +1878,11 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       </div>
                     </th>
                   )}
-                  {visibleColumns.includes('joiningDate') && (
+                  {activeVisibleColumns.includes('joiningDate') && (
                     <th 
                       onClick={() => handleSort('joiningDate')}
                       className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
-                      title={language === 'en' ? 'Click to sort by Joining Date' : 'ज्वाइनिंग तिथि से सॉर्ट करें'}
+                      title={'Click to sort by Joining Date'}
                     >
                       <div className="flex items-center gap-1.5">
                         <span>{t.colJoining}</span>
@@ -1878,11 +1896,11 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       </div>
                     </th>
                   )}
-                  {visibleColumns.includes('salary') && (
+                  {activeVisibleColumns.includes('salary') && (
                     <th 
                       onClick={() => handleSort('basicSalary')}
                       className="py-4 px-6 cursor-pointer select-none hover:bg-gray-100/80 transition-colors text-gray-700 font-bold group"
-                      title={language === 'en' ? 'Click to sort by Monthly Salary' : 'मासिक वेतन से सॉर्ट करें'}
+                      title={'Click to sort by Monthly Salary'}
                     >
                       <div className="flex items-center gap-1.5">
                         <span>{t.colSalary}</span>
@@ -1896,30 +1914,30 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       </div>
                     </th>
                   )}
-                  {visibleColumns.includes('paymentMethod') && <th className="py-4 px-6">{t.colPayment}</th>}
-                  {visibleColumns.includes('status') && <th className="py-4 px-6 text-center">{t.colStatus}</th>}
+                  {activeVisibleColumns.includes('paymentMethod') && <th className="py-4 px-6">{t.colPayment}</th>}
+                  {activeVisibleColumns.includes('status') && <th className="py-4 px-6 text-center">{t.colStatus}</th>}
                   
                   {/* Optional Custom Columns Headers */}
-                  {visibleColumns.includes('mobileNo') && <th className="py-4 px-6">{language === 'en' ? 'Mobile No' : 'मोबाइल नंबर'}</th>}
-                  {visibleColumns.includes('personalMobileNo') && <th className="py-4 px-6">{language === 'en' ? 'Personal Mobile' : 'व्यक्तिगत मोबाइल'}</th>}
-                  {visibleColumns.includes('personalEmail') && <th className="py-4 px-6">{language === 'en' ? 'Personal Email' : 'व्यक्तिगत ईमेल'}</th>}
-                  {visibleColumns.includes('dob') && <th className="py-4 px-6">{language === 'en' ? 'DOB' : 'जन्म तिथि'}</th>}
-                  {visibleColumns.includes('gender') && <th className="py-4 px-6">{language === 'en' ? 'Gender' : 'लिंग'}</th>}
-                  {visibleColumns.includes('bloodGroup') && <th className="py-4 px-6">{language === 'en' ? 'Blood Group' : 'ब्लड ग्रुप'}</th>}
-                  {visibleColumns.includes('emergencyContactNo') && <th className="py-4 px-6">{language === 'en' ? 'Emergency Contact' : 'आपातकालीन संपर्क'}</th>}
-                  {visibleColumns.includes('bankDetails') && <th className="py-4 px-6">{language === 'en' ? 'Bank Details' : 'बैंक विवरण'}</th>}
-                  {visibleColumns.includes('identityDetails') && <th className="py-4 px-6">{language === 'en' ? 'Govt IDs' : 'पहचान पत्र'}</th>}
-                  {visibleColumns.includes('pfEsicDetails') && <th className="py-4 px-6">{language === 'en' ? 'PF & ESIC' : 'पीएफ और ईएसआईसी'}</th>}
-                  {visibleColumns.includes('gpsAndMobile') && <th className="py-4 px-6 text-center">{language === 'en' ? 'GPS & Mobile' : 'जीपीएस और मोबाइल'}</th>}
+                  {activeVisibleColumns.includes('mobileNo') && <th className="py-4 px-6">{'Mobile No'}</th>}
+                  {activeVisibleColumns.includes('personalMobileNo') && <th className="py-4 px-6">{'Personal Mobile'}</th>}
+                  {activeVisibleColumns.includes('personalEmail') && <th className="py-4 px-6">{'Personal Email'}</th>}
+                  {activeVisibleColumns.includes('dob') && <th className="py-4 px-6">{'DOB'}</th>}
+                  {activeVisibleColumns.includes('gender') && <th className="py-4 px-6">{'Gender'}</th>}
+                  {activeVisibleColumns.includes('bloodGroup') && <th className="py-4 px-6">{'Blood Group'}</th>}
+                  {activeVisibleColumns.includes('emergencyContactNo') && <th className="py-4 px-6">{'Emergency Contact'}</th>}
+                  {activeVisibleColumns.includes('bankDetails') && <th className="py-4 px-6">{'Bank Details'}</th>}
+                  {activeVisibleColumns.includes('identityDetails') && <th className="py-4 px-6">{'Govt IDs'}</th>}
+                  {activeVisibleColumns.includes('pfEsicDetails') && <th className="py-4 px-6">{'PF & ESIC'}</th>}
+                  {activeVisibleColumns.includes('gpsAndMobile') && <th className="py-4 px-6 text-center">{'GPS & Mobile'}</th>}
                   
-                  <th className="py-4 px-6 text-right">{t.colActions}</th>
+                  {!isRecruiter && <th className="py-4 px-6 text-right">{t.colActions}</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-sm">
                 {paginatedEmployees.map((emp) => (
                   <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors">
-                    {visibleColumns.includes('id') && <td className="py-4 px-6 font-mono text-xs text-gray-500 font-semibold">{emp.id}</td>}
-                    {visibleColumns.includes('name') && (
+                    {activeVisibleColumns.includes('id') && <td className="py-4 px-6 font-mono text-xs text-gray-500 font-semibold">{emp.id}</td>}
+                    {activeVisibleColumns.includes('name') && (
                       <td className="py-4 px-6 font-semibold text-gray-900">
                         <div className="flex items-center gap-3">
                           {emp.photoUrl ? (
@@ -1927,8 +1945,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                               src={parseGoogleDriveImageUrl(emp.photoUrl)} 
                               alt={emp.name} 
                               className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
-                              referrerPolicy="no-referrer"
-                            />
+                              referrerPolicy="no-referrer" />
                           ) : (
                             <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#03623c] flex items-center justify-center font-bold text-xs shrink-0 uppercase">
                               {emp.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
@@ -1941,7 +1958,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         </div>
                       </td>
                     )}
-                    {visibleColumns.includes('role') && (
+                    {activeVisibleColumns.includes('role') && (
                       <td className="py-4 px-6">
                         <div>
                           <div className="font-semibold text-gray-800 leading-tight">{emp.designation}</div>
@@ -1950,18 +1967,18 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         </div>
                       </td>
                     )}
-                    {visibleColumns.includes('joiningDate') && (
+                    {activeVisibleColumns.includes('joiningDate') && (
                       <td className="py-4 px-6 text-gray-500 font-mono text-xs">
                         {new Date(emp.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
                     )}
-                    {visibleColumns.includes('salary') && (
+                    {activeVisibleColumns.includes('salary') && (
                       <td className="py-4 px-6">
                         <div className="font-semibold text-gray-800">₹{getCurrentBasicSalary(emp).toLocaleString('en-IN')}</div>
-                        <div className="text-xxs text-gray-400">₹{emp.allowances} (Allowance) / -₹{emp.deductions} (Deduct)</div>
+                        <div className="text-xxs text-gray-400">₹{emp.allowances} (Allowance)₹{emp.deductions} (Deduct)</div>
                       </td>
                     )}
-                    {visibleColumns.includes('paymentMethod') && (
+                    {activeVisibleColumns.includes('paymentMethod') && (
                       <td className="py-4 px-6">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                           <CreditCard className="w-3.5 h-3.5" />
@@ -1969,7 +1986,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         </span>
                       </td>
                     )}
-                    {visibleColumns.includes('status') && (
+                    {activeVisibleColumns.includes('status') && (
                       <td className="py-4 px-6 text-center">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                           emp.isActive 
@@ -1982,42 +1999,42 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     )}
 
                     {/* Optional Custom Columns Cells */}
-                    {visibleColumns.includes('mobileNo') && (
+                    {activeVisibleColumns.includes('mobileNo') && (
                       <td className="py-4 px-6 font-mono text-xs text-gray-700">
                         {emp.mobileNo || '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('personalMobileNo') && (
+                    {activeVisibleColumns.includes('personalMobileNo') && (
                       <td className="py-4 px-6 font-mono text-xs text-gray-700">
                         {emp.personalMobileNo || '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('personalEmail') && (
+                    {activeVisibleColumns.includes('personalEmail') && (
                       <td className="py-4 px-6 text-xs text-gray-700 normal-case">
                         {emp.personalEmail || '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('dob') && (
+                    {activeVisibleColumns.includes('dob') && (
                       <td className="py-4 px-6 font-mono text-xs text-gray-700">
                         {emp.dob ? new Date(emp.dob).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('gender') && (
+                    {activeVisibleColumns.includes('gender') && (
                       <td className="py-4 px-6 text-xs text-gray-700">
                         {emp.gender || '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('bloodGroup') && (
+                    {activeVisibleColumns.includes('bloodGroup') && (
                       <td className="py-4 px-6 font-mono text-xs text-gray-700 font-bold text-rose-700">
                         {emp.bloodGroup || '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('emergencyContactNo') && (
+                    {activeVisibleColumns.includes('emergencyContactNo') && (
                       <td className="py-4 px-6 font-mono text-xs text-gray-700">
                         {emp.emergencyContactNo || '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('bankDetails') && (
+                    {activeVisibleColumns.includes('bankDetails') && (
                       <td className="py-4 px-6 text-xs text-gray-700 leading-snug">
                         {emp.bankAccountNo ? (
                           <div>
@@ -2028,7 +2045,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         ) : '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('identityDetails') && (
+                    {activeVisibleColumns.includes('identityDetails') && (
                       <td className="py-4 px-6 text-xs text-gray-700 leading-snug">
                         {(emp.aadhaarNo || emp.panNo) ? (
                           <div>
@@ -2038,7 +2055,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         ) : '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('pfEsicDetails') && (
+                    {activeVisibleColumns.includes('pfEsicDetails') && (
                       <td className="py-4 px-6 text-xs text-gray-700 leading-snug">
                         {(emp.pfAccountNo || emp.esicNo || emp.uan) ? (
                           <div>
@@ -2049,7 +2066,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         ) : '-'}
                       </td>
                     )}
-                    {visibleColumns.includes('gpsAndMobile') && (
+                    {activeVisibleColumns.includes('gpsAndMobile') && (
                       <td className="py-4 px-6 text-center">
                         <div className="flex flex-col items-center gap-1.5">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
@@ -2057,21 +2074,21 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                               ? 'bg-emerald-100 text-emerald-800' 
                               : 'bg-slate-100 text-slate-400 line-through'
                           }`}>
-                            {language === 'en' ? 'Mobile' : 'मोबाइल'}: {emp.enableMobileAttendance ? 'ON' : 'OFF'}
+                            {'Mobile'}: {emp.enableMobileAttendance ? 'ON' : 'OFF'}
                           </span>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
                             emp.enableGeofencing 
                               ? 'bg-blue-100 text-blue-800 font-extrabold' 
                               : 'bg-slate-100 text-slate-400'
                           }`}>
-                            {language === 'en' ? 'GPS' : 'जीपीएस'}: {emp.enableGeofencing ? 'ENFORCED' : 'OFF'}
+                            {'GPS'}: {emp.enableGeofencing ? 'ENFORCED' : 'OFF'}
                           </span>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold ${
                             emp.approvedDeviceId 
                               ? 'bg-purple-100 text-purple-800 border border-purple-200' 
                               : 'bg-amber-100 text-amber-800 border border-amber-200'
                           }`}>
-                            📱 {language === 'en' ? 'Device' : 'डिवाइस'}: {emp.approvedDeviceId ? (emp.allowMultipleDevices ? (language === 'en' ? 'Multi-Device' : 'मल्टी-डिवाइस') : (language === 'en' ? 'Locked' : 'लॉक्ड')) : (language === 'en' ? 'Not Bound' : 'कोई डिवाइस नहीं')}
+                            📱 {'Device'}: {emp.approvedDeviceId ? (emp.allowMultipleDevices ? ('Multi-Device') : ('Locked')) : ('Not Bound')}
                           </span>
                           {emp.approvedDeviceId && (
                             <span className="text-[8px] font-mono text-slate-400 max-w-[100px] truncate" title={emp.approvedDeviceId}>
@@ -2083,14 +2100,15 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                               ? 'bg-[#03623c]/10 text-[#03623c]' 
                               : 'bg-rose-100 text-rose-800 animate-pulse'
                           }`}>
-                            {language === 'en' ? 'Status' : 'स्थिति'}: {emp.isApproved !== false ? (language === 'en' ? 'Approved' : 'मंजूर') : (language === 'en' ? 'Pending' : 'लंबित')}
+                            {'Status'}: {emp.isApproved !== false ? ('Approved') : ('Pending')}
                           </span>
                         </div>
                       </td>
                     )}
 
-                    <td className="py-4 px-6 text-right">
-                      <div className="flex justify-end gap-2">
+                    {!isRecruiter && (
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex justify-end gap-2">
                         {/* Device & Access Reset Popover */}
                         {hasPermission('edit') && (
                           <div className="relative inline-block text-left">
@@ -2101,7 +2119,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                   ? 'bg-[#03623c]/15 text-[#03623c]' 
                                   : 'text-gray-500 hover:text-[#03623c] hover:bg-emerald-50'
                               }`}
-                              title={language === 'en' ? 'Manage Device Lock, First Login & Multi-Device Permission' : 'डिवाइस लॉक, फर्स्ट लॉगिन और मल्टी-डिवाइस स्वीकृति'}
+                              title={'Manage Device Lock, First Login & Multi-Device Permission'}
                               id={`access-control-${emp.id}`}
                             >
                               <Smartphone className="w-4 h-4" />
@@ -2111,8 +2129,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                               <>
                                 <div 
                                   className="fixed inset-0 z-40" 
-                                  onClick={() => setActiveAccessMenuId(null)} 
-                                />
+                                  onClick={() => setActiveAccessMenuId(null)} />
                                 <div className="absolute right-0 mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-gray-150 z-50 p-3 text-left">
                                   <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-gray-100">
                                     <span className="font-extrabold text-slate-950 text-xs truncate max-w-[150px]">{emp.name}</span>
@@ -2152,7 +2169,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                           }}
                                           className="w-full text-center py-1.5 bg-[#03623c] hover:bg-[#02492d] text-white rounded text-[10px] font-bold cursor-pointer transition-all"
                                         >
-                                          {language === 'en' ? 'Approve Now' : 'तुरंत मंजूर करें'}
+                                          {'Approve Now'}
                                         </button>
                                       )}
 
@@ -2164,7 +2181,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                           }}
                                           className="w-full text-left px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded text-[10px] font-bold border border-amber-200/60 transition-all cursor-pointer"
                                         >
-                                          🔄 {language === 'en' ? 'Reset Device Lock' : 'डिवाइस लॉक अनलॉक'}
+                                          🔄 {'Reset Device Lock'}
                                         </button>
                                       )}
 
@@ -2176,7 +2193,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                         className="w-full text-left px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded text-[10px] font-bold border border-rose-200/60 transition-all cursor-pointer"
                                         title="Resets employee status so they must be approved again on next login"
                                       >
-                                        ⚠️ {language === 'en' ? 'Reset to First Login' : 'फर्स्ट लॉगिन रीसेट करें'}
+                                        ⚠️ {'Reset to First Login'}
                                       </button>
 
                                       <button
@@ -2187,8 +2204,8 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                         className="w-full text-left px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded text-[10px] font-bold border border-indigo-200/60 transition-all cursor-pointer"
                                       >
                                         📱 {emp.allowMultipleDevices 
-                                          ? (language === 'en' ? 'Restrict to 1 Device' : '1 डिवाइस सीमा लगाएं') 
-                                          : (language === 'en' ? 'Allow Multi-Device' : 'मल्टी-डिवाइस अनुमति दें')}
+                                          ? ('Restrict to 1 Device') 
+                                          : ('Allow Multi-Device')}
                                       </button>
                                     </div>
 
@@ -2196,7 +2213,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                     {emp.loggedDevices && emp.loggedDevices.length > 0 && (
                                       <div className="pt-2 border-t border-gray-150">
                                         <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
-                                          {language === 'en' ? 'Logged Devices / History' : 'लॉगिन किए गए डिवाइस / इतिहास'} ({emp.loggedDevices.length})
+                                          {'Logged DevicesHistory'} ({emp.loggedDevices.length})
                                         </span>
                                         <div className="max-h-28 overflow-y-auto space-y-1 pr-0.5 scrollbar-thin">
                                           {emp.loggedDevices.map((d, index) => {
@@ -2212,7 +2229,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                                     <span className="font-extrabold truncate block" title={d.browser}>{d.browser}</span>
                                                     {isCurrentApproved && (
                                                       <span className="text-[7px] font-black uppercase font-mono px-1 py-0.25 bg-emerald-100 text-emerald-800 rounded tracking-wide shrink-0">
-                                                        {language === 'en' ? 'Bound' : 'बाउंड'}
+                                                        {'Bound'}
                                                       </span>
                                                     )}
                                                   </div>
@@ -2231,9 +2248,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                                                     });
                                                   }}
                                                   className="text-rose-600 hover:text-rose-800 font-extrabold px-1.5 py-0.5 text-[8px] uppercase hover:bg-rose-50 rounded border border-rose-100 hover:border-rose-200 transition-all shrink-0 cursor-pointer"
-                                                  title={language === 'en' ? 'Remove/Logout this Device' : 'इस डिवाइस को हटाएं / लॉगआउट करें'}
+                                                  title={'Remove/Logout this Device'}
                                                 >
-                                                  {language === 'en' ? 'Logout' : 'लॉगआउट'}
+                                                  {'Logout'}
                                                 </button>
                                               </div>
                                             );
@@ -2275,7 +2292,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                             <button
                               onClick={() => handleDeleteEmployeeRecord(emp)}
                               className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                              title={language === 'en' ? 'Delete Employee Record' : 'कर्मचारी रिकॉर्ड हटाएं'}
+                              title={'Delete Employee Record'}
                               id={`delete-${emp.id}`}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -2284,6 +2301,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         )}
                       </div>
                     </td>
+                  )}
                   </tr>
                 ))}
               </tbody>
@@ -2340,7 +2358,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
         )}
       </div>
 
-      {/* Edit / Register Modal */}
+      {/* EditRegister Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-2xl max-w-6xl w-full max-h-[95vh] flex flex-col overflow-hidden">
@@ -2437,27 +2455,31 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                   </div>
 
                   {/* Category Card: Bank details */}
-                  <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-3">
-                    <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5">
-                      Bank Detail
-                    </h4>
-                    {renderFormInput('bankAccountNo', 'Bank Account No')}
-                    {renderFormInput('bankAccountHolderName', 'Account Holder Name')}
-                    {renderFormInput('bankName', 'Bank Name')}
-                    {renderFormInput('ifscCode', 'IFSC Code')}
-                  </div>
+                  {!isRecruiter && (
+                    <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-3">
+                      <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+                        Bank Detail
+                      </h4>
+                      {renderFormInput('bankAccountNo', 'Bank Account No')}
+                      {renderFormInput('bankAccountHolderName', 'Account Holder Name')}
+                      {renderFormInput('bankName', 'Bank Name')}
+                      {renderFormInput('ifscCode', 'IFSC Code')}
+                    </div>
+                  )}
 
                   {/* Category Card: Other details */}
-                  <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-3">
-                    <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5">
-                      Other Detail (Government IDs)
-                    </h4>
-                    {renderFormInput('panNo', 'PAN No')}
-                    {renderFormInput('pfAccountNo', 'PF Account No')}
-                    {renderFormInput('esicNo', 'ESIC No')}
-                    {renderFormInput('aadhaarNo', 'Aadhaar No')}
-                    {renderFormInput('uan', 'UAN')}
-                  </div>
+                  {!isRecruiter && (
+                    <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-3">
+                      <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+                        Other Detail (Government IDs)
+                      </h4>
+                      {renderFormInput('panNo', 'PAN No')}
+                      {renderFormInput('pfAccountNo', 'PF Account No')}
+                      {renderFormInput('esicNo', 'ESIC No')}
+                      {renderFormInput('aadhaarNo', 'Aadhaar No')}
+                      {renderFormInput('uan', 'UAN')}
+                    </div>
+                  )}
                 </div>
 
                 {/* Column 3: Employment Detail, Salary Info & Photo Upload */}
@@ -2465,7 +2487,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                   {/* Category Card: Profile Photo */}
                   <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 flex flex-col items-center text-center space-y-3">
                     <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5 w-full">
-                      {language === 'en' ? 'Profile Photo (Google Drive Link)' : 'प्रोफ़ाइल फ़ोटो (गूगल ड्राइव लिंक)'}
+                      {'Profile Photo (Google Drive Link)'}
                     </h4>
                     
                     <div className="relative w-20 h-20 rounded-full border-2 border-dashed border-gray-300 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
@@ -2474,8 +2496,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                           src={parseGoogleDriveImageUrl(formData.photoUrl)} 
                           alt="Profile preview" 
                           className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
+                          referrerPolicy="no-referrer" />
                       ) : (
                         <Camera className="w-7 h-7 text-gray-300" />
                       )}
@@ -2484,7 +2505,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     <div className="w-full space-y-1.5 text-left">
                       <label className="text-[11px] font-semibold text-gray-700 flex items-center gap-1.5">
                         <Link2 className="w-3.5 h-3.5 text-blue-600" />
-                        {language === 'en' ? 'Google Drive Link / Image URL' : 'गूगल ड्राइव या फ़ोटो वेब लिंक'}
+                        {'Google Drive LinkImage URL'}
                       </label>
                       <input
                         type="url"
@@ -2497,12 +2518,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         }}
                         placeholder="https://drive.google.com/file/d/..."
                         className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-mono"
-                        id="input-photo-url-link"
-                      />
+                        id="input-photo-url-link" />
                       <p className="text-[10px] text-gray-500 leading-normal">
-                        {language === 'en' 
-                          ? 'Paste Google Drive shareable link. Link will sync directly with Google Sheet.' 
-                          : 'गूगल ड्राइव का Shareable link पेस्ट करें। यह गूगल शीट में भी सीधे सेव होगा।'}
+                        {'Paste Google Drive shareable link. Link will sync directly with Google Sheet.'}
                       </p>
                     </div>
                   </div>
@@ -2528,236 +2546,226 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                   </div>
 
                   {/* Category Card: Standard Salary & Payroll info */}
-                  <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-3">
-                    <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5">
-                      Salary Structure & Payroll
-                    </h4>
-                    {renderFormInput('basicSalary', t.fieldSalary, 'number')}
-                    {renderFormInput('allowances', t.fieldAllowances, 'number')}
-                    {renderFormInput('deductions', t.fieldDeductions, 'number')}
-                    {renderFormInput('hourlyRate', t.fieldHourly, 'number')}
-                    {renderFormInput('paymentMethod', t.fieldPayment, 'text', PAYMENT_METHODS)}
+                  {!isRecruiter && (
+                    <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 space-y-3">
+                      <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+                        Salary Structure & Payroll
+                      </h4>
+                      {renderFormInput('basicSalary', t.fieldSalary, 'number')}
+                      {renderFormInput('allowances', t.fieldAllowances, 'number')}
+                      {renderFormInput('deductions', t.fieldDeductions, 'number')}
+                      {renderFormInput('hourlyRate', t.fieldHourly, 'number')}
+                      {renderFormInput('paymentMethod', t.fieldPayment, 'text', PAYMENT_METHODS)}
 
-                    <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
-                      <h5 className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wide mb-2">Advanced Allowances (कस्टम भत्ते)</h5>
-                      <div className="grid grid-cols-2 gap-2">
-                        {renderFormInput('hra', 'House Rent (HRA) (₹)', 'number')}
-                        {renderFormInput('da', 'Dearness (DA) (₹)', 'number')}
+                      <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
+                        <h5 className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wide mb-2">Advanced Allowances</h5>
+                        <div className="grid grid-cols-2 gap-2">
+                          {renderFormInput('hra', 'House Rent (HRA) (₹)', 'number')}
+                          {renderFormInput('da', 'Dearness (DA) (₹)', 'number')}
+                        </div>
+                        <div className="mt-2">
+                          {renderFormInput('conveyanceAllowance', 'Conveyance Allowance (₹)', 'number')}
+                        </div>
                       </div>
-                      <div className="mt-2">
-                        {renderFormInput('conveyanceAllowance', 'Conveyance Allowance (₹)', 'number')}
+
+                      <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
+                        <h5 className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wide mb-2">Advance & Loan</h5>
+                        <div className="grid grid-cols-2 gap-2">
+                          {renderFormInput('advanceSalaryBalance', 'Advance Outstanding (₹)', 'number')}
+                          {renderFormInput('advanceSalaryDeduction', 'Monthly EMI/Deduct (₹)', 'number')}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
-                      <h5 className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wide mb-2">Advance & Loan (एडवांस और लोन)</h5>
-                      <div className="grid grid-cols-2 gap-2">
-                        {renderFormInput('advanceSalaryBalance', 'Advance Outstanding (₹)', 'number')}
-                        {renderFormInput('advanceSalaryDeduction', 'Monthly EMI/Deduct (₹)', 'number')}
+                      <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
+                        <h5 className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-wide mb-2">Leaves Balance</h5>
+                        <div className="grid grid-cols-2 gap-2">
+                          {renderFormInput('clBalance', 'CL Balance (Casual)', 'number')}
+                          {renderFormInput('elBalance', 'EL Balance (Earned)', 'number')}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
-                      <h5 className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-wide mb-2">Leaves Balance (छुट्टियों का रिकॉर्ड)</h5>
-                      <div className="grid grid-cols-2 gap-2">
-                        {renderFormInput('clBalance', 'CL Balance (Casual)', 'number')}
-                        {renderFormInput('elBalance', 'EL Balance (Earned)', 'number')}
-                      </div>
-                    </div>
-
-                    <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
-                      <h5 className="text-[10px] font-extrabold text-[#7c3aed] uppercase tracking-wide mb-2">Rule Customization (इस कर्मचारी के नियम व कटौतियां)</h5>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-semibold text-gray-700">
-                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="isPfApplicable"
-                            checked={formData.isPfApplicable !== false}
-                            onChange={handleInputChange}
-                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-gray-800 font-bold">Deduct PF (PF कटौती)</span>
-                            <span className="text-[9px] text-gray-400 font-medium">Provident Fund (12%)</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="isEsicApplicable"
-                            checked={formData.isEsicApplicable !== false}
-                            onChange={handleInputChange}
-                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-gray-800 font-bold">Deduct ESIC (ESIC कटौती)</span>
-                            <span className="text-[9px] text-gray-400 font-medium">State Insurance (0.75%)</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="isPtApplicable"
-                            checked={formData.isPtApplicable !== false}
-                            onChange={handleInputChange}
-                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-gray-800 font-bold">Deduct PT (PT कटौती)</span>
-                            <span className="text-[9px] text-gray-400 font-medium">Professional Tax (₹200)</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="isHraApplicable"
-                            checked={formData.isHraApplicable !== false}
-                            onChange={handleInputChange}
-                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-gray-800 font-bold">Enable HRA (HRA चालू)</span>
-                            <span className="text-[9px] text-gray-400 font-medium">House Rent Allowance</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="isDaApplicable"
-                            checked={formData.isDaApplicable !== false}
-                            onChange={handleInputChange}
-                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-gray-800 font-bold">Enable DA (DA चालू)</span>
-                            <span className="text-[9px] text-gray-400 font-medium">Dearness Allowance</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="isConveyanceApplicable"
-                            checked={formData.isConveyanceApplicable !== false}
-                            onChange={handleInputChange}
-                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-gray-800 font-bold">Enable Conveyance (Conveyance चालू)</span>
-                            <span className="text-[9px] text-gray-400 font-medium">Conveyance Allowance</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="isPaidLeaveApplicable"
-                            checked={formData.isPaidLeaveApplicable !== false}
-                            onChange={handleInputChange}
-                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-gray-800 font-bold">Paid Leave Policy (सवैतनिक अवकाश नियम)</span>
-                            <span className="text-[9px] text-gray-400 font-medium">Earned Leave Credit & Status</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-[#03623c]/5 hover:bg-[#03623c]/10 border border-[#03623c]/20 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="isApproved"
-                            checked={formData.isApproved !== false}
-                            onChange={(e) => setFormData({ ...formData, isApproved: e.target.checked })}
-                            className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-[#03623c] font-black">HR/Admin Approved (मंजूर लॉगिन)</span>
-                            <span className="text-[9px] text-gray-500 font-medium">Must be checked for the employee to login</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-emerald-50 hover:bg-emerald-100/60 border border-emerald-200 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="enableMobileAttendance"
-                            checked={!!formData.enableMobileAttendance}
-                            onChange={(e) => setFormData({ ...formData, enableMobileAttendance: e.target.checked })}
-                            className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 border-emerald-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-emerald-900 font-bold">Enable Mobile Attendance (मोबाइल उपस्थिति)</span>
-                            <span className="text-[9px] text-emerald-700 font-medium">Allows accessing Self Attendance Tab</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-blue-50/50 hover:bg-blue-100/30 border border-blue-200/50 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="enableGeofencing"
-                            checked={!!formData.enableGeofencing}
-                            onChange={(e) => setFormData({ ...formData, enableGeofencing: e.target.checked })}
-                            className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500 border-blue-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-blue-900 font-bold">Enforce GPS/Geofence (जीपीएस सत्यापन)</span>
-                            <span className="text-[9px] text-blue-700 font-medium">Requires punching near authorized branches</span>
-                          </div>
-                        </label>
-
-                        <label className="flex items-center gap-2 p-2 bg-indigo-50/50 hover:bg-indigo-100/30 border border-indigo-200/50 rounded-lg cursor-pointer transition-colors">
-                          <input 
-                            type="checkbox"
-                            name="allowMultipleDevices"
-                            checked={!!formData.allowMultipleDevices}
-                            onChange={(e) => setFormData({ ...formData, allowMultipleDevices: e.target.checked })}
-                            className="w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500 border-indigo-300 rounded"
-                          />
-                          <div>
-                            <span className="block text-[11px] text-indigo-900 font-bold">Allow Multi-Device Login (मल्टी-डिवाइस लॉगिन)</span>
-                            <span className="text-[9px] text-indigo-700 font-medium">Bypasses single device login lock</span>
-                          </div>
-                        </label>
-
-                        {formData.approvedDeviceId && (
-                          <div className="flex items-center justify-between p-2.5 bg-rose-50 border border-rose-150 rounded-lg sm:col-span-2">
-                            <div className="space-y-0.5">
-                              <span className="block text-[11px] text-rose-950 font-extrabold">Device Locked (डिवाइस लॉक सक्रिय है)</span>
-                              <span className="block font-mono text-[9px] text-rose-600 max-w-[280px] truncate">Fingerprint: {formData.approvedDeviceId}</span>
+                      <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
+                        <h5 className="text-[10px] font-extrabold text-[#7c3aed] uppercase tracking-wide mb-2">Rule Customization</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-semibold text-gray-700">
+                          <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="isPfApplicable"
+                              checked={formData.isPfApplicable !== false}
+                              onChange={handleInputChange}
+                              className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-gray-800 font-bold">Deduct PF</span>
+                              <span className="text-[9px] text-gray-400 font-medium">Provident Fund (12%)</span>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setFormData({ ...formData, approvedDeviceId: '' })}
-                              className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold transition-all cursor-pointer animate-pulse"
-                            >
-                              Reset Device Lock (रीसेट करें)
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                          </label>
 
-                    <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
-                      <h5 className="text-[10px] font-extrabold text-[#03623c] uppercase tracking-wide mb-1.5">Portal Access (पोर्टल लॉगिन पासवर्ड)</h5>
-                      <div className="space-y-1">
-                        <label className="block text-[10px] font-semibold text-gray-500 uppercase">
-                          Login Password (पासवर्ड)
-                        </label>
-                        <input
-                          type="text"
-                          name="password"
-                          value={formData.password as string || ''}
-                          onChange={handleInputChange}
-                          placeholder="Password (default: ID or 123456)"
-                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-medium"
-                        />
-                        <p className="text-[9px] text-gray-400 font-medium">If left blank, employee can log in using their ID or "123456" as password.</p>
+                          <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="isEsicApplicable"
+                              checked={formData.isEsicApplicable !== false}
+                              onChange={handleInputChange}
+                              className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-gray-800 font-bold">Deduct ESIC</span>
+                              <span className="text-[9px] text-gray-400 font-medium">State Insurance (0.75%)</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="isPtApplicable"
+                              checked={formData.isPtApplicable !== false}
+                              onChange={handleInputChange}
+                              className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-gray-800 font-bold">Deduct PT</span>
+                              <span className="text-[9px] text-gray-400 font-medium">Professional Tax (₹200)</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="isHraApplicable"
+                              checked={formData.isHraApplicable !== false}
+                              onChange={handleInputChange}
+                              className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-gray-800 font-bold">Enable HRA (HRA Enabled)</span>
+                              <span className="text-[9px] text-gray-400 font-medium">House Rent Allowance</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="isDaApplicable"
+                              checked={formData.isDaApplicable !== false}
+                              onChange={handleInputChange}
+                              className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-gray-800 font-bold">Enable DA (DA Enabled)</span>
+                              <span className="text-[9px] text-gray-400 font-medium">Dearness Allowance</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="isConveyanceApplicable"
+                              checked={formData.isConveyanceApplicable !== false}
+                              onChange={handleInputChange}
+                              className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-gray-800 font-bold">Enable Conveyance (Conveyance Enabled)</span>
+                              <span className="text-[9px] text-gray-400 font-medium">Conveyance Allowance</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2 p-2 bg-white hover:bg-gray-50 border border-gray-150 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="isPaidLeaveApplicable"
+                              checked={formData.isPaidLeaveApplicable !== false}
+                              onChange={handleInputChange}
+                              className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-gray-800 font-bold">Paid Leave Policy</span>
+                              <span className="text-[9px] text-gray-400 font-medium">Earned Leave Credit & Status</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2 p-2 bg-[#03623c]/5 hover:bg-[#03623c]/10 border border-[#03623c]/20 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="isApproved"
+                              checked={formData.isApproved !== false}
+                              onChange={(e) => setFormData({ ...formData, isApproved: e.target.checked })}
+                              className="w-3.5 h-3.5 text-[#03623c] focus:ring-[#03623c] border-gray-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-[#03623c] font-black">HR/Admin Approved</span>
+                              <span className="text-[9px] text-gray-500 font-medium">Must be checked for the employee to login</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2 p-2 bg-emerald-50 hover:bg-emerald-100/60 border border-emerald-200 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="enableMobileAttendance"
+                              checked={!!formData.enableMobileAttendance}
+                              onChange={(e) => setFormData({ ...formData, enableMobileAttendance: e.target.checked })}
+                              className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 border-emerald-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-emerald-900 font-bold">Enable Mobile Attendance</span>
+                              <span className="text-[9px] text-emerald-700 font-medium">Allows accessing Self Attendance Tab</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2 p-2 bg-blue-50/50 hover:bg-blue-100/30 border border-blue-200/50 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="enableGeofencing"
+                              checked={!!formData.enableGeofencing}
+                              onChange={(e) => setFormData({ ...formData, enableGeofencing: e.target.checked })}
+                              className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500 border-blue-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-blue-900 font-bold">Enforce GPS/Geofence</span>
+                              <span className="text-[9px] text-blue-700 font-medium">Requires punching near authorized branches</span>
+                            </div>
+                          </label>
+
+                          <label className="flex items-center gap-2 p-2 bg-indigo-50/50 hover:bg-indigo-100/30 border border-indigo-200/50 rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox"
+                              name="allowMultipleDevices"
+                              checked={!!formData.allowMultipleDevices}
+                              onChange={(e) => setFormData({ ...formData, allowMultipleDevices: e.target.checked })}
+                              className="w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500 border-indigo-300 rounded" />
+                            <div>
+                              <span className="block text-[11px] text-indigo-900 font-bold">Allow Multi-Device Login</span>
+                              <span className="text-[9px] text-indigo-700 font-medium">Bypasses single device login lock</span>
+                            </div>
+                          </label>
+
+                          {formData.approvedDeviceId && (
+                            <div className="flex items-center justify-between p-2.5 bg-rose-50 border border-rose-150 rounded-lg sm:col-span-2">
+                              <div className="space-y-0.5">
+                                <span className="block text-[11px] text-rose-950 font-extrabold">Device Locked</span>
+                                <span className="block font-mono text-[9px] text-rose-600 max-w-[280px] truncate">Fingerprint: {formData.approvedDeviceId}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, approvedDeviceId: '' })}
+                                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold transition-all cursor-pointer animate-pulse"
+                              >
+                                Reset Device Lock
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="border-t border-dashed border-gray-250 my-2.5 pt-2.5">
+                        <h5 className="text-[10px] font-extrabold text-[#03623c] uppercase tracking-wide mb-1.5">Portal Access</h5>
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-semibold text-gray-500 uppercase">
+                            Login Password
+                          </label>
+                          <input
+                            type="text"
+                            name="password"
+                            value={formData.password as string || ''}
+                            onChange={handleInputChange}
+                            placeholder="Password (default: ID or 123456)"
+                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-medium" />
+                          <p className="text-[9px] text-gray-400 font-medium">If left blank, employee can log in using their ID or "123456" as password.</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 </div>
@@ -2774,8 +2782,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                         id="isActive"
                         checked={formData.isActive}
                         onChange={handleInputChange}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded-sm focus:ring-blue-500 cursor-pointer"
-                      />
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded-sm focus:ring-blue-500 cursor-pointer" />
                       <label htmlFor="isActive" className="text-xs font-bold text-gray-700 cursor-pointer">
                         {t.fieldActive}
                       </label>
@@ -2850,9 +2857,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     {t.requiredHeaderWarning}
                   </p>
                   <p className="text-[11px] text-gray-500 font-medium">
-                    {language === 'en'
-                      ? 'Tip: You can export all existing employee data, edit/correct the values in Excel, and upload the updated file back to sync modifications.'
-                      : 'टिप: आप मौजूदा सभी कर्मचारियों का डेटा डाउनलोड करके एक्सेल में संशोधन/सुधार कर सकते हैं और दोबारा अपलोड करके अपडेट कर सकते हैं।'}
+                    {'Tip: You can export all existing employee data, edit/correct the values in Excel, and upload the updated file back to sync modifications.'}
                   </p>
                 </div>
                 <div className="shrink-0 flex flex-wrap sm:flex-nowrap items-center gap-2">
@@ -2893,8 +2898,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                   ref={fileInputRef}
                   onChange={handleFileChange}
                   accept=".csv"
-                  className="hidden"
-                />
+                  className="hidden" />
                 <div className="p-3 bg-gray-50 text-gray-400 rounded-full group-hover:bg-blue-50 group-hover:text-blue-500 transition-all">
                   <Upload className="w-6 h-6" />
                 </div>
@@ -2906,7 +2910,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                 </p>
               </div>
 
-              {/* Success / Warning logs */}
+              {/* SuccessWarning logs */}
               {importedEmployees.length > 0 && (
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2.5">
                   <div className="bg-emerald-500 text-white p-1 rounded-full shrink-0">
@@ -3029,8 +3033,8 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       )}
         </>
       ) : (
-        /* Render Increment History Report */
         <div className="space-y-4">
+          {/* Render Increment History Report */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex flex-1 flex-col sm:flex-row gap-3">
               {/* Search Input */}
@@ -3040,11 +3044,10 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                 </span>
                 <input
                   type="text"
-                  placeholder={language === 'en' ? "Search for employee increments..." : "कर्मचारी वेतन वृद्धि खोजें..."}
+                  placeholder={"Search for employee increments..."}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm font-semibold text-gray-900"
-                />
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm font-semibold text-gray-900" />
               </div>
 
               {/* Department Filter */}
@@ -3054,7 +3057,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                   onChange={(e) => setSelectedDept(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-semibold text-gray-700"
                 >
-                  <option value="All">{language === 'en' ? 'All Departments' : 'सभी विभाग'}</option>
+                  <option value="All">{'All Departments'}</option>
                   {DEPARTMENTS.map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
@@ -3230,8 +3233,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     type="text"
                     disabled
                     value={`₹${getCurrentBasicSalary(selectedEmployeeForIncrement).toLocaleString('en-IN')}`}
-                    className="w-full px-3 py-2 border border-gray-150 bg-gray-50 rounded-xl mt-1 font-mono font-bold text-gray-600"
-                  />
+                    className="w-full px-3 py-2 border border-gray-150 bg-gray-50 rounded-xl mt-1 font-mono font-bold text-gray-600" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Increment Amount (₹) <span className="text-red-500">*</span></label>
@@ -3246,8 +3248,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       setIncAmount(val);
                       setIncNewSalary(getCurrentBasicSalary(selectedEmployeeForIncrement) + val);
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-mono font-bold text-gray-900"
-                  />
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-mono font-bold text-gray-900" />
                 </div>
               </div>
 
@@ -3260,8 +3261,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     min="1"
                     value={incNewSalary || ''}
                     onChange={(e) => setIncNewSalary(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-mono font-bold text-gray-900"
-                  />
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-mono font-bold text-gray-900" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Increment Date <span className="text-red-500">*</span></label>
@@ -3270,8 +3270,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                     required
                     value={incDate}
                     onChange={(e) => setIncDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-semibold text-gray-800"
-                  />
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-semibold text-gray-800" />
                 </div>
               </div>
 
@@ -3281,18 +3280,16 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                   type="date"
                   value={incNextDate}
                   onChange={(e) => setIncNextDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-semibold text-gray-800"
-                />
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] font-semibold text-gray-800" />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Remarks / Notes</label>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">RemarksNotes</label>
                 <textarea
                   placeholder="Reason for increment, e.g., Annual Performance appraisal"
                   value={incRemarks}
                   onChange={(e) => setIncRemarks(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] text-xs h-16 font-semibold"
-                />
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl mt-1 focus:outline-none focus:ring-1.5 focus:ring-[#03623c] text-xs h-16 font-semibold" />
               </div>
 
               <div className="pt-3 border-t border-gray-100 flex justify-end gap-3">

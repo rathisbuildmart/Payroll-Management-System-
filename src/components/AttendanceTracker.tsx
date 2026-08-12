@@ -54,11 +54,11 @@ export default function AttendanceTracker({
   const [isSaving, setIsSaving] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   
-  // States for approvals
+  //States for approvals
   const [pendingChanges, setPendingChanges] = useState<Attendance[]>([]);
   const [isSavingApprovals, setIsSavingApprovals] = useState(false);
 
-  // WhatsApp modal state
+  //WhatsApp modal state
   const [waModalOpen, setWaModalOpen] = useState(false);
   const [waRecipient, setWaRecipient] = useState<{ name: string; mobileNo?: string; email?: string }>({ name: '' });
   const [waCategory, setWaCategory] = useState<'missPunch' | 'lateWarning' | 'customNotice'>('missPunch');
@@ -68,7 +68,7 @@ export default function AttendanceTracker({
     if (onUpdateAttendanceRecords) {
       await onUpdateAttendanceRecords(importedRecords);
       
-      // Update local state immediately if any match the currently selected date
+      //Update local state immediately if any match the currently selected date
       const recordsForDate = importedRecords.filter(r => r.date === selectedDate);
       if (recordsForDate.length > 0) {
         setLocalRecords(prev => {
@@ -79,20 +79,20 @@ export default function AttendanceTracker({
           return copy;
         });
       }
-      alert(language === 'en' ? 'Biometric records imported successfully!' : 'बायोमेट्रिक पंच लॉग सफलतापूर्वक आयात किए गए!');
+      alert('Biometric records imported successfully!');
     } else {
       alert('Import service not registered on parent.');
     }
   };
 
-  // Filters state
+  //Filters state
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('All');
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Particular record history modal states
+  //Particular record history modal states
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyModalEmpId, setHistoryModalEmpId] = useState('');
   const [historyModalDate, setHistoryModalDate] = useState('');
@@ -138,7 +138,7 @@ export default function AttendanceTracker({
     return filteredActiveEmployees.slice(start, start + pageSize);
   }, [filteredActiveEmployees, currentPage, pageSize]);
 
-  const totalPages = Math.ceil(filteredActiveEmployees.length / pageSize) || 1;
+  const totalPages = Math.ceil(filteredActiveEmployees.lengthpageSize) || 1;
 
   const activeEmployees = filteredActiveEmployees;
 
@@ -152,7 +152,7 @@ export default function AttendanceTracker({
       colStatus: "Attendance Status",
       colTiming: "Working Hours",
       colOvertime: "Overtime (Hrs)",
-      colRemarks: "Remarks / Notes",
+      colRemarks: "RemarksNotes",
       present: "Present",
       absent: "Absent",
       halfDay: "Half Day",
@@ -165,7 +165,7 @@ export default function AttendanceTracker({
       noEmployees: "Please register active employees first under the Employee tab.",
       autoOvertimeTitle: "Auto-calculate Overtime",
       
-      // Approvals specific
+      //Approvals specific
       subTabDaily: "Daily Attendance Register",
       subTabMissPunch: "Miss Punch Approvals",
       subTabHalfDay: "Half Day Register",
@@ -183,47 +183,47 @@ export default function AttendanceTracker({
       approvalUpdated: "Approvals saved and synced with Google Sheets successfully!"
     },
     hi: {
-      title: "उपस्थिति ट्रैकर",
-      selectDate: "कार्य तिथि चुनें",
-      bulkPresent: "सबको उपस्थित करें",
-      bulkAbsent: "सबको अनुपस्थित करें",
-      colEmp: "कर्मचारी विवरण",
-      colStatus: "उपस्थिति की स्थिति",
-      colTiming: "काम के घंटे",
-      colOvertime: "ओवरटाइम (घंटे)",
-      colRemarks: "टिप्पणी / नोट्स",
-      present: "उपस्थित",
-      absent: "अनुपस्थित",
-      halfDay: "हाफ डे",
-      leave: "छुट्टी पर",
-      checkIn: "आगमन",
-      checkOut: "प्रस्थान",
-      saveBtn: "उपस्थिति सुरक्षित करें",
-      saving: "शीट्स में अपलोड हो रहा है...",
-      savedSuccess: "उपस्थिति सफलतापूर्वक दर्ज की गई!",
-      noEmployees: "कृपया पहले कर्मचारी टैब के तहत सक्रिय कर्मचारियों को पंजीकृत करें।",
-      autoOvertimeTitle: "ऑटो ओवरटाइम गणना",
-
-      // Approvals specific
-      subTabDaily: "दैनिक उपस्थिति रजिस्टर",
-      subTabMissPunch: "मिस पंच मंजूरी",
-      subTabHalfDay: "हाफ डे रजिस्टर",
-      subTabCalendar: "मासिक कैलेंडर रिपोर्ट",
-      subTabHeatmap: "उपस्थिति हीटमैप",
-      approvalStatus: "मंजूरी की स्थिति",
-      action: "कार्रवाई",
-      approved: "मंजूर किया",
-      rejected: "अस्वीकृत",
-      pending: "लंबित",
-      saveApprovals: "अनुमोदन सहेजें",
-      noMissPunch: "कोई मिस पंच रिकॉर्ड नहीं मिला।",
-      noHalfDays: "कोई हाफ-डे रिकॉर्ड नहीं मिला।",
-      date: "तारीख",
-      approvalUpdated: "अनुमोदन सहेजे गए और Google Sheets के साथ सफलतापूर्वक सिंक किए गए!"
+      title: "Attendance Tracker",
+      selectDate: "Select Work Date",
+      bulkPresent: "Mark All Present",
+      bulkAbsent: "Mark All Absent",
+      colEmp: "Employee Info",
+      colStatus: "Attendance Status",
+      colTiming: "Working Hours",
+      colOvertime: "Overtime (Hrs)",
+      colRemarks: "RemarksNotes",
+      present: "Present",
+      absent: "Absent",
+      halfDay: "Half Day",
+      leave: "On Leave",
+      checkIn: "In",
+      checkOut: "Out",
+      saveBtn: "Save & Sync Attendance",
+      saving: "Uploading to Sheets...",
+      savedSuccess: "Attendance recorded successfully!",
+      noEmployees: "Please register active employees first under the Employee tab.",
+      autoOvertimeTitle: "Auto-calculate Overtime",
+      
+      //Approvals specific
+      subTabDaily: "Daily Attendance Register",
+      subTabMissPunch: "Miss Punch Approvals",
+      subTabHalfDay: "Half Day Register",
+      subTabCalendar: "Monthly Calendar Report",
+      subTabHeatmap: "Attendance Heatmap",
+      approvalStatus: "Approval Status",
+      action: "Action",
+      approved: "Approved",
+      rejected: "Rejected",
+      pending: "Pending",
+      saveApprovals: "Save & Sync Approvals",
+      noMissPunch: "No missed punch logs found.",
+      noHalfDays: "No half-day attendance logs found.",
+      date: "Date",
+      approvalUpdated: "Approvals saved and synced with Google Sheets successfully!"
     }
   }[language];
 
-  // Load existing records or set defaults when selectedDate or employees list changes
+  //Load existing records or set defaults when selectedDate or employees list changes
   useEffect(() => {
     const recordsForDate = attendanceRecords.filter(r => r.date === selectedDate);
     const newLocalRecords: { [empId: string]: Attendance } = {};
@@ -252,7 +252,7 @@ export default function AttendanceTracker({
 
   const handleStatusChange = (empId: string, status: Attendance['status']) => {
     if (!hasPermission('edit')) {
-      alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+      alert('You do not have permission to edit attendance.');
       return;
     }
     const emp = employees.find(e => e.id === empId);
@@ -299,7 +299,7 @@ export default function AttendanceTracker({
 
   const handleTimeChange = (empId: string, field: 'checkIn' | 'checkOut', value: string) => {
     if (!hasPermission('edit')) {
-      alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+      alert('You do not have permission to edit attendance.');
       return;
     }
     setLocalRecords(prev => {
@@ -316,7 +316,7 @@ export default function AttendanceTracker({
 
         if (!isNaN(inH) && !isNaN(outH)) {
           let totalHours = (outH + outM / 60) - (inH + inM / 60);
-          if (totalHours < 0) totalHours += 24; // overnight shift
+          if (totalHours < 0) totalHours += 24; //overnight shift
 
           if (totalHours > regularHours) {
             const calculatedOvertime = Math.round((totalHours - regularHours) * 10) / 10;
@@ -333,7 +333,7 @@ export default function AttendanceTracker({
 
   const handleNumericChange = (empId: string, value: number) => {
     if (!hasPermission('edit')) {
-      alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+      alert('You do not have permission to edit attendance.');
       return;
     }
     setLocalRecords(prev => ({
@@ -344,7 +344,7 @@ export default function AttendanceTracker({
 
   const handleRemarksChange = (empId: string, value: string) => {
     if (!hasPermission('edit')) {
-      alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+      alert('You do not have permission to edit attendance.');
       return;
     }
     setLocalRecords(prev => ({
@@ -377,7 +377,7 @@ export default function AttendanceTracker({
     try {
       const recordsToSave = Object.values(localRecords) as Attendance[];
       
-      // Compare and generate audit logs
+      //Compare and generate audit logs
       const newAuditLogs: AuditLog[] = [];
       const actorUsername = portalUser?.username || 'admin';
       const actorRole = portalUser?.role || 'admin';
@@ -390,7 +390,7 @@ export default function AttendanceTracker({
         const empName = getEmployeeName(rec.employeeId);
 
         if (!prevRec) {
-          // New record created
+          //New record created
           newAuditLogs.push({
             id: `audit-${Math.random().toString(36).substring(2, 9)}`,
             timestamp: new Date().toISOString(),
@@ -406,7 +406,7 @@ export default function AttendanceTracker({
             remarks: rec.remarks || 'Daily Attendance initial entry'
           });
         } else {
-          // Check what fields changed
+          //Check what fields changed
           const fieldsToCompare: ('status' | 'checkIn' | 'checkOut' | 'overtimeHours' | 'remarks')[] = [
             'status', 'checkIn', 'checkOut', 'overtimeHours', 'remarks'
           ];
@@ -450,7 +450,7 @@ export default function AttendanceTracker({
     }
   };
 
-  // Handling Miss Punch and Half Day Approvals
+  //Handling Miss Punch and Half Day Approvals
   const missPunchLogs = attendanceRecords
     .filter(r => r.status === 'Miss Punch' || (r.approvalStatus && r.approvalStatus !== 'Pending' && (r.remarks?.toLowerCase().includes('miss punch') || r.remarks?.toLowerCase().includes('mispunch'))))
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -462,12 +462,12 @@ export default function AttendanceTracker({
   const handleApprovalChange = (record: Attendance, field: 'approvalStatus' | 'checkIn' | 'checkOut' | 'remarks' | 'status', value: any) => {
     if (field === 'approvalStatus') {
       if (!hasPermission('approve')) {
-        alert(language === 'en' ? 'You do not have permission to approve attendance.' : 'आपके पास उपस्थिति स्वीकृत करने की अनुमति नहीं है।');
+        alert('You do not have permission to approve attendance.');
         return;
       }
     } else {
       if (!hasPermission('edit')) {
-        alert(language === 'en' ? 'You do not have permission to edit attendance.' : 'आपके पास उपस्थिति संशोधित करने की अनुमति नहीं है।');
+        alert('You do not have permission to edit attendance.');
         return;
       }
     }
@@ -477,7 +477,7 @@ export default function AttendanceTracker({
         ? { ...prev[existsIdx], [field]: value } 
         : { ...record, [field]: value };
 
-      // If approved, automatically add default times if empty and convert status to Present for Miss Punch
+      //If approved, automatically add default times if empty and convert status to Present for Miss Punch
       if (field === 'approvalStatus' && value === 'Approved') {
         if (updatedRecord.status === 'Miss Punch' || record.status === 'Miss Punch') {
           const emp = employees.find(e => e.id === record.employeeId);
@@ -519,7 +519,7 @@ export default function AttendanceTracker({
     setIsSavingApprovals(true);
     try {
       if (onUpdateAttendanceRecords) {
-        // Compare and generate audit logs for approvals
+        //Compare and generate audit logs for approvals
         const approvalAuditLogs: AuditLog[] = [];
         const actorUsername = portalUser?.username || 'admin';
         const actorRole = portalUser?.role || 'admin';
@@ -701,8 +701,7 @@ export default function AttendanceTracker({
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
                   className="border border-gray-200 dark:border-[#1e3a2f] rounded-xl px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#03623c] bg-white dark:bg-[#0b1812] cursor-pointer text-gray-800 dark:text-slate-100"
-                  id="attendance-date"
-                />
+                  id="attendance-date" />
               </div>
             </div>
 
@@ -714,7 +713,7 @@ export default function AttendanceTracker({
                   id="bulk-import-punch"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
-                  {language === 'en' ? 'Upload Punch Machine Data' : 'पंच मशीन डाटा अपलोड करें'}
+                  {'Upload Punch Machine Data'}
                 </button>
                 <button
                   onClick={() => markBulkStatus('Present')}
@@ -779,7 +778,7 @@ export default function AttendanceTracker({
                 onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
                 className="bg-gray-50 dark:bg-[#0b1812] border border-gray-200 dark:border-[#1e3a2f] text-xs font-semibold text-gray-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#03623c] transition-all cursor-pointer max-w-[150px]"
               >
-                <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+                <option value="All" className="dark:bg-[#11221b]">{'All Employees'}</option>
                 {employeeOptions.map(emp => (
                   <option key={emp.id} value={emp.id} className="dark:bg-[#11221b]">{emp.name}</option>
                 ))}
@@ -799,7 +798,7 @@ export default function AttendanceTracker({
                       <th className="py-4 px-6 text-center min-w-[180px]">{t.colTiming}</th>
                       <th className="py-4 px-6 text-center min-w-[100px]">{t.colOvertime}</th>
                       <th className="py-4 px-6">{t.colRemarks}</th>
-                      <th className="py-4 px-6 text-center min-w-[90px]">{language === 'en' ? 'History' : 'इतिहास'}</th>
+                      <th className="py-4 px-6 text-center min-w-[90px]">{'History'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-[#1e3a2f] text-sm">
@@ -832,7 +831,7 @@ export default function AttendanceTracker({
                               <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 p-1 sm:p-1.5 rounded-xl">
                                 <div className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-extrabold text-amber-800 dark:text-amber-300 uppercase tracking-wider animate-pulse whitespace-nowrap">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                  <span>{language === 'en' ? 'Miss Punch' : 'मिस पंच'}</span>
+                                  <span>{'Miss Punch'}</span>
                                 </div>
                                 <div className="flex gap-1">
                                   <button
@@ -841,14 +840,14 @@ export default function AttendanceTracker({
                                     className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-[#03623c] hover:bg-[#024d2e] text-white font-extrabold text-[9px] sm:text-[10px] rounded-lg transition-colors flex items-center gap-1 cursor-pointer shadow-3xs whitespace-nowrap"
                                   >
                                     <Check className="w-3 h-3" />
-                                    <span>{language === 'en' ? 'Approve' : 'मंजूर करें'}</span>
+                                    <span>{'Approve'}</span>
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleStatusChange(emp.id, 'Absent')}
                                     className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-white dark:bg-[#0b1812] hover:bg-red-50 dark:hover:bg-rose-950/50 border border-gray-200 dark:border-[#1e3a2f] text-gray-500 dark:text-slate-300 hover:text-red-600 font-bold text-[9px] sm:text-[10px] rounded-lg transition-colors cursor-pointer whitespace-nowrap"
                                   >
-                                    {language === 'en' ? 'Absent' : 'अनुपस्थित'}
+                                    {'Absent'}
                                   </button>
                                 </div>
                               </div>
@@ -903,7 +902,7 @@ export default function AttendanceTracker({
                                   onClick={() => handleStatusChange(emp.id, 'Miss Punch')}
                                   className="px-1.5 sm:px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 hover:bg-amber-100"
                                 >
-                                  {language === 'en' ? 'Miss Punch' : 'मिस पंच'}
+                                  {'Miss Punch'}
                                 </button>
                               </div>
                             )}
@@ -923,13 +922,12 @@ export default function AttendanceTracker({
                                         isLate 
                                           ? 'border-rose-300 dark:border-rose-800 focus:ring-rose-500 bg-rose-50/20' 
                                           : 'border-gray-200 dark:border-[#1e3a2f] focus:ring-[#03623c]'
-                                      }`}
-                                    />
+                                      }`} />
                                   </div>
                                   {isLate && (
                                     <span className="text-[9px] sm:text-[10px] text-rose-600 dark:text-rose-400 font-black flex items-center gap-1 pl-2 sm:pl-10" title="Late Arrival">
                                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                                      <span>{language === 'en' ? 'Late' : 'देरी'}</span>
+                                      <span>{'Late'}</span>
                                     </span>
                                   )}
                                 </div>
@@ -945,13 +943,12 @@ export default function AttendanceTracker({
                                         isEarly 
                                           ? 'border-amber-300 dark:border-amber-800 focus:ring-amber-500 bg-amber-50/20' 
                                           : 'border-gray-200 dark:border-[#1e3a2f] focus:ring-[#03623c]'
-                                      }`}
-                                    />
+                                      }`} />
                                   </div>
                                   {isEarly && (
                                     <span className="text-[9px] sm:text-[10px] text-amber-600 dark:text-amber-400 font-black flex items-center gap-1 pl-2 sm:pl-11" title="Early Departure">
                                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                      <span>{language === 'en' ? 'Early' : 'जल्दी'}</span>
+                                      <span>{'Early'}</span>
                                     </span>
                                   )}
                                 </div>
@@ -971,8 +968,7 @@ export default function AttendanceTracker({
                                   value={record.overtimeHours || ''}
                                   placeholder="0"
                                   onChange={(e) => handleNumericChange(emp.id, Number(e.target.value))}
-                                  className="w-16 border border-gray-200 dark:border-[#1e3a2f] rounded-lg px-2 py-1 text-xs text-center font-semibold text-gray-700 dark:text-slate-100 bg-white dark:bg-[#0b1812] focus:outline-none"
-                                />
+                                  className="w-16 border border-gray-200 dark:border-[#1e3a2f] rounded-lg px-2 py-1 text-xs text-center font-semibold text-gray-700 dark:text-slate-100 bg-white dark:bg-[#0b1812] focus:outline-none" />
                                 <span className="text-xxs text-gray-400 dark:text-slate-400 font-medium">h</span>
                               </div>
                             ) : (
@@ -986,8 +982,7 @@ export default function AttendanceTracker({
                               value={record.remarks}
                               onChange={(e) => handleRemarksChange(emp.id, e.target.value)}
                               placeholder="e.g. Medical emergency, Late entry"
-                              className="w-full border border-gray-200 dark:border-[#1e3a2f] rounded-lg px-3 py-1 text-xs text-gray-700 dark:text-slate-100 bg-white dark:bg-[#0b1812] focus:outline-none focus:ring-1 focus:ring-[#03623c]"
-                            />
+                              className="w-full border border-gray-200 dark:border-[#1e3a2f] rounded-lg px-3 py-1 text-xs text-gray-700 dark:text-slate-100 bg-white dark:bg-[#0b1812] focus:outline-none focus:ring-1 focus:ring-[#03623c]" />
                           </td>
                           <td className="py-4 px-6 text-center">
                             <div className="flex items-center justify-center gap-1.5">
@@ -1000,10 +995,10 @@ export default function AttendanceTracker({
                                   setHistoryModalOpen(true);
                                 }}
                                 className="p-1 px-2 bg-slate-50 dark:bg-[#0b1812] hover:bg-slate-100 dark:hover:bg-[#162e24] border border-slate-200 dark:border-[#1e3a2f] text-slate-700 dark:text-slate-200 hover:text-emerald-700 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold"
-                                title={language === 'en' ? 'View change history' : 'बदलाव इतिहास देखें'}
+                                title={'View change history'}
                               >
                                 <History className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                                <span>{language === 'en' ? 'History' : 'इतिहास'}</span>
+                                <span>{'History'}</span>
                               </button>
 
                               <button
@@ -1155,8 +1150,8 @@ export default function AttendanceTracker({
                       const remarksVal = getLogCurrentValue(log, 'remarks') || '';
                       const isRowEdited = pendingChanges.some(p => p.employeeId === log.employeeId && p.date === log.date);
 
-                      // Limit calculation: Count other APPROVED miss punches for the same employee in the same month
-                      const logMonth = log.date.substring(0, 7); // YYYY-MM
+                      //Limit calculation: Count other APPROVED miss punches for the same employee in the same month
+                      const logMonth = log.date.substring(0, 7); //YYYY-MM
                       const approvedCountForMonth = attendanceRecords.filter(r => 
                         r.employeeId === log.employeeId && 
                         r.status === 'Miss Punch' && 
@@ -1177,9 +1172,7 @@ export default function AttendanceTracker({
                               <span>{log.date}</span>
                               {isLimitExceeded && (
                                 <span className="block text-[9px] font-extrabold text-amber-600 mt-0.5">
-                                  {language === 'en' 
-                                    ? `[Approved: ${approvedCountForMonth}/3]` 
-                                    : `[स्वीकृत: ${approvedCountForMonth}/3]`}
+                                  {`[Approved: ${approvedCountForMonth} //3]`}
                                 </span>
                               )}
                             </div>
@@ -1198,8 +1191,7 @@ export default function AttendanceTracker({
                                   type="time"
                                   value={checkInVal}
                                   onChange={(e) => handleApprovalChange(log, 'checkIn', e.target.value)}
-                                  className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none"
-                                />
+                                  className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none" />
                               </div>
                               <div className="flex items-center gap-1">
                                 <span className="text-[9px] text-gray-400 font-black uppercase">Out</span>
@@ -1207,8 +1199,7 @@ export default function AttendanceTracker({
                                   type="time"
                                   value={checkOutVal}
                                   onChange={(e) => handleApprovalChange(log, 'checkOut', e.target.value)}
-                                  className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none"
-                                />
+                                  className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none" />
                               </div>
                             </div>
                           </td>
@@ -1218,9 +1209,7 @@ export default function AttendanceTracker({
                                 value={currentStatus}
                                 onChange={(e) => {
                                   if (e.target.value === 'Approved' && isApprovalBlockedForUser) {
-                                    alert(language === 'en' 
-                                      ? `Direct HR approval limit exceeded (${approvedCountForMonth}/3) for this employee in ${logMonth}. Only Directors can approve this request.` 
-                                      : `इस कर्मचारी के लिए ${logMonth} में प्रत्यक्ष HR मंजूरी सीमा (${approvedCountForMonth}/3) से अधिक हो गई है। केवल डायरेक्टर ही इसे स्वीकृत कर सकते हैं।`);
+                                    alert(`Direct HR approval limit exceeded (${approvedCountForMonth} //3) for this employee in ${logMonth}. Only Directors can approve this request.`);
                                     return;
                                   }
                                   handleApprovalChange(log, 'approvalStatus', e.target.value);
@@ -1235,18 +1224,18 @@ export default function AttendanceTracker({
                               >
                                 <option value="Pending">{t.pending}</option>
                                 <option value="Approved" disabled={isApprovalBlockedForUser}>
-                                  {t.approved} {isApprovalBlockedForUser ? (language === 'en' ? ' (Req. Director)' : ' (डायरेक्टर आवश्यक)') : ''}
+                                  {t.approved} {isApprovalBlockedForUser ? (' (Req. Director)') : ''}
                                 </option>
                                 <option value="Rejected">{t.rejected}</option>
                               </select>
                               {isApprovalBlockedForUser && (
                                 <span className="block text-[8px] font-black text-red-600 uppercase tracking-tighter">
-                                  {language === 'en' ? '⚠️ Director Approval Req.' : '⚠️ डायरेक्टर मंजूरी आवश्यक'}
+                                  {'⚠️ Director Approval Req.'}
                                 </span>
                               )}
                               {isLimitExceeded && !isHRorBranchManager && (
                                 <span className="block text-[8px] font-black text-emerald-600 uppercase tracking-tighter">
-                                  {language === 'en' ? '✨ Director Override Active' : '✨ डायरेक्टर ओवरराइड सक्रिय'}
+                                  {'✨ Director Override Active'}
                                 </span>
                               )}
                             </div>
@@ -1257,8 +1246,7 @@ export default function AttendanceTracker({
                               value={remarksVal}
                               onChange={(e) => handleApprovalChange(log, 'remarks', e.target.value)}
                               placeholder="Adjustment remarks..."
-                              className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none w-full max-w-[180px]"
-                            />
+                              className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none w-full max-w-[180px]" />
                           </td>
                           <td className="py-4 px-6 text-right">
                             <div className="flex justify-end gap-1.5">
@@ -1270,16 +1258,14 @@ export default function AttendanceTracker({
                                   setHistoryModalOpen(true);
                                 }}
                                 className="p-1 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg cursor-pointer transition-all"
-                                title={language === 'en' ? 'View change history' : 'बदलाव इतिहास देखें'}
+                                title={'View change history'}
                               >
                                 <History className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => {
                                   if (isApprovalBlockedForUser) {
-                                    alert(language === 'en' 
-                                      ? `Direct HR approval limit exceeded (${approvedCountForMonth}/3) for this employee in ${logMonth}. Only Directors can approve this request.` 
-                                      : `इस कर्मचारी के लिए ${logMonth} में प्रत्यक्ष HR मंजूरी सीमा (${approvedCountForMonth}/3) से अधिक हो गई है। केवल डायरेक्टर ही इसे स्वीकृत कर सकते हैं।`);
+                                    alert(`Direct HR approval limit exceeded (${approvedCountForMonth} //3) for this employee in ${logMonth}. Only Directors can approve this request.`);
                                     return;
                                   }
                                   handleApprovalChange(log, 'approvalStatus', 'Approved');
@@ -1402,8 +1388,7 @@ export default function AttendanceTracker({
                                   type="time"
                                   value={checkInVal}
                                   onChange={(e) => handleApprovalChange(log, 'checkIn', e.target.value)}
-                                  className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none"
-                                />
+                                  className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none" />
                               </div>
                               <div className="flex items-center gap-1">
                                 <span className="text-[9px] text-gray-400 font-black uppercase">Out</span>
@@ -1411,8 +1396,7 @@ export default function AttendanceTracker({
                                   type="time"
                                   value={checkOutVal}
                                   onChange={(e) => handleApprovalChange(log, 'checkOut', e.target.value)}
-                                  className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none"
-                                />
+                                  className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none" />
                               </div>
                             </div>
                           </td>
@@ -1439,8 +1423,7 @@ export default function AttendanceTracker({
                               value={remarksVal}
                               onChange={(e) => handleApprovalChange(log, 'remarks', e.target.value)}
                               placeholder="Remarks..."
-                              className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none w-full max-w-[180px]"
-                            />
+                              className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none w-full max-w-[180px]" />
                           </td>
                           <td className="py-4 px-6 text-right">
                             <div className="flex justify-end gap-1.5">
@@ -1452,7 +1435,7 @@ export default function AttendanceTracker({
                                   setHistoryModalOpen(true);
                                 }}
                                 className="p-1 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg cursor-pointer transition-all"
-                                title={language === 'en' ? 'View change history' : 'बदलाव इतिहास देखें'}
+                                title={'View change history'}
                               >
                                 <History className="w-3.5 h-3.5" />
                               </button>
@@ -1525,8 +1508,7 @@ export default function AttendanceTracker({
           employeeList={employees}
           attendanceRecords={attendanceRecords}
           adminSettings={adminSettings || { defaultCheckIn: '09:00', defaultCheckOut: '18:00' } as any}
-          language={language}
-        />
+          language={language} />
       )}
 
       {/* HEATMAP VIEW */}
@@ -1535,8 +1517,7 @@ export default function AttendanceTracker({
           employees={employees}
           attendanceRecords={attendanceRecords}
           adminSettings={adminSettings}
-          language={language}
-        />
+          language={language} />
       )}
 
       {/* Biometric Punch Import Modal */}
@@ -1546,8 +1527,7 @@ export default function AttendanceTracker({
         employees={employees}
         onImportComplete={handlePunchImportComplete}
         language={language}
-        adminSettings={adminSettings}
-      />
+        adminSettings={adminSettings} />
 
       {/* Particular Attendance Audit Logs Modal */}
       {historyModalOpen && (
@@ -1561,7 +1541,7 @@ export default function AttendanceTracker({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-gray-900 text-sm">
-                    {language === 'en' ? 'Attendance Audit Trail' : 'उपस्थिति ऑडिट इतिहास'}
+                    {'Attendance Audit Trail'}
                   </h3>
                   <p className="text-xs text-gray-400 font-bold font-mono mt-0.5 uppercase tracking-wide">
                     {historyModalEmpName} ({historyModalEmpId}) · {historyModalDate}
@@ -1588,14 +1568,10 @@ export default function AttendanceTracker({
                     <div className="text-center py-12 text-gray-400">
                       <AlertCircle className="w-12 h-12 mx-auto text-gray-200 mb-2" />
                       <p className="text-xs font-bold">
-                        {language === 'en'
-                          ? 'No manual modifications logged for this attendance record.'
-                          : 'इस उपस्थिति रिकॉर्ड के लिए कोई मैन्युअल बदलाव लॉग नहीं मिला।'}
+                        {'No manual modifications logged for this attendance record.'}
                       </p>
                       <p className="text-[10px] text-gray-400 mt-1">
-                        {language === 'en'
-                          ? 'Modifications made during this session will be recorded upon saving.'
-                          : 'इस सत्र के दौरान किए गए बदलावों को सहेजने पर दर्ज किया जाएगा।'}
+                        {'Modifications made during this session will be recorded upon saving.'}
                       </p>
                     </div>
                   );
@@ -1618,7 +1594,7 @@ export default function AttendanceTracker({
                             </span>
                           </div>
                           <div className="text-xs text-gray-500">
-                            {language === 'en' ? 'Field Changed: ' : 'बदला गया क्षेत्र: '}
+                            {'Field Changed: '}
                             <span className="font-bold text-gray-700 font-mono text-[10px] bg-emerald-50 text-emerald-800 px-1 py-0.5 rounded-md">
                               {log.fieldChanged}
                             </span>
@@ -1651,7 +1627,7 @@ export default function AttendanceTracker({
                           </span>
                           <span className="text-[10px] font-mono text-gray-400 font-bold">
                             {new Date(log.timestamp).toLocaleString(
-                              language === 'en' ? 'en-US' : 'hi-IN'
+                              'en-US'
                             )}
                           </span>
                         </div>
@@ -1668,7 +1644,7 @@ export default function AttendanceTracker({
                 onClick={() => setHistoryModalOpen(false)}
                 className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
-                {language === 'en' ? 'Close' : 'बंद करें'}
+                {'Close'}
               </button>
             </div>
           </div>
@@ -1683,8 +1659,7 @@ export default function AttendanceTracker({
           settings={adminSettings}
           recipient={waRecipient}
           defaultCategory={waCategory}
-          variables={waVars}
-        />
+          variables={waVars} />
       )}
 
     </div>

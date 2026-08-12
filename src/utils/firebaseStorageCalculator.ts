@@ -1,7 +1,6 @@
 /**
- * Helper utility to calculate exact byte, KB, and MB size of Firebase Cloud Storage / Firestore data.
+ * Helper utility to calculate exact byte, KB, and MB size of Firebase Cloud StorageFirestore data.
  */
-
 export interface StorageCategoryBreakdown {
   category: string;
   categoryHi: string;
@@ -63,7 +62,7 @@ export function calculateFirebaseStorageUsage(data: {
   passwordRequests?: any[];
   auditLogs?: any[];
 }): FirebaseStorageMetrics {
-  const FIRESTORE_DOC_OVERHEAD_BYTES = 32; // Standard Firestore metadata overhead per document
+  const FIRESTORE_DOC_OVERHEAD_BYTES = 32; //Standard Firestore metadata overhead per document
 
   const getCollectionMetrics = (
     key: string,
@@ -93,15 +92,15 @@ export function calculateFirebaseStorageUsage(data: {
   };
 
   const rawCategories = [
-    getCollectionMetrics('Employees Directory', 'कर्मचारी निर्देशिका', data.employees, 'Users'),
-    getCollectionMetrics('Attendance Archives', 'उपस्थिति अभिलेख', data.attendance, 'Calendar'),
-    getCollectionMetrics('Payroll Slips', 'पेरोल स्लिप्स', data.payroll, 'CreditCard'),
-    getCollectionMetrics('Transactional Email Logs', 'ईमेल लॉग इतिहास', data.emailLogs, 'Mail'),
-    getCollectionMetrics('Notices & Circulars', 'सूचना एवं परिपत्र', data.announcements, 'Megaphone'),
-    getCollectionMetrics('System Settings & Config', 'सिस्टम सेटिंग्स', data.adminSettings, 'Settings'),
-    getCollectionMetrics('Security & Failed Logins', 'सुरक्षा लॉग', data.failedLogins, 'ShieldAlert'),
-    getCollectionMetrics('HR Tickets & Requests', 'एचआर हेल्पडेस्क टिकट', data.hrTickets, 'LifeBuoy'),
-    getCollectionMetrics('Audit Activity Trail', 'ऑडिट गतिविधि ट्रेल', data.auditLogs, 'Activity'),
+    getCollectionMetrics('Employees Directory', 'Employees Directory', data.employees, 'Users'),
+    getCollectionMetrics('Attendance Archives', 'Attendance Archives', data.attendance, 'Calendar'),
+    getCollectionMetrics('Payroll Slips', 'Payroll Slips', data.payroll, 'CreditCard'),
+    getCollectionMetrics('Transactional Email Logs', 'Transactional Email Logs', data.emailLogs, 'Mail'),
+    getCollectionMetrics('Notices & Circulars', 'Notices & Circulars', data.announcements, 'Megaphone'),
+    getCollectionMetrics('System Settings & Config', 'System Settings & Config', data.adminSettings, 'Settings'),
+    getCollectionMetrics('Security & Failed Logins', 'Security & Failed Logins', data.failedLogins, 'ShieldAlert'),
+    getCollectionMetrics('HR Tickets & Requests', 'HR Tickets & Requests', data.hrTickets, 'LifeBuoy'),
+    getCollectionMetrics('Audit Activity Trail', 'Audit Activity Trail', data.auditLogs, 'Activity'),
   ];
 
   const totalBytes = rawCategories.reduce((acc, c) => acc + c.bytes, 0);
@@ -110,7 +109,7 @@ export function calculateFirebaseStorageUsage(data: {
   const totalKb = totalBytes / 1024;
   const totalMb = totalKb / 1024;
 
-  // Free Spark Tier Firestore Limit = 1 GB (1,024 MB = 1,073,741,824 bytes)
+  //Free Spark Tier Firestore Limit = 1 GB (1,024 MB = 1,073,741,824 bytes)
   const FREE_TIER_BYTES = 1024 * 1024 * 1024;
   const quotaPercentOf1GB = Math.min(100, Number(((totalBytes / FREE_TIER_BYTES) * 100).toFixed(4)));
 

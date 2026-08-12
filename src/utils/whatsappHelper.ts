@@ -2,7 +2,6 @@
  * WhatsApp & Email Automation Helper
  * Integrates with app.messageautosender.com API & WhatsApp Direct Web link
  */
-
 export interface WhatsAppConfig {
   username?: string;
   password?: string;
@@ -103,7 +102,7 @@ export function processTemplate(template: string, variables: Record<string, stri
 export function formatPhoneNumber(phone: string | undefined): string {
   if (!phone) return '';
   let digits = phone.replace(/\D/g, '');
-  // If 10 digits without country code, assume India +91
+  //If 10 digits without country code, assume India +91
   if (digits.length === 10) {
     digits = '91' + digits;
   }
@@ -121,9 +120,11 @@ export function buildMessageAutoSenderUrl(
   message: string
 ): string {
   const cleanMobile = formatPhoneNumber(receiverMobileNo);
-  const encodedUser = encodeURIComponent(username || '');
-  const encodedPass = encodeURIComponent(password || '');
-  const encodedMobile = encodeURIComponent(cleanMobile || receiverMobileNo || '');
+  const finalUser = username || 'rathis';
+  const finalPass = password || 'Rathis@ravs#2025!';
+  const encodedUser = encodeURIComponent(finalUser);
+  const encodedPass = encodeURIComponent(finalPass);
+  const encodedMobile = encodeURIComponent(cleanMobile || receiverMobileNo || '918518880943');
   const encodedName = encodeURIComponent(receiverName || 'Employee');
   const encodedMessage = encodeURIComponent(message || '');
 
@@ -131,7 +132,7 @@ export function buildMessageAutoSenderUrl(
 }
 
 /**
- * Construct the Excel / Google Sheet formula matching user request:
+ * Construct the ExcelGoogle Sheet formula matching user request:
  * =HYPERLINK("https://app.messageautosender.com/message/new?username="&User&"&password="&Password&"&receiverMobileNo="&B6&"&receiverName=test&message=MESSAGETEST","Manual Test Send")
  */
 export function buildMessageAutoSenderExcelFormula(
@@ -142,7 +143,7 @@ export function buildMessageAutoSenderExcelFormula(
   messageCellRefOrText: string,
   label: string = 'Send WhatsApp'
 ): string {
-  // If provided as raw string instead of cell ref (e.g. "admin"), wrap in quotes in formula if needed
+  //If provided as raw string instead of cell ref (e.g. "admin"), wrap in quotes in formula if needed
   const userExpr = userRefOrVal.startsWith('"') || userRefOrVal.match(/^[A-Z]+\d+$/) ? userRefOrVal : `"${userRefOrVal}"`;
   const passExpr = passRefOrVal.startsWith('"') || passRefOrVal.match(/^[A-Z]+\d+$/) ? passRefOrVal : `"${passRefOrVal}"`;
   const mobileExpr = mobileCellRef.match(/^[A-Z]+\d+$/) ? mobileCellRef : `"${mobileCellRef}"`;
@@ -153,7 +154,7 @@ export function buildMessageAutoSenderExcelFormula(
 }
 
 /**
- * Construct standard WhatsApp wa.me / api.whatsapp.com URL
+ * Construct standard WhatsApp wa.meapi.whatsapp.com URL
  */
 export function buildStandardWhatsAppUrl(receiverMobileNo: string, message: string): string {
   const cleanMobile = formatPhoneNumber(receiverMobileNo);
@@ -181,7 +182,7 @@ export async function sendWhatsAppNotification(params: {
   message: string;
   preferDirectApi?: boolean;
 }): Promise<{ success: boolean; method: 'api' | 'web' | 'formula_copied'; message: string; url: string }> {
-  const { username = '', password = '', receiverMobileNo, receiverName, message, preferDirectApi = true } = params;
+  const { username = 'rathis', password = 'Rathis@ravs#2025!', receiverMobileNo, receiverName, message, preferDirectApi = true } = params;
   const cleanMobile = formatPhoneNumber(receiverMobileNo);
 
   if (!cleanMobile) {
@@ -193,14 +194,14 @@ export async function sendWhatsAppNotification(params: {
     };
   }
 
-  // If username and password are provided for MessageAutoSender
+  //If username and password are provided for MessageAutoSender
   if (username && password && preferDirectApi) {
     const autoSenderUrl = buildMessageAutoSenderUrl(username, password, cleanMobile, receiverName, message);
     
-    // Attempt fetch call to trigger MessageAutoSender API endpoint
+    //Attempt fetch call to trigger MessageAutoSender API endpoint
     try {
       const resp = await fetch(autoSenderUrl, { mode: 'no-cors' });
-      // Opening in popup / new tab as well to ensure delivery if browser CORS blocks response
+      //Opening in popupnew tab as well to ensure delivery if browser CORS blocks response
       window.open(autoSenderUrl, '_blank', 'noopener,noreferrer');
       return {
         success: true,
@@ -209,7 +210,7 @@ export async function sendWhatsAppNotification(params: {
         url: autoSenderUrl
       };
     } catch (err) {
-      // Fallback to opening window
+      //Fallback to opening window
       window.open(autoSenderUrl, '_blank', 'noopener,noreferrer');
       return {
         success: true,
@@ -219,7 +220,7 @@ export async function sendWhatsAppNotification(params: {
       };
     }
   } else {
-    // Fallback to standard WhatsApp Web wa.me link
+    //Fallback to standard WhatsApp Web wa.me link
     const waUrl = buildStandardWhatsAppUrl(cleanMobile, message);
     window.open(waUrl, '_blank', 'noopener,noreferrer');
     return {

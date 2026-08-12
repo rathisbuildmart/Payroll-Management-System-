@@ -23,37 +23,37 @@ export default function AttendanceHeatmap({
   language
 }: AttendanceHeatmapProps) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1); // 1-12
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1); //1-12
   const [viewMode, setViewMode] = useState<ViewMode>('matrix');
   
-  // Filters
+  //Filters
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [selectedDept, setSelectedDept] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Selected Day Modal
+  //Selected Day Modal
   const [inspectDate, setInspectDate] = useState<string | null>(null);
 
-  // Helper arrays
+  //Helper arrays
   const YEARS = [2025, 2026, 2027, 2028];
   const MONTHS = [
-    { name: 'January', hindi: 'जनवरी', value: 1 },
-    { name: 'February', hindi: 'फरवरी', value: 2 },
-    { name: 'March', hindi: 'मार्च', value: 3 },
-    { name: 'April', hindi: 'अप्रैल', value: 4 },
-    { name: 'May', hindi: 'मई', value: 5 },
-    { name: 'June', hindi: 'जून', value: 6 },
-    { name: 'July', hindi: 'जुलाई', value: 7 },
-    { name: 'August', hindi: 'अगस्त', value: 8 },
-    { name: 'September', hindi: 'सितंबर', value: 9 },
-    { name: 'October', hindi: 'अक्टूबर', value: 10 },
-    { name: 'November', hindi: 'नवंबर', value: 11 },
-    { name: 'December', hindi: 'दिसंबर', value: 12 },
+    { name: 'January', hindi: "", value: 1 },
+    { name: 'February', hindi: "", value: 2 },
+    { name: 'March', hindi: "", value: 3 },
+    { name: 'April', hindi: "", value: 4 },
+    { name: 'May', hindi: "", value: 5 },
+    { name: 'June', hindi: "", value: 6 },
+    { name: 'July', hindi: "", value: 7 },
+    { name: 'August', hindi: "", value: 8 },
+    { name: 'September', hindi: "", value: 9 },
+    { name: 'October', hindi: "", value: 10 },
+    { name: 'November', hindi: "", value: 11 },
+    { name: 'December', hindi: "", value: 12 },
   ];
 
   const WEEKDAYS_SHORT = language === 'en' 
     ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    : ['रवि', 'सोम', 'मंगल', 'बुध', 'गुरु', 'शुक्र', 'शनि'];
+    : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const t = {
     en: {
@@ -90,41 +90,41 @@ export default function AttendanceHeatmap({
       currentMonth: "Current Month"
     },
     hi: {
-      title: "उपस्थिति घनत्व हीटमैप",
-      subtitle: "दृश्य घनत्व रुझान, दैनिक उपस्थिति प्रतिशत और माह भर के कर्मचारी उपस्थिति मैट्रिक्स।",
-      matrixView: "कर्मचारी x दिन मैट्रिक्स",
-      dailyDensityView: "दैनिक कार्यबल घनत्व",
-      deptDensityView: "विभाग घनत्व",
-      month: "महीना",
-      year: "वर्ष",
-      branch: "शाखा",
-      dept: "विभाग",
-      searchPlaceholder: "नाम या आईडी से कर्मचारी खोजें...",
-      avgPresence: "औसत उपस्थिति दर",
-      peakPresence: "उच्चतम उपस्थिति दिवस",
-      highAbsence: "उच्चतम अनुपस्थिति दिवस",
-      activeStaff: "सक्रिय कर्मचारी",
-      present: "उपस्थित",
-      absent: "अनुपस्थित",
-      halfDay: "हाफ डे",
-      leave: "छुट्टी पर",
-      missPunch: "मिस पंच",
-      lateIn: "देरी से आगमन",
-      legendTitle: "हीटमैप घनत्व संकेतक",
-      matrixLegend: "मैट्रिक्स स्थिति रंग",
-      dayDetailsTitle: "उपस्थिति दैनिक विवरण",
-      close: "बंद करें",
-      noRecords: "इस अवधि के लिए कोई उपस्थिति रिकॉर्ड नहीं मिला।",
-      rate: "उपस्थिति दर",
-      totalLogs: "कुल पंजीकृत लॉग",
-      exportCsv: "हीटमैप डेटा निर्यात करें",
-      prevMonth: "पिछला महीना",
-      nextMonth: "अगला महीना",
-      currentMonth: "वर्तमान महीना"
+      title: "Attendance Density Heatmap",
+      subtitle: "Visual density trends, daily presence percentages, and month-long individual attendance matrices.",
+      matrixView: "Employee x Days Matrix",
+      dailyDensityView: "Daily Workforce Density",
+      deptDensityView: "Department Density",
+      month: "Month",
+      year: "Year",
+      branch: "Branch",
+      dept: "Department",
+      searchPlaceholder: "Search employee by name or ID...",
+      avgPresence: "Avg Presence Rate",
+      peakPresence: "Peak Attendance Day",
+      highAbsence: "Highest Absence Day",
+      activeStaff: "Active Staff",
+      present: "Present",
+      absent: "Absent",
+      halfDay: "Half Day",
+      leave: "On Leave",
+      missPunch: "Miss Punch",
+      lateIn: "Late In",
+      legendTitle: "Heatmap Density Legend",
+      matrixLegend: "Matrix Status Colors",
+      dayDetailsTitle: "Attendance Day Ledger",
+      close: "Close",
+      noRecords: "No attendance logs found for this period.",
+      rate: "Presence Rate",
+      totalLogs: "Total Registered Logs",
+      exportCsv: "Export Heatmap Data",
+      prevMonth: "Previous Month",
+      nextMonth: "Next Month",
+      currentMonth: "Current Month"
     }
   }[language];
 
-  // Options
+  //Options
   const branchOptions = useMemo(() => {
     const set = new Set<string>();
     employees.forEach(e => { if (e.branch) set.add(e.branch); });
@@ -137,7 +137,7 @@ export default function AttendanceHeatmap({
     return ['All', ...Array.from(set)];
   }, [employees]);
 
-  // Filtered Employees
+  //Filtered Employees
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       if (!emp.isActive) return false;
@@ -150,12 +150,12 @@ export default function AttendanceHeatmap({
     });
   }, [employees, selectedBranch, selectedDept, searchQuery]);
 
-  // Date Math
+  //Date Math
   const formattedPeriod = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
   const startDayOfWeek = new Date(selectedYear, selectedMonth - 1, 1).getDay();
 
-  // All days of month array: [1, 2, ..., daysInMonth]
+  //All days of month array: [1, 2, ..., daysInMonth]
   const monthDays = useMemo(() => {
     const days: { day: number; dateStr: string; dayOfWeek: number }[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
@@ -166,7 +166,7 @@ export default function AttendanceHeatmap({
     return days;
   }, [selectedYear, selectedMonth, daysInMonth, formattedPeriod]);
 
-  // Map attendance records for selected period: map[empId][dateStr] = Attendance
+  //Map attendance records for selected period: map[empId][dateStr] = Attendance
   const periodAttendanceMap = useMemo(() => {
     const map: { [empId: string]: { [dateStr: string]: Attendance } } = {};
     attendanceRecords.forEach(r => {
@@ -178,7 +178,7 @@ export default function AttendanceHeatmap({
     return map;
   }, [attendanceRecords, formattedPeriod]);
 
-  // Daily Aggregate Metrics across filtered employees
+  //Daily Aggregate Metrics across filtered employees
   const dailyMetrics = useMemo(() => {
     const metrics: { 
       [dateStr: string]: { 
@@ -189,7 +189,7 @@ export default function AttendanceHeatmap({
         absentCount: number;
         missPunchCount: number;
         lateCount: number;
-        presenceRate: number; // percentage 0-100
+        presenceRate: number; //percentage 0-100
       } 
     } = {};
 
@@ -231,7 +231,7 @@ export default function AttendanceHeatmap({
       });
 
       const totalActive = filteredEmpIds.size;
-      // Presence Rate = (Present + 0.5 * HalfDay) / TotalActive * 100
+      //Presence Rate = (Present + 0.5 * HalfDay)TotalActive * 100
       const effectivePresent = presentCount + (halfDayCount * 0.5);
       const presenceRate = totalActive > 0 ? Math.round((effectivePresent / totalActive) * 100) : 0;
 
@@ -250,7 +250,7 @@ export default function AttendanceHeatmap({
     return metrics;
   }, [filteredEmployees, monthDays, periodAttendanceMap, adminSettings]);
 
-  // Overall Month Statistics
+  //Overall Month Statistics
   const monthStats = useMemo(() => {
     let sumRate = 0;
     let daysWithData = 0;
@@ -264,7 +264,7 @@ export default function AttendanceHeatmap({
     let totalManDaysMissPunch = 0;
 
     monthDays.forEach(({ dateStr, dayOfWeek }) => {
-      // Exclude Sunday (0) from average rate calculation if no records
+      //Exclude Sunday (0) from average rate calculation if no records
       const m = dailyMetrics[dateStr];
       if (m) {
         totalManDaysPresent += m.presentCount;
@@ -273,7 +273,7 @@ export default function AttendanceHeatmap({
         totalManDaysAbsent += m.absentCount;
         totalManDaysMissPunch += m.missPunchCount;
 
-        if (dayOfWeek !== 0) { // Non-Sunday
+        if (dayOfWeek !== 0) { //Non-Sunday
           sumRate += m.presenceRate;
           daysWithData++;
 
@@ -302,7 +302,7 @@ export default function AttendanceHeatmap({
     };
   }, [monthDays, dailyMetrics]);
 
-  // Department Density Aggregate: map[dept][dateStr] = presenceRate
+  //Department Density Aggregate: map[dept][dateStr] = presenceRate
   const deptMetrics = useMemo(() => {
     const depts = Array.from(new Set(employees.map(e => e.department).filter(Boolean)));
     const map: { [dept: string]: { [dateStr: string]: { present: number; total: number; rate: number } } } = {};
@@ -330,7 +330,7 @@ export default function AttendanceHeatmap({
     return map;
   }, [employees, monthDays, periodAttendanceMap]);
 
-  // Month navigation handlers
+  //Month navigation handlers
   const handlePrevMonth = () => {
     if (selectedMonth === 1) {
       setSelectedMonth(12);
@@ -355,7 +355,7 @@ export default function AttendanceHeatmap({
     setSelectedMonth(now.getMonth() + 1);
   };
 
-  // Export CSV Handler
+  //Export CSV Handler
   const handleExportCSV = () => {
     const headers = ['Employee ID', 'Employee Name', 'Department', 'Branch', ...monthDays.map(d => d.dateStr)];
     const rows: string[][] = [headers];
@@ -363,9 +363,9 @@ export default function AttendanceHeatmap({
     filteredEmployees.forEach(emp => {
       const row = [
         `"${emp.id}"`,
-        `"${emp.name.replace(/"/g, '""')}"`,
-        `"${(emp.department || '').replace(/"/g, '""')}"`,
-        `"${(emp.branch || '').replace(/"/g, '""')}"`
+        `"${emp.name.replace(/" /g, '""')}"`,
+        `"${(emp.department || '').replace(/" /g, '""')}"`,
+        `"${(emp.branch || '').replace(/" /g, '""')}"`
       ];
 
       monthDays.forEach(({ dateStr }) => {
@@ -388,7 +388,7 @@ export default function AttendanceHeatmap({
     document.body.removeChild(link);
   };
 
-  // Helper for density cell bg color (0-100%)
+  //Helper for density cell bg color (0-100%)
   const getDensityBgColor = (rate: number, isWeekend: boolean) => {
     if (isWeekend && rate === 0) return 'bg-slate-100/70 border-slate-200/50 text-slate-400';
     if (rate >= 85) return 'bg-emerald-600 text-white font-extrabold border-emerald-700 shadow-3xs';
@@ -399,7 +399,7 @@ export default function AttendanceHeatmap({
     return 'bg-slate-50 text-slate-300 border-slate-200/60';
   };
 
-  // Helper for Matrix Status Cell styling
+  //Helper for Matrix Status Cell styling
   const getStatusCellClass = (status?: string, isSunday?: boolean, approvalStatus?: string) => {
     let effectiveStatus = status;
     if (status === 'Miss Punch' && approvalStatus === 'Approved') {
@@ -551,7 +551,7 @@ export default function AttendanceHeatmap({
             </button>
           </div>
 
-          {/* Export CSV / Backup Button */}
+          {/* Export CSVBackup Button */}
           <button
             onClick={handleExportCSV}
             className="px-3.5 py-2 bg-[#03623c] hover:bg-[#024a2d] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
@@ -593,7 +593,7 @@ export default function AttendanceHeatmap({
           </div>
           <div className="mt-2">
             <span className="text-xl font-black text-amber-700 dark:text-amber-300 font-mono block">
-              {monthStats.peakDay.dateStr ? monthStats.peakDay.dateStr.split('-').reverse().join('/') : '—'}
+              {monthStats.peakDay.dateStr ? monthStats.peakDay.dateStr.split('-').reverse().join(' //') : '—'}
             </span>
             <span className="text-[10px] font-extrabold text-amber-800 dark:text-amber-300/80 mt-0.5 block">
               {monthStats.peakDay.rate >= 0 ? `${monthStats.peakDay.rate}% Presence (${monthStats.peakDay.count} present)` : 'No records'}
@@ -609,7 +609,7 @@ export default function AttendanceHeatmap({
           </div>
           <div className="mt-2">
             <span className="text-xl font-black text-rose-600 dark:text-rose-400 font-mono block">
-              {monthStats.highAbsenceDay.dateStr ? monthStats.highAbsenceDay.dateStr.split('-').reverse().join('/') : '—'}
+              {monthStats.highAbsenceDay.dateStr ? monthStats.highAbsenceDay.dateStr.split('-').reverse().join(' //') : '—'}
             </span>
             <span className="text-[10px] font-extrabold text-rose-700 dark:text-rose-300/80 mt-0.5 block">
               {monthStats.highAbsenceDay.count >= 0 ? `${monthStats.highAbsenceDay.count} Absences Logged` : '0 Absences'}
@@ -646,7 +646,7 @@ export default function AttendanceHeatmap({
             onChange={(e) => setSelectedDept(e.target.value)}
             className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] text-xs font-bold text-slate-700 dark:text-slate-200 px-2.5 py-1.5 rounded-xl focus:outline-none focus:border-[#03623c] cursor-pointer"
           >
-            <option value="All">{language === 'en' ? 'All Depts' : 'सभी विभाग'}</option>
+            <option value="All">{'All Depts'}</option>
             {deptOptions.filter(d => d !== 'All').map(d => (
               <option key={d} value={d}>{d}</option>
             ))}
@@ -658,7 +658,7 @@ export default function AttendanceHeatmap({
             onChange={(e) => setSelectedBranch(e.target.value)}
             className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] text-xs font-bold text-slate-700 dark:text-slate-200 px-2.5 py-1.5 rounded-xl focus:outline-none focus:border-[#03623c] cursor-pointer"
           >
-            <option value="All">{language === 'en' ? 'All Branches' : 'सभी शाखाएं'}</option>
+            <option value="All">{'All Branches'}</option>
             {branchOptions.filter(b => b !== 'All').map(b => (
               <option key={b} value={b}>{b}</option>
             ))}
@@ -673,8 +673,7 @@ export default function AttendanceHeatmap({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t.searchPlaceholder}
-            className="w-full bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] text-xs font-semibold text-slate-800 dark:text-slate-100 pl-8 pr-3 py-1.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#03623c]"
-          />
+            className="w-full bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] text-xs font-semibold text-slate-800 dark:text-slate-100 pl-8 pr-3 py-1.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#03623c]" />
         </div>
       </div>
 
@@ -806,7 +805,7 @@ export default function AttendanceHeatmap({
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-5 h-5 rounded bg-slate-100 dark:bg-[#183328] text-slate-400 dark:text-slate-300 font-extrabold text-[8px] flex items-center justify-center">OFF</span>
-              <span>Sunday / Off</span>
+              <span>SundayOff</span>
             </div>
           </div>
         </div>
@@ -869,7 +868,7 @@ export default function AttendanceHeatmap({
 
                     <div className="my-1 text-center font-mono text-[9.5px]">
                       <div className="font-bold">
-                        {metric?.presentCount || 0} / {metric?.totalEmployees || 0}
+                        {metric?.presentCount || 0}{metric?.totalEmployees || 0}
                       </div>
                       <div className="text-[8px] opacity-80">
                         Present
@@ -957,7 +956,7 @@ export default function AttendanceHeatmap({
                         return (
                           <td key={dateStr} className="p-0.5 text-center border-r border-slate-100 dark:border-[#1e3a2f]/40">
                             <div 
-                              title={`${dept} (${dateStr}): ${m?.rate || 0}% presence (${m?.present || 0}/${m?.total || 0})`}
+                              title={`${dept} (${dateStr}): ${m?.rate || 0}% presence (${m?.present || 0} //${m?.total || 0})`}
                               className={`w-full h-8 rounded flex items-center justify-center text-[9px] font-mono cursor-pointer ${cellBg}`}
                             >
                               {m?.rate || 0}%
@@ -1037,7 +1036,7 @@ export default function AttendanceHeatmap({
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase font-mono">
                       <th className="py-2.5 px-4">Employee</th>
                       <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3">In / Out Timings</th>
+                      <th className="py-2.5 px-3">InOut Timings</th>
                       <th className="py-2.5 px-3">Remarks</th>
                     </tr>
                   </thead>

@@ -18,18 +18,18 @@ interface PayrollCalculatorProps {
 }
 
 const MONTHS = [
-  { name: 'January', hindi: 'जनवरी', value: '01' },
-  { name: 'February', hindi: 'फरवरी', value: '02' },
-  { name: 'March', hindi: 'मार्च', value: '03' },
-  { name: 'April', hindi: 'अप्रैल', value: '04' },
-  { name: 'May', hindi: 'मई', value: '05' },
-  { name: 'June', hindi: 'जून', value: '06' },
-  { name: 'July', hindi: 'जुलाई', value: '07' },
-  { name: 'August', hindi: 'अगस्त', value: '08' },
-  { name: 'September', hindi: 'सितंबर', value: '09' },
-  { name: 'October', hindi: 'अक्टूबर', value: '10' },
-  { name: 'November', hindi: 'नवंबर', value: '11' },
-  { name: 'December', hindi: 'दिसंबर', value: '12' },
+  { name: 'January', hindi: "", value: '01' },
+  { name: 'February', hindi: "", value: '02' },
+  { name: 'March', hindi: "", value: '03' },
+  { name: 'April', hindi: "", value: '04' },
+  { name: 'May', hindi: "", value: '05' },
+  { name: 'June', hindi: "", value: '06' },
+  { name: 'July', hindi: "", value: '07' },
+  { name: 'August', hindi: "", value: '08' },
+  { name: 'September', hindi: "", value: '09' },
+  { name: 'October', hindi: "", value: '10' },
+  { name: 'November', hindi: "", value: '11' },
+  { name: 'December', hindi: "", value: '12' },
 ];
 
 import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
@@ -51,20 +51,20 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   const [confirmPayEmpId, setConfirmPayEmpId] = useState<string | null>(null);
   const [confirmPayAll, setConfirmPayAll] = useState<boolean>(false);
 
-  // States for manual payroll adjustments modal
+  //States for manual payroll adjustments modal
   const [editingRecord, setEditingRecord] = useState<PayrollRecord | null>(null);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [isMasterSheetOpen, setIsMasterSheetOpen] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'ledger' | 'refunds'>('ledger');
 
-  // WhatsApp & Email modal state
+  //WhatsApp & Email modal state
   const [waModalOpen, setWaModalOpen] = useState(false);
   const [waRecipient, setWaRecipient] = useState<{ name: string; mobileNo?: string; email?: string }>({ name: '' });
   const [waCategory, setWaCategory] = useState<'payslip' | 'salaryDisbursed' | 'customNotice'>('payslip');
   const [waVars, setWaVars] = useState<Record<string, string | number | undefined>>({});
 
-  // One-time deductions list and their monthly refund tracking
+  //One-time deductions list and their monthly refund tracking
   const [oneTimeDeductions, setOneTimeDeductions] = useState<OneTimeDeduction[]>(() => {
     try {
       const saved = localStorage.getItem('payroll_one_time_deductions');
@@ -72,7 +72,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     } catch (e) {
       console.error(e);
     }
-    // Pre-populate with beautiful standard demo data so the report lists items by default
+    //Pre-populate with beautiful standard demo data so the report lists items by default
     const defaultDeductions: OneTimeDeduction[] = [
       {
         id: 'REF001',
@@ -112,19 +112,19 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     return defaultDeductions;
   });
 
-  // Track the deductions in localStorage on updates
+  //Track the deductions in localStorage on updates
   useEffect(() => {
     localStorage.setItem('payroll_one_time_deductions', JSON.stringify(oneTimeDeductions));
   }, [oneTimeDeductions]);
 
-  // Form states for creating new one-time deduction & refund plans
+  //Form states for creating new one-time deduction & refund plans
   const [newDeductEmpId, setNewDeductEmpId] = useState('');
   const [newDeductType, setNewDeductType] = useState<'Uniform' | 'Tour' | 'Other'>('Uniform');
   const [newDeductTotal, setNewDeductTotal] = useState<number>(3000);
   const [newDeductInstallment, setNewDeductInstallment] = useState<number>(500);
   const [newDeductDesc, setNewDeductDesc] = useState('');
 
-  // Filters state
+  //Filters state
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('All');
@@ -151,11 +151,11 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   const employeeOptions = useMemo(() => {
     return employees.map(emp => ({
       id: emp.id,
-      name: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${language === 'en' ? 'Inactive' : 'निष्क्रिय'}`
+      name: emp.isActive !== false ? `${emp.name} (${emp.id})` : `${emp.name} (${emp.id}) - ${'Inactive'}`
     }));
   }, [employees, language]);
 
-  // Compute filtered payroll list
+  //Compute filtered payroll list
   const filteredPayroll = useMemo(() => {
     return localPayroll.filter(record => {
       const emp = employees.find(e => e.id === record.employeeId);
@@ -169,7 +169,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     });
   }, [localPayroll, employees, selectedBranch, selectedDept, selectedEmployeeId, selectedPaymentMode]);
 
-  // Calculate payment mode breakdown statistics
+  //Calculate payment mode breakdown statistics
   const paymentSummary = useMemo(() => {
     let bankTotal = 0, bankCount = 0;
     let cashTotal = 0, cashCount = 0;
@@ -206,28 +206,28 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     return filteredPayroll.slice(start, start + pageSize);
   }, [filteredPayroll, currentPage, pageSize]);
 
-  const totalPages = Math.ceil(filteredPayroll.length / pageSize) || 1;
+  const totalPages = Math.ceil(filteredPayroll.lengthpageSize) || 1;
 
   const activeEmployees = employees.filter(e => e.isActive);
   const selectedMonthYear = `${selectedYear}-${selectedMonth}`;
 
-  // Unified Payroll Calculation Engine (Supports HRA, DA, Conveyance, PF, ESIC, PT, TDS, Advances & Leaves)
+  //Unified Payroll Calculation Engine (Supports HRA, DA, Conveyance, PF, ESIC, PT, TDS, Advances & Leaves)
   const calculateSingleEmployeePayroll = (emp: Employee, overrideRecord?: Partial<PayrollRecord>): PayrollRecord => {
     const empAtt = attendanceRecords.filter(r => r.employeeId === emp.id && r.date.startsWith(selectedMonthYear));
     
     const daysPresent = empAtt.filter(r => r.status === 'Present' || (r.status === 'Miss Punch' && r.approvalStatus === 'Approved')).length;
     const daysHalfDay = empAtt.filter(r => r.status === 'Half Day').length;
-    const daysLeave = empAtt.filter(r => r.status === 'Leave').length; // Paid Leave
+    const daysLeave = empAtt.filter(r => r.status === 'Leave').length; //Paid Leave
     const daysMissPunch = empAtt.filter(r => r.status === 'Miss Punch' && r.approvalStatus !== 'Approved').length;
     
-    // Compute pro-rated earned basic (Miss punches or pending aren't fully counted unless approved, keeping simple)
-    // Check if Paid Leave is applicable for this employee based on Policy & service tenure at payroll month
+    //Compute pro-rated earned basic (Miss punches or pending aren't fully counted unless approved, keeping simple)
+    //Check if Paid Leave is applicable for this employee based on Policy & service tenure at payroll month
     const joinDate = emp.joiningDate ? new Date(emp.joiningDate) : null;
     let isEligibleForPaidLeave = adminSettings?.enablePaidLeaveCalculation !== false && emp.isPaidLeaveApplicable !== false;
     
     if (isEligibleForPaidLeave && joinDate) {
       const payYear = Number(selectedYear);
-      const payMonth = Number(selectedMonth) - 1; // 0-indexed
+      const payMonth = Number(selectedMonth) - 1; //0-indexed
       const diffMonths = (payYear - joinDate.getFullYear()) * 12 + (payMonth - joinDate.getMonth());
       const probationMonths = adminSettings?.paidLeaveStartAfterMonths || 0;
       if (diffMonths < probationMonths) {
@@ -241,11 +241,11 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     const currentEmpBasic = getCurrentBasicSalary(emp);
     const earnedBasic = Math.round(currentEmpBasic * (workedDaysVal === 0 ? 0 : earnedRatio));
 
-    // Overtime
+    //Overtime
     const overtimeHoursTotal = empAtt.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
     const overtimePay = Math.round(overtimeHoursTotal * (emp.hourlyRate || 150));
 
-    // Base default structures from employee profile or Indian standards (conditional on adminSettings and employee-specific toggles)
+    //Base default structures from employee profile or Indian standards (conditional on adminSettings and employee-specific toggles)
     const defaultHra = (adminSettings?.enableHra !== false && emp.isHraApplicable !== false)
       ? (emp.hra !== undefined && emp.hra > 0 ? emp.hra : Math.round(currentEmpBasic * 0.40))
       : 0;
@@ -257,7 +257,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       : 0;
     const defaultAdvanceDeduction = emp.advanceSalaryDeduction !== undefined && emp.advanceSalaryDeduction > 0 ? Math.min(emp.advanceSalaryBalance || 0, emp.advanceSalaryDeduction) : 0;
 
-    // Compute late coming and early going fine: 5 min grace, 3 free days, ₹100/day after
+    //Compute late coming and early going fine: 5 min grace, 3 free days, ₹100/day after
     let lateEarlyDaysCount = 0;
     const activeAtt = empAtt.filter(r => r.status === 'Present' || r.status === 'Half Day');
     activeAtt.forEach(r => {
@@ -269,12 +269,12 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     });
     const attendanceFine = Math.max(0, lateEarlyDaysCount - 3) * 100;
 
-    // Compute monthly wise part-part refund of one-time deductions (e.g. Uniform / Tour)
+    //Compute monthly wise part-part refund of one-time deductions (e.g. UniformTour)
     const activeRefunds = oneTimeDeductions.filter(d => d.employeeId === emp.id && d.status !== 'Fully Refunded');
     const computedRefundAmount = activeRefunds.reduce((sum, d) => sum + Math.min(d.monthlyRefundInstallment, d.totalAmount - d.refundedAmount), 0);
     const oneTimeRefundAmount = overrideRecord?.oneTimeRefundAmount !== undefined ? overrideRecord.oneTimeRefundAmount : computedRefundAmount;
 
-    // Use current overrides or default values
+    //Use current overrides or default values
     const hra = overrideRecord?.hra !== undefined ? overrideRecord.hra : defaultHra;
     const da = overrideRecord?.da !== undefined ? overrideRecord.da : defaultDa;
     const conveyanceAllowance = overrideRecord?.conveyanceAllowance !== undefined ? overrideRecord.conveyanceAllowance : defaultConveyance;
@@ -283,24 +283,24 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     const leaveAdjustment = overrideRecord?.leaveAdjustment !== undefined ? overrideRecord.leaveAdjustment : 0;
     const advanceDeduction = overrideRecord?.advanceDeduction !== undefined ? overrideRecord.advanceDeduction : defaultAdvanceDeduction;
 
-    // Prorate standard HRA/DA/Conveyance based on attendance ratio (standard practice) or keep fixed?
-    // Let's keep HRA/DA/Conveyance fixed/monthly full, but pro-rate Basic (very common to prevent penalizing allowances, or we can proration, let's keep them fully paid as configured)
+    //Prorate standard HRA/DA/Conveyance based on attendance ratio (standard practice) or keep fixed?
+    //Let's keep HRA/DA/Conveyance fixed/monthly full, but pro-rate Basic (very common to prevent penalizing allowances, or we can proration, let's keep them fully paid as configured)
     const standardAllowancesTotal = emp.allowances;
     const customAllowancesTotal = hra + da + conveyanceAllowance;
     const grossSalary = earnedBasic + standardAllowancesTotal + customAllowancesTotal + overtimePay + festivalBonus + performanceIncentive + leaveAdjustment + oneTimeRefundAmount;
 
-    // PF contribution: 12% of pro-rated basic salary (conditional on employee-specific toggle)
+    //PF contribution: 12% of pro-rated basic salary (conditional on employee-specific toggle)
     const providentFund = emp.isPfApplicable !== false ? Math.round(earnedBasic * 0.12) : 0;
 
-    // ESIC contribution: 0.75% of Gross Salary if gross is <= 21,000 INR (conditional on employee-specific toggle)
+    //ESIC contribution: 0.75% of Gross Salary if gross is <= 21,000 INR (conditional on employee-specific toggle)
     const esic = emp.isEsicApplicable !== false ? (grossSalary <= 21000 ? Math.round(grossSalary * 0.0075) : 0) : 0;
 
-    // Professional Tax (PT): ₹200 if Gross >= 10000 INR (conditional on adminSettings and employee-specific toggle)
+    //Professional Tax (PT): ₹200 if Gross >= 10000 INR (conditional on adminSettings and employee-specific toggle)
     const professionalTax = (emp.isPtApplicable !== false && adminSettings?.enableProfessionalTax !== false) 
       ? (grossSalary >= 10000 ? 200 : 0)
       : 0;
 
-    // Indian Income Tax TDS (Estimated Bracket based on annual projected Gross)
+    //Indian Income Tax TDS (Estimated Bracket based on annual projected Gross)
     const annualEstGross = grossSalary * 12;
     let computedTds = 0;
     if (annualEstGross > 700000) {
@@ -318,13 +318,13 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     const finalPf = overrideRecord?.providentFund !== undefined ? overrideRecord.providentFund : providentFund;
     const finalEsic = overrideRecord?.esic !== undefined ? overrideRecord.esic : esic;
 
-    // Statutory deductions total
+    //Statutory deductions total
     const statutoryDeductionsTotal = finalPf + finalEsic + finalPt + finalTds;
     
-    // Total standard and custom deductions including attendance fine
+    //Total standard and custom deductions including attendance fine
     const totalDeductions = emp.deductions + statutoryDeductionsTotal + attendanceFine;
 
-    // Net Payable = Gross - Deductions - Advance repaid
+    //Net Payable = Gross - Deductions - Advance repaid
     const netSalary = Math.max(0, grossSalary - totalDeductions - advanceDeduction);
 
     return {
@@ -334,11 +334,11 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       allowances: standardAllowancesTotal + customAllowancesTotal + festivalBonus + performanceIncentive + leaveAdjustment + oneTimeRefundAmount,
       deductions: totalDeductions,
       overtimePay,
-      totalSalary: grossSalary, // Gross Salary
+      totalSalary: grossSalary, //Gross Salary
       paymentDate: overrideRecord?.paymentDate || '',
       paymentStatus: overrideRecord?.paymentStatus || 'Pending',
 
-      // Detailed breakdown fields saved in metadata
+      //Detailed breakdown fields saved in metadata
       hra,
       da,
       conveyanceAllowance,
@@ -357,7 +357,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     };
   };
 
-  // 1. PDF Payslip Generation using jspdf
+  //1. PDF Payslip Generation using jspdf
   const downloadPayslipPDF = (record: PayrollRecord, emp: any) => {
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -365,32 +365,32 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       format: 'a4'
     });
 
-    const navyColor = [15, 23, 42]; // Slate-900 theme
-    const goldColor = [16, 185, 129]; // Emerald-500
-    const lightGray = [248, 250, 252]; // Slate-50 background
+    const navyColor = [15, 23, 42]; //Slate-900 theme
+    const goldColor = [16, 185, 129]; //Emerald-500
+    const lightGray = [248, 250, 252]; //Slate-50 background
     
-    // Header banner
+    //Header banner
     doc.setFillColor(navyColor[0], navyColor[1], navyColor[2]);
     doc.rect(0, 0, 210, 18, 'F');
     
-    // Header Text
+    //Header Text
     doc.setTextColor(255, 255, 255);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(14);
     doc.text('RATHI BUILD MART - PAYSLIP', 105, 11, { align: 'center' });
 
-    // Company address
+    //Company address
     doc.setTextColor(100, 116, 139);
     doc.setFontSize(8);
     doc.setFont('Helvetica', 'normal');
     doc.text('Headquarters: NH-6, Rathi Estate, Raipur, Chhattisgarh, India', 105, 24, { align: 'center' });
     doc.text(`Salary Slip for the Pay Period: ${record.monthYear}`, 105, 28, { align: 'center' });
 
-    // Separator line
+    //Separator line
     doc.setDrawColor(226, 232, 240);
     doc.line(10, 32, 200, 32);
 
-    // Section 1: Employee metadata
+    //Section 1: Employee metadata
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(navyColor[0], navyColor[1], navyColor[2]);
@@ -400,23 +400,23 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     doc.setFontSize(8);
     doc.setTextColor(51, 65, 85);
     
-    // Column 1
+    //Column 1
     doc.text(`Employee ID: ${record.employeeId}`, 10, 45);
     doc.text(`Employee Name: ${emp?.name || 'N/A'}`, 10, 50);
     doc.text(`Designation: ${emp?.designation || 'N/A'}`, 10, 55);
     doc.text(`Department: ${emp?.department || 'N/A'}`, 10, 60);
     doc.text(`Joining Date: ${emp?.joiningDate || 'N/A'}`, 10, 65);
 
-    // Column 2
+    //Column 2
     doc.text(`Bank Account No: ${emp?.bankAccountNo || 'N/A'}`, 110, 45);
     doc.text(`Bank Name: ${emp?.bankName || 'N/A'}`, 110, 50);
     doc.text(`IFSC Code: ${emp?.ifscCode || 'N/A'}`, 110, 55);
     doc.text(`PAN Number: ${emp?.panNo || 'N/A'}`, 110, 60);
-    doc.text(`UAN / PF Number: ${emp?.uan || emp?.pfAccountNo || 'N/A'}`, 110, 65);
+    doc.text(`UANPF Number: ${emp?.uan || emp?.pfAccountNo || 'N/A'}`, 110, 65);
 
     doc.line(10, 70, 200, 70);
 
-    // Attendance Overview
+    //Attendance Overview
     const empAtt = attendanceRecords.filter(r => r.employeeId === record.employeeId && r.date.startsWith(selectedMonthYear));
     const daysPresent = empAtt.filter(r => r.status === 'Present' || (r.status === 'Miss Punch' && r.approvalStatus === 'Approved')).length;
     const daysHalfDay = empAtt.filter(r => r.status === 'Half Day').length;
@@ -435,7 +435,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
     doc.line(10, 85, 200, 85);
 
-    // Header of breakdown table
+    //Header of breakdown table
     doc.setFillColor(navyColor[0], navyColor[1], navyColor[2]);
     doc.rect(10, 90, 90, 7, 'F');
     doc.rect(110, 90, 90, 7, 'F');
@@ -448,7 +448,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     doc.text('STATUTORY DEDUCTIONS', 115, 95);
     doc.text('AMOUNT (₹)', 180, 95);
 
-    // Custom allowances/deductions values
+    //Custom allowances/deductions values
     const hra = record.hra !== undefined ? record.hra : Math.round(record.basicSalary * 0.40);
     const da = record.da !== undefined ? record.da : 0;
     const conv = record.conveyanceAllowance !== undefined ? record.conveyanceAllowance : 0;
@@ -471,7 +471,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       { name: 'Conveyance Allowance', amount: conv },
       { name: 'Standard Allowances', amount: standardAllowances },
       { name: 'Overtime Earnings', amount: record.overtimePay },
-      { name: 'Festival / Diwali Bonus', amount: festBonus },
+      { name: 'FestivalDiwali Bonus', amount: festBonus },
       { name: 'Performance Incentives', amount: perfInc },
       { name: 'CL/EL Leave Adjustment', amount: leaveAdj },
     ];
@@ -494,7 +494,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       const earn = earnings[i];
       const deduct = deductions[i];
 
-      // Alternating row styling
+      //Alternating row styling
       if (i % 2 === 0) {
         doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
         if (earn) doc.rect(10, currentY - 3, 90, 5, 'F');
@@ -514,7 +514,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       currentY += 5;
     }
 
-    // Dividers
+    //Dividers
     doc.line(10, currentY, 200, currentY);
     currentY += 5;
     doc.setFont('Helvetica', 'bold');
@@ -530,13 +530,13 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     doc.text(`Rs. ${totalDeductions.toLocaleString('en-IN')}`, 180, currentY);
 
     currentY += 8;
-    // Draw Net Payout Highlights Block
+    //Draw Net Payout Highlights Block
     doc.setFillColor(241, 245, 249);
     doc.rect(10, currentY - 4, 190, 8, 'F');
     doc.setTextColor(2, 24, 16);
     doc.setFontSize(9.5);
     doc.text('NET SALARY DISBURSED:', 15, currentY);
-    doc.text(`Rs. ${netSalaryPay.toLocaleString('en-IN')}  /-  (Rupees Only)`, 110, currentY);
+    doc.text(`Rs. ${netSalaryPay.toLocaleString('en-IN')}(Rupees Only)`, 110, currentY);
 
     currentY += 15;
     doc.setTextColor(100, 116, 139);
@@ -554,7 +554,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     doc.save(`Payslip_${emp?.name?.replace(/\s+/g, '_') || 'Employee'}_${record.monthYear}.pdf`);
   };
 
-  // Helper: Convert Amount Number to Words in Indian English
+  //Helper: Convert Amount Number to Words in Indian English
   const numberToWordsINR = (num: number): string => {
     const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
     const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -572,7 +572,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     return str.trim() ? str.trim() + ' Rupees Only' : 'Zero Rupees';
   };
 
-  // 2. Bank Bulk Upload CSV Format Generator (HDFC, SBI, ICICI) - Exports ONLY Bank Transfer Employees
+  //2. Bank Bulk Upload CSV Format Generator (HDFC, SBI, ICICI) - Exports ONLY Bank Transfer Employees
   const handleBankExport = (bank: 'SBI' | 'HDFC' | 'ICICI') => {
     let headers: string[] = [];
     let rows: string[][] = [];
@@ -584,7 +584,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     });
 
     if (bankRecords.length === 0) {
-      alert(language === 'en' ? 'No Bank Transfer mode employees found in current payroll.' : 'वर्तमान पेरोल में कोई बैंक ट्रांसफ़र मोड वाला कर्मचारी नहीं मिला।');
+      alert('No Bank Transfer mode employees found in current payroll.');
       return;
     }
 
@@ -653,7 +653,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     document.body.removeChild(link);
   };
 
-  // 3. Cash Disbursal Advice Report Generator (.csv) - Exports ONLY Cash Payment Employees
+  //3. Cash Disbursal Advice Report Generator (.csv) - Exports ONLY Cash Payment Employees
   const handleCashExport = () => {
     const cashRecords = localPayroll.filter(rec => {
       const emp = employees.find(e => e.id === rec.employeeId);
@@ -661,7 +661,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     });
 
     if (cashRecords.length === 0) {
-      alert(language === 'en' ? 'No Cash payment mode employees found in current payroll.' : 'वर्तमान पेरोल में कोई नकद भुगतान वाला कर्मचारी नहीं मिला।');
+      alert('No Cash payment mode employees found in current payroll.');
       return;
     }
 
@@ -699,10 +699,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     document.body.removeChild(link);
   };
 
-  // 4. Combined Master Payroll Sheet Generator (.csv) - Exports ALL Modes (Bank + Cash + Cheque)
+  //4. Combined Master Payroll Sheet Generator (.csv) - Exports ALL Modes (Bank + Cash + Cheque)
   const handleCombinedExport = () => {
     if (localPayroll.length === 0) {
-      alert(language === 'en' ? 'No payroll records available to export.' : 'निर्यात करने के लिए कोई पेरोल रिकॉर्ड उपलब्ध नहीं है।');
+      alert('No payroll records available to export.');
       return;
     }
 
@@ -760,7 +760,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     document.body.removeChild(link);
   };
 
-  // 5. PDF Cash Disbursal Payment Voucher Generator
+  //5. PDF Cash Disbursal Payment Voucher Generator
   const handleCashVoucherPDF = (singleRec?: PayrollRecord) => {
     const recordsToPrint = singleRec 
       ? [singleRec] 
@@ -770,7 +770,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
         });
 
     if (recordsToPrint.length === 0) {
-      alert(language === 'en' ? 'No cash payment mode records found.' : 'कोई नकद भुगतान मोड वाला रिकॉर्ड नहीं मिला।');
+      alert('No cash payment mode records found.');
       return;
     }
 
@@ -785,7 +785,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       const emp = employees.find(e => e.id === rec.employeeId);
       const amount = rec.netSalary !== undefined ? rec.netSalary : rec.totalSalary;
 
-      // Header Banner
+      //Header Banner
       doc.setFillColor(3, 98, 60);
       doc.rect(10, 10, 190, 22, 'F');
 
@@ -799,7 +799,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
       let startY = 40;
 
-      // Voucher details box
+      //Voucher details box
       doc.setDrawColor(203, 213, 225);
       doc.setFillColor(248, 250, 252);
       doc.roundedRect(10, startY, 190, 36, 2, 2, 'FD');
@@ -821,7 +821,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
       startY += 44;
 
-      // Salary components box
+      //Salary components box
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(10, startY, 190, 40, 2, 2, 'FD');
 
@@ -835,12 +835,12 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       doc.text(`Allowances & Bonus: Rs. ${(rec.allowances || 0).toLocaleString('en-IN')}`, 15, startY + 23);
       doc.text(`Overtime Pay: Rs. ${(rec.overtimePay || 0).toLocaleString('en-IN')}`, 15, startY + 30);
 
-      doc.text(`Deductions / Advances: Rs. ${(rec.deductions || 0).toLocaleString('en-IN')}`, 110, startY + 16);
+      doc.text(`DeductionsAdvances: Rs. ${(rec.deductions || 0).toLocaleString('en-IN')}`, 110, startY + 16);
       doc.text(`Payment Status: ${rec.paymentStatus}`, 110, startY + 23);
 
       startY += 48;
 
-      // Net Amount Disbursed Highlight Box
+      //Net Amount Disbursed Highlight Box
       doc.setFillColor(236, 253, 245);
       doc.setDrawColor(16, 185, 129);
       doc.roundedRect(10, startY, 190, 18, 2, 2, 'FD');
@@ -848,14 +848,14 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       doc.setTextColor(6, 78, 59);
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(12);
-      doc.text(`TOTAL NET CASH DISBURSED: Rs. ${amount.toLocaleString('en-IN')} /-`, 15, startY + 8);
+      doc.text(`TOTAL NET CASH DISBURSED: Rs. ${amount.toLocaleString('en-IN')}`, 15, startY + 8);
       doc.setFontSize(9);
       doc.setFont('Helvetica', 'normal');
       doc.text(`Amount in Words: ${numberToWordsINR(amount)}`, 15, startY + 14);
 
       startY += 26;
 
-      // Denomination Memo Box
+      //Denomination Memo Box
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(226, 232, 240);
       doc.roundedRect(10, startY, 190, 28, 2, 2, 'FD');
@@ -866,11 +866,11 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8);
       doc.text('Rs. 500 x ______ = ______    |    Rs. 200 x ______ = ______    |    Rs. 100 x ______ = ______', 15, startY + 13);
-      doc.text('Rs. 50   x ______ = ______    |    Rs. 20   x ______ = ______    |    Coins / Change  = ______', 15, startY + 20);
+      doc.text('Rs. 50   x ______ = ______    |    Rs. 20   x ______ = ______    |    CoinsChange  = ______', 15, startY + 20);
 
       startY += 38;
 
-      // Signature section
+      //Signature section
       doc.setDrawColor(148, 163, 184);
       doc.line(15, startY + 20, 75, startY + 20);
       doc.line(130, startY + 20, 185, startY + 20);
@@ -878,7 +878,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       doc.setFontSize(8.5);
       doc.setFont('Helvetica', 'bold');
       doc.text('Employee Signature (Cash Received)', 18, startY + 25);
-      doc.text('Cashier / Authorized Signatory', 133, startY + 25);
+      doc.text('CashierAuthorized Signatory', 133, startY + 25);
 
       doc.setFontSize(7.5);
       doc.setFont('Helvetica', 'normal');
@@ -889,7 +889,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     doc.save(`Cash_Payment_Vouchers_${selectedMonthYear}.pdf`);
   };
 
-  // 3. Historical Annual Financial Summary Data Loader
+  //3. Historical Annual Financial Summary Data Loader
   const getAnnualAnalytics = () => {
     const monthsGrouped: { [key: string]: { gross: number; net: number; pf: number; esic: number; tds: number; pt: number; count: number } } = {};
     
@@ -930,7 +930,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       colOvertime: "Overtime Pay",
       colTotal: "Net Salary",
       colStatus: "Payment Status",
-      colAction: "Payslip / Actions",
+      colAction: "PayslipActions",
       paid: "Paid",
       pending: "Pending",
       markPaidBtn: "Mark Paid",
@@ -949,8 +949,8 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       empRole: "Designation",
       joiningDate: "Joining Date",
       paymentMethod: "Payment Method",
-      slipEarnings: "Earnings (क्र. संख्या)",
-      slipDeductions: "Deductions (क्र. संख्या)",
+      slipEarnings: "Earnings (S.No)",
+      slipDeductions: "Deductions (S.No)",
       basicPay: "Basic Salary",
       allowance: "Allowances",
       overtime: "Overtime Pay",
@@ -968,70 +968,70 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       closeSlip: "Close"
     },
     hi: {
-      title: "वेतन और पेरोल",
-      selectMonth: "पेरोल महीना चुनें",
-      year: "वर्ष",
-      month: "महीना",
-      workingDays: "कुल कार्य दिवस",
-      calculateBtn: "पुनर्गणना करें",
-      saveBtn: "पेरोल सुरक्षित करें",
-      saving: "पेरोल सिंक हो रहा है...",
-      markAllPaid: "सभी का भुगतान करें",
-      colEmp: "कर्मचारी",
-      colAttendance: "उपस्थिति विवरण",
-      colSalary: "कमाई और कटौती",
-      colOvertime: "ओवरटाइम भुगतान",
-      colTotal: "नेट वेतन",
-      colStatus: "भुगतान की स्थिति",
-      colAction: "पे-स्लिप / कार्रवाई",
-      paid: "भुगतान हुआ",
-      pending: "लंबित",
-      markPaidBtn: "भुगतान करें",
-      payslipBtn: "पे-स्लिप",
-      noRecords: "इस अवधि के लिए कोई उपस्थिति या पेरोल रिकॉर्ड नहीं मिला। पहले उपस्थिति दर्ज करें, फिर गणना करें।",
-      savedSuccess: "पेरोल रिकॉर्ड सफलतापूर्वक गूगल शीट्स में सुरक्षित किए गए!",
-      confirmPay: "क्या आप इस कर्मचारी का वेतन भुगतान चिह्नित करना चाहते हैं?",
-      confirmAllPay: "क्या आप वाकई इस महीने के सभी लंबित पेरोल भुगतानों को पूरा करना चाहते हैं?",
-      payslipHeader: "कर्मचारी वेतन पर्ची (पे-स्लिप)",
-      payslipTitle: "पेरोल मैनेजमेंट सिस्टम",
-      payslipMonth: "वेतन का महीना / वर्ष",
-      payslipEmpDetails: "कर्मचारी का विवरण",
-      empId: "आईडी",
-      empName: "नाम",
-      empDept: "विभाग",
-      empRole: "पद",
-      joiningDate: "शामिल होने की तिथि",
-      paymentMethod: "भुगतान का माध्यम",
-      slipEarnings: "कमाई विवरण",
-      slipDeductions: "कटौती विवरण",
-      basicPay: "मूल वेतन",
-      allowance: "भत्ते",
-      overtime: "ओवरटाइम भुगतान",
-      earnedBasic: "अर्जित मूल वेतन",
-      deducts: "कुल कटौती",
-      netPayable: "शुद्ध देय राशि (नेट सैलरी)",
-      authorizedSign: "प्राधिकृत हस्ताक्षरकर्ता",
-      receiptSign: "कर्मचारी के हस्ताक्षर",
-      attendanceBreakdown: "उपस्थिति का विवरण",
-      attPresent: "उपस्थित दिन",
-      attHalf: "हाफ डे",
-      attAbsent: "अनुपस्थित",
-      attLeave: "छुट्टियां",
-      printSlip: "प्रिंट करें",
-      closeSlip: "बंद करें"
+      title: "Salary slips & Payroll",
+      selectMonth: "Select Payroll Month",
+      year: "Year",
+      month: "Month",
+      workingDays: "Total Working Days",
+      calculateBtn: "Recalculate Sheet",
+      saveBtn: "Save & Sync Payroll",
+      saving: "Saving Payroll...",
+      markAllPaid: "Mark All Paid",
+      colEmp: "Employee",
+      colAttendance: "Attendance Info",
+      colSalary: "Earnings & Deducts",
+      colOvertime: "Overtime Pay",
+      colTotal: "Net Salary",
+      colStatus: "Payment Status",
+      colAction: "PayslipActions",
+      paid: "Paid",
+      pending: "Pending",
+      markPaidBtn: "Mark Paid",
+      payslipBtn: "Payslip",
+      noRecords: "No attendance or payroll records found for this period. Mark attendance first, then compute.",
+      savedSuccess: "Payroll records saved to Google Sheets!",
+      confirmPay: "Mark Rajesh's salary as paid?",
+      confirmAllPay: "Are you sure you want to mark ALL pending payroll records for this month as paid?",
+      payslipHeader: "EMPLOYEE SALARY SLIP",
+      payslipTitle: "Payroll Management System",
+      payslipMonth: "Salary Month/Year",
+      payslipEmpDetails: "Employee Details",
+      empId: "ID",
+      empName: "Name",
+      empDept: "Department",
+      empRole: "Designation",
+      joiningDate: "Joining Date",
+      paymentMethod: "Payment Method",
+      slipEarnings: "Earnings (S.No)",
+      slipDeductions: "Deductions (S.No)",
+      basicPay: "Basic Salary",
+      allowance: "Allowances",
+      overtime: "Overtime Pay",
+      earnedBasic: "Earned Basic",
+      deducts: "Total Deductions",
+      netPayable: "Net Payable Amount",
+      authorizedSign: "Authorized Signatory",
+      receiptSign: "Employee Signature",
+      attendanceBreakdown: "Attendance Breakdown",
+      attPresent: "Present",
+      attHalf: "Half Day",
+      attAbsent: "Absent",
+      attLeave: "Leave",
+      printSlip: "Print Payslip",
+      closeSlip: "Close"
     }
   }[language];
 
-  // Calculate or load payroll records
+  //Calculate or load payroll records
   useEffect(() => {
-    // Check if payroll records exist for this MonthYear in state
+    //Check if payroll records exist for this MonthYear in state
     const savedRecords = payrollRecords.filter(p => p.monthYear === selectedMonthYear);
 
     if (savedRecords.length > 0) {
-      // Use saved records
+      //Use saved records
       setLocalPayroll(savedRecords);
     } else {
-      // Automatically compute payroll based on employees + attendance
+      //Automatically compute payroll based on employees + attendance
       const computed: PayrollRecord[] = activeEmployees.map(emp => {
         return calculateSingleEmployeePayroll(emp);
       });
@@ -1043,7 +1043,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   const handleAddDeductionPlan = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPermission('add')) {
-      alert(language === 'en' ? 'You do not have permission to add deduction & refund plans.' : 'आपके पास कटौती और रिफंड योजना जोड़ने की अनुमति नहीं है।');
+      alert('You do not have permission to add deduction & refund plans.');
       return;
     }
     if (!newDeductEmpId) {
@@ -1066,7 +1066,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     setNewDeductDesc('');
     alert('Deduction & Refund Plan added successfully! It will now be processed automatically month-by-month inside active payroll sheets.');
     
-    // Automatically recalculate current sheet to immediately reflect refund additions!
+    //Automatically recalculate current sheet to immediately reflect refund additions!
     setTimeout(() => {
       handleRecalculate();
     }, 200);
@@ -1074,7 +1074,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
   const handleDeleteDeductionPlan = (id: string) => {
     if (!hasPermission('delete')) {
-      alert(language === 'en' ? 'You do not have permission to delete plans.' : 'आपके पास योजनाओं को हटाने की अनुमति नहीं है।');
+      alert('You do not have permission to delete plans.');
       return;
     }
     if (confirm('Are you sure you want to delete this deduction & refund plan?')) {
@@ -1092,7 +1092,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       format: 'a4'
     });
 
-    // Outer frame / header styling - elegant deep green theme
+    //Outer frameheader styling - elegant deep green theme
     doc.setFillColor(3, 98, 60); 
     doc.rect(0, 0, 210, 28, 'F');
 
@@ -1105,7 +1105,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     doc.text('Deduction tracking, month-wise refunds progress & outstanding balances', 15, 17);
     doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 15, 23);
 
-    // Summary statistics boxes
+    //Summary statistics boxes
     const totalDeductedVal = oneTimeDeductions.reduce((sum, d) => sum + d.totalAmount, 0);
     const totalRefundedVal = oneTimeDeductions.reduce((sum, d) => sum + d.refundedAmount, 0);
     const totalPendingVal = totalDeductedVal - totalRefundedVal;
@@ -1125,7 +1125,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     doc.text(`Rs. ${totalRefundedVal.toLocaleString('en-IN')}`, 80, 45);
     doc.text(`Rs. ${totalPendingVal.toLocaleString('en-IN')}`, 140, 45);
 
-    // Table setup
+    //Table setup
     doc.setFillColor(235, 235, 235);
     doc.rect(15, 56, 180, 8, 'F');
     doc.setFontSize(8.5);
@@ -1166,7 +1166,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       }
     });
 
-    // Add a professional footer
+    //Add a professional footer
     doc.setFontSize(7.5);
     doc.setTextColor(150, 150, 150);
     doc.text('Confidential - Generated by Payroll Management System', 15, 288);
@@ -1176,7 +1176,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
   const handleRecalculate = () => {
     if (!hasPermission('add')) {
-      alert(language === 'en' ? 'You do not have permission to calculate payroll.' : 'आपके पास पेरोल की गणना करने की अनुमति नहीं है।');
+      alert('You do not have permission to calculate payroll.');
       return;
     }
     const computed: PayrollRecord[] = activeEmployees.map(emp => {
@@ -1188,7 +1188,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
   const handleMarkPaid = async (empId: string) => {
     if (!hasPermission('delete')) {
-      alert(language === 'en' ? 'You do not have permission to record payment status.' : 'आपके पास भुगतान स्थिति दर्ज करने की अनुमति नहीं है।');
+      alert('You do not have permission to record payment status.');
       return;
     }
     if (confirmPayEmpId !== empId) {
@@ -1213,7 +1213,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
     setLocalPayroll(updated);
 
-    // Process one-time deduction refunds for this employee
+    //Process one-time deduction refunds for this employee
     const employeeRecord = localPayroll.find(p => p.employeeId === empId);
     if (employeeRecord && employeeRecord.oneTimeRefundAmount && employeeRecord.oneTimeRefundAmount > 0) {
       setOneTimeDeductions(prev => {
@@ -1236,10 +1236,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       });
     }
     
-    // Save to Google sheets directly
+    //Save to Google sheets directly
     setIsSaving(true);
     try {
-      // Deduct advance balance in employee profile if callback is registered and deduction is positive
+      //Deduct advance balance in employee profile if callback is registered and deduction is positive
       if (onUpdateEmployees && advanceDeductionAmt > 0) {
         const empToUpdate = employees.find(e => e.id === empId);
         if (empToUpdate) {
@@ -1252,7 +1252,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
         }
       }
 
-      // Merge with non-selected-month history so we don't wipe out other months
+      //Merge with non-selected-month history so we don't wipe out other months
       const otherMonthsHistory = payrollRecords.filter(p => p.monthYear !== selectedMonthYear);
       const combined = [...otherMonthsHistory, ...updated];
       await onSavePayroll(combined);
@@ -1265,7 +1265,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
   const handleMarkAllPaid = async () => {
     if (!hasPermission('delete')) {
-      alert(language === 'en' ? 'You do not have permission to record payment status.' : 'आपके पास भुगतान स्थिति दर्ज करने की अनुमति नहीं है।');
+      alert('You do not have permission to record payment status.');
       return;
     }
     if (!confirmPayAll) {
@@ -1283,7 +1283,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
     setLocalPayroll(updated);
 
-    // Process one-time deduction refunds for all paid employees in bulk
+    //Process one-time deduction refunds for all paid employees in bulk
     setOneTimeDeductions(prev => {
       let currentDeductions = [...prev];
       localPayroll.forEach(p => {
@@ -1311,7 +1311,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     
     setIsSaving(true);
     try {
-      // Bulk update employees who had advance deductions
+      //Bulk update employees who had advance deductions
       if (onUpdateEmployees) {
         const empsToUpdate: Employee[] = [];
         localPayroll.forEach(p => {
@@ -1345,7 +1345,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
 
   const handleSavePayroll = async () => {
     if (!hasPermission('add')) {
-      alert(language === 'en' ? 'You do not have permission to save payroll sheets.' : 'आपके पास पेरोल शीट सहेजने की अनुमति नहीं है।');
+      alert('You do not have permission to save payroll sheets.');
       return;
     }
     setIsSaving(true);
@@ -1372,7 +1372,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     const daysAbsent = empAtt.filter(r => r.status === 'Absent').length;
     const overtimeHoursTotal = empAtt.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
 
-    // Compute earned basic for slip
+    //Compute earned basic for slip
     const workedDaysVal = daysPresent + (0.5 * daysHalfDay) + daysLeave;
     const earnedRatio = Math.min(1, workedDaysVal / workingDays);
     const earnedBasic = Math.round(record.basicSalary * (workedDaysVal === 0 ? 0 : earnedRatio));
@@ -1409,20 +1409,20 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       slips: "slips paid"
     },
     hi: {
-      totalNetSalary: "कुल नेट पेरोल",
-      totalPaid: "भुगतान की गई राशि",
-      totalPending: "लंबित राशि (बाकी)",
-      disbursalCompletion: "भुगतान की स्थिति",
-      averageSalary: "औसत नेट भुगतान",
-      activeEmployees: "मूल्यांकित कर्मचारी",
-      paidText: "भुगतान हुआ",
-      pendingText: "लंबित",
-      of: "का",
-      slips: "पर्चियों का भुगतान"
+      totalNetSalary: "Total Net Payroll",
+      totalPaid: "Total Amount Paid",
+      totalPending: "Total Pending Balance",
+      disbursalCompletion: "Payment Disbursal Status",
+      averageSalary: "Average Net Salary",
+      activeEmployees: "Evaluated Staff",
+      paidText: "Paid",
+      pendingText: "Pending",
+      of: "of",
+      slips: "Payslips Disbursed"
     }
   }[language];
 
-  // Live recalculate on adjustment input changes
+  //Live recalculate on adjustment input changes
   const handleAdjustmentChange = (field: keyof PayrollRecord, value: number) => {
     if (!editingRecord) return;
     
@@ -1431,7 +1431,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
       [field]: value
     } as PayrollRecord;
     
-    // Live update allowances
+    //Live update allowances
     const allowances = Number(nextRecord.hra || 0) + 
                        Number(nextRecord.da || 0) + 
                        Number(nextRecord.conveyanceAllowance || 0) + 
@@ -1439,14 +1439,14 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                        Number(nextRecord.performanceIncentive || 0) + 
                        Number(nextRecord.leaveAdjustment || 0);
 
-    // Live update deductions
+    //Live update deductions
     const deductions = Number(nextRecord.providentFund || 0) + 
                        Number(nextRecord.esic || 0) + 
                        Number(nextRecord.professionalTax || 0) + 
                        Number(nextRecord.tds || 0) + 
                        Number(nextRecord.advanceDeduction || 0);
 
-    // Gross = Earned Basic + Overtime Pay + Allowances
+    //Gross = Earned Basic + Overtime Pay + Allowances
     const totalSalary = Number(nextRecord.basicSalary || 0) + 
                         Number(nextRecord.overtimePay || 0) + 
                         Number(allowances);
@@ -1468,7 +1468,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     setEditingRecord(null);
   };
 
-  // Stats calculations
+  //Stats calculations
   const totalNetSalary = localPayroll.reduce((sum, r) => sum + r.totalSalary, 0);
   const totalPaid = localPayroll.filter(r => r.paymentStatus === 'Paid').reduce((sum, r) => sum + r.totalSalary, 0);
   const totalPending = localPayroll.filter(r => r.paymentStatus === 'Pending').reduce((sum, r) => sum + r.totalSalary, 0);
@@ -1576,7 +1576,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           }`}
         >
           <Check className="w-4 h-4 text-[#03623c] dark:text-emerald-400" />
-          <span>Monthly Payroll Ledger (मासिक पेरोल सूची)</span>
+          <span>Monthly Payroll Ledger</span>
         </button>
         <button
           onClick={() => setActiveSubTab('refunds')}
@@ -1587,7 +1587,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           }`}
         >
           <RefreshCcw className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-          <span>One-Time Deductions & Refunds Report (कटौती एवं रिफंड)</span>
+          <span>One-Time Deductions & Refunds Report</span>
         </button>
       </div>
 
@@ -1600,7 +1600,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             <div>
               <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
-                <span>Annual Financial Summary & Statutory Ledger (वार्षिक वित्तीय सारांश)</span>
+                <span>Annual Financial Summary & Statutory Ledger</span>
               </h3>
               <p className="text-[11px] text-slate-400 mt-1 font-medium">Aggregated real-time statutory payments, taxes collected (TDS/PT) & PF accumulations</p>
             </div>
@@ -1747,8 +1747,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 value={workingDays}
                 onChange={(e) => setWorkingDays(Number(e.target.value))}
                 className="w-full border border-slate-200 dark:border-[#1e3a2f] rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white dark:bg-[#0b1812] shadow-2xs text-slate-800 dark:text-slate-100 transition-all"
-                id="payroll-working-days"
-              />
+                id="payroll-working-days" />
             </div>
           </div>
         </div>
@@ -1762,7 +1761,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             id="btn-master-attendance-salary-sheet"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
-            <span>{language === 'en' ? 'Master Attendance & Salary Sheet (Day-wise + Excel/PDF)' : 'मास्टर अटेंडेंस व सैलरी शीट (डे-वाइज़ + एक्सेल/PDF)'}</span>
+            <span>{'Master Attendance & Salary Sheet (Day-wise + Excel/PDF)'}</span>
           </button>
 
           <button
@@ -1775,14 +1774,14 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             id="toggle-analytics"
           >
             <TrendingUp className="w-4 h-4 text-amber-500" />
-            <span>{language === 'en' ? 'Annual Analytics' : 'वार्षिक विश्लेषण'}</span>
+            <span>{'Annual Analytics'}</span>
           </button>
 
           {/* Export Dropdown with Bank + Cash + Combined options */}
           <div className="relative group">
             <button className="px-4 py-2.5 border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-800 dark:text-indigo-300 text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer transition-all hover:shadow-2xs active:scale-98">
               <Landmark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <span>{language === 'en' ? 'Export Payroll Reports 📊' : 'पेरोल एवं बैंक रिपोर्ट निर्यात'}</span>
+              <span>{'Export Payroll Reports 📊'}</span>
               <ChevronDown className="w-3.5 h-3.5 text-indigo-500" />
             </button>
             <div className="absolute right-0 mt-1 w-72 bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-xl shadow-xl py-2 z-30 hidden group-hover:block hover:block divide-y divide-slate-100 dark:divide-[#1e3a2f]">
@@ -1790,7 +1789,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               {/* Section 1: Combined Master Sheet */}
               <div className="px-1 py-1">
                 <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 font-mono">
-                  {language === 'en' ? 'Combined Master Export' : 'संयुक्त मास्टर रिपोर्ट'}
+                  {'Combined Master Export'}
                 </div>
                 <button 
                   onClick={() => setIsMasterSheetOpen(true)}
@@ -1798,7 +1797,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 >
                   <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
                   <div>
-                    <div className="text-emerald-900 font-black">{language === 'en' ? 'Day-Wise Attendance + Salary Sheet' : 'डे-वाइज़ अटेंडेंस + सैलरी शीट'}</div>
+                    <div className="text-emerald-900 font-black">{'Day-Wise Attendance + Salary Sheet'}</div>
                     <div className="text-[10px] text-emerald-700 font-normal">Custom Columns + Excel (.xlsx) & PDF</div>
                   </div>
                 </button>
@@ -1808,7 +1807,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 >
                   <Download className="w-4 h-4 text-emerald-600 shrink-0" />
                   <div>
-                    <div>{language === 'en' ? 'All Modes Master CSV' : 'सभी मोड मास्टर CSV'}</div>
+                    <div>{'All Modes Master CSV'}</div>
                     <div className="text-[10px] text-slate-400 font-normal">Bank + Cash + Cheque Records</div>
                   </div>
                 </button>
@@ -1818,7 +1817,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <div className="px-1 py-1">
                 <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-600 font-mono flex items-center gap-1">
                   <Banknote className="w-3.5 h-3.5" />
-                  <span>{language === 'en' ? 'Cash Disbursal Reports' : 'नकद भुगतान रिपोर्ट'}</span>
+                  <span>{'Cash Disbursal Reports'}</span>
                 </div>
                 <button 
                   onClick={handleCashExport}
@@ -1826,7 +1825,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 >
                   <Download className="w-4 h-4 text-amber-600 shrink-0" />
                   <div>
-                    <div>{language === 'en' ? 'Cash Disbursal Advice (.csv)' : 'नकद भुगतान सूची (.csv)'}</div>
+                    <div>{'Cash Disbursal Advice (.csv)'}</div>
                     <div className="text-[10px] text-slate-400 font-normal">With Signature & Net Pay Columns</div>
                   </div>
                 </button>
@@ -1836,7 +1835,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 >
                   <FileText className="w-4 h-4 text-amber-600 shrink-0" />
                   <div>
-                    <div>{language === 'en' ? 'Cash Payment Vouchers (.pdf)' : 'नकद भुगतान रसीद/वाउचर (.pdf)'}</div>
+                    <div>{'Cash Payment Vouchers (.pdf)'}</div>
                     <div className="text-[10px] text-slate-400 font-normal">Printable Cash Receipt Slips</div>
                   </div>
                 </button>
@@ -1846,7 +1845,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <div className="px-1 py-1">
                 <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 font-mono flex items-center gap-1">
                   <Landmark className="w-3.5 h-3.5" />
-                  <span>{language === 'en' ? 'Bank Transfer Files' : 'बैंक ट्रांसफ़र फ़ाइलें'}</span>
+                  <span>{'Bank Transfer Files'}</span>
                 </div>
                 <button 
                   onClick={() => handleBankExport('SBI')} 
@@ -1893,7 +1892,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             id="mark-all-paid"
           >
             <Check className="w-4 h-4 text-emerald-600" />
-            <span>{confirmPayAll ? (language === 'en' ? 'Click to Confirm All' : 'सभी की पुष्टि करें') : t.markAllPaid}</span>
+            <span>{confirmPayAll ? ('Click to Confirm All') : t.markAllPaid}</span>
           </button>
         </div>
       </div>
@@ -1905,13 +1904,13 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           <div>
             <div className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider font-mono flex items-center gap-1">
               <Landmark className="w-3 h-3" />
-              <span>{language === 'en' ? 'Bank Transfer' : 'बैंक ट्रांसफ़र'}</span>
+              <span>{'Bank Transfer'}</span>
             </div>
             <div className="text-base font-extrabold text-slate-900 dark:text-slate-100 mt-0.5 font-mono">
               ₹{paymentSummary.bankTotal.toLocaleString('en-IN')}
             </div>
             <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
-              {paymentSummary.bankCount} {language === 'en' ? 'Employees' : 'कर्मचारी'}
+              {paymentSummary.bankCount} {'Employees'}
             </div>
           </div>
           <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
@@ -1924,13 +1923,13 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           <div>
             <div className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider font-mono flex items-center gap-1">
               <Banknote className="w-3 h-3" />
-              <span>{language === 'en' ? 'Cash Payout' : 'नकद भुगतान'}</span>
+              <span>{'Cash Payout'}</span>
             </div>
             <div className="text-base font-extrabold text-slate-900 dark:text-slate-100 mt-0.5 font-mono">
               ₹{paymentSummary.cashTotal.toLocaleString('en-IN')}
             </div>
             <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
-              {paymentSummary.cashCount} {language === 'en' ? 'Employees' : 'कर्मचारी'}
+              {paymentSummary.cashCount} {'Employees'}
             </div>
           </div>
           <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
@@ -1943,13 +1942,13 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           <div>
             <div className="text-[10px] font-extrabold text-purple-600 dark:text-purple-400 uppercase tracking-wider font-mono flex items-center gap-1">
               <CreditCard className="w-3 h-3" />
-              <span>{language === 'en' ? 'Cheque Payout' : 'चेक भुगतान'}</span>
+              <span>{'Cheque Payout'}</span>
             </div>
             <div className="text-base font-extrabold text-slate-900 dark:text-slate-100 mt-0.5 font-mono">
               ₹{paymentSummary.chequeTotal.toLocaleString('en-IN')}
             </div>
             <div className="text-[10px] text-slate-400 font-semibold mt-0.5">
-              {paymentSummary.chequeCount} {language === 'en' ? 'Employees' : 'कर्मचारी'}
+              {paymentSummary.chequeCount} {'Employees'}
             </div>
           </div>
           <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
@@ -1961,13 +1960,13 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
         <div className="bg-gradient-to-br from-emerald-800 to-teal-900 text-white p-3.5 rounded-xl shadow-2xs flex items-center justify-between">
           <div>
             <div className="text-[10px] font-extrabold text-emerald-200 uppercase tracking-wider font-mono">
-              {language === 'en' ? 'Total Payroll' : 'कुल पेरोल'}
+              {'Total Payroll'}
             </div>
             <div className="text-base font-extrabold mt-0.5 font-mono">
               ₹{paymentSummary.grandTotal.toLocaleString('en-IN')}
             </div>
             <div className="text-[10px] text-emerald-200/80 font-semibold mt-0.5">
-              {paymentSummary.totalCount} {language === 'en' ? 'Total Disbursed' : 'कुल कर्मचारी'}
+              {paymentSummary.totalCount} {'Total Disbursed'}
             </div>
           </div>
           <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center shrink-0">
@@ -2019,7 +2018,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
             className="bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-xs font-semibold text-slate-700 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer max-w-[150px]"
           >
-            <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Employees' : 'सभी कर्मचारी'}</option>
+            <option value="All" className="dark:bg-[#11221b]">{'All Employees'}</option>
             {employeeOptions.map(emp => (
               <option key={emp.id} value={emp.id} className="dark:bg-[#11221b]">{emp.name}</option>
             ))}
@@ -2034,7 +2033,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             onChange={(e) => { setSelectedPaymentMode(e.target.value as any); setCurrentPage(1); }}
             className="bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-xs font-bold text-slate-800 dark:text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-indigo-600 transition-all cursor-pointer"
           >
-            <option value="All" className="dark:bg-[#11221b]">{language === 'en' ? 'All Modes (सब)' : 'सभी माध्यम'}</option>
+            <option value="All" className="dark:bg-[#11221b]">{'All Modes'}</option>
             <option value="Bank Transfer" className="dark:bg-[#11221b]">🏦 Bank Transfer</option>
             <option value="Cash" className="dark:bg-[#11221b]">💵 Cash Mode</option>
             <option value="Cheque" className="dark:bg-[#11221b]">📝 Cheque Mode</option>
@@ -2080,8 +2079,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                               src={parseGoogleDriveImageUrl(emp.photoUrl)} 
                               alt={emp.name} 
                               className="w-9 h-9 rounded-full object-cover border border-slate-200/80 dark:border-[#1e3a2f] shrink-0 shadow-2xs"
-                              referrerPolicy="no-referrer"
-                            />
+                              referrerPolicy="no-referrer" />
                           ) : (
                             <div className="w-9 h-9 rounded-full bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-xs border border-indigo-100 dark:border-indigo-800/50 uppercase shrink-0">
                               {emp?.name ? emp.name.split(' ').map(n => n[0]).join('').substring(0, 2) : 'EM'}
@@ -2118,7 +2116,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                           {daysMissPunch > 0 && (
                             <span className="bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 px-2 py-0.5 rounded-md shadow-3xs animate-pulse font-sans font-bold flex items-center gap-1 shrink-0" title="Pending Miss Punch Approvals">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                              <span>{daysMissPunch} {language === 'en' ? 'Miss Punch (Pending)' : 'लंबित मिस पंच'}</span>
+                              <span>{daysMissPunch} {'Miss Punch (Pending)'}</span>
                             </span>
                           )}
                         </div>
@@ -2215,7 +2213,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                           <button
                             onClick={() => {
                               if (!hasPermission('edit')) {
-                                alert(language === 'en' ? 'You do not have permission to adjust payroll.' : 'आपके पास पेरोल संयोजित करने की अनुमति नहीं है।');
+                                alert('You do not have permission to adjust payroll.');
                                 return;
                               }
                               setEditingRecord(rec);
@@ -2225,7 +2223,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                             title="Adjust Salary Components"
                           >
                             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                            <span>{language === 'en' ? 'Adjust' : 'बदलाव'}</span>
+                            <span>{'Adjust'}</span>
                           </button>
 
                           {/* Payslip View */}
@@ -2259,7 +2257,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                               setWaModalOpen(true);
                             }}
                             className="bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all hover:shadow-3xs active:scale-97"
-                            title="Send WhatsApp / Email Payslip"
+                            title="Send WhatsAppEmail Payslip"
                           >
                             <MessageSquare className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                             <span>WhatsApp</span>
@@ -2277,7 +2275,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                               id={`pay-${rec.employeeId}`}
                             >
                               <CreditCard className="w-3.5 h-3.5" />
-                              <span>{confirmPayEmpId === rec.employeeId ? (language === 'en' ? 'Click to Confirm' : 'पुष्टि करें') : t.markPaidBtn}</span>
+                              <span>{confirmPayEmpId === rec.employeeId ? ('Click to Confirm') : t.markPaidBtn}</span>
                             </button>
                           )}
                         </div>
@@ -2372,10 +2370,10 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex gap-3 text-indigo-900 mt-6">
             <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
             <div className="text-xs space-y-1 font-medium">
-              <p className="font-bold">एक-बारगी कटौती एवं मासिक रिफंड प्रणाली (Deduction & Refund System Rulebook):</p>
-              <p>1. Uniform या Tour जैसी एक-बारगी लगने वाली कटौतियों को दर्ज करें।</p>
-              <p>2. प्रत्येक माह की पेरोल गणना में इस राशि का एक निश्चित भाग (मासिक किस्त) कर्मचारी के वेतन में जोड़कर वापस (Refund) कर दिया जाता है।</p>
-              <p>3. जैसे ही पेरोल शीट 'Paid' मार्क होती है, शेष रिफंड राशि को घटा दिया जाता है और स्थिति अपडेट हो जाती है।</p>
+              <p className="font-bold">Deduction & Refund System Rulebook:</p>
+              <p>1. Log one-time deductions such as Uniform or Tour kit expenses.</p>
+              <p>2. In each month payroll generation, a fixed installment of this amount is refunded back to the employee salary.</p>
+              <p>3. Once payroll sheet is marked Paid, outstanding refund balance is reduced and status updates automatically.</p>
             </div>
           </div>
 
@@ -2385,19 +2383,19 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
               <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
                 <PlusCircle className="w-4 h-4 text-[#03623c]" />
-                <span>नयी कटौती और रिफंड योजना जोड़ें</span>
+                <span>Add New Deduction & Refund Plan</span>
               </h3>
 
               <form onSubmit={handleAddDeductionPlan} className="space-y-4 font-sans">
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">कर्मचारी का चयन करें (Select Employee)</label>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Select Employee</label>
                   <select
                     value={newDeductEmpId}
                     onChange={(e) => setNewDeductEmpId(e.target.value)}
                     required
                     className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white cursor-pointer"
                   >
-                    <option value="">-- चुनें (Choose Employee) --</option>
+                    <option value="">-- Choose Employee --</option>
                     {employees.filter(emp => emp.isActive !== false).map(emp => (
                       <option key={emp.id} value={emp.id}>
                         {emp.name} ({emp.id}) - {emp.designation}
@@ -2407,52 +2405,49 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">कटौती का प्रकार (Deduction Type)</label>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Deduction Type</label>
                   <select
                     value={newDeductType}
                     onChange={(e) => setNewDeductType(e.target.value as any)}
                     className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white cursor-pointer"
                   >
-                    <option value="Uniform">Uniform (यूनिफॉर्म चार्ज)</option>
-                    <option value="Tour">Tour (दौरा / टूर व्यय)</option>
-                    <option value="Other">Other (अन्य कटौती)</option>
+                    <option value="Uniform">Uniform</option>
+                    <option value="Tour">Tour</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">कुल राशि (Total Amount)</label>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Total Amount</label>
                     <input
                       type="number"
                       required
                       min="1"
                       value={newDeductTotal}
                       onChange={(e) => setNewDeductTotal(Number(e.target.value))}
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold font-mono focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c]"
-                    />
+                      className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold font-mono focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c]" />
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">मासिक किस्त (Monthly Part)</label>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Monthly Installment</label>
                     <input
                       type="number"
                       required
                       min="1"
                       value={newDeductInstallment}
                       onChange={(e) => setNewDeductInstallment(Number(e.target.value))}
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold font-mono focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c]"
-                    />
+                      className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold font-mono focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c]" />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">विवरण / नोट (Description)</label>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Description</label>
                   <textarea
                     rows={2}
                     value={newDeductDesc}
                     onChange={(e) => setNewDeductDesc(e.target.value)}
-                    placeholder="जैसे: Winter uniform kit 2026..."
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c]"
-                  />
+                    placeholder="e.g. Winter uniform kit 2026..."
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c]" />
                 </div>
 
                 <button
@@ -2460,7 +2455,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                   className="w-full bg-[#03623c] hover:bg-[#024d2e] text-white p-3 rounded-lg text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs active:scale-98"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  <span>योजना लागू करें (Save Plan)</span>
+                  <span>Save & Apply Plan</span>
                 </button>
               </form>
             </div>
@@ -2470,7 +2465,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <div>
                 <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">
-                    कटौती वापसी एवं शेष विवरण रिपोर्ट (Active Plans & Outstanding Balances)
+                    Active Deduction & Refund Plans Report
                   </h3>
                   <button
                     onClick={downloadRefundReportPDF}
@@ -2484,28 +2479,28 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 {oneTimeDeductions.length === 0 ? (
                   <div className="p-12 text-center text-slate-400 text-xs font-medium flex flex-col items-center gap-2.5">
                     <RefreshCcw className="w-8 h-8 text-slate-300 animate-spin" />
-                    <span>कोई भी सक्रिय योजना नहीं मिली। ऊपर फॉर्म का उपयोग करके एक नई योजना जोड़ें।</span>
+                    <span>No active plans found. Add a plan using the form above.</span>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse font-sans">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 text-[10px] uppercase tracking-wider">
-                          <th className="py-3 px-4">कर्मचारी (Employee)</th>
-                          <th className="py-3 px-4">प्रकार (Type)</th>
-                          <th className="py-3 px-4">कुल कटौती</th>
-                          <th className="py-3 px-4">किस्त (Monthly)</th>
-                          <th className="py-3 px-4">वापस मिला (Refunded)</th>
-                          <th className="py-3 px-4">बचा हुआ (Outstanding)</th>
-                          <th className="py-3 px-4">स्थिति (Status)</th>
-                          <th className="py-3 px-4 text-center">क्रिया</th>
+                          <th className="py-3 px-4">Employee</th>
+                          <th className="py-3 px-4">Type</th>
+                          <th className="py-3 px-4">Total Deduction</th>
+                          <th className="py-3 px-4">Installment (Monthly)</th>
+                          <th className="py-3 px-4">Refunded</th>
+                          <th className="py-3 px-4">Outstanding</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4 text-center">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {oneTimeDeductions.map(d => {
                           const emp = employees.find(e => e.id === d.employeeId);
                           const outstanding = d.totalAmount - d.refundedAmount;
-                          const progressPercent = Math.min(100, Math.round((d.refundedAmount / d.totalAmount) * 100));
+                          const progressPercent = Math.min(100, Math.round((d.refundedAmountd.totalAmount) * 100));
 
                           return (
                             <tr key={d.id} className="hover:bg-slate-50/50 transition-colors font-medium">
@@ -2537,7 +2532,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                                   d.status === 'Partially Refunded' ? 'bg-indigo-50 text-indigo-800 border border-indigo-100' :
                                   'bg-amber-50 text-amber-800 border border-amber-100 animate-pulse'
                                 }`}>
-                                  {d.status === 'Fully Refunded' ? 'पूर्ण भुगतान' : d.status === 'Partially Refunded' ? 'आंशिक' : 'लंबित'}
+                                  {d.status}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-center">
@@ -2572,7 +2567,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <Sparkles className="w-96 h-96 text-indigo-900" />
             </div>
 
-            {/* Header / Brand info with distinct luxury styling */}
+            {/* HeaderBrand info with distinct luxury styling */}
             <div className="border-b border-slate-200 pb-5 text-center relative">
               <div className="flex items-center justify-center gap-2 mb-1.5">
                 <div className="w-6 h-6 rounded bg-indigo-600 text-white flex items-center justify-center font-extrabold text-[10px] shadow-3xs font-display">P</div>
@@ -2660,7 +2655,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <div>
                 <div className="bg-slate-50 p-3 border-b border-slate-200 font-bold uppercase tracking-wider text-slate-700 text-[10px] flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  <span>{t.slipEarnings} (अर्जित भत्ते)</span>
+                  <span>{t.slipEarnings}</span>
                 </div>
                 <div className="p-4 space-y-2 text-slate-600">
                   <div className="flex justify-between font-medium pb-1 border-b border-slate-100">
@@ -2712,7 +2707,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <div>
                 <div className="bg-slate-50 p-3 border-b border-slate-200 font-bold uppercase tracking-wider text-slate-700 text-[10px] flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                  <span>{t.slipDeductions} (कटौतियां)</span>
+                  <span>{t.slipDeductions}</span>
                 </div>
                 <div className="p-4 space-y-2 text-slate-600">
                   <div className="flex justify-between font-medium">
@@ -2775,7 +2770,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 title="Download Professional PDF slip"
               >
                 <FileText className="w-3.5 h-3.5 text-white" />
-                <span>Download PDF (पीडीएफ डाउनलोड)</span>
+                <span>Download PDF</span>
               </button>
               <button
                 onClick={handlePrint}
@@ -2804,7 +2799,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
                 <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-widest">
-                  {language === 'en' ? 'Adjust Salary Structure' : 'वेतन संरचना समायोजन'}
+                  {'Adjust Salary Structure'}
                 </h3>
               </div>
               <button 
@@ -2838,72 +2833,65 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 <div className="space-y-3 bg-emerald-50/20 p-3 rounded-lg border border-emerald-100/40">
                   <h4 className="font-bold text-emerald-800 uppercase tracking-wider text-[10px] flex items-center gap-1 border-b border-emerald-100/40 pb-1.5">
                     <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Allowances & Earnings (अर्जित भत्ते)</span>
+                    <span>Allowances & Earnings</span>
                   </h4>
                   
                   <div className="grid grid-cols-2 gap-2.5">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Basic Pay (अर्जित मूल वेतन)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Basic Pay</label>
                       <input 
                         type="number" 
                         value={editingRecord.basicSalary} 
                         onChange={(e) => handleAdjustmentChange('basicSalary', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Overtime Pay (ओवरटाइम)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Overtime Pay</label>
                       <input 
                         type="number" 
                         value={editingRecord.overtimePay} 
                         onChange={(e) => handleAdjustmentChange('overtimePay', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">HRA (मकान किराया)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">HRA</label>
                       <input 
                         type="number" 
                         value={editingRecord.hra !== undefined ? editingRecord.hra : Math.round(editingRecord.basicSalary * 0.40)} 
                         onChange={(e) => handleAdjustmentChange('hra', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Dearness (DA भत्त्ता)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Dearness (DA)</label>
                       <input 
                         type="number" 
                         value={editingRecord.da || 0} 
                         onChange={(e) => handleAdjustmentChange('da', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Conveyance (यातायात)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Conveyance</label>
                       <input 
                         type="number" 
                         value={editingRecord.conveyanceAllowance || 0} 
                         onChange={(e) => handleAdjustmentChange('conveyanceAllowance', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Festival Bonus (बोनस)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Festival Bonus</label>
                       <input 
                         type="number" 
                         value={editingRecord.festivalBonus || 0} 
                         onChange={(e) => handleAdjustmentChange('festivalBonus', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Incentive (प्रोत्साहन)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Incentive</label>
                       <input 
                         type="number" 
                         value={editingRecord.performanceIncentive || 0} 
                         onChange={(e) => handleAdjustmentChange('performanceIncentive', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Paid Leave Credit</label>
@@ -2911,8 +2899,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                         type="number" 
                         value={editingRecord.leaveAdjustment || 0} 
                         onChange={(e) => handleAdjustmentChange('leaveAdjustment', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                   </div>
                 </div>
@@ -2921,7 +2908,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                 <div className="space-y-3 bg-rose-50/20 p-3 rounded-lg border border-rose-100/40">
                   <h4 className="font-bold text-rose-800 uppercase tracking-wider text-[10px] flex items-center gap-1 border-b border-rose-100/40 pb-1.5">
                     <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Statutory & Personal Deductions (कटौतियां)</span>
+                    <span>Statutory & Personal Deductions</span>
                   </h4>
 
                   <div className="grid grid-cols-2 gap-2.5">
@@ -2931,8 +2918,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                         type="number" 
                         value={editingRecord.providentFund || 0} 
                         onChange={(e) => handleAdjustmentChange('providentFund', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">State Insurance (ESIC)</label>
@@ -2940,8 +2926,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                         type="number" 
                         value={editingRecord.esic || 0} 
                         onChange={(e) => handleAdjustmentChange('esic', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Professional Tax (PT)</label>
@@ -2949,8 +2934,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                         type="number" 
                         value={editingRecord.professionalTax || 0} 
                         onChange={(e) => handleAdjustmentChange('professionalTax', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 mb-1">Income Tax (TDS)</label>
@@ -2958,17 +2942,15 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                         type="number" 
                         value={editingRecord.tds || 0} 
                         onChange={(e) => handleAdjustmentChange('tds', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Advance EMI Repayment (एडवांस सैलरी किस्त)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Advance EMI Repayment</label>
                       <input 
                         type="number" 
                         value={editingRecord.advanceDeduction || 0} 
                         onChange={(e) => handleAdjustmentChange('advanceDeduction', Number(e.target.value))}
-                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white"
-                      />
+                        className="w-full border border-slate-200 rounded px-2.5 py-1 font-mono text-xs font-bold bg-white" />
                     </div>
                   </div>
                 </div>
@@ -3003,13 +2985,13 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
                   }}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer"
                 >
-                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                  {'Cancel'}
                 </button>
                 <button
                   type="submit"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-3xs hover:shadow-[0_4px_12px_rgba(79,70,229,0.2)]"
                 >
-                  {language === 'en' ? 'Apply Adjustments' : 'समायोजन लागू करें'}
+                  {'Apply Adjustments'}
                 </button>
               </div>
 
@@ -3026,8 +3008,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
           settings={adminSettings}
           recipient={waRecipient}
           defaultCategory={waCategory}
-          variables={waVars}
-        />
+          variables={waVars} />
       )}
 
       {/* Master Attendance & Salary Sheet Modal */}
@@ -3038,8 +3019,7 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
         attendanceRecords={attendanceRecords}
         payrollRecords={payrollRecords}
         initialMonthYear={selectedMonthYear}
-        language={language}
-      />
+        language={language} />
     </div>
   );
 }

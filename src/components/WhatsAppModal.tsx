@@ -11,7 +11,9 @@ import {
   Key, 
   FileSpreadsheet, 
   Sparkles,
-  Info
+  Info,
+  Globe,
+  CheckCircle2
 } from 'lucide-react';
 import { AdminSettings } from '../types';
 import { useModalBackHandler } from '../utils/useHistoryBackHandler';
@@ -60,15 +62,16 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'email' | 'formula'>('whatsapp');
   const [copiedFormula, setCopiedFormula] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const [sentStatus, setSentStatus] = useState<string | null>(null);
 
-  // Default credentials or fallback
-  const username = settings.whatsappUsername || 'User';
-  const password = settings.whatsappPassword || 'Password';
+  //Default credentials or fallback
+  const username = settings.whatsappUsername || 'rathis';
+  const password = settings.whatsappPassword || 'Rathis@ravs#2025!';
   const companyName = settings.companyName || 'Rathi Buildmart';
 
-  // Merge default variables with company & recipient details
+  //Merge default variables with company & recipient details
   const mergedVars: Record<string, string | number | undefined> = {
     NAME: recipient.name,
     COMPANY_NAME: companyName,
@@ -77,13 +80,13 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
     ...variables
   };
 
-  // Resolve template text
+  //Resolve template text
   const userWaTemplate = settings.whatsappTemplates?.[defaultCategory] || DEFAULT_WHATSAPP_TEMPLATES[defaultCategory] || DEFAULT_WHATSAPP_TEMPLATES.customNotice;
   const initialWaMessage = processTemplate(userWaTemplate, mergedVars);
 
   const [waMessage, setWaMessage] = useState(initialWaMessage);
 
-  // Email subject/body resolve
+  //Email subject/body resolve
   const defaultSubject = settings.emailTemplates?.payslipSubject || DEFAULT_EMAIL_TEMPLATES.payslipSubject;
   const defaultBody = settings.emailTemplates?.payslipBody || DEFAULT_EMAIL_TEMPLATES.payslipBody;
 
@@ -95,11 +98,11 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
 
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>(defaultCategory);
 
-  // Template switching logic
+  //Template switching logic
   const handleSelectTemplate = (key: string) => {
     setSelectedTemplateKey(key);
 
-    // Check if key matches custom template list
+    //Check if key matches custom template list
     const customTpl = (settings.customMessageTemplates || []).find((t) => t.id === key);
     if (customTpl) {
       if (customTpl.whatsappBody) {
@@ -112,11 +115,11 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
         setEmailText(processTemplate(customTpl.emailBody, mergedVars));
       }
     } else {
-      // Standard template keys
+      //Standard template keys
       const stdWa = settings.whatsappTemplates?.[key as keyof typeof DEFAULT_WHATSAPP_TEMPLATES] || DEFAULT_WHATSAPP_TEMPLATES[key as keyof typeof DEFAULT_WHATSAPP_TEMPLATES] || DEFAULT_WHATSAPP_TEMPLATES.customNotice;
       setWaMessage(processTemplate(stdWa, mergedVars));
 
-      // Standard email matching if applicable
+      //Standard email matching if applicable
       if (key === 'payslip') {
         const sub = settings.emailTemplates?.payslipSubject || DEFAULT_EMAIL_TEMPLATES.payslipSubject;
         const body = settings.emailTemplates?.payslipBody || DEFAULT_EMAIL_TEMPLATES.payslipBody;
@@ -138,7 +141,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
 
   const cleanPhone = formatPhoneNumber(recipient.mobileNo);
 
-  // MessageAutoSender API URL
+  //MessageAutoSender API URL
   const autoSenderUrl = buildMessageAutoSenderUrl(
     username,
     password,
@@ -147,11 +150,10 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
     waMessage
   );
 
-  // Standard WhatsApp URL
+  //Standard WhatsApp URL
   const standardWaUrl = buildStandardWhatsAppUrl(cleanPhone || recipient.mobileNo || '', waMessage);
 
-  // Excel Formula requested by user:
-  // =HYPERLINK("https://app.messageautosender.com/message/new?username="&User&"&password="&Password&"&receiverMobileNo="&B6&"&receiverName=test&message=MESSAGETEST","Manual Test Send")
+  //Excel Formula requested by user: //=HYPERLINK("https://app.messageautosender.com/message/new?username="&User&"&password="&Password&"&receiverMobileNo="&B6&"&receiverName=test&message=MESSAGETEST","Manual Test Send")
   const excelFormula = `=HYPERLINK("https://app.messageautosender.com/message/new?username="${username}"&password="${password}"&receiverMobileNo="${cleanPhone || 'MOBILE'}"&receiverName="${recipient.name || 'NAME'}"&message="${waMessage.replace(/"/g, '""')}","Manual Test Send")`;
 
   const handleCopyFormula = () => {
@@ -285,7 +287,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
                 <optgroup label="Custom Added Templates">
                   {(settings.customMessageTemplates || []).map((ct) => (
                     <option key={ct.id} value={ct.id}>
-                      ★ {ct.name} ({ct.category.toUpperCase()})
+                      ★ {ct.name} {ct.purpose ? `[${ct.purpose}]` : ''} ({ct.category.toUpperCase()})
                     </option>
                   ))}
                 </optgroup>
@@ -321,42 +323,86 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
                 value={waMessage}
                 onChange={(e) => setWaMessage(e.target.value)}
                 rows={6}
-                className="w-full p-3.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c] leading-relaxed shadow-inner"
-              />
+                className="w-full p-3.5 text-xs font-mono bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c] leading-relaxed shadow-inner" />
 
               {/* MessageAutoSender Config Credentials status */}
-              <div className="p-3 bg-amber-50/70 dark:bg-[#1a140b] border border-amber-200 dark:border-amber-900/60 rounded-xl text-xs space-y-1">
+              <div className="p-3 bg-amber-50/80 dark:bg-[#1a140b] border border-amber-200 dark:border-amber-900/60 rounded-xl text-xs space-y-1">
                 <div className="flex items-center justify-between font-bold text-amber-900 dark:text-amber-300">
                   <span className="flex items-center gap-1.5">
                     <Key className="w-3.5 h-3.5 text-amber-600" />
-                    <span>MessageAutoSender API Credentials:</span>
+                    <span>MessageAutoSender Gateway User: <span className="font-mono text-[#03623c] dark:text-emerald-400">{username}</span></span>
                   </span>
-                  <span className="text-[10px] bg-amber-200 dark:bg-amber-900/80 px-2 py-0.5 rounded font-mono">
-                    User: {username}
+                  <span className="text-[10px] bg-amber-200 dark:bg-amber-900/80 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded font-mono font-bold">
+                    Target: {cleanPhone || recipient.mobileNo || 'Not provided'}
                   </span>
                 </div>
-                <p className="text-[11px] text-amber-800 dark:text-amber-400">
-                  Target Mobile Number: <span className="font-bold font-mono">{cleanPhone || recipient.mobileNo || 'Not provided'}</span>
+                <p className="text-[11px] text-amber-800 dark:text-amber-400 leading-tight">
+                  💡 <strong>Tip:</strong> If MessageAutoSender displays <em>"HTTP Status 401 - Full authentication is required"</em>, use <strong>"Open Direct WhatsApp Web (wa.me)"</strong> below to send directly without login!
                 </p>
+              </div>
+
+              {/* Live Generated MessageAutoSender URL Preview Box */}
+              <div className="p-3 bg-slate-900 text-slate-100 rounded-xl space-y-1.5 border border-slate-800 shadow-inner">
+                <div className="flex items-center justify-between text-[11px] font-bold text-emerald-400">
+                  <span className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Generated MessageAutoSender API URL:</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(autoSenderUrl);
+                      setCopiedUrl(true);
+                      setTimeout(() => setCopiedUrl(false), 2000);
+                    }}
+                    className="text-emerald-400 hover:text-emerald-300 font-medium text-[10px] flex items-center gap-1 cursor-pointer bg-slate-800 px-2 py-0.5 rounded border border-slate-700 transition-all hover:bg-slate-700"
+                  >
+                    {copiedUrl ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-emerald-400" />}
+                    <span>{copiedUrl ? 'URL Copied!' : 'Copy URL'}</span>
+                  </button>
+                </div>
+                <div className="text-[11px] font-mono break-all text-slate-300 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 select-all max-h-24 overflow-y-auto leading-relaxed">
+                  {autoSenderUrl}
+                </div>
               </div>
 
               {/* Direct Buttons */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <button
-                  onClick={handleSendAutoSender}
+                <a
+                  href={autoSenderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    if (!recipient.mobileNo && !cleanPhone) {
+                      e.preventDefault();
+                      alert('Recipient mobile number is missing.');
+                      return;
+                    }
+                    setSentStatus('WhatsApp Message URL opened in MessageAutoSender!');
+                  }}
                   className="w-full bg-[#03623c] hover:bg-[#024d2e] text-white p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98"
                 >
                   <Send className="w-4 h-4" />
                   <span>Send via MessageAutoSender</span>
-                </button>
+                </a>
 
-                <button
-                  onClick={handleSendStandardWa}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-all active:scale-98"
+                <a
+                  href={standardWaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    if (!recipient.mobileNo && !cleanPhone) {
+                      e.preventDefault();
+                      alert('Recipient mobile number is missing.');
+                      return;
+                    }
+                    setSentStatus('Opened WhatsApp Web chat window!');
+                  }}
+                  className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-all active:scale-98 border border-slate-200 dark:border-slate-700"
                 >
-                  <ExternalLink className="w-4 h-4" />
+                  <ExternalLink className="w-4 h-4 text-slate-500" />
                   <span>Open WhatsApp Web (wa.me)</span>
-                </button>
+                </a>
               </div>
             </div>
           )}
@@ -367,7 +413,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
               <div className="p-3 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-900 dark:text-blue-300 space-y-1">
                 <div className="font-extrabold flex items-center gap-1.5">
                   <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span>MessageAutoSender Excel / Google Sheet Formula Generator</span>
+                  <span>MessageAutoSender ExcelGoogle Sheet Formula Generator</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-blue-800 dark:text-blue-300">
                   Copy this exact HYPERLINK formula and paste it into your Google Sheets or Excel payroll sheet to trigger one-click WhatsApp sends directly from your spreadsheets!
@@ -383,8 +429,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
                     readOnly
                     value={excelFormula}
                     rows={4}
-                    className="w-full p-3 pr-10 text-xs font-mono bg-slate-900 text-emerald-400 border border-slate-800 rounded-xl focus:outline-none leading-relaxed select-all"
-                  />
+                    className="w-full p-3 pr-10 text-xs font-mono bg-slate-900 text-emerald-400 border border-slate-800 rounded-xl focus:outline-none leading-relaxed select-all" />
                   <button
                     onClick={handleCopyFormula}
                     className="absolute top-2.5 right-2.5 p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg cursor-pointer transition-all shadow-xs"
@@ -424,8 +469,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
                   type="text"
                   value={emailSub}
                   onChange={(e) => setEmailSub(e.target.value)}
-                  className="w-full p-2.5 text-xs font-bold bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]"
-                />
+                  className="w-full p-2.5 text-xs font-bold bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]" />
               </div>
 
               <div className="space-y-1.5">
@@ -434,8 +478,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
                   value={emailText}
                   onChange={(e) => setEmailText(e.target.value)}
                   rows={6}
-                  className="w-full p-3 text-xs font-sans bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c] leading-relaxed shadow-inner"
-                />
+                  className="w-full p-3 text-xs font-sans bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c] leading-relaxed shadow-inner" />
               </div>
 
               <button

@@ -29,22 +29,22 @@ export default function PunchImportModal({
 }: PunchImportModalProps) {
   useModalBackHandler(isOpen, onClose, 'punch-import-modal');
 
-  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Upload, 2: Map, 3: Preview
+  const [step, setStep] = useState<1 | 2 | 3>(1); //1: Upload, 2: Map, 3: Preview
   const [fileContent, setFileContent] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const [error, setError] = useState<string>('');
   
-  // CSV Raw Rows
+  //CSV Raw Rows
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
   
-  // Column Mapping
+  //Column Mapping
   const [mapEmpId, setMapEmpId] = useState<number>(-1);
   const [mapDate, setMapDate] = useState<number>(-1);
   const [mapCheckIn, setMapCheckIn] = useState<number>(-1);
   const [mapCheckOut, setMapCheckOut] = useState<number>(-1);
   
-  // Parsed and previewed records
+  //Parsed and previewed records
   const [parsedRecords, setParsedRecords] = useState<Attendance[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,14 +58,14 @@ export default function PunchImportModal({
       step1: "1. Upload File",
       step2: "2. Map Columns",
       step3: "3. Review & Import",
-      dragDropText: "Drag and drop your biometric CSV / TXT file here, or click to browse",
+      dragDropText: "Drag and drop your biometric CSVTXT file here, or click to browse",
       sampleCsvTip: "Tip: Most punch machines export CSV or TXT sheets containing Employee ID, Date, In Time and Out Time.",
       selectCols: "Map CSV Columns to Portal Fields",
       selectColsSub: "Select which columns in your punch machine file match the required system fields.",
       colEmpId: "Employee ID (e.g. EMP001)",
       colDate: "Punch Date (e.g. 13-07-2026 or 2026-07-13)",
-      colCheckIn: "Check-In / Swipe In Time",
-      colCheckOut: "Check-Out / Swipe Out Time (Optional)",
+      colCheckIn: "Check-InSwipe In Time",
+      colCheckOut: "Check-OutSwipe Out Time (Optional)",
       previewTitle: "Verify Parsed Punch Logs",
       previewSub: "Review the matching employees and punch timings before final sync.",
       totalRecords: "Total rows parsed:",
@@ -90,55 +90,55 @@ export default function PunchImportModal({
       successMsg: "Weekly punch logs imported and synced successfully!",
     },
     hi: {
-      modalTitle: "पंच मशीन डेटा आयात करें",
-      modalSub: "बायोमेट्रिक उपकरणों से सीधे साप्ताहिक या मासिक उपस्थिति रिपोर्ट अपलोड करें",
-      step1: "1. फ़ाइल अपलोड करें",
-      step2: "2. कॉलम मैप करें",
-      step3: "3. समीक्षा करें",
-      dragDropText: "अपनी बायोमेट्रिक CSV / TXT फ़ाइल को यहाँ खींचें या ब्राउज़ करने के लिए क्लिक करें",
-      sampleCsvTip: "सलाह: अधिकांश पंच मशीनें CSV या TXT निर्यात करती हैं जिनमें कर्मचारी आईडी, दिनांक, आने का समय और जाने का समय होता है।",
-      selectCols: "CSV कॉलम को पोर्टल फ़ील्ड से मैप करें",
-      selectColsSub: "चुनें कि आपकी फ़ाइल के कौन से कॉलम आवश्यक सिस्टम फ़ील्ड से मेल खाते हैं।",
-      colEmpId: "कर्मचारी आईडी (जैसे EMP001)",
-      colDate: "पंच दिनांक (जैसे 13-07-2026 या 2026-07-13)",
-      colCheckIn: "चेक-इन / आने का समय",
-      colCheckOut: "चेक-आउट / जाने का समय (वैकल्पिक)",
-      previewTitle: "पार्स किए गए पंच लॉग्स सत्यापित करें",
-      previewSub: "अंतिम सिंक से पहले मेल खाने वाले कर्मचारियों और समय की समीक्षा करें।",
-      totalRecords: "कुल पंक्तियाँ:",
-      matchedEmp: "कर्मचारी मिले:",
-      matchedDates: "दिनांक सीमा:",
-      btnNext: "अगला चरण",
-      btnBack: "पीछे",
-      btnImport: "आयात करें और सिंक करें",
-      btnImporting: "सिंक हो रहा है...",
-      colTableEmp: "कर्मचारी",
-      colTableDate: "तारीख",
-      colTableIn: "आगमन",
-      colTableOut: "प्रस्थान",
-      colTableStatus: "स्थिति",
-      colTableOT: "ओवरटाइम (घंटे)",
-      statusPresent: "उपस्थित",
-      statusMissPunch: "मिस पंच",
-      statusInvalid: "कर्मचारी नहीं मिला",
-      errEmptyFile: "चुनी गई फ़ाइल खाली है।",
-      errParsing: "फ़ाइल पार्स नहीं की जा सकी। सुनिश्चित करें कि यह वैध CSV, टैब या सेमीकोलन फ़ाइल है।",
-      errMapping: "आगे बढ़ने के लिए कृपया कर्मचारी आईडी और पंच तिथि के कॉलम चुनें।",
-      successMsg: "साप्ताहिक पंच लॉग सफलतापूर्वक आयात और सिंक किए गए!",
+      modalTitle: "Import Punch Machine Data",
+      modalSub: "Upload weekly or monthly attendance reports directly from biometric devices",
+      step1: "1. Upload File",
+      step2: "2. Map Columns",
+      step3: "3. Review & Import",
+      dragDropText: "Drag and drop your biometric CSVTXT file here, or click to browse",
+      sampleCsvTip: "Tip: Most punch machines export CSV or TXT sheets containing Employee ID, Date, In Time and Out Time.",
+      selectCols: "Map CSV Columns to Portal Fields",
+      selectColsSub: "Select which columns in your punch machine file match the required system fields.",
+      colEmpId: "Employee ID (e.g. EMP001)",
+      colDate: "Punch Date (e.g. 13-07-2026 or 2026-07-13)",
+      colCheckIn: "Check-InSwipe In Time",
+      colCheckOut: "Check-OutSwipe Out Time (Optional)",
+      previewTitle: "Verify Parsed Punch Logs",
+      previewSub: "Review the matching employees and punch timings before final sync.",
+      totalRecords: "Total rows parsed:",
+      matchedEmp: "Matched Employees:",
+      matchedDates: "Date Range:",
+      btnNext: "Next Step",
+      btnBack: "Back",
+      btnImport: "Import & Sync Records",
+      btnImporting: "Syncing with Firestore...",
+      colTableEmp: "Employee",
+      colTableDate: "Date",
+      colTableIn: "In Time",
+      colTableOut: "Out Time",
+      colTableStatus: "Status",
+      colTableOT: "Overtime (Hrs)",
+      statusPresent: "Present",
+      statusMissPunch: "Miss Punch",
+      statusInvalid: "Employee Not Found",
+      errEmptyFile: "The selected file is empty.",
+      errParsing: "Could not parse file. Ensure it is a valid comma, tab or semicolon separated text file.",
+      errMapping: "Please select columns for Employee ID and Punch Date to proceed.",
+      successMsg: "Weekly punch logs imported and synced successfully!",
     }
   }[language];
 
-  // Robust Date Parser
+  //Robust Date Parser
   const parseDateRobustly = (raw: string): string => {
     if (!raw) return '';
     const cleaned = raw.trim();
     
-    // Matches YYYY-MM-DD
+    //Matches YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
       return cleaned;
     }
     
-    // Matches DD-MM-YYYY or DD/MM/YYYY
+    //Matches DD-MM-YYYY or DD/MM/YYYY
     const dmyMatch = cleaned.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
     if (dmyMatch) {
       const day = dmyMatch[1].padStart(2, '0');
@@ -147,7 +147,7 @@ export default function PunchImportModal({
       return `${year}-${month}-${day}`;
     }
     
-    // Matches DD-MM-YY or DD/MM/YY
+    //Matches DD-MM-YY or DD/MM/YY
     const dmyShortMatch = cleaned.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2})$/);
     if (dmyShortMatch) {
       const day = dmyShortMatch[1].padStart(2, '0');
@@ -156,7 +156,7 @@ export default function PunchImportModal({
       return `${year}-${month}-${day}`;
     }
 
-    // Matches YYYY/MM/DD
+    //Matches YYYY/MM/DD
     const ymdMatch = cleaned.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
     if (ymdMatch) {
       const year = ymdMatch[1];
@@ -168,12 +168,12 @@ export default function PunchImportModal({
     return '';
   };
 
-  // Robust Time Parser
+  //Robust Time Parser
   const parseTimeRobustly = (raw: string): string => {
     if (!raw) return '';
     const cleaned = raw.trim();
 
-    // If it has a full timestamp e.g. "13/07/2026 09:15:22" or "2026-07-13 09:15"
+    //If it has a full timestamp e.g. "13/07/2026 09:15:22" or "2026-07-13 09:15"
     const timeOnlyMatch = cleaned.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i);
     if (timeOnlyMatch) {
       let hours = parseInt(timeOnlyMatch[1], 10);
@@ -201,7 +201,7 @@ export default function PunchImportModal({
     setFileName(name);
     setFileContent(text);
 
-    // Auto-detect separator
+    //Auto-detect separator
     const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line !== '');
     if (lines.length === 0) {
       setError(t.errEmptyFile);
@@ -217,7 +217,7 @@ export default function PunchImportModal({
     if (tabs > commas && tabs > semicolons) sep = '\t';
     else if (semicolons > commas && semicolons > tabs) sep = ';';
 
-    // Parse CSV rows safely keeping quotes in mind
+    //Parse CSV rows safely keeping quotes in mind
     const parsedRows: string[][] = [];
     
     lines.forEach(line => {
@@ -227,7 +227,7 @@ export default function PunchImportModal({
       } else if (sep === ';') {
         cols = line.split(';');
       } else {
-        // Regex to parse comma separated values respecting double quotes
+        //Regex to parse comma separated values respecting double quotes
         const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
         cols = matches.map(val => val.replace(/^"|"$/g, '').trim());
       }
@@ -243,7 +243,7 @@ export default function PunchImportModal({
     setHeaders(headerCols);
     setRows(parsedRows.slice(1));
 
-    // Guess column indices based on header names
+    //Guess column indices based on header names
     let empIdIdx = -1;
     let dateIdx = -1;
     let checkInIdx = -1;
@@ -265,7 +265,7 @@ export default function PunchImportModal({
       }
     });
 
-    // If still undecided, use default first few indices
+    //If still undecided, use default first few indices
     setMapEmpId(empIdIdx !== -1 ? empIdIdx : 0);
     setMapDate(dateIdx !== -1 ? dateIdx : 1);
     setMapCheckIn(checkInIdx !== -1 ? checkInIdx : 2);
@@ -286,7 +286,7 @@ export default function PunchImportModal({
     reader.readAsText(file);
   };
 
-  // Drag and Drop support
+  //Drag and Drop support
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
@@ -312,8 +312,8 @@ export default function PunchImportModal({
 
     setError('');
     
-    // Group records by Employee ID and Date to merge duplicates if necessary
-    // Some machines write checkIn and checkOut as separate rows, or write multiple swipe logs
+    //Group records by Employee ID and Date to merge duplicates if necessary
+    //Some machines write checkIn and checkOut as separate rows, or write multiple swipe logs
     const punchLogsGrouped: { [key: string]: { checkInRaw: string; checkOutRaw: string; empId: string; dateStr: string } } = {};
 
     rows.forEach(row => {
@@ -324,10 +324,10 @@ export default function PunchImportModal({
       const parsedDate = parseDateRobustly(rawDate);
       if (!parsedDate) return;
 
-      // Match Employee cleanly (fuzzy match or exact)
+      //Match Employee cleanly (fuzzy match or exact)
       const matchedEmp = employees.find(e => 
         e.id.trim().toLowerCase() === rawEmpId.toLowerCase() || 
-        // Handles cases where excel exports numeric ID e.g. "1" but employee ID is "EMP001"
+        //Handles cases where excel exports numeric ID e.g. "1" but employee ID is "EMP001"
         e.id.trim().toLowerCase().replace(/^emp0*/, '') === rawEmpId.toLowerCase().replace(/^0*/, '')
       );
 
@@ -348,7 +348,7 @@ export default function PunchImportModal({
           checkOutRaw: checkOutParsed
         };
       } else {
-        // If row already exists, merge swipe times intelligently
+        //If row already exists, merge swipe times intelligently
         if (checkInParsed) {
           if (!punchLogsGrouped[key].checkInRaw || checkInParsed < punchLogsGrouped[key].checkInRaw) {
             punchLogsGrouped[key].checkInRaw = checkInParsed;
@@ -362,7 +362,7 @@ export default function PunchImportModal({
       }
     });
 
-    // Create final Attendance list and calculate Overtime
+    //Create final Attendance list and calculate Overtime
     const finalAttendanceRecords: Attendance[] = [];
 
     Object.values(punchLogsGrouped).forEach(log => {
@@ -373,7 +373,7 @@ export default function PunchImportModal({
       let checkOut = log.checkOutRaw;
       let overtimeHours = 0;
 
-      // If no checkIn but checkOut exists, or checkIn but no checkOut -> Miss Punch
+      //If no checkIn but checkOut exists, or checkIn but no checkOut -> Miss Punch
       if (checkIn && !checkOut) {
         status = 'Miss Punch';
       } else if (!checkIn && checkOut) {
@@ -384,7 +384,7 @@ export default function PunchImportModal({
         status = 'Absent';
       }
 
-      // Calculate Overtime automatically
+      //Calculate Overtime automatically
       if (emp && status === 'Present' && checkIn && checkOut) {
         const timings = getShiftTimings(emp.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
         const regularHours = getShiftDurationHours(timings.checkIn, timings.checkOut);
@@ -394,7 +394,7 @@ export default function PunchImportModal({
 
         if (!isNaN(inH) && !isNaN(outH)) {
           let totalHours = (outH + outM / 60) - (inH + inM / 60);
-          if (totalHours < 0) totalHours += 24; // overnight shift
+          if (totalHours < 0) totalHours += 24; //overnight shift
 
           if (totalHours > regularHours) {
             const calculatedOvertime = Math.round((totalHours - regularHours) * 10) / 10;
@@ -410,12 +410,12 @@ export default function PunchImportModal({
         checkIn,
         checkOut,
         overtimeHours,
-        remarks: language === 'en' ? 'Punch Machine Imported' : 'पंच मशीन से आयातित',
+        remarks: 'Punch Machine Imported',
         approvalStatus: status === 'Miss Punch' ? 'Pending' : 'Approved'
       });
     });
 
-    // Sort by date then employeeId
+    //Sort by date then employeeId
     finalAttendanceRecords.sort((a, b) => a.date.localeCompare(b.date) || a.employeeId.localeCompare(b.employeeId));
 
     setParsedRecords(finalAttendanceRecords);
@@ -427,7 +427,7 @@ export default function PunchImportModal({
     try {
       await onImportComplete(parsedRecords);
       onClose();
-      // Reset State
+      //Reset State
       setStep(1);
       setParsedRecords([]);
       setFileName('');
@@ -505,15 +505,14 @@ export default function PunchImportModal({
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-800">{t.dragDropText}</p>
-                  <p className="text-xs text-gray-400 mt-1 font-medium">{language === 'en' ? "Supports CSV or TXT file exports" : "CSV या TXT फ़ाइल एक्सपोर्ट्स का समर्थन करता है"}</p>
+                  <p className="text-xs text-gray-400 mt-1 font-medium">{"Supports CSV or TXT file exports"}</p>
                 </div>
                 <input 
                   type="file" 
                   ref={fileInputRef} 
                   onChange={handleFileUpload}
                   accept=".csv,.txt"
-                  className="hidden" 
-                />
+                  className="hidden" />
               </div>
 
               <div className="p-4 bg-amber-50/50 border border-amber-200/50 rounded-2xl flex items-start gap-3">
@@ -606,7 +605,7 @@ export default function PunchImportModal({
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1">
                   <HelpCircle className="w-4 h-4 text-gray-400" />
-                  {language === 'en' ? "Sample data preview (First row):" : "डेटा पूर्वावलोकन (पहली पंक्ति):"}
+                  {"Sample data preview (First row):"}
                 </h5>
                 <div className="overflow-x-auto text-xs font-mono bg-white p-3 rounded-xl border border-gray-200/60 leading-relaxed text-gray-600">
                   {headers.map((h, idx) => {
@@ -726,7 +725,7 @@ export default function PunchImportModal({
               disabled={isSubmitting}
               className="px-4 py-2 border border-gray-200 hover:bg-gray-100 text-gray-500 text-xs font-bold rounded-xl transition-colors cursor-pointer"
             >
-              {language === 'en' ? 'Cancel' : 'रद्द करें'}
+              {'Cancel'}
             </button>
             
             {step === 1 && (

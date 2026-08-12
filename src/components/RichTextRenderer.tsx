@@ -18,17 +18,17 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
 }) => {
   if (!content) return null;
 
-  // Check if content contains HTML tags
+  //Check if content contains HTML tags
   const containsHtml = /<[a-z][\s\S]*>/i.test(content);
 
   if (containsHtml) {
-    // Basic sanitization: strip script tags or inline event handlers
+    //Basic sanitization: strip script tags or inline event handlers
     let sanitizedHtml = content
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/ on\w+="[^"]*"/gi, '')
-      .replace(/ on\w+='[^']*'/gi, '');
+      .replace(/on\w+="[^"]*"/gi, '')
+      .replace(/on\w+='[^']*'/gi, '');
 
-    // Ensure <a> links inside HTML have target="_blank" and rel="noopener noreferrer"
+    //Ensure <a> links inside HTML have target="_blank" and rel="noopener noreferrer"
     sanitizedHtml = sanitizedHtml.replace(
       /<a\s+(?:[^>]*?\s+)?href="([^"]*)"([^>]*)>/gi,
       (_match, url, rest) => {
@@ -40,12 +40,11 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
     return (
       <div
         className={`rich-text-content space-y-2 leading-relaxed text-slate-700 dark:text-slate-200 text-xs ${className}`}
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-      />
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
     );
   }
 
-  // Fallback for Plain Text: convert URLs to clickable links and preserve linebreaks
+  //Fallback for Plain Text: convert URLs to clickable links and preserve linebreaks
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = content.split(urlRegex);
 

@@ -46,7 +46,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const isUpdatingRef = useRef(false);
 
-  // Sync value into contentEditable when value prop changes externally
+  //Sync value into contentEditable when value prop changes externally
   useEffect(() => {
     if (editorRef.current && !isUpdatingRef.current && !isCodeView) {
       if (editorRef.current.innerHTML !== value) {
@@ -59,7 +59,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (editorRef.current) {
       isUpdatingRef.current = true;
       const html = editorRef.current.innerHTML;
-      // Treat empty editor as empty string
+      //Treat empty editor as empty string
       const cleanHtml = html === '<br>' || html === '<div><br></div>' ? '' : html;
       onChange(cleanHtml);
       setTimeout(() => {
@@ -77,7 +77,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     handleInput();
   };
 
-  // Save current selection range before opening link dialog
+  //Save current selection range before opening link dialog
   const handleOpenLinkDialog = () => {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) {
@@ -106,7 +106,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       editorRef.current.focus();
     }
 
-    // Restore selection if saved
+    //Restore selection if saved
     const sel = window.getSelection();
     if (sel && savedSelection) {
       sel.removeAllRanges();
@@ -116,10 +116,10 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     const labelToUse = linkText.trim() || targetUrl;
 
     if (sel && !sel.isCollapsed) {
-      // Create link on selected text
+      //Create link on selected text
       document.execCommand('createLink', false, targetUrl);
     } else {
-      // Insert new HTML hyperlink
+      //Insert new HTML hyperlink
       const anchorHtml = `<a href="${targetUrl}" target="_blank" rel="noopener noreferrer">${labelToUse}</a>`;
       document.execCommand('insertHTML', false, anchorHtml);
     }
@@ -166,7 +166,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onClick={() => executeCommand('bold')}
               disabled={isCodeView || isPreviewMode}
               className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
-              title={isEn ? 'Bold (Ctrl+B)' : 'बोल्ड करें'}
+              title={'Bold (Ctrl+B)'}
             >
               <Bold className="w-3.5 h-3.5" />
             </button>
@@ -176,7 +176,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onClick={() => executeCommand('italic')}
               disabled={isCodeView || isPreviewMode}
               className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
-              title={isEn ? 'Italic (Ctrl+I)' : 'तिरछा (Italic)'}
+              title={'Italic (Ctrl+I)'}
             >
               <Italic className="w-3.5 h-3.5" />
             </button>
@@ -186,7 +186,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onClick={() => executeCommand('underline')}
               disabled={isCodeView || isPreviewMode}
               className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
-              title={isEn ? 'Underline (Ctrl+U)' : 'रेखांकित (Underline)'}
+              title={'Underline (Ctrl+U)'}
             >
               <Underline className="w-3.5 h-3.5" />
             </button>
@@ -198,7 +198,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onClick={() => executeCommand('insertUnorderedList')}
               disabled={isCodeView || isPreviewMode}
               className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
-              title={isEn ? 'Bullet List' : 'बुलेट सूची'}
+              title={'Bullet List'}
             >
               <List className="w-3.5 h-3.5" />
             </button>
@@ -208,7 +208,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onClick={() => executeCommand('insertOrderedList')}
               disabled={isCodeView || isPreviewMode}
               className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
-              title={isEn ? 'Numbered List' : 'संख्यात्मक सूची'}
+              title={'Numbered List'}
             >
               <ListOrdered className="w-3.5 h-3.5" />
             </button>
@@ -220,7 +220,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onClick={handleOpenLinkDialog}
               disabled={isCodeView || isPreviewMode}
               className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
-              title={isEn ? 'Insert Hyperlink' : 'हाइपरलिंक जोड़ें'}
+              title={'Insert Hyperlink'}
             >
               <LinkIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             </button>
@@ -230,7 +230,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onClick={handleRemoveLink}
               disabled={isCodeView || isPreviewMode}
               className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
-              title={isEn ? 'Remove Hyperlink' : 'लिंक हटाएँ'}
+              title={'Remove Hyperlink'}
             >
               <Unlink className="w-3.5 h-3.5 text-rose-500" />
             </button>
@@ -240,7 +240,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onClick={handleHighlight}
               disabled={isCodeView || isPreviewMode}
               className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
-              title={isEn ? 'Highlight Text' : 'हाइलाइट करें'}
+              title={'Highlight Text'}
             >
               <Highlighter className="w-3.5 h-3.5 text-amber-500" />
             </button>
@@ -250,7 +250,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onClick={() => executeCommand('removeFormat')}
               disabled={isCodeView || isPreviewMode}
               className="p-1.5 rounded text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
-              title={isEn ? 'Clear Formatting' : 'फॉर्मेटिंग साफ़ करें'}
+              title={'Clear Formatting'}
             >
               <Eraser className="w-3.5 h-3.5" />
             </button>
@@ -269,10 +269,10 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                   ? 'bg-[#03623c] text-white' 
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700'
               }`}
-              title={isEn ? 'Live Card Preview' : 'लाइव पूर्वावलोकन'}
+              title={'Live Card Preview'}
             >
               <Eye className="w-3 h-3" />
-              <span>{isEn ? 'Preview' : 'पूर्वावलोकन'}</span>
+              <span>{'Preview'}</span>
             </button>
 
             <button
@@ -286,10 +286,10 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                   ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900' 
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700'
               }`}
-              title={isEn ? 'Toggle HTML Source Code' : 'एचटीएमएल कोड'}
+              title={'Toggle HTML Source Code'}
             >
               <Code className="w-3 h-3" />
-              <span>{isEn ? 'HTML' : 'कोड'}</span>
+              <span>{'HTML'}</span>
             </button>
           </div>
         </div>
@@ -297,38 +297,36 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         {/* Editor Body */}
         <div className="relative p-3">
           {isPreviewMode ? (
-            /* Live Render Preview Mode */
             <div 
               style={{ minHeight }}
               className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 leading-relaxed font-sans"
             >
+              {/* Live Render Preview Mode */}
               <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-1 flex items-center gap-1">
                 <Eye className="w-3 h-3" />
-                {isEn ? 'Announcement Display Preview' : 'सूचना प्रदर्शन पूर्वावलोकन'}
+                {'Announcement Display Preview'}
               </div>
               {value ? (
                 <div 
                   className="space-y-1"
-                  dangerouslySetInnerHTML={{ __html: value }} 
-                />
+                  dangerouslySetInnerHTML={{ __html: value }} />
               ) : (
                 <span className="text-slate-400 italic text-[11px]">
-                  {isEn ? 'No description text entered yet.' : 'अभी तक कोई विवरण नहीं लिखा गया है।'}
+                  {'No description text entered yet.'}
                 </span>
               )}
             </div>
           ) : isCodeView ? (
-            /* HTML Source Code Mode */
             <textarea
+              /* HTML Source Code Mode */
               value={value}
               onChange={(e) => onChange(e.target.value)}
               style={{ minHeight }}
               placeholder="<h1>Heading</h1><p>Notice text...</p>"
-              className="w-full font-mono text-[11px] p-2 bg-slate-900 text-emerald-400 rounded-lg focus:outline-none resize-y leading-relaxed"
-            />
+              className="w-full font-mono text-[11px] p-2 bg-slate-900 text-emerald-400 rounded-lg focus:outline-none resize-y leading-relaxed" />
           ) : (
-            /* Interactive WYSIWYG Editor */
             <div className="relative">
+              {/* Interactive WYSIWYG Editor */}
               {!value && (
                 <div className="absolute top-0 left-0 text-slate-400 text-xs font-medium pointer-events-none select-none italic">
                   {placeholder}
@@ -339,8 +337,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 contentEditable
                 onInput={handleInput}
                 style={{ minHeight }}
-                className="focus:outline-none text-xs text-slate-800 dark:text-slate-100 font-semibold leading-relaxed overflow-y-auto max-h-[220px] [&_a]:text-[#03623c] [&_a]:font-bold [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-black [&_strong]:font-black [&_mark]:bg-amber-200 [&_mark]:px-0.5 [&_mark]:rounded"
-              />
+                className="focus:outline-none text-xs text-slate-800 dark:text-slate-100 font-semibold leading-relaxed overflow-y-auto max-h-[220px] [&_a]:text-[#03623c] [&_a]:font-bold [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-black [&_strong]:font-black [&_mark]:bg-amber-200 [&_mark]:px-0.5 [&_mark]:rounded" />
             </div>
           )}
         </div>
@@ -354,7 +351,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
               <div className="flex items-center gap-2">
                 <LinkIcon className="w-4 h-4 text-[#03623c] dark:text-emerald-400" />
                 <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-                  {isEn ? 'Insert Hyperlink' : 'हाइपरलिंक संलग्न करें'}
+                  {'Insert Hyperlink'}
                 </h4>
               </div>
               <button
@@ -369,20 +366,19 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             <form onSubmit={handleInsertLink} className="space-y-3">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  {isEn ? 'Link Text / Label' : 'लिंक नाम / लेबल'}
+                  {'Link TextLabel'}
                 </label>
                 <input
                   type="text"
                   value={linkText}
                   onChange={(e) => setLinkText(e.target.value)}
-                  placeholder={isEn ? 'e.g. Download Guidelines PDF' : 'उदा. गाइडलाइंस डाउनलोड करें'}
-                  className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c]"
-                />
+                  placeholder={'e.g. Download Guidelines PDF'}
+                  className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c]" />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  {isEn ? 'Destination URL' : 'गंतव्य URL वेब लिंक'}
+                  {'Destination URL'}
                 </label>
                 <input
                   type="url"
@@ -390,8 +386,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   placeholder="https://example.com/document.pdf"
-                  className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono font-semibold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c]"
-                />
+                  className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono font-semibold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c]" />
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">
@@ -400,14 +395,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                   onClick={() => setShowLinkDialog(false)}
                   className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                 >
-                  {isEn ? 'Cancel' : 'रद्द करें'}
+                  {'Cancel'}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[#03623c] text-white hover:bg-[#024a2e] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  {isEn ? 'Insert Link' : 'लिंक जोड़ें'}
+                  {'Insert Link'}
                 </button>
               </div>
             </form>

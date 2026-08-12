@@ -1,8 +1,8 @@
-import { Employee, Attendance, PayrollRecord, AdminSettings } from '../types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, JobPosting, Candidate, CandidateFollowUp } from '../types';
 
 const SPREADSHEET_NAME = 'Payroll_Management_System_Data';
 
-// Helper to convert index to Column Letter (e.g., 0 -> A, 25 -> Z, 26 -> AA, 27 -> AB...)
+//Helper to convert index to Column Letter (e.g., 0 -> A, 25 -> Z, 26 -> AA, 27 -> AB...)
 function getColumnLetter(colIndex: number): string {
   let temp = colIndex;
   let letter = '';
@@ -13,7 +13,7 @@ function getColumnLetter(colIndex: number): string {
   return letter;
 }
 
-// Full specifications of Google Sheet columns
+//Full specifications of Google Sheet columns
 export const EMPLOYEE_COLUMNS: { key: keyof Employee; header: string }[] = [
   { key: 'id', header: 'ID' },
   { key: 'name', header: 'Name' },
@@ -122,7 +122,7 @@ export const PAYROLL_COLUMNS: { key: keyof PayrollRecord; header: string }[] = [
   { key: 'attendanceFine', header: 'Attendance Fine' }
 ];
 
-// Helper to check response
+//Helper to check response
 async function checkResponse(res: Response, errorMsg: string) {
   if (!res.ok) {
     const errorText = await res.text();
@@ -201,7 +201,7 @@ export async function createSpreadsheet(token: string): Promise<string> {
   const data = await res.json();
   const spreadsheetId = data.spreadsheetId;
 
-  // Initialize headers
+  //Initialize headers
   await initHeaders(spreadsheetId, token);
 
   return spreadsheetId;
@@ -211,7 +211,7 @@ export async function createSpreadsheet(token: string): Promise<string> {
  * Initialize headers for all sheets dynamically based on columns specifications
  */
 export async function initHeaders(spreadsheetId: string, token: string) {
-  // Safe check to ensure the 'Settings' sheet exists in the spreadsheet
+  //Safe check to ensure the 'Settings' sheet exists in the spreadsheet
   try {
     const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
     const metaRes = await fetch(metaUrl, {
@@ -287,7 +287,7 @@ export async function initHeaders(spreadsheetId: string, token: string) {
  * Reads Employees from the Google Sheet
  */
 export async function fetchEmployees(spreadsheetId: string, token: string): Promise<Employee[]> {
-  const empEndLetter = getColumnLetter(EMPLOYEE_COLUMNS.length); // includes Metadata
+  const empEndLetter = getColumnLetter(EMPLOYEE_COLUMNS.length); //includes Metadata
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Employees!A1:${empEndLetter}2000`;
   const res = await fetch(url, {
     headers: {
@@ -300,7 +300,7 @@ export async function fetchEmployees(spreadsheetId: string, token: string): Prom
   const rows = data.values || [];
   if (rows.length === 0) return [];
 
-  // Match headers to support both old and new layouts seamlessly
+  //Match headers to support both old and new layouts seamlessly
   const headers: string[] = rows[0] || [];
   const dataRows = rows.slice(1);
 
@@ -365,7 +365,7 @@ export async function fetchEmployees(spreadsheetId: string, token: string): Prom
       }
     });
 
-    // Merge legacy or additional metadata from the JSON column if available
+    //Merge legacy or additional metadata from the JSON column if available
     if (metadataColIdx !== -1 && row[metadataColIdx]) {
       try {
         const metadata = JSON.parse(row[metadataColIdx]);
@@ -383,7 +383,7 @@ export async function fetchEmployees(spreadsheetId: string, token: string): Prom
  * Reads Attendance from the Google Sheet
  */
 export async function fetchAttendance(spreadsheetId: string, token: string): Promise<Attendance[]> {
-  const attEndLetter = getColumnLetter(ATTENDANCE_COLUMNS.length); // includes Metadata
+  const attEndLetter = getColumnLetter(ATTENDANCE_COLUMNS.length); //includes Metadata
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Attendance!A1:${attEndLetter}10000`;
   const res = await fetch(url, {
     headers: {
@@ -459,7 +459,7 @@ export async function fetchAttendance(spreadsheetId: string, token: string): Pro
  * Reads Payroll Records from the Google Sheet
  */
 export async function fetchPayrollHistory(spreadsheetId: string, token: string): Promise<PayrollRecord[]> {
-  const payEndLetter = getColumnLetter(PAYROLL_COLUMNS.length); // includes Metadata
+  const payEndLetter = getColumnLetter(PAYROLL_COLUMNS.length); //includes Metadata
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Payroll_History!A1:${payEndLetter}5000`;
   const res = await fetch(url, {
     headers: {
@@ -544,7 +544,7 @@ export async function fetchPayrollHistory(spreadsheetId: string, token: string):
  * Saves all Employees back to the sheet with explicit columns
  */
 export async function saveEmployees(spreadsheetId: string, employees: Employee[], token: string): Promise<void> {
-  const empEndLetter = getColumnLetter(EMPLOYEE_COLUMNS.length); // includes Metadata
+  const empEndLetter = getColumnLetter(EMPLOYEE_COLUMNS.length); //includes Metadata
   const clearRange = `Employees!A2:${empEndLetter}2000`;
   const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${clearRange}:clear`;
   await fetch(clearUrl, {
@@ -574,7 +574,7 @@ export async function saveEmployees(spreadsheetId: string, employees: Employee[]
       }
     });
 
-    // Residual fields that are not defined in the schema go to Metadata column
+    //Residual fields that are not defined in the schema go to Metadata column
     const metadata: any = {};
     Object.keys(emp).forEach(key => {
       if (!mappedKeys.has(key as keyof Employee)) {
@@ -606,7 +606,7 @@ export async function saveEmployees(spreadsheetId: string, employees: Employee[]
  * Saves all Attendance records back to the sheet with explicit columns
  */
 export async function saveAttendance(spreadsheetId: string, attendance: Attendance[], token: string): Promise<void> {
-  const attEndLetter = getColumnLetter(ATTENDANCE_COLUMNS.length); // includes Metadata
+  const attEndLetter = getColumnLetter(ATTENDANCE_COLUMNS.length); //includes Metadata
   const clearRange = `Attendance!A2:${attEndLetter}10000`;
   const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${clearRange}:clear`;
   await fetch(clearUrl, {
@@ -662,7 +662,7 @@ export async function saveAttendance(spreadsheetId: string, attendance: Attendan
  * Saves all Payroll Records back to the sheet with explicit columns
  */
 export async function savePayrollHistory(spreadsheetId: string, payroll: PayrollRecord[], token: string): Promise<void> {
-  const payEndLetter = getColumnLetter(PAYROLL_COLUMNS.length); // includes Metadata
+  const payEndLetter = getColumnLetter(PAYROLL_COLUMNS.length); //includes Metadata
   const clearRange = `Payroll_History!A2:${payEndLetter}5000`;
   const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${clearRange}:clear`;
   await fetch(clearUrl, {
@@ -866,4 +866,178 @@ export async function fetchAdminSettings(spreadsheetId: string, token: string): 
 
   if (Object.keys(settings).length === 0) return null;
   return settings as AdminSettings;
+}
+
+/**
+ * Ensures recruitment sheets exist in the spreadsheet and syncs:
+ * 1. Job_Openings
+ * 2. Active_Candidates
+ * 3. Candidate_FollowUps (Interview & Discussion Logs)
+ * 4. Rejected_Candidates (Archived auto-transferred candidates)
+ */
+export async function syncRecruitmentToSheets(
+  spreadsheetId: string,
+  token: string,
+  jobs: JobPosting[],
+  candidates: Candidate[]
+): Promise<{ success: boolean; message: string }> {
+  try {
+    //Step 1: Ensure sheets exist
+    const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
+    const metaRes = await fetch(metaUrl, { headers: { Authorization: `Bearer ${token}` } });
+    if (!metaRes.ok) {
+      throw new Error('Failed to retrieve spreadsheet metadata');
+    }
+
+    const metaData = await metaRes.json();
+    const existingTitles: string[] = metaData.sheets?.map((s: any) => s.properties?.title) || [];
+
+    const requiredSheets = ['Job_Openings', 'Active_Candidates', 'Candidate_FollowUps', 'Rejected_Candidates'];
+    const sheetsToAdd = requiredSheets.filter(t => !existingTitles.includes(t));
+
+    if (sheetsToAdd.length > 0) {
+      const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+      await fetch(updateUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requests: sheetsToAdd.map(title => ({
+            addSheet: { properties: { title } }
+          }))
+        })
+      });
+    }
+
+    //Step 2: Prepare Job_Openings sheet
+    const jobHeaders = ['Job ID', 'Job Title', 'Department', 'Branch Location', 'Type', 'Openings', 'Status', 'Target CTC Range', 'Urgency', 'Director Name', 'Target Date', 'Posted Date'];
+    const jobRows = jobs.map(j => [
+      j.id,
+      j.title,
+      j.department,
+      j.location,
+      j.type,
+      j.openings,
+      j.status,
+      `₹${(j.targetCtcMin || 0).toLocaleString()} - ₹${(j.targetCtcMax || 0).toLocaleString()}`,
+      j.urgency || 'Medium',
+      j.directorName || '',
+      j.targetDate || '',
+      j.postedDate
+    ]);
+
+    //Step 3: Separate Active vs Rejected Candidates
+    const activeCandidates = candidates.filter(c => c.stage !== 'Rejected' && !c.isArchived);
+    const rejectedCandidates = candidates.filter(c => c.stage === 'Rejected' || c.isArchived);
+
+    //Active Candidates rows
+    const candidateHeaders = ['Candidate ID', 'Name', 'Phone', 'Email', 'Job Title', 'Stage', 'Interview Round', 'Mode (Telephonic/Physical/Online)', 'Interview Date & Time', 'Interviewer', 'Expected CTC', 'Experience (Yrs)', 'Applied Date', 'HR Recruiter', 'NotesRemarks'];
+    const candidateRows = activeCandidates.map(c => [
+      c.id,
+      c.name,
+      c.phone,
+      c.email,
+      c.jobTitle || 'General Pool',
+      c.stage,
+      c.interviewRound || '-',
+      c.interviewType || 'Telephonic',
+      c.interviewDate ? `${c.interviewDate} ${c.interviewTime || ''}` : '-',
+      c.interviewerName || '-',
+      c.expectedSalary ? `₹${c.expectedSalary.toLocaleString()}` : '-',
+      c.experienceYears || 0,
+      c.appliedDate,
+      c.hrName || 'HR Team',
+      c.notes || ''
+    ]);
+
+    //Step 4: Candidate FollowUp Discussion Logs
+    const followUpHeaders = ['FollowUp ID', 'Candidate ID', 'Candidate Name', 'Date & Time', 'Round Name', 'Interview Mode', 'Conducted ByInterviewer', 'Stage', 'Discussion Summary (Kya baat hua)'];
+    const allFollowUps: CandidateFollowUp[] = [];
+    candidates.forEach(c => {
+      if (c.followUpHistory && c.followUpHistory.length > 0) {
+        allFollowUps.push(...c.followUpHistory);
+      }
+    });
+
+    const followUpRows = allFollowUps.map(f => [
+      f.id,
+      f.candidateId,
+      f.candidateName,
+      `${f.date} ${f.time || ''}`,
+      f.round,
+      f.interviewType,
+      f.interviewer || f.conductedBy || '-',
+      f.stageAtTime,
+      f.discussionSummary
+    ]);
+
+    //Step 5: Rejected Candidates rows
+    const rejectedHeaders = ['Candidate ID', 'Name', 'Phone', 'Email', 'Job Title', 'Rejection Reason', 'Rejection Date', 'Final Stage', 'RemarksNotes'];
+    const rejectedRows = rejectedCandidates.map(c => [
+      c.id,
+      c.name,
+      c.phone,
+      c.email,
+      c.jobTitle || 'General Pool',
+      c.rejectionReason || 'DeclinedNot Suitable',
+      c.rejectedDate || c.appliedDate,
+      c.stage,
+      c.notes || ''
+    ]);
+
+    //Step 6: Batch Update Values to Google Sheets
+    const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`;
+
+    //Clear existing contents first
+    const clearRanges = [
+      'Job_Openings!A1:Z5000',
+      'Active_Candidates!A1:Z5000',
+      'Candidate_FollowUps!A1:Z5000',
+      'Rejected_Candidates!A1:Z5000'
+    ];
+
+    for (const range of clearRanges) {
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:clear`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    }
+
+    const payload = {
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        { range: `Job_Openings!A1:L${jobRows.length + 1}`, values: [jobHeaders, ...jobRows] },
+        { range: `Active_Candidates!A1:O${candidateRows.length + 1}`, values: [candidateHeaders, ...candidateRows] },
+        { range: `Candidate_FollowUps!A1:I${followUpRows.length + 1}`, values: [followUpHeaders, ...followUpRows] },
+        { range: `Rejected_Candidates!A1:I${rejectedRows.length + 1}`, values: [rejectedHeaders, ...rejectedRows] }
+      ]
+    };
+
+    const saveRes = await fetch(batchUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!saveRes.ok) {
+      const errText = await saveRes.text();
+      throw new Error(`Google Sheets API Error: ${errText}`);
+    }
+
+    return {
+      success: true,
+      message: `Successfully synced ${jobs.length} Job Openings, ${activeCandidates.length} Active Candidates, ${allFollowUps.length} FollowUp Logs, and ${rejectedCandidates.length} Rejected Candidates to Google Sheets!`
+    };
+  } catch (e: any) {
+    console.error('Recruitment Google Sheet Sync Error:', e);
+    return {
+      success: false,
+      message: e.message || 'Failed to sync recruitment data to Google Sheets.'
+    };
+  }
 }

@@ -151,7 +151,7 @@ export interface UserRoleAccount {
   id: string;
   username: string;
   password?: string;
-  role: 'admin' | 'director' | 'sub_admin' | 'hr' | 'branch_manager' | 'employee';
+  role: UserRole;
   name: string;
   email?: string;
   mobileNo?: string;
@@ -210,6 +210,11 @@ export interface AdminSettings {
   senderEmail?: string;
   enablePasswordLoginOtp?: boolean;
   enableAdminWelcomePopup?: boolean;
+  // Recruitment & Hiring Settings
+  recruitmentAutoNotify?: boolean;
+  defaultInterviewVenue?: string;
+  defaultInterviewTime?: string;
+  jobOpeningsList?: string[];
   // WhatsApp & Email Automation Settings
   whatsappUsername?: string;
   whatsappPassword?: string;
@@ -237,6 +242,7 @@ export interface AdminSettings {
     id: string;
     name: string;
     category: 'whatsapp' | 'email' | 'both';
+    purpose?: string;
     whatsappBody?: string;
     emailSubject?: string;
     emailBody?: string;
@@ -374,4 +380,206 @@ export interface TransactionalEmailLog {
   senderEmail?: string;
   bodyPreview?: string;
 }
+
+// Phase 2 — Hiring (Recruitment & Onboarding)
+export interface JobPosting {
+  id: string;
+  title: string;
+  department: string;
+  location: string;
+  type: 'Full-time' | 'Part-time' | 'Contract' | 'Internship';
+  openings: number;
+  status: 'Open' | 'Closed' | 'Draft' | 'On Hold';
+  postedDate: string;
+  description: string;
+  requirements?: string;
+  targetCtcMin?: number;
+  targetCtcMax?: number;
+  hiringManager?: string;
+  urgency?: 'High' | 'Medium' | 'Low';
+  experienceLevel?: string;
+  directorName?: string;
+  targetDate?: string;
+}
+
+export interface CandidateFollowUp {
+  id: string;
+  candidateId: string;
+  candidateName: string;
+  timestamp: string; // ISO string or format
+  date: string; // YYYY-MM-DD
+  time?: string;
+  round: 'First Round' | 'Second Round' | 'HR Interview' | 'Director Interview' | 'Technical Round' | 'Final Round' | 'Screening' | string;
+  interviewType: 'Telephonic' | 'Physical' | 'Online';
+  interviewer?: string;
+  stageAtTime: Candidate['stage'];
+  discussionSummary: string; // What was discussed with candidate ("kya baat hua hai")
+  nextFollowUpDate?: string;
+  conductedBy?: string;
+}
+
+export interface Candidate {
+  id: string;
+  jobId?: string;
+  jobTitle?: string;
+  name: string;
+  email: string;
+  phone: string;
+  experienceYears: number;
+  stage: 'Applied' | 'Screening' | 'HR Interview' | 'Director Interview' | 'Interview' | 'Offered' | 'Hired' | 'Rejected';
+  appliedDate: string;
+  interviewDate?: string;
+  interviewTime?: string;
+  interviewType?: 'Telephonic' | 'Physical' | 'Online';
+  interviewRound?: 'First Round' | 'Second Round' | 'HR Interview' | 'Director Interview' | 'Technical Round' | 'Final Round';
+  interviewerName?: string;
+  interviewVenue?: string;
+  resumeUrl?: string;
+  notes?: string;
+  expectedSalary?: number;
+  gender?: string;
+  highestEducation?: string;
+  hrName?: string;
+  location?: string;
+  source?: string;
+  rejectionReason?: string;
+  rejectedDate?: string;
+  isArchived?: boolean;
+  followUpHistory?: CandidateFollowUp[];
+}
+
+export interface OnboardingTask {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  taskName: string;
+  category: 'Documents' | 'IT Setup' | 'HR Orientation' | 'Training' | 'Asset Handover';
+  dueDate: string;
+  status: 'Pending' | 'In Progress' | 'Completed';
+  assignedTo?: string;
+  completedDate?: string;
+}
+
+export interface OfferLetter {
+  id: string;
+  candidateName: string;
+  email: string;
+  phone: string;
+  department: string;
+  designation: string;
+  offeredCtc: number;
+  joiningDate: string;
+  status: 'Draft' | 'Sent' | 'Accepted' | 'Declined';
+  issuedDate: string;
+  termsNotes?: string;
+}
+
+// Phase 3 — Employee Lifecycle (Performance, Assets, Transfer & Promotion)
+export interface PerformanceReview {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  reviewPeriod: string;
+  rating: number; // 1-5
+  keyAchievements: string;
+  areasOfImprovement: string;
+  goalsForNextPeriod: string;
+  reviewerName: string;
+  reviewDate: string;
+  status: 'Draft' | 'Submitted' | 'Approved';
+}
+
+export interface CompanyAsset {
+  id: string;
+  assetTag: string;
+  name: string;
+  category: 'Laptop' | 'Mobile Phone' | 'Tablet' | 'Vehicle' | 'ID Card / Key' | 'Peripheral' | 'Other';
+  serialNumber: string;
+  assignedToEmployeeId?: string;
+  assignedToEmployeeName?: string;
+  assignedDate?: string;
+  condition: 'New' | 'Good' | 'Damaged' | 'In Repair';
+  status: 'Available' | 'Assigned' | 'Maintenance' | 'Scrapped';
+  notes?: string;
+}
+
+export interface TransferPromotionRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  type: 'Transfer' | 'Promotion' | 'Transfer & Promotion' | 'Salary Revision';
+  currentDepartment: string;
+  newDepartment: string;
+  currentDesignation: string;
+  newDesignation: string;
+  currentSalary: number;
+  newSalary: number;
+  effectiveDate: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  approvedBy?: string;
+  reason?: string;
+  createdDate: string;
+}
+
+// Phase 5 — Exit (Exit Management & Exit Clearance)
+export interface ClearanceTaskItem {
+  id: string;
+  title: string;
+  department: 'IT' | 'HR' | 'Finance' | 'Operations' | 'Admin' | 'Security' | 'Store';
+  assignedTo?: string;
+  status: 'Pending' | 'Completed' | 'Waived';
+  completedAt?: string;
+  completedBy?: string;
+  notes?: string;
+  requiredForFnF?: boolean;
+}
+
+export interface ExitRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  designation: string;
+  resignationDate: string;
+  lastWorkingDay: string;
+  reason: 'Better Opportunity' | 'Personal Reasons' | 'Relocation' | 'Higher Studies' | 'Health' | 'Performance / Termination' | 'Other';
+  status: 'Resigned' | 'In Clearance' | 'FnF Completed' | 'Relieved' | 'Rejected';
+  noticePeriodDays: number;
+  exitInterviewNotes?: string;
+  clearance: {
+    departmentManager: boolean;
+    itAssets: boolean;
+    financeDues: boolean;
+    hrDocuments: boolean;
+  };
+  customChecklist?: ClearanceTaskItem[];
+  completionNotified?: boolean;
+  completionNotificationDate?: string;
+  fnfAmount?: number;
+  fnfStatus?: 'Pending' | 'Approved' | 'Paid';
+  relievingLetterIssued: boolean;
+  createdDate: string;
+}
+
+export type UserRole = 
+  | 'super_admin' 
+  | 'admin' 
+  | 'hr' 
+  | 'recruiter' 
+  | 'branch_manager' 
+  | 'director' 
+  | 'sub_admin' 
+  | 'employee';
+
+export interface PortalUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  employee?: Employee;
+  branch?: string;
+  branches?: string[];
+  isPrimarySuperAdmin?: boolean;
+}
+
 

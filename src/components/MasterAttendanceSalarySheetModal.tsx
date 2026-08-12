@@ -94,18 +94,18 @@ const DEFAULT_COLUMNS: ColumnVisibilityConfig = {
 };
 
 const MONTHS = [
-  { name: 'January', hindi: 'जनवरी', value: '01' },
-  { name: 'February', hindi: 'फरवरी', value: '02' },
-  { name: 'March', hindi: 'मार्च', value: '03' },
-  { name: 'April', hindi: 'अप्रैल', value: '04' },
-  { name: 'May', hindi: 'मई', value: '05' },
-  { name: 'June', hindi: 'जून', value: '06' },
-  { name: 'July', hindi: 'जुलाई', value: '07' },
-  { name: 'August', hindi: 'अगस्त', value: '08' },
-  { name: 'September', hindi: 'सितंबर', value: '09' },
-  { name: 'October', hindi: 'अक्टूबर', value: '10' },
-  { name: 'November', hindi: 'नवंबर', value: '11' },
-  { name: 'December', hindi: 'दिसंबर', value: '12' },
+  { name: 'January', hindi: "", value: '01' },
+  { name: 'February', hindi: "", value: '02' },
+  { name: 'March', hindi: "", value: '03' },
+  { name: 'April', hindi: "", value: '04' },
+  { name: 'May', hindi: "", value: '05' },
+  { name: 'June', hindi: "", value: '06' },
+  { name: 'July', hindi: "", value: '07' },
+  { name: 'August', hindi: "", value: '08' },
+  { name: 'September', hindi: "", value: '09' },
+  { name: 'October', hindi: "", value: '10' },
+  { name: 'November', hindi: "", value: '11' },
+  { name: 'December', hindi: "", value: '12' },
 ];
 
 export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySheetModalProps> = ({
@@ -129,7 +129,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isColumnDrawerOpen, setIsColumnDrawerOpen] = useState(false);
 
-  // Column visibility settings state
+  //Column visibility settings state
   const [cols, setCols] = useState<ColumnVisibilityConfig>(() => {
     try {
       const saved = localStorage.getItem('payroll_master_sheet_columns');
@@ -140,7 +140,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
     return DEFAULT_COLUMNS;
   });
 
-  // Save column visibility settings to local storage
+  //Save column visibility settings to local storage
   const handleToggleColumn = (key: keyof ColumnVisibilityConfig) => {
     setCols((prev) => {
       const updated = { ...prev, [key]: !prev[key] };
@@ -167,19 +167,19 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
 
   const selectedMonthYear = `${selectedYear}-${selectedMonth}`;
 
-  // Get total days in selected month (e.g. 31 for Aug, 30 for Sep, 28/29 for Feb)
+  //Get total days in selected month (e.g. 31 for Aug, 30 for Sep, 28/29 for Feb)
   const daysInMonth = useMemo(() => {
     const year = parseInt(selectedYear, 10);
     const month = parseInt(selectedMonth, 10);
     return new Date(year, month, 0).getDate();
   }, [selectedYear, selectedMonth]);
 
-  // Array of dates in the month: ['01', '02', ..., '31']
+  //Array of dates in the month: ['01', '02', ..., '31']
   const monthDaysArray = useMemo(() => {
     return Array.from({ length: daysInMonth }, (_, i) => String(i + 1).padStart(2, '0'));
   }, [daysInMonth]);
 
-  // Filtered employees
+  //Filtered employees
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
       if (!emp.isActive && emp.isActive !== undefined) return false;
@@ -196,7 +196,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
     });
   }, [employees, selectedBranch, selectedDepartment, searchQuery]);
 
-  // Map attendance records indexed by empId_YYYY-MM-DD
+  //Map attendance records indexed by empId_YYYY-MM-DD
   const attendanceMap = useMemo(() => {
     const map = new Map<string, Attendance>();
     attendanceRecords.forEach((rec) => {
@@ -207,7 +207,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
     return map;
   }, [attendanceRecords, selectedMonthYear]);
 
-  // Map payroll records indexed by empId
+  //Map payroll records indexed by empId
   const payrollMap = useMemo(() => {
     const map = new Map<string, PayrollRecord>();
     payrollRecords.forEach((rec) => {
@@ -218,7 +218,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
     return map;
   }, [payrollRecords, selectedMonthYear]);
 
-  // Process master data for every employee
+  //Process master data for every employee
   const masterSheetData = useMemo(() => {
     return filteredEmployees.map((emp) => {
       const empBasic = getCurrentBasicSalary(emp);
@@ -235,7 +235,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
       monthDaysArray.forEach((day) => {
         const fullDateStr = `${selectedMonthYear}-${day}`;
         const att = attendanceMap.get(`${emp.id}_${fullDateStr}`);
-        const dayOfWeek = new Date(fullDateStr).getDay(); // 0 = Sunday
+        const dayOfWeek = new Date(fullDateStr).getDay(); //0 = Sunday
 
         if (att) {
           if (att.overtimeHours) totalOvertimeHours += att.overtimeHours;
@@ -270,7 +270,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
 
       const payableDays = presentCount + halfDayCount * 0.5 + leaveCount + weeklyOffCount;
 
-      // Payroll record or calculated fallback
+      //Payroll record or calculated fallback
       const pr = payrollMap.get(emp.id);
 
       const perDayRate = empBasic / daysInMonth;
@@ -325,7 +325,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
     });
   }, [filteredEmployees, monthDaysArray, selectedMonthYear, attendanceMap, payrollMap, adminSettings, daysInMonth]);
 
-  // Grand summary stats
+  //Grand summary stats
   const grandTotals = useMemo(() => {
     let gross = 0;
     let deductions = 0;
@@ -356,12 +356,12 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
 
   if (!isOpen) return null;
 
-  // EXPORT TO EXCEL (.xlsx)
+  //EXPORT TO EXCEL (.xlsx)
   const handleExportExcel = () => {
     const monthName = MONTHS.find((m) => m.value === selectedMonth)?.name || selectedMonth;
     const sheetName = `${monthName}_${selectedYear}_Salary`;
 
-    // 1. Build Header Metadata
+    //1. Build Header Metadata
     const excelRows: any[] = [];
     excelRows.push({
       'RATHI BUILDMART - MASTER ATTENDANCE & SALARY SHEET': '',
@@ -369,9 +369,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
     excelRows.push({
       'RATHI BUILDMART - MASTER ATTENDANCE & SALARY SHEET': `Period: ${monthName} ${selectedYear} | Exported On: ${new Date().toLocaleDateString('en-IN')}`,
     });
-    excelRows.push({}); // Empty spacing row
-
-    // 2. Build Column Headers based on active `cols` settings
+    excelRows.push({}); //Empty spacing row/2. Build Column Headers based on active `cols` settings
     masterSheetData.forEach((row, idx) => {
       const exportItem: Record<string, any> = {
         'S.No.': idx + 1,
@@ -385,7 +383,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
       if (cols.bankDetails) exportItem['Bank Account'] = row.emp.bankAccountNo ? `'${row.emp.bankAccountNo}` : '-';
       if (cols.mobileNo) exportItem['Mobile No'] = row.emp.mobileNo || '-';
 
-      // Day wise attendance columns
+      //Day wise attendance columns
       if (cols.dayWiseAttendance) {
         monthDaysArray.forEach((d) => {
           const st = row.dailyStatuses[d];
@@ -393,7 +391,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
         });
       }
 
-      // Summary counts
+      //Summary counts
       if (cols.totalDays) exportItem['Total Days'] = daysInMonth;
       if (cols.presentDays) exportItem['Present (P)'] = row.presentCount;
       if (cols.halfDays) exportItem['Half Day (HD)'] = row.halfDayCount;
@@ -404,7 +402,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
       if (cols.overtimeHours) exportItem['OT Hours'] = row.totalOvertimeHours;
       if (cols.lateDays) exportItem['Late Days'] = row.lateDaysCount;
 
-      // Salary details
+      //Salary details
       if (cols.basicSalary) exportItem['Basic Salary'] = row.empBasic;
       if (cols.earnedBasic) exportItem['Earned Basic'] = row.earnedBasic;
       if (cols.hra) exportItem['HRA'] = row.hra;
@@ -414,7 +412,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
       if (cols.bonus) exportItem['Bonus'] = row.bonus;
       if (cols.grossSalary) exportItem['Gross Salary'] = row.grossSalary;
 
-      // Deductions
+      //Deductions
       if (cols.pfDeduction) exportItem['PF'] = row.pf;
       if (cols.esicDeduction) exportItem['ESIC'] = row.esic;
       if (cols.ptDeduction) exportItem['PT'] = row.pt;
@@ -422,7 +420,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
       if (cols.otherDeductions) exportItem['Other Deducts'] = row.otherDeductions;
       if (cols.totalDeductions) exportItem['Total Deductions'] = row.totalDeductions;
 
-      // Net Salary & Mode
+      //Net Salary & Mode
       if (cols.netSalary) exportItem['Net Payable Salary'] = row.netSalary;
       if (cols.paymentStatus) exportItem['Status'] = row.paymentStatus;
       if (cols.paymentMode) exportItem['Payment Mode'] = row.paymentMode;
@@ -430,7 +428,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
       excelRows.push(exportItem);
     });
 
-    // 3. Add Grand Summary Row
+    //3. Add Grand Summary Row
     const grandRow: Record<string, any> = {
       'S.No.': 'TOTAL',
       'Employee Name': `${grandTotals.count} Employees`,
@@ -444,10 +442,10 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
 
     excelRows.push(grandRow);
 
-    // Create Worksheet
+    //Create Worksheet
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
 
-    // Auto-fit column widths
+    //Auto-fit column widths
     const colWidths = Object.keys(excelRows[0] || {}).map((key) => ({
       wch: Math.max(key.length + 3, 10),
     }));
@@ -459,7 +457,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
     XLSX.writeFile(workbook, `Master_Attendance_Salary_Sheet_${monthName}_${selectedYear}.xlsx`);
   };
 
-  // EXPORT TO PDF
+  //EXPORT TO PDF
   const handleExportPDF = () => {
     const doc = new jsPDF({
       orientation: 'landscape',
@@ -470,8 +468,8 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
     const monthName = MONTHS.find((m) => m.value === selectedMonth)?.name || selectedMonth;
     const companyName = adminSettings?.companyName || 'Rathi Buildmart';
 
-    // PDF Header Title
-    doc.setFillColor(15, 23, 42); // slate-900
+    //PDF Header Title
+    doc.setFillColor(15, 23, 42); //slate-900
     doc.rect(0, 0, 297, 24, 'F');
 
     doc.setTextColor(255, 255, 255);
@@ -485,7 +483,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
 
     doc.setTextColor(30, 41, 59);
 
-    // Attendance Legend Code Bar
+    //Attendance Legend Code Bar
     doc.setFillColor(241, 245, 249);
     doc.rect(14, 28, 269, 10, 'F');
     doc.setFontSize(8);
@@ -494,16 +492,16 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
 
     let startY = 44;
 
-    // Draw Employee Table Rows
+    //Draw Employee Table Rows
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
 
-    // Table Header
+    //Table Header
     doc.setFillColor(226, 232, 240);
     doc.rect(14, startY, 269, 8, 'F');
     doc.text('ID', 16, startY + 5.5);
     doc.text('Employee Name', 32, startY + 5.5);
-    doc.text('Dept / Branch', 90, startY + 5.5);
+    doc.text('DeptBranch', 90, startY + 5.5);
     doc.text('P', 140, startY + 5.5);
     doc.text('HD', 150, startY + 5.5);
     doc.text('L', 160, startY + 5.5);
@@ -526,7 +524,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
         doc.setFont('helvetica', 'bold');
         doc.text('ID', 16, startY + 5.5);
         doc.text('Employee Name', 32, startY + 5.5);
-        doc.text('Dept / Branch', 90, startY + 5.5);
+        doc.text('DeptBranch', 90, startY + 5.5);
         doc.text('P', 140, startY + 5.5);
         doc.text('HD', 150, startY + 5.5);
         doc.text('L', 160, startY + 5.5);
@@ -546,7 +544,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
 
       doc.text(row.emp.id.substring(0, 8), 16, startY + 5);
       doc.text(row.emp.name.substring(0, 24), 32, startY + 5);
-      doc.text(`${(row.emp.department || '').substring(0, 12)} / ${(row.emp.branch || '').substring(0, 10)}`, 90, startY + 5);
+      doc.text(`${(row.emp.department || '').substring(0, 12)}${(row.emp.branch || '').substring(0, 10)}`, 90, startY + 5);
       doc.text(String(row.presentCount), 140, startY + 5);
       doc.text(String(row.halfDayCount), 150, startY + 5);
       doc.text(String(row.leaveCount), 160, startY + 5);
@@ -559,7 +557,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
       startY += 7;
     });
 
-    // Grand Summary Footer
+    //Grand Summary Footer
     startY += 3;
     doc.setFillColor(15, 23, 42);
     doc.rect(14, startY, 269, 10, 'F');
@@ -584,15 +582,13 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                {language === 'hi' ? 'मास्टर अटेंडेंस व सैलरी शीट रिपोर्ट' : 'Master Attendance & Salary Sheet Report'}
+                {'Master Attendance & Salary Sheet Report'}
                 <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-semibold">
                   Excel & PDF Exportable
                 </span>
               </h2>
               <p className="text-xs text-slate-300">
-                {language === 'hi'
-                  ? 'कर्मचारी-वार डे-वाइज़ अटेंडेंस (P, H, L) और पूर्ण वेतन ब्रेकडाउन - कॉलम कस्टमाइज़ेशन के साथ'
-                  : 'Employee-wise Day-wise Attendance (P, HD, L, A) & Salary Breakdown with Column Customization'}
+                {'Employee-wise Day-wise Attendance (P, HD, L, A) & Salary Breakdown with Column Customization'}
               </p>
             </div>
           </div>
@@ -609,7 +605,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
               id="btn-toggle-column-settings"
             >
               <Settings className="w-4 h-4 text-amber-300 animate-spin-slow" />
-              <span>{language === 'hi' ? 'कॉलम सेटिंग्स' : 'Column Settings'}</span>
+              <span>{'Column Settings'}</span>
             </button>
 
             {/* Export Excel Button */}
@@ -720,9 +716,8 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={language === 'hi' ? 'नाम या आईडी से खोजें...' : 'Search Name / ID...'}
-                className="pl-8 pr-3 py-1 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 font-medium outline-none focus:border-emerald-500 w-44 shadow-2xs"
-              />
+                placeholder={'Search NameID...'}
+                className="pl-8 pr-3 py-1 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 font-medium outline-none focus:border-emerald-500 w-44 shadow-2xs" />
             </div>
           </div>
 
@@ -747,7 +742,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4 text-amber-400" />
                 <h3 className="text-xs font-extrabold tracking-wide uppercase text-amber-300">
-                  {language === 'hi' ? 'कॉलम कस्टमाइज़ेशन सेटिंग्स (कॉलम चालू/बंद करें)' : 'Column Visibility Customization Settings'}
+                  {'Column Visibility Customization Settings'}
                 </h3>
               </div>
 
@@ -773,7 +768,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
                 <span className="text-[10px] font-extrabold uppercase text-slate-400 block mb-1">Employee Details</span>
                 <label className="flex items-center gap-2 cursor-pointer hover:text-amber-300">
                   <input type="checkbox" checked={cols.empCode} onChange={() => handleToggleColumn('empCode')} className="rounded text-amber-500" />
-                  <span>Emp Code / ID</span>
+                  <span>Emp CodeID</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer hover:text-amber-300">
                   <input type="checkbox" checked={cols.empName} onChange={() => handleToggleColumn('empName')} className="rounded text-amber-500" />
@@ -805,8 +800,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
                     type="checkbox"
                     checked={cols.dayWiseAttendance}
                     onChange={() => handleToggleColumn('dayWiseAttendance')}
-                    className="rounded text-emerald-500"
-                  />
+                    className="rounded text-emerald-500" />
                   <span>Day-Wise Grid (1..{daysInMonth})</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer hover:text-amber-300">
@@ -869,7 +863,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer hover:text-amber-300">
                   <input type="checkbox" checked={cols.da} onChange={() => handleToggleColumn('da')} className="rounded text-amber-500" />
-                  <span>DA / Conveyance</span>
+                  <span>DAConveyance</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer hover:text-amber-300 font-bold text-amber-300">
                   <input type="checkbox" checked={cols.grossSalary} onChange={() => handleToggleColumn('grossSalary')} className="rounded text-amber-500" />
@@ -894,7 +888,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer hover:text-amber-300">
                   <input type="checkbox" checked={cols.advanceDeduction} onChange={() => handleToggleColumn('advanceDeduction')} className="rounded text-amber-500" />
-                  <span>Loan / Advance</span>
+                  <span>LoanAdvance</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer hover:text-amber-300 font-bold text-rose-300">
                   <input type="checkbox" checked={cols.totalDeductions} onChange={() => handleToggleColumn('totalDeductions')} className="rounded text-rose-500" />
@@ -981,9 +975,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
                   {masterSheetData.length === 0 ? (
                     <tr>
                       <td colSpan={40} className="py-12 text-center text-slate-400 font-semibold">
-                        {language === 'hi'
-                          ? 'कोई कर्मचारी या उपस्थिति रिकॉर्ड उपलब्ध नहीं है।'
-                          : 'No matching employee or attendance records found.'}
+                        {'No matching employee or attendance records found.'}
                       </td>
                     </tr>
                   ) : (
@@ -1142,9 +1134,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-400" />
             <span>
-              {language === 'hi'
-                ? 'टिप्पणी: कॉलम चालू/बंद करने के लिए ऊपर "कॉलम सेटिंग्स" बटन पर क्लिक करें। एक्सपोर्ट वही कॉलम लेगा जो सक्रिय हैं।'
-                : 'Tip: Click "Column Settings" above to show or hide columns before exporting to Excel or PDF.'}
+              {'Tip: Click "Column Settings" above to show or hide columns before exporting to Excel or PDF.'}
             </span>
           </div>
 
@@ -1152,7 +1142,7 @@ export const MasterAttendanceSalarySheetModal: React.FC<MasterAttendanceSalarySh
             onClick={onClose}
             className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition-all cursor-pointer"
           >
-            {language === 'hi' ? 'बंद करें (Close)' : 'Close'}
+            {'Close'}
           </button>
         </div>
       </div>

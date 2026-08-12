@@ -1,7 +1,6 @@
 /**
  * Utilities for parsing and calculating shift timings, late coming, and early going.
  */
-
 export interface TimeObject {
   hour: number;
   minute: number;
@@ -124,7 +123,7 @@ export const isAttendanceLate = (
   const checkInMin = checkInTime.hour * 60 + checkInTime.minute;
   const shiftStartMin = shiftStart.hour * 60 + shiftStart.minute;
   
-  // Late if check-in is beyond shift start + grace period
+  //Late if check-in is beyond shift start + grace period
   return checkInMin > (shiftStartMin + graceMinutes);
 };
 
@@ -136,7 +135,7 @@ export const isAttendanceEarlyGoing = (
   workTiming?: string,
   defaultCheckOut: string = "18:00"
 ): boolean => {
-  if (record.status === 'Half Day') return false; // Half day has its own logic
+  if (record.status === 'Half Day') return false; //Half day has its own logic
   if (!record.checkOut || record.checkOut === '--:--' || record.checkOut === '') return false;
   const checkOutTime = parseTime(record.checkOut);
   if (!checkOutTime) return false;
@@ -145,7 +144,7 @@ export const isAttendanceEarlyGoing = (
   const checkOutMin = checkOutTime.hour * 60 + checkOutTime.minute;
   const shiftEndMin = shiftEnd.hour * 60 + shiftEnd.minute;
   
-  // Early if checkout is before shift end
+  //Early if checkout is before shift end
   return checkOutMin < shiftEndMin;
 };
 
@@ -155,11 +154,11 @@ export const isAttendanceEarlyGoing = (
 export const getShiftDurationHours = (checkInStr: string, checkOutStr: string): number => {
   const [inH, inM] = checkInStr.split(':').map(Number);
   const [outH, outM] = checkOutStr.split(':').map(Number);
-  if (isNaN(inH) || isNaN(outH)) return 9; // Default 9 hours
+  if (isNaN(inH) || isNaN(outH)) return 9; //Default 9 hours
   
   let diff = (outH + outM / 60) - (inH + inM / 60);
   if (diff < 0) {
-    // Night shift (ends next day)
+    //Night shift (ends next day)
     diff += 24;
   }
   return diff;

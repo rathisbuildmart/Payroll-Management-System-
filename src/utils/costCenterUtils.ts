@@ -1,7 +1,6 @@
 /**
  * Utility functions to manage Cost Center prefixes and Employee ID series generation.
  */
-
 export function getCostCenterPrefix(
   costCenterName?: string,
   customCodes?: Record<string, string>
@@ -12,38 +11,32 @@ export function getCostCenterPrefix(
 
   const trimmed = costCenterName.trim();
 
-  // 1. Check custom overrides first if present
+  //1. Check custom overrides first if present
   if (customCodes && customCodes[trimmed] && customCodes[trimmed].trim()) {
     return customCodes[trimmed].trim().toUpperCase();
   }
 
-  // 2. Clean and split words by spaces, dashes, or slashes
+  //2. Clean and split words by spaces, dashes, or slashes
   const words = trimmed.split(/[\s\-_/]+/).filter(Boolean);
 
   if (words.length === 0) {
     return 'EMP';
   }
 
-  // Single word case: e.g. "Raipur" -> "RAI"
+  //Single word case: e.g. "Raipur" -> "RAI"
   if (words.length === 1) {
     const letters = words[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     if (letters.length <= 3) return letters || 'EMP';
     return letters.slice(0, 3) || 'EMP';
   }
 
-  // Multi-word case:
-  // e.g. "Raipur Store" -> "RS"
-  // "Raipur Store Cash" -> "RSC"
-  // "Raipur Warehouse" -> "RW"
-  // "Raipur Warehouse Cash" -> "RWC"
-  // "Bilaspur Store Cash" -> "BSC"
-  // "Jagdalpur Store" -> "JS"
-  // "Jagdalpur Store Cash" -> "JSC"
+  //Multi-word case:
+  //e.g. "Raipur Store" -> "RS" //"Raipur Store Cash" -> "RSC" //"Raipur Warehouse" -> "RW" //"Raipur Warehouse Cash" -> "RWC" //"Bilaspur Store Cash" -> "BSC" //"Jagdalpur Store" -> "JS" //"Jagdalpur Store Cash" -> "JSC"
   let prefix = '';
   for (const word of words) {
     const letters = word.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     if (letters) {
-      // If word is short all-caps like "HR" or "IT", preserve it
+      //If word is short all-caps like "HR" or "IT", preserve it
       if (word === word.toUpperCase() && letters.length <= 2) {
         prefix += letters;
       } else {
@@ -84,7 +77,7 @@ export function generateNextEmployeeId(
   let nextNum = maxNum + 1;
   let nextId = `${prefix}${String(nextNum).padStart(3, '0')}`;
 
-  // Ensure uniqueness
+  //Ensure uniqueness
   while (existingEmployees.some((e) => e.id.toUpperCase() === nextId.toUpperCase())) {
     nextNum += 1;
     nextId = `${prefix}${String(nextNum).padStart(3, '0')}`;

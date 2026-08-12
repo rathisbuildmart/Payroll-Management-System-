@@ -39,7 +39,10 @@ import {
   PhoneCall,
   Monitor,
   Sun,
-  Moon
+  Moon,
+  UserPlus,
+  Award,
+  UserX
 } from 'lucide-react';
 import { initAuth, googleSignIn, googleSignInRedirect, logout } from './services/auth';
 import { 
@@ -56,10 +59,10 @@ import {
   fetchAdminSettings,
   saveAdminSettings
 } from './services/sheets';
-import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog, LeaveRequest, TransactionalEmailLog } from './types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog, LeaveRequest, TransactionalEmailLog, UserRole, PortalUser } from './types';
 import { saveToFirestore, loadFromFirestore } from './services/firestore';
 
-// Unique device fingerprint generator for browser lock
+//Unique device fingerprint generator for browser lock
 const getDeviceFingerprint = (): string => {
   let fingerprint = localStorage.getItem('payroll_device_fingerprint');
   if (!fingerprint) {
@@ -69,7 +72,7 @@ const getDeviceFingerprint = (): string => {
   return fingerprint;
 };
 
-// Helper to detect human-readable Browser & Operating System
+//Helper to detect human-readable Browser & Operating System
 const getBrowserAndOSName = (): string => {
   const ua = navigator.userAgent;
   let browser = "Browser";
@@ -100,7 +103,7 @@ const getBrowserAndOSName = (): string => {
   return `${browser} (${os})`;
 };
 
-// Update an employee's loggedDevices list with the current device
+//Update an employee's loggedDevices list with the current device
 const updateLoggedDevicesForEmployee = (emp: Employee, deviceId: string): Employee => {
   const browser = getBrowserAndOSName();
   const lastUsed = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
@@ -128,7 +131,7 @@ const updateLoggedDevicesForEmployee = (emp: Employee, deviceId: string): Employ
   };
 };
 
-// Importing Tab Components
+//Importing Tab Components
 import Dashboard from './components/Dashboard';
 import EmployeeList from './components/EmployeeList';
 import AttendanceTracker from './components/AttendanceTracker';
@@ -141,18 +144,14 @@ import NoticesSupport from './components/NoticesSupport';
 import RichTextRenderer from './components/RichTextRenderer';
 import FirebaseStorageMonitor from './components/FirebaseStorageMonitor';
 import AdminWelcomeModal from './components/AdminWelcomeModal';
+import HiringOnboarding from './components/HiringOnboarding';
+import EmployeeLifecycleModule from './components/EmployeeLifecycleModule';
+import ExitManagementModule from './components/ExitManagementModule';
 import { useModalBackHandler } from './utils/useHistoryBackHandler';
 
-export interface PortalUser {
-  id: string;
-  name: string;
-  role: 'admin' | 'director' | 'sub_admin' | 'hr' | 'branch_manager' | 'employee';
-  employee?: Employee;
-  branch?: string;
-  branches?: string[];
-}
+//PortalUser imported from ./types
 
-// Merge utility functions to handle offline modifications merging back with Google Sheets
+//Merge utility functions to handle offline modifications merging back with Google Sheets
 const isDefaultDemoEmployee = (emp: Employee): boolean => {
   const defaults = [
     { id: 'emp001', name: 'rajesh kumar' },
@@ -172,11 +171,11 @@ const mergeEmployees = (local: Employee[], remote: Employee[]): Employee[] => {
   local.forEach(localEmp => {
     const idx = merged.findIndex(e => e.id.trim().toLowerCase() === localEmp.id.trim().toLowerCase());
     if (idx > -1) {
-      // Remote (Google Sheets) is the absolute source of truth.
-      // Remote properties must override local stale default properties (e.g. Suresh Kumar vs Aashish Sahu)
+      //Remote (Google Sheets) is the absolute source of truth.
+      //Remote properties must override local stale default properties (e.g. Suresh Kumar vs Aashish Sahu)
       merged[idx] = { ...localEmp, ...merged[idx] };
     } else {
-      // If employee exists in local but not remote, only merge if they are NOT a default demo employee
+      //If employee exists in local but not remote, only merge if they are NOT a default demo employee
       if (!isDefaultDemoEmployee(localEmp)) {
         merged.push(localEmp);
       }
@@ -216,25 +215,24 @@ const mergePayroll = (local: PayrollRecord[], remote: PayrollRecord[]): PayrollR
 };
 
 export function getDirectImageUrl(url: string | undefined): string {
-  const fallback = '/src/assets/images/rathi_favicon_1783945713829.jpg';
+  const fallback = ' //src/assets/images/rathi_favicon_1783945713829.jpg';
   if (!url || !url.trim()) return fallback;
   
   const trimmed = url.trim();
   
-  // If it's already a local asset, data URL, or blob, return as is
-  if (trimmed.startsWith('/') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+  //If it's already a local asset, data URL, or blob, return as is
+  if (trimmed.startsWith(' //') || trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
     return trimmed;
   }
   
-  // Google Drive URL patterns:
-  // 1. /file/d/{ID}/view or /file/d/{ID}/edit or similar
-  const fileDMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]{25,50})/);
+  // Google Drive URL patterns:/1. /file/d/{ID}/view or /file/d/{ID}/edit or similar
+  const fileDMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]{25,50})\//);
   if (fileDMatch && fileDMatch[1]) {
     return `https://lh3.googleusercontent.com/d/${fileDMatch[1]}`;
   }
   
   // 2. id={ID} query parameter (e.g. open?id=..., uc?id=..., uc?export=download&id=...)
-  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{25,50})/);
+  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{25,50})(?:[&/]|$)/);
   if (idMatch && idMatch[1]) {
     return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
   }
@@ -264,7 +262,7 @@ export default function App() {
   const [hasLoadedFromCloud, setHasLoadedFromCloud] = useState<boolean>(false);
   const [isDataModified, setIsDataModified] = useState<boolean>(false);
 
-  // Theme Mode (Light / Dark) State
+  //Theme Mode (LightDark) State
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('payroll_theme_mode') as 'light' | 'dark') || 'light';
   });
@@ -280,12 +278,12 @@ export default function App() {
     localStorage.setItem('payroll_theme_mode', themeMode);
   }, [themeMode]);
 
-  // Sheets Metadata
+  //Sheets Metadata
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
   const [spreadsheetLink, setSpreadsheetLink] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
 
-  // Sync Status, Logs & Last Successful Sync
+  //Sync Status, Logs & Last Successful Sync
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>(() => {
     const saved = localStorage.getItem('payroll_sync_logs');
     if (saved) {
@@ -320,7 +318,7 @@ export default function App() {
         status,
         details
       };
-      const updated = [newLog, ...prev].slice(0, 50); // Keep last 50 logs
+      const updated = [newLog, ...prev].slice(0, 50); //Keep last 50 logs
       localStorage.setItem('payroll_sync_logs', JSON.stringify(updated));
       return updated;
     });
@@ -331,7 +329,37 @@ export default function App() {
     }
   };
 
-  // Application Data States (with local cache fallbacks for instant offline load)
+  const handleRoleSwitch = (newRole: UserRole) => {
+    if (!portalUser) return;
+    const updatedUser: PortalUser = {
+      ...portalUser,
+      role: newRole,
+      isPrimarySuperAdmin: true
+    };
+    setPortalUser(updatedUser);
+    localStorage.setItem('payroll_portal_user', JSON.stringify(updatedUser));
+
+    const defaultRolePermissions: Record<string, string[]> = {
+      super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+      admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+      director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'leaves', 'notices_support'],
+      hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      recruiter: ['dashboard', 'hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
+      branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
+      employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
+    };
+
+    const allowed = (newRole === 'super_admin' || newRole === 'admin')
+      ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
+      : (adminSettings.rolePermissions?.[newRole] ?? defaultRolePermissions[newRole] ?? []);
+
+    if (!allowed.includes(currentTab)) {
+      setCurrentTab((allowed[0] as any) || 'dashboard');
+    }
+  };
+
+  //Application Data States (with local cache fallbacks for instant offline load)
   const [employees, setEmployees] = useState<Employee[]>(() => {
     const defaultEmployees: Employee[] = [
       {
@@ -419,7 +447,7 @@ export default function App() {
       }
     }
 
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const currentMonth = new Date().toISOString().slice(0, 7); //YYYY-MM
     const sampleAttendance: Attendance[] = [];
     const empIds = ['EMP001', 'EMP002', 'EMP003'];
     
@@ -456,13 +484,13 @@ export default function App() {
     return [];
   });
 
-  // Unsuccessful login attempts state
+  //Unsuccessful login attempts state
   const [failedLogins, setFailedLogins] = useState<FailedLoginAttempt[]>(() => {
     const saved = localStorage.getItem('cached_failed_logins');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // User Audit Logs state
+  //User Audit Logs state
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
     const saved = localStorage.getItem('cached_audit_logs');
     return saved ? JSON.parse(saved) : [];
@@ -470,7 +498,7 @@ export default function App() {
 
   const handleClearAuditLogs = () => {
     if (!portalUser || portalUser.role !== 'admin') {
-      alert(language === 'en' ? 'Only Admin can clear audit logs!' : 'केवल एडमिन ही ऑडिट लॉग साफ़ कर सकते हैं!');
+      alert('Only Admin can clear audit logs!');
       return;
     }
     const deleteLog: AuditLog = {
@@ -503,7 +531,7 @@ export default function App() {
     setIsDataModified(true);
   };
 
-  // Transactional Email Logs state
+  //Transactional Email Logs state
   const [emailLogs, setEmailLogs] = useState<TransactionalEmailLog[]>(() => {
     const saved = localStorage.getItem('cached_email_logs');
     return saved ? JSON.parse(saved) : [];
@@ -522,14 +550,14 @@ export default function App() {
 
   const handleClearEmailLogs = async () => {
     if (!portalUser || portalUser.role !== 'admin') {
-      alert(language === 'en' ? 'Only Admin can clear email history!' : 'केवल एडमिन ही ईमेल इतिहास साफ़ कर सकते हैं!');
+      alert('Only Admin can clear email history!');
       return;
     }
     setEmailLogs([]);
     localStorage.setItem('cached_email_logs', JSON.stringify([]));
     setIsDataModified(true);
     try {
-      await fetch('/api/email-logs/clear', { method: 'POST' });
+      await fetch(' //api/email-logs/clear', { method: 'POST' });
     } catch (e) {
       console.warn('Failed to clear server email logs:', e);
     }
@@ -537,7 +565,7 @@ export default function App() {
 
   const handleSendTestEmail = async (recipient: string, type: 'OTP' | 'Welcome Message' | 'Custom Notice', subject: string, customBody?: string) => {
     try {
-      const res = await fetch('/api/send-otp', {
+      const res = await fetch(' //api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -569,10 +597,10 @@ export default function App() {
   const handleResendEmail = async (log: TransactionalEmailLog) => {
     try {
       const endpoint = log.type === 'Welcome Message' 
-        ? '/api/send-welcome' 
+        ? ' //api/send-welcome' 
         : log.type === 'Leave Update' 
-        ? '/api/send-leave-update' 
-        : '/api/send-otp';
+        ? ' //api/send-leave-update' 
+        : ' //api/send-otp';
       
       const payload: any = {
         email: log.recipientEmail,
@@ -615,7 +643,7 @@ export default function App() {
     }
   };
 
-  // Portal login & enhanced login UX states
+  //Portal login & enhanced login UX states
   const [rememberMe, setRememberMe] = useState<boolean>(() => {
     return localStorage.getItem('payroll_remember_me') === 'true';
   });
@@ -632,7 +660,7 @@ export default function App() {
   const [isCapsLockOn, setIsCapsLockOn] = useState(false);
   const [showLoginNotice, setShowLoginNotice] = useState(true);
 
-  // Corporate notices & support gateway states
+  //Corporate notices & support gateway states
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [supportSubmitted, setSupportSubmitted] = useState(false);
@@ -648,19 +676,19 @@ export default function App() {
   const [forgotMobile, setForgotMobile] = useState('');
   const [forgotError, setForgotError] = useState<string | null>(null);
 
-  // OTP Reset and OTP Login States
+  //OTP Reset and OTP Login States
   const [lastSentEmail, setLastSentEmail] = useState<any>(null);
   const [showEmailViewer, setShowEmailViewer] = useState(false);
   const [fallbackOtpPayload, setFallbackOtpPayload] = useState<any | null>(null);
   
-  // Forgot Password Self-Service Flow States
+  //Forgot Password Self-Service Flow States
   const [forgotStep, setForgotStep] = useState<'request' | 'verify_otp' | 'new_password'>('request');
   const [forgotGeneratedOtp, setForgotGeneratedOtp] = useState('');
   const [forgotEnteredOtp, setForgotEnteredOtp] = useState('');
   const [forgotNewPass, setForgotNewPass] = useState('');
   const [isSendingForgotOtp, setIsSendingForgotOtp] = useState(false);
 
-  // OTP Login Flow States
+  //OTP Login Flow States
   const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
   const [loginOtpStep, setLoginOtpStep] = useState<'request_otp' | 'enter_otp'>('request_otp');
   const [loginGeneratedOtp, setLoginGeneratedOtp] = useState('');
@@ -670,7 +698,7 @@ export default function App() {
   const [loginMobileTab, setLoginMobileTab] = useState<'signin' | 'info'>('signin');
   const [infoSubTab, setInfoSubTab] = useState<'notices' | 'hr' | 'it' | 'rules'>('notices');
 
-  // Password 2FA OTP States
+  //Password 2FA OTP States
   const [passwordLoginOtpStep, setPasswordLoginOtpStep] = useState<'password' | 'enter_otp'>('password');
   const [passwordLoginPendingUser, setPasswordLoginPendingUser] = useState<{
     type: 'admin' | 'role' | 'employee';
@@ -679,7 +707,7 @@ export default function App() {
   const [passwordLoginEnteredOtp, setPasswordLoginEnteredOtp] = useState('');
   const [isSendingPasswordLoginOtp, setIsSendingPasswordLoginOtp] = useState(false);
 
-  // First-Time Login Security Verification States
+  //First-Time Login Security Verification States
   const [isFirstLoginVerification, setIsFirstLoginVerification] = useState<boolean>(false);
   const [firstLoginEmployee, setFirstLoginEmployee] = useState<Employee | null>(null);
   const [firstLoginStep, setFirstLoginStep] = useState<'select_option' | 'email_otp' | 'admin_approval'>('select_option');
@@ -694,32 +722,32 @@ export default function App() {
       {
         id: 'ann-1',
         title: 'Implementation of Biometric Punch System',
-        titleHi: 'बायोमेट्रिक पंच प्रणाली का कार्यान्वयन',
+        titleHi: "",
         date: '2026-07-12',
         content: 'All departments must ensure staff punches via the integrated biometric portal. Late punches after standard 15-min grace period will record automatic late penalty checks.',
-        contentHi: 'सभी विभागों को एकीकृत बायोमेट्रिक पोर्टल के माध्यम से कर्मचारियों का पंच सुनिश्चित करना होगा। 15 मिनट की छूट अवधि के बाद देर से पंच करने पर स्वचालित विलंब पेनल्टी दर्ज होगी।',
+        contentHi: "",
         badge: 'Critical',
-        badgeHi: 'महत्वपूर्ण'
+        badgeHi: ""
       },
       {
         id: 'ann-2',
         title: 'Upcoming Public Holiday Notice',
-        titleHi: 'आगामी सार्वजनिक अवकाश सूचना',
+        titleHi: "",
         date: '2026-07-20',
         content: 'The workspace will remain closed on July 25th in observation of the regional festival. Off-duty profiles are auto-applied.',
-        contentHi: 'क्षेत्रीय त्योहार के अवसर पर 25 जुलाई को कार्यक्षेत्र बंद रहेगा। ऑफ-ड्यूटी प्रोफाइल स्वचालित रूप से लागू हो गई हैं।',
+        contentHi: "",
         badge: 'Holiday',
-        badgeHi: 'छुट्टी'
+        badgeHi: ""
       },
       {
         id: 'ann-3',
         title: 'Revised Provident Fund Policies',
-        titleHi: 'संशोधित भविष्य निधि (PF) नीतियां',
+        titleHi: "",
         date: '2026-07-08',
         content: 'Effective from this payroll cycle, PF calculations adhere to the updated 12% statutory caps. Review your salary slips structure under settings.',
-        contentHi: 'इस पेरोल चक्र से प्रभावी, पीएफ गणना अपडेटेड 12% वैधानिक सीमा के अनुरूप है। सेटिंग्स के तहत अपनी सैलरी स्लिप संरचना की समीक्षा करें।',
+        contentHi: "",
         badge: 'Policy',
-        badgeHi: 'नीति'
+        badgeHi: ""
       }
     ];
   });
@@ -737,7 +765,7 @@ export default function App() {
         empId: 'EMP001',
         email: 'rohan@rathibuildmart.com',
         category: 'Attendance Adjustment',
-        categoryHi: 'उपस्थिति समायोजन',
+        categoryHi: "",
         message: 'Forgot to punch out yesterday due to emergency on-site meeting. Please approve my miss punch adjustment request.',
         date: '2026-07-12T14:30:00Z',
         status: 'Pending'
@@ -748,7 +776,7 @@ export default function App() {
         empId: 'EMP003',
         email: 'sunita@rathibuildmart.com',
         category: 'Salary Discrepancy',
-        categoryHi: 'वेतन विसंगति',
+        categoryHi: "",
         message: 'My PF contribution seems to have a mismatch of 200 INR. Kindly assist.',
         date: '2026-07-10T11:15:00Z',
         status: 'Resolved'
@@ -821,7 +849,7 @@ export default function App() {
     localStorage.setItem('payroll_password_requests', JSON.stringify(passwordRequests));
   }, [passwordRequests]);
 
-  // Live time for login clock
+  //Live time for login clock
   const [liveTime, setLiveTime] = useState<Date>(new Date());
   useEffect(() => {
     const timer = setInterval(() => {
@@ -830,15 +858,15 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // We disable the automatic Google Sheets redirect on page load because it causes infinite redirect loops 
-  // on custom/Render domains if the Authorized Domains list is not fully configured yet.
-  // Instead, the administrator can stably click the "Authorize Google Sheets" button manually in the dashboard.
+  //We disable the automatic Google Sheets redirect on page load because it causes infinite redirect loops 
+  //on custom/Render domains if the Authorized Domains list is not fully configured yet.
+  //Instead, the administrator can stably click the "Authorize Google Sheets" button manually in the dashboard.
   useEffect(() => {
-    // Automatic redirect is disabled to ensure maximum stability and offline-first usage.
-    // The admin can manually click "Authorize Google Sheets" when ready.
+    //Automatic redirect is disabled to ensure maximum stability and offline-first usage.
+    //The admin can manually click "Authorize Google Sheets" when ready.
   }, []);
 
-  // Manage login-page-active class on body/html/root to allow scrolling on mobile when logged out
+  //Manage login-page-active class on body/html/root to allow scrolling on mobile when logged out
   useEffect(() => {
     const rootEl = document.getElementById('root');
     if (!portalUser) {
@@ -857,12 +885,12 @@ export default function App() {
     };
   }, [portalUser]);
 
-  // Sync state changes to local storage caches automatically
+  //Sync state changes to local storage caches automatically
   useEffect(() => {
     localStorage.setItem('cached_employees', JSON.stringify(employees));
   }, [employees]);
 
-  // Keep portalUser (employee profile) updated with latest employee details from employees state
+  //Keep portalUser (employee profile) updated with latest employee details from employees state
   useEffect(() => {
     if (portalUser && portalUser.role === 'employee' && portalUser.id) {
       const currentEmp = employees.find(e => e.id.trim().toLowerCase() === portalUser.id.trim().toLowerCase());
@@ -899,7 +927,7 @@ export default function App() {
     localStorage.setItem('cached_failed_logins', JSON.stringify(failedLogins));
   }, [failedLogins]);
 
-  // UI States
+  //UI States
   const [isOnline, setIsOnline] = useState<boolean>(typeof window !== 'undefined' ? navigator.onLine : true);
 
   useEffect(() => {
@@ -914,12 +942,12 @@ export default function App() {
     };
   }, []);
 
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support' | 'hiring_onboarding' | 'employee_lifecycle' | 'exit_management'>('dashboard');
   const [activeNoticeSubTab, setActiveNoticeSubTab] = useState<'announcements' | 'passwords' | 'tickets'>('announcements');
 
-  // Helper for navigating between tabs with Browser History support (enables Browser Back button)
+  //Helper for navigating between tabs with Browser History support (enables Browser Back button)
   const navigateToTab = (
-    tab: 'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support',
+    tab: 'dashboard' | 'employees' | 'attendance' | 'payroll' | 'leaves' | 'admin' | 'ledger' | 'notices_support' | 'hiring_onboarding' | 'employee_lifecycle' | 'exit_management',
     noticeSubTab?: 'announcements' | 'passwords' | 'tickets' | 'notices' | string
   ) => {
     const validNoticeSubTab = (noticeSubTab === 'notices' || !noticeSubTab)
@@ -940,7 +968,7 @@ export default function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Set initial state in browser history stack
+    //Set initial state in browser history stack
     if (!window.history.state || !window.history.state.tab) {
       window.history.replaceState({ page: 'app', tab: currentTab, activeNoticeSubTab }, '');
     }
@@ -962,7 +990,7 @@ export default function App() {
 
   const [isSidebarHovered, setIsSidebarHovered] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [language, setLanguage] = useState<'en' | 'hi'>('en'); // Set default to English as bilingual toggle is disabled
+  const [language, setLanguage] = useState<'en' | 'hi'>('en'); //Set default to English as bilingual toggle is disabled
   const [showSeedDialog, setShowSeedDialog] = useState<boolean>(false);
   const [showSheetsNotice, setShowSheetsNotice] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
@@ -977,7 +1005,7 @@ export default function App() {
 
   const [showPendingAlertModal, setShowPendingAlertModal] = useState<boolean>(false);
 
-  // Register Back-Button Handlers for Modals and Mobile Sidebar Drawers
+  //Register Back-Button Handlers for Modals and Mobile Sidebar Drawers
   useModalBackHandler(isMobileMenuOpen, () => setIsMobileMenuOpen(false), 'mobile-menu');
   useModalBackHandler(showSeedDialog, () => setShowSeedDialog(false), 'seed-dialog');
   useModalBackHandler(showPendingAlertModal, () => setShowPendingAlertModal(false), 'pending-alert-modal');
@@ -1002,7 +1030,7 @@ export default function App() {
     }
   }, [portalUser, passwordRequests, hrTickets]);
 
-  // Admin settings loaded from localStorage with standard static fallback
+  //Admin settings loaded from localStorage with standard static fallback
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(() => {
     const saved = localStorage.getItem('payroll_admin_settings');
     if (saved) {
@@ -1015,7 +1043,7 @@ export default function App() {
     return INITIAL_ADMIN_SETTINGS;
   });
 
-  // Auto-redirect to first allowed tab based on user role permissions
+  //Auto-redirect to first allowed tab based on user role permissions
   useEffect(() => {
     if (!portalUser || portalUser.role === 'employee') return;
     
@@ -1033,10 +1061,10 @@ export default function App() {
     }
   }, [portalUser, adminSettings, currentTab]);
 
-  // State for Admin Welcome Boss Popup
+  //State for Admin Welcome Boss Popup
   const [showAdminWelcomeModal, setShowAdminWelcomeModal] = useState(false);
 
-  // Trigger Admin Welcome Popup once per session when Admin or Manager logs in
+  //Trigger Admin Welcome Popup once per session when Admin or Manager logs in
   useEffect(() => {
     if (
       portalUser &&
@@ -1051,16 +1079,16 @@ export default function App() {
     }
   }, [portalUser, adminSettings.enableAdminWelcomePopup]);
 
-  // Dynamically update document title and favicon when company name or logo changes
+  //Dynamically update document title and favicon when company name or logo changes
   useEffect(() => {
     document.title = `${adminSettings.companyName || 'Rathi Buildmart'} - Payroll & Attendance Portal`;
     
     const updateFavicon = () => {
-      // Remove any existing favicons to avoid conflicts
+      //Remove any existing favicons to avoid conflicts
       const linkElements = document.querySelectorAll("link[rel*='icon']");
       linkElements.forEach(el => el.parentNode?.removeChild(el));
       
-      // Create and append the new custom favicon
+      //Create and append the new custom favicon
       const newLink = document.createElement('link');
       newLink.type = adminSettings.companyLogo ? 'image/png' : 'image/jpeg';
       newLink.rel = 'shortcut icon';
@@ -1071,7 +1099,7 @@ export default function App() {
     updateFavicon();
   }, [adminSettings.companyName, adminSettings.companyLogo]);
 
-  // Load global data from Firestore on startup to allow any device/browser to log in with up-to-date credentials
+  //Load global data from Firestore on startup to allow any device/browser to log in with up-to-date credentials
   useEffect(() => {
     const fetchGlobalData = async () => {
       try {
@@ -1113,9 +1141,9 @@ export default function App() {
             setSpreadsheetLink(globalData.spreadsheetLink);
           }
           
-          // Also fetch server-side recorded email logs
+          //Also fetch server-side recorded email logs
           try {
-            const serverRes = await fetch('/api/email-logs');
+            const serverRes = await fetch(' //api/email-logs');
             const serverData = await serverRes.json();
             if (serverData.success && serverData.logs && serverData.logs.length > 0) {
               setEmailLogs(prev => {
@@ -1132,8 +1160,8 @@ export default function App() {
 
           console.log('Successfully loaded synced credentials from cloud Firestore');
         } else if (result && result.success && !result.data) {
-          // Cloud Firestore is empty. Trigger a save so the baseline default employees/attendance
-          // are automatically registered in the cloud database.
+          //Cloud Firestore is empty. Trigger a save so the baseline default employees/attendance
+          //are automatically registered in the cloud database.
           setIsDataModified(true);
           console.log('Cloud Firestore is empty. Automatically syncing baseline default data to Firestore...');
         }
@@ -1141,14 +1169,14 @@ export default function App() {
         console.warn('Failed to load global data from Firestore on startup:', err);
       } finally {
         setHasLoadedFromCloud(true);
-        // If we didn't trigger an automatic baseline sync, clear modified status
-        // otherwise let the auto-save effect handle it and reset it.
+        //If we didn't trigger an automatic baseline sync, clear modified status
+        //otherwise let the auto-save effect handle it and reset it.
       }
     };
     fetchGlobalData();
   }, []);
 
-  // Synchronize state changes to Firestore when we have finished loading from the cloud and user has modified data
+  //Synchronize state changes to Firestore when we have finished loading from the cloud and user has modified data
   useEffect(() => {
     if (!hasLoadedFromCloud || !isDataModified) return;
 
@@ -1171,7 +1199,7 @@ export default function App() {
       }
     };
 
-    // Debounce cloud writes by 1.5 seconds to avoid rapid write limits
+    //Debounce cloud writes by 1.5 seconds to avoid rapid write limits
     const timer = setTimeout(() => {
       syncToCloud();
     }, 1500);
@@ -1179,7 +1207,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [employees, attendance, payroll, adminSettings, failedLogins, spreadsheetId, spreadsheetLink, hasLoadedFromCloud, isDataModified]);
 
-  // Periodically fetch fresh data from Firestore to keep admin/employee views in sync in real-time
+  //Periodically fetch fresh data from Firestore to keep admin/employee views in sync in real-time
   useEffect(() => {
     if (!hasLoadedFromCloud || isDataModified) return;
 
@@ -1188,7 +1216,7 @@ export default function App() {
         const result = await loadFromFirestore();
         if (result && result.success && result.data) {
           const globalData = result.data;
-          // Only update if something changed to avoid unnecessary re-renders
+          //Only update if something changed to avoid unnecessary re-renders
           if (globalData.employees && JSON.stringify(employees) !== JSON.stringify(globalData.employees)) {
             setEmployees(globalData.employees);
           }
@@ -1205,7 +1233,7 @@ export default function App() {
       } catch (err) {
         console.warn('Failed to auto-refresh data from Firestore:', err);
       }
-    }, 12000); // Check every 12 seconds
+    }, 12000); //Check every 12 seconds
 
     return () => clearInterval(interval);
   }, [hasLoadedFromCloud, isDataModified, employees, attendance, payroll, failedLogins]);
@@ -1218,30 +1246,30 @@ export default function App() {
       try {
         setSyncStatus('syncing');
         addSyncLog(
-          language === 'en' ? 'Save Settings' : 'सेटिंग्स सहेजें',
+          'Save Settings',
           'syncing',
-          language === 'en' ? 'Saving updated workspace settings to Google Sheets...' : 'Google Sheets में अपडेट की गई सेटिंग्स सहेज रहे हैं...'
+          'Saving updated workspace settings to Google Sheets...'
         );
         await saveAdminSettings(spreadsheetId, updated, token);
         setSyncStatus('synced');
         addSyncLog(
-          language === 'en' ? 'Save Settings' : 'सेटिंग्स सहेजें',
+          'Save Settings',
           'success',
-          language === 'en' ? 'Workspace settings synced successfully to Google Sheets.' : 'सेटिंग्स सफलतापूर्वक Google Sheets में सिंक हो गईं।'
+          'Workspace settings synced successfully to Google Sheets.'
         );
       } catch (e: any) {
         console.error('Failed to save settings to Google Sheets:', e);
         setSyncStatus('error');
         addSyncLog(
-          language === 'en' ? 'Save Settings' : 'सेटिंग्स सहेजें',
+          'Save Settings',
           'error',
-          language === 'en' ? `Failed to save settings: ${e?.message || e}` : `सेटिंग्स सहेजने में विफल: ${e?.message || e}`
+          `Failed to save settings: ${e?.message || e}`
         );
       }
     }
   };
 
-  // Initialize Firebase Auth
+  //Initialize Firebase Auth
   useEffect(() => {
     const unsubscribe = initAuth(
       (userInstance, accessToken) => {
@@ -1260,7 +1288,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sync / Load data from Sheets when authenticated
+  //SyncLoad data from Sheets when authenticated
   useEffect(() => {
     if (token) {
       loadApplicationData(token);
@@ -1271,19 +1299,19 @@ export default function App() {
     setIsLoadingData(true);
     setSyncStatus('syncing');
     addSyncLog(
-      language === 'en' ? 'Load Application Data' : 'एप्लिकेशन डेटा लोड करें',
+      'Load Application Data',
       'syncing',
-      language === 'en' ? 'Initializing Google Sheets API connection and updating headers...' : 'Google Sheets API कनेक्शन शुरू किया जा रहा है और हेडर अपडेट किए जा रहे हैं...'
+      'Initializing Google Sheets API connection and updating headers...'
     );
     try {
-      // 1. Find or create Spreadsheet
+      //1. Find or create Spreadsheet
       let sheetId = await findSpreadsheet(accessToken);
       if (!sheetId) {
         sheetId = await createSpreadsheet(accessToken);
-        // Newly created spreadsheet is empty, offer to seed demo data
+        //Newly created spreadsheet is empty, offer to seed demo data
         setShowSeedDialog(true);
       } else {
-        // If the spreadsheet already exists, ensure all new headers/columns are added to row 1
+        //If the spreadsheet already exists, ensure all new headers/columns are added to row 1
         try {
           await initHeaders(sheetId, accessToken);
         } catch (e) {
@@ -1292,16 +1320,16 @@ export default function App() {
       }
       setSpreadsheetId(sheetId);
 
-      // 2. Get the web URL of the Google Sheet
+      //2. Get the web URL of the Google Sheet
       const webLink = await getSpreadsheetLink(sheetId, accessToken);
       setSpreadsheetLink(webLink);
 
-      // 3. Load Employees, Attendance, Payroll, and Admin Settings
+      //3. Load Employees, Attendance, Payroll, and Admin Settings
       const fetchedEmployees = await fetchEmployees(sheetId, accessToken);
       const fetchedAttendance = await fetchAttendance(sheetId, accessToken);
       const fetchedPayroll = await fetchPayrollHistory(sheetId, accessToken);
 
-      // Perform bidirectional merge to preserve offline modifications
+      //Perform bidirectional merge to preserve offline modifications
       const mergedEmployees = mergeEmployees(employees, fetchedEmployees);
       const mergedAttendance = mergeAttendance(attendance, fetchedAttendance);
       const mergedPayroll = mergePayroll(payroll, fetchedPayroll);
@@ -1311,7 +1339,7 @@ export default function App() {
       setPayroll(mergedPayroll);
       setIsDataModified(true);
 
-      // Save merged results back to Google Sheets if they contain changes not present on remote
+      //Save merged results back to Google Sheets if they contain changes not present on remote
       if (mergedEmployees.length > fetchedEmployees.length || JSON.stringify(mergedEmployees) !== JSON.stringify(fetchedEmployees)) {
         try {
           await saveEmployees(sheetId, mergedEmployees, accessToken);
@@ -1334,7 +1362,7 @@ export default function App() {
         }
       }
 
-      // Load Settings from Google Sheets
+      //Load Settings from Google Sheets
       let activeSettings = adminSettings;
       try {
         const fetchedSettings = await fetchAdminSettings(sheetId, accessToken);
@@ -1342,17 +1370,17 @@ export default function App() {
           activeSettings = { ...INITIAL_ADMIN_SETTINGS, ...adminSettings, ...fetchedSettings };
           setAdminSettings(activeSettings);
           localStorage.setItem('payroll_admin_settings', JSON.stringify(activeSettings));
-          // Ensure all 52 setting keys (SMTP, Rules, Roles, Automation) are populated in Google Sheets
+          //Ensure all 52 setting keys (SMTP, Rules, Roles, Automation) are populated in Google Sheets
           await saveAdminSettings(sheetId, activeSettings, accessToken);
         } else {
-          // If the sheet doesn't have settings yet, write current local settings to Google Sheets
+          //If the sheet doesn't have settings yet, write current local settings to Google Sheets
           await saveAdminSettings(sheetId, adminSettings, accessToken);
         }
       } catch (e) {
         console.warn('Failed to load/sync settings from Google Sheets:', e);
       }
 
-      // Sync portalUser with fresh details from Google Sheets
+      //Sync portalUser with fresh details from Google Sheets
       if (portalUser && portalUser.role === 'employee') {
         const freshEmp = fetchedEmployees.find(e => e.id.trim().toLowerCase() === portalUser.id.trim().toLowerCase());
         if (freshEmp) {
@@ -1362,13 +1390,13 @@ export default function App() {
         }
       }
 
-      // If existing employees are found, hide seed dialog
+      //If existing employees are found, hide seed dialog
       if (fetchedEmployees.length > 0) {
         setShowSeedDialog(false);
       }
 
-      // Force direct, immediate synchronization of loaded real data to central Firestore database
-      // so other devices, browsers, and employee portals can access the real data immediately.
+      //Force direct, immediate synchronization of loaded real data to central Firestore database
+      //so other devices, browsers, and employee portals can access the real data immediately.
       try {
         await saveToFirestore({
           employees: mergedEmployees,
@@ -1379,7 +1407,7 @@ export default function App() {
           spreadsheetId: sheetId,
           spreadsheetLink: webLink
         });
-        setIsDataModified(false); // Directly saved, clear modified state
+        setIsDataModified(false); //Directly saved, clear modified state
         console.log('Central Firestore database successfully synchronized with fresh Google Sheets data.');
       } catch (fErr) {
         console.warn('Failed to save fresh Google Sheets data directly to Firestore:', fErr);
@@ -1387,16 +1415,14 @@ export default function App() {
 
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Data Loaded Successfully' : 'डेटा सफलतापूर्वक लोड हुआ',
+        'Data Loaded Successfully',
         'success',
-        language === 'en' 
-          ? `Loaded ${mergedEmployees.length} employees, ${mergedAttendance.length} attendance, and ${mergedPayroll.length} payroll records.`
-          : `सफलतापूर्वक ${mergedEmployees.length} कर्मचारी, ${mergedAttendance.length} उपस्थिति, और ${mergedPayroll.length} वेतन प्रविष्टियां लोड की गईं।`
+        `Loaded ${mergedEmployees.length} employees, ${mergedAttendance.length} attendance, and ${mergedPayroll.length} payroll records.`
       );
     } catch (error: any) {
       console.warn('Failed to load Google Sheets data, checking Firestore fallback:', error);
       
-      // Attempt Firestore fallback before flagging sync error
+      //Attempt Firestore fallback before flagging sync error
       try {
         const fsResult = await loadFromFirestore();
         if (fsResult && fsResult.success && fsResult.data) {
@@ -1406,9 +1432,9 @@ export default function App() {
           if (fsResult.data.adminSettings) setAdminSettings(fsResult.data.adminSettings);
           setSyncStatus('synced');
           addSyncLog(
-            language === 'en' ? 'Loaded Active Cloud Database' : 'सक्रिय क्लाउड डेटाबेस लोड हुआ',
+            'Loaded Active Cloud Database',
             'success',
-            language === 'en' ? 'Safely loaded active database from Cloud Firestore.' : 'क्लाउड फ़ायरस्टोर से डेटाबेस सफलतापूर्वक लोड किया गया।'
+            'Safely loaded active database from Cloud Firestore.'
           );
           return;
         }
@@ -1418,11 +1444,9 @@ export default function App() {
 
       setSyncStatus('error');
       addSyncLog(
-        language === 'en' ? 'Load Error' : 'लोड त्रुटि',
+        'Load Error',
         'error',
-        language === 'en' 
-          ? `Failed to sync: ${error?.message || error}`
-          : `सिंक करने में विफल: ${error?.message || error}`
+        `Failed to sync: ${error?.message || error}`
       );
       const errStr = String(error?.message || error);
       if (
@@ -1433,7 +1457,7 @@ export default function App() {
         errStr.includes('Failed to fetch') ||
         errStr.includes('TypeError')
       ) {
-        // Clear expired/invalid session token to prevent persistent lockout loops
+        //Clear expired/invalid session token to prevent persistent lockout loops
         console.warn('Stale or blocked token detected, resetting sheets session state:', errStr);
         logout();
         setUser(null);
@@ -1451,15 +1475,13 @@ export default function App() {
     const nowIso = new Date().toISOString();
 
     addSyncLog(
-      language === 'en' ? 'Force Sync Started' : 'फ़ोर्स सिंक शुरू',
+      'Force Sync Started',
       'syncing',
-      language === 'en'
-        ? 'Synchronizing database collections with Cloud Firestore and Google Sheets...'
-        : 'क्लाउड फ़ायरस्टोर और गूगल शीट्स के साथ डेटाबेस सिंक किया जा रहा है...'
+      'Synchronizing database collections with Cloud Firestore and Google Sheets...'
     );
 
     try {
-      // 1. First push local state to Cloud Firestore so unsaved local changes are preserved
+      //1. First push local state to Cloud Firestore so unsaved local changes are preserved
       await saveToFirestore({
         employees,
         attendance,
@@ -1471,11 +1493,11 @@ export default function App() {
         lastUpdated: nowIso
       });
 
-      // 2. If Google OAuth token is active, save to Google Sheets and refresh
+      //2. If Google OAuth token is active, save to Google Sheets and refresh
       if (token) {
         await loadApplicationData(token);
       } else {
-        // 3. Otherwise reload fresh state from Cloud Firestore
+        //3. Otherwise reload fresh state from Cloud Firestore
         const fsResult = await loadFromFirestore();
         if (fsResult && fsResult.success && fsResult.data) {
           const globalData = fsResult.data;
@@ -1495,31 +1517,25 @@ export default function App() {
       localStorage.setItem('payroll_last_success_sync', nowIso);
 
       addSyncLog(
-        language === 'en' ? 'Force Sync Completed' : 'फ़ोर्स सिंक पूरा हुआ',
+        'Force Sync Completed',
         'success',
-        language === 'en'
-          ? `All collections successfully synchronized at ${new Date().toLocaleTimeString()}.`
-          : `सभी कलेक्शन ${new Date().toLocaleTimeString()} पर सफलतापूर्वक सिंक हो गए।`
+        `All collections successfully synchronized at ${new Date().toLocaleTimeString()}.`
       );
 
       alert(
-        language === 'en'
-          ? 'Database successfully synchronized with Cloud Firestore & Google Sheets!'
-          : 'डेटाबेस क्लाउड फ़ायरस्टोर और गूगल शीट्स के साथ सफलतापूर्वक सिंक हो गया है!'
+        'Database successfully synchronized with Cloud Firestore & Google Sheets!'
       );
     } catch (err: any) {
       console.error('Force Sync error:', err);
       setSyncStatus('error');
       const errMsg = err?.message || String(err);
       addSyncLog(
-        language === 'en' ? 'Force Sync Failed' : 'फ़ोर्स सिंक विफल',
+        'Force Sync Failed',
         'error',
-        language === 'en' ? `Sync failed: ${errMsg}` : `सिंक विफल: ${errMsg}`
+        `Sync failed: ${errMsg}`
       );
       alert(
-        language === 'en'
-          ? `Sync failed: ${errMsg}`
-          : `सिंक विफल: ${errMsg}`
+        `Sync failed: ${errMsg}`
       );
     } finally {
       setIsLoadingData(false);
@@ -1551,7 +1567,7 @@ export default function App() {
     setIsSendingPasswordLoginOtp(true);
 
     try {
-      const res = await fetch('/api/send-otp', {
+      const res = await fetch(' //api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1600,17 +1616,15 @@ export default function App() {
     } catch (err: any) {
       console.error('[2FA Login OTP Send Error]', err);
       setIsSendingPasswordLoginOtp(false);
-      setLoginErr(language === 'en' ? `Network error sending 2FA OTP: ${err.message || err}` : `2FA ओटीपी भेजने में नेटवर्क त्रुटि: ${err.message || err}`);
+      setLoginErr(`Network error sending 2FA OTP: ${err.message || err}`);
     }
   };
 
   const handlePortalLogout = () => {
     setConfirmDialog({
       isOpen: true,
-      title: language === 'en' ? 'Sign Out' : 'लॉग आउट करें',
-      message: language === 'en' 
-        ? 'Are you sure you want to log out from the portal?' 
-        : 'क्या आप पोर्टल से लॉग आउट करना चाहते हैं?',
+      title: 'Sign Out',
+      message: 'Are you sure you want to log out from the portal?',
       onConfirm: () => {
         setPortalUser(null);
         localStorage.removeItem('payroll_portal_user');
@@ -1638,7 +1652,7 @@ export default function App() {
     setFailedLogins(updatedFailures);
     setIsDataModified(true);
 
-    // Sync to Firestore immediately so that admin sees the device approval alert instantly
+    //Sync to Firestore immediately so that admin sees the device approval alert instantly
     try {
       await saveToFirestore({
         employees,
@@ -1707,10 +1721,8 @@ export default function App() {
   const handleLogout = () => {
     setConfirmDialog({
       isOpen: true,
-      title: language === 'en' ? 'Sign Out Admin' : 'डैशबोर्ड लॉग आउट',
-      message: language === 'en' 
-        ? 'Are you sure you want to sign out from the Admin Dashboard?' 
-        : 'क्या आप एडमिन डैशबोर्ड से लॉग आउट करना चाहते हैं?',
+      title: 'Sign Out Admin',
+      message: 'Are you sure you want to sign out from the Admin Dashboard?',
       onConfirm: async () => {
         setPortalUser(null);
         localStorage.removeItem('payroll_portal_user');
@@ -1735,7 +1747,7 @@ export default function App() {
     });
   };
 
-  // Seeding sample data
+  //Seeding sample data
   const handleSeedDemoData = async () => {
     setIsLoadingData(true);
     setSyncStatus('syncing');
@@ -1783,14 +1795,14 @@ export default function App() {
         }
       ];
 
-      // Seed 5 days of attendance for current month
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+      //Seed 5 days of attendance for current month
+      const currentMonth = new Date().toISOString().slice(0, 7); //YYYY-MM
       const sampleAttendance: Attendance[] = [];
       
       for (let day = 1; day <= 5; day++) {
         const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
         sampleEmployees.forEach((emp, index) => {
-          // Rajesh & Sunita present, Amit absent on day 3
+          //Rajesh & Sunita present, Amit absent on day 3
           const isAbsent = day === 3 && index === 2;
           const isHalfDay = day === 4 && index === 1;
 
@@ -1799,41 +1811,41 @@ export default function App() {
             employeeId: emp.id,
             status: isAbsent ? 'Absent' : isHalfDay ? 'Half Day' : 'Present',
             checkIn: isAbsent ? '' : '09:00',
-            checkOut: isAbsent ? '' : isHalfDay ? '13:30' : '18:30', // राजेश worked some overtime
+            checkOut: isAbsent ? '' : isHalfDay ? '13:30' : '18:30', //worked some overtime
             overtimeHours: (!isAbsent && !isHalfDay && index === 0) ? 0.5 : 0,
             remarks: isAbsent ? 'Sick leave' : isHalfDay ? 'Personal chore' : 'On-time'
           });
         });
       }
 
-      // Save Employees and Attendance to sheets if connected
+      //Save Employees and Attendance to sheets if connected
       if (spreadsheetId && token) {
         addSyncLog(
-          language === 'en' ? 'Seed Database' : 'डेटाबेस सीड करें',
+          'Seed Database',
           'syncing',
-          language === 'en' ? 'Writing sample employees and attendance history...' : 'नमूना कर्मचारी और उपस्थिति इतिहास लिखा जा रहा है...'
+          'Writing sample employees and attendance history...'
         );
         await saveEmployees(spreadsheetId, sampleEmployees, token);
         await saveAttendance(spreadsheetId, sampleAttendance, token);
       }
 
-      // Reload
+      //Reload
       setEmployees(sampleEmployees);
       setAttendance(sampleAttendance);
       setIsDataModified(true);
       setShowSeedDialog(false);
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Seed Database' : 'डेटाबेस सीड करें',
+        'Seed Database',
         'success',
-        language === 'en' ? 'Seeded 3 demo employees and 5 days of attendance history.' : '3 नमूना कर्मचारी और 5 दिनों का उपस्थिति इतिहास सफलतापूर्वक सीड किया गया।'
+        'Seeded 3 demo employees and 5 days of attendance history.'
       );
     } catch (err: any) {
       console.error('Error seeding demo data', err);
       addSyncLog(
-        language === 'en' ? 'Seed Database Error' : 'डेटाबेस सीड त्रुटि',
+        'Seed Database Error',
         'error',
-        language === 'en' ? `Failed to seed: ${err?.message || err}` : `सीड करने में विफल: ${err?.message || err}`
+        `Failed to seed: ${err?.message || err}`
       );
       if (spreadsheetId && token) {
         alert('Failed to seed demo data to Sheets.');
@@ -1879,14 +1891,14 @@ export default function App() {
       setIsDataModified(true);
       addSyncLog('Process Leave Request', 'success', `Leave request ${id} has been ${status.toLowerCase()}.`);
 
-      // If approved, insert or update the corresponding days in the attendance state
+      //If approved, insert or update the corresponding days in the attendance state
       if (status === 'Approved') {
         const empId = affectedReq.employeeId;
         const start = new Date(affectedReq.startDate);
         const end = new Date(affectedReq.endDate);
         const lType = affectedReq.leaveType;
 
-        // Generate all dates in range
+        //Generate all dates in range
         const dates: string[] = [];
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
           dates.push(d.toISOString().split('T')[0]);
@@ -1910,12 +1922,12 @@ export default function App() {
               checkOut = '13:30';
             } else if (lType === 'Late Coming') {
               attStatus = 'Present';
-              checkIn = '10:30'; // Late marking
+              checkIn = '10:30'; //Late marking
               checkOut = '18:30';
             } else if (lType === 'Early Going') {
               attStatus = 'Present';
               checkIn = '09:00';
-              checkOut = '16:00'; // Early departure
+              checkOut = '16:00'; //Early departure
             }
 
             if (idx >= 0) {
@@ -1944,11 +1956,11 @@ export default function App() {
         });
       }
 
-      // Trigger outbound SMTP/simulation email to the employee
+      //Trigger outbound SMTP/simulation email to the employee
       const emp = employees.find(e => e.id === affectedReq?.employeeId);
       if (emp && emp.email && emp.email.trim()) {
         try {
-          const res = await fetch('/api/send-leave-update', {
+          const res = await fetch(' //api/send-leave-update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1984,11 +1996,11 @@ export default function App() {
     }
   };
 
-  // Callback functions for syncing mutations
+  //Callback functions for syncing mutations
   const handleAddEmployee = async (newEmp: Employee) => {
-    // Dispatch Welcome Email Notification
+    //Dispatch Welcome Email Notification
     if (newEmp.email && newEmp.email.trim()) {
-      fetch('/api/send-welcome', {
+      fetch(' //api/send-welcome', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2025,32 +2037,32 @@ export default function App() {
     if (!spreadsheetId || !token) {
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Add Employee (Local)' : 'कर्मचारी जोड़ें (स्थानीय)',
+        'Add Employee (Local)',
         'success',
-        language === 'en' ? `Added ${newEmp.name} to local database (offline).` : `स्थानीय डेटाबेस में ${newEmp.name} को जोड़ा गया (ऑफ़लाइन)।`
+        `Added ${newEmp.name} to local database (offline).`
       );
       return;
     }
     setSyncStatus('syncing');
     addSyncLog(
-      language === 'en' ? 'Add Employee' : 'कर्मचारी जोड़ें',
+      'Add Employee',
       'syncing',
-      language === 'en' ? `Saving employee ${newEmp.name} to Google Sheets...` : `कर्मचारी ${newEmp.name} को Google Sheets में सहेजा जा रहा है...`
+      `Saving employee ${newEmp.name} to Google Sheets...`
     );
     try {
       await saveEmployees(spreadsheetId, updated, token);
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Add Employee' : 'कर्मचारी जोड़ें',
+        'Add Employee',
         'success',
-        language === 'en' ? `Employee ${newEmp.name} successfully saved in Sheets.` : `कर्मचारी ${newEmp.name} को सफलतापूर्वक Sheets में सुरक्षित किया गया।`
+        `Employee ${newEmp.name} successfully saved in Sheets.`
       );
     } catch (err: any) {
       setSyncStatus('error');
       addSyncLog(
-        language === 'en' ? 'Add Employee Error' : 'कर्मचारी जोड़ने में त्रुटि',
+        'Add Employee Error',
         'error',
-        language === 'en' ? `Failed to save ${newEmp.name}: ${err?.message || err}` : `कर्मचारी ${newEmp.name} को सहेजने में विफल: ${err?.message || err}`
+        `Failed to save ${newEmp.name}: ${err?.message || err}`
       );
       throw err;
     }
@@ -2072,32 +2084,32 @@ export default function App() {
     if (!spreadsheetId || !token) {
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Bulk Add (Local)' : 'थोक में जोड़ें (स्थानीय)',
+        'Bulk Add (Local)',
         'success',
-        language === 'en' ? `Imported ${newEmployees.length} employees to local database (offline).` : `स्थानीय डेटाबेस में ${newEmployees.length} कर्मचारियों को इम्पोर्ट किया गया (ऑफ़लाइन)।`
+        `Imported ${newEmployees.length} employees to local database (offline).`
       );
       return;
     }
     setSyncStatus('syncing');
     addSyncLog(
-      language === 'en' ? 'Bulk Add Employees' : 'थोक में कर्मचारी जोड़ें',
+      'Bulk Add Employees',
       'syncing',
-      language === 'en' ? `Saving ${newEmployees.length} employees to Google Sheets...` : `${newEmployees.length} कर्मचारियों को Google Sheets में सहेजा जा रहा है...`
+      `Saving ${newEmployees.length} employees to Google Sheets...`
     );
     try {
       await saveEmployees(spreadsheetId, updated, token);
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Bulk Add Employees' : 'थोक में कर्मचारी जोड़ें',
+        'Bulk Add Employees',
         'success',
-        language === 'en' ? `Successfully saved ${newEmployees.length} employees in Sheets.` : `${newEmployees.length} कर्मचारियों को सफलतापूर्वक Sheets में सुरक्षित किया गया।`
+        `Successfully saved ${newEmployees.length} employees in Sheets.`
       );
     } catch (err: any) {
       setSyncStatus('error');
       addSyncLog(
-        language === 'en' ? 'Bulk Add Error' : 'थोक जोड़ने में त्रुटि',
+        'Bulk Add Error',
         'error',
-        language === 'en' ? `Failed to bulk add: ${err?.message || err}` : `थोक जोड़ने में विफल: ${err?.message || err}`
+        `Failed to bulk add: ${err?.message || err}`
       );
       throw err;
     }
@@ -2111,17 +2123,17 @@ export default function App() {
     if (!spreadsheetId || !token) {
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Delete Employee (Local)' : 'कर्मचारी हटाएं (स्थानीय)',
+        'Delete Employee (Local)',
         'success',
-        language === 'en' ? `Deleted employee ${targetEmp?.name || empIdToDelete} from local database.` : `स्थानीय डेटाबेस से कर्मचारी ${targetEmp?.name || empIdToDelete} हटाया गया।`
+        `Deleted employee ${targetEmp?.name || empIdToDelete} from local database.`
       );
       return;
     }
     setSyncStatus('syncing');
     addSyncLog(
-      language === 'en' ? 'Delete Employee' : 'कर्मचारी हटाएं',
+      'Delete Employee',
       'syncing',
-      language === 'en' ? `Removing ${targetEmp?.name || empIdToDelete} from Google Sheets...` : `कर्मचारी ${targetEmp?.name || empIdToDelete} को Google Sheets से हटाया जा रहा है...`
+      `Removing ${targetEmp?.name || empIdToDelete} from Google Sheets...`
     );
     try {
       await saveEmployees(spreadsheetId, updated, token);
@@ -2149,39 +2161,39 @@ export default function App() {
     if (!spreadsheetId || !token) {
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Update Employee (Local)' : 'कर्मचारी अपडेट करें (स्थानीय)',
+        'Update Employee (Local)',
         'success',
-        language === 'en' ? `Updated ${updatedEmp.name} (${updatedEmp.id}) details in local database (offline).` : `स्थानीय डेटाबेस में ${updatedEmp.name} (${updatedEmp.id}) का विवरण अपडेट किया गया (ऑफ़लाइन)।`
+        `Updated ${updatedEmp.name} (${updatedEmp.id}) details in local database (offline).`
       );
       return;
     }
     setSyncStatus('syncing');
     addSyncLog(
-      language === 'en' ? 'Update Employee' : 'कर्मचारी अपडेट करें',
+      'Update Employee',
       'syncing',
-      language === 'en' ? `Saving details for ${updatedEmp.name} to Google Sheets...` : `कर्मचारी ${updatedEmp.name} का विवरण Google Sheets में सहेजा जा रहा है...`
+      `Saving details for ${updatedEmp.name} to Google Sheets...`
     );
     try {
       await saveEmployees(spreadsheetId, updated, token);
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Update Employee' : 'कर्मचारी अपडेट करें',
+        'Update Employee',
         'success',
-        language === 'en' ? `Details for ${updatedEmp.name} successfully updated in Sheets.` : `कर्मचारी ${updatedEmp.name} का विवरण सफलतापूर्वक Sheets में सुरक्षित किया गया।`
+        `Details for ${updatedEmp.name} successfully updated in Sheets.`
       );
     } catch (err: any) {
       setSyncStatus('error');
       addSyncLog(
-        language === 'en' ? 'Update Employee Error' : 'कर्मचारी अपडेट त्रुटि',
+        'Update Employee Error',
         'error',
-        language === 'en' ? `Failed to update ${updatedEmp.name}: ${err?.message || err}` : `${updatedEmp.name} को अपडेट करने में विफल: ${err?.message || err}`
+        `Failed to update ${updatedEmp.name}: ${err?.message || err}`
       );
       throw err;
     }
   };
 
   const handleSaveAttendance = async (date: string, records: Attendance[]) => {
-    // Filter out old records for this specific date and append/overwrite new ones
+    //Filter out old records for this specific date and append/overwrite new ones
     const filteredOld = attendance.filter(r => r.date !== date);
     const combined = [...filteredOld, ...records];
     
@@ -2190,32 +2202,32 @@ export default function App() {
     if (!spreadsheetId || !token) {
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Save Attendance (Local)' : 'उपस्थिति सहेजें (स्थानीय)',
+        'Save Attendance (Local)',
         'success',
-        language === 'en' ? `Saved ${records.length} attendance records for ${date} (offline).` : `दिनांक ${date} के लिए ${records.length} उपस्थिति रिकॉर्ड स्थानीय रूप से सहेजे गए (ऑफ़लाइन)।`
+        `Saved ${records.length} attendance records for ${date} (offline).`
       );
       return;
     }
     setSyncStatus('syncing');
     addSyncLog(
-      language === 'en' ? 'Save Attendance' : 'उपस्थिति सहेजें',
+      'Save Attendance',
       'syncing',
-      language === 'en' ? `Saving ${records.length} attendance records for ${date} to Google Sheets...` : `दिनांक ${date} के लिए ${records.length} उपस्थिति रिकॉर्ड Google Sheets में सहेजे जा रहे हैं...`
+      `Saving ${records.length} attendance records for ${date} to Google Sheets...`
     );
     try {
       await saveAttendance(spreadsheetId, combined, token);
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Save Attendance' : 'उपस्थिति सहेजें',
+        'Save Attendance',
         'success',
-        language === 'en' ? `Attendance for ${date} successfully saved in Sheets.` : `दिनांक ${date} की उपस्थिति को सफलतापूर्वक Sheets में सुरक्षित किया गया।`
+        `Attendance for ${date} successfully saved in Sheets.`
       );
     } catch (err: any) {
       setSyncStatus('error');
       addSyncLog(
-        language === 'en' ? 'Save Attendance Error' : 'उपस्थिति सहेजने में त्रुटि',
+        'Save Attendance Error',
         'error',
-        language === 'en' ? `Failed to save attendance: ${err?.message || err}` : `उपस्थिति सहेजने में विफल: ${err?.message || err}`
+        `Failed to save attendance: ${err?.message || err}`
       );
       throw err;
     }
@@ -2239,32 +2251,32 @@ export default function App() {
     if (!spreadsheetId || !token) {
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Update Attendance (Local)' : 'उपस्थिति अपडेट (स्थानीय)',
+        'Update Attendance (Local)',
         'success',
-        language === 'en' ? `Updated ${updatedRecords.length} attendance logs (offline).` : `स्थानीय रूप से ${updatedRecords.length} उपस्थिति रिकॉर्ड अपडेट किए गए (ऑफ़लाइन)।`
+        `Updated ${updatedRecords.length} attendance logs (offline).`
       );
       return;
     }
     setSyncStatus('syncing');
     addSyncLog(
-      language === 'en' ? 'Update Attendance Logs' : 'उपस्थिति रिकॉर्ड अपडेट करें',
+      'Update Attendance Logs',
       'syncing',
-      language === 'en' ? `Saving ${updatedRecords.length} attendance updates to Google Sheets...` : `${updatedRecords.length} उपस्थिति अपडेट Google Sheets में सहेजे जा रहे हैं...`
+      `Saving ${updatedRecords.length} attendance updates to Google Sheets...`
     );
     try {
       await saveAttendance(spreadsheetId, updated, token);
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Update Attendance Logs' : 'उपस्थिति रिकॉर्ड अपडेट करें',
+        'Update Attendance Logs',
         'success',
-        language === 'en' ? `Attendance updates successfully saved in Sheets.` : `उपस्थिति अपडेट सफलतापूर्वक Sheets में सुरक्षित किए गए।`
+        `Attendance updates successfully saved in Sheets.`
       );
     } catch (err: any) {
       setSyncStatus('error');
       addSyncLog(
-        language === 'en' ? 'Attendance Update Error' : 'उपस्थिति अपडेट त्रुटि',
+        'Attendance Update Error',
         'error',
-        language === 'en' ? `Failed to update attendance: ${err?.message || err}` : `उपस्थिति अपडेट करने में विफल: ${err?.message || err}`
+        `Failed to update attendance: ${err?.message || err}`
       );
       throw err;
     }
@@ -2276,32 +2288,32 @@ export default function App() {
     if (!spreadsheetId || !token) {
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Save Payroll (Local)' : 'वेतन सहेजें (स्थानीय)',
+        'Save Payroll (Local)',
         'success',
-        language === 'en' ? `Saved ${records.length} payroll records locally (offline).` : `स्थानीय रूप से ${records.length} वेतन प्रविष्टियां सहेजी गईं (ऑफ़लाइन)।`
+        `Saved ${records.length} payroll records locally (offline).`
       );
       return;
     }
     setSyncStatus('syncing');
     addSyncLog(
-      language === 'en' ? 'Save Payroll History' : 'वेतन इतिहास सहेजें',
+      'Save Payroll History',
       'syncing',
-      language === 'en' ? `Saving ${records.length} payroll history items to Google Sheets...` : `${records.length} वेतन इतिहास प्रविष्टियां Google Sheets में सहेजी जा रही हैं...`
+      `Saving ${records.length} payroll history items to Google Sheets...`
     );
     try {
       await savePayrollHistory(spreadsheetId, records, token);
       setSyncStatus('synced');
       addSyncLog(
-        language === 'en' ? 'Save Payroll History' : 'वेतन इतिहास सहेजें',
+        'Save Payroll History',
         'success',
-        language === 'en' ? `Payroll history successfully updated in Sheets.` : `वेतन इतिहास सफलतापूर्वक Sheets में सुरक्षित किया गया।`
+        `Payroll history successfully updated in Sheets.`
       );
     } catch (err: any) {
       setSyncStatus('error');
       addSyncLog(
-        language === 'en' ? 'Payroll Sync Error' : 'वेतन सिंक त्रुटि',
+        'Payroll Sync Error',
         'error',
-        language === 'en' ? `Failed to save payroll history: ${err?.message || err}` : `वेतन इतिहास सुरक्षित करने में विफल: ${err?.message || err}`
+        `Failed to save payroll history: ${err?.message || err}`
       );
       throw err;
     }
@@ -2311,7 +2323,7 @@ export default function App() {
     setLanguage(prev => prev === 'en' ? 'hi' : 'en');
   };
 
-  // Translations
+  //Translations
   const uiTexts = {
     appName: "Payroll Portal",
     tagline: "Secure Employee Payroll & Attendance Tracking synced to Google Sheets",
@@ -2324,8 +2336,8 @@ export default function App() {
     attendance: "Attendance",
     payroll: "Salary & Payroll",
     adminSettings: "Admin Settings",
-    leaves: language === 'en' ? "Leaves & Holidays" : "अवकाश और छुट्टियां",
-    ledger: language === 'en' ? "Employee Ledger" : "कर्मचारी लेजर",
+    leaves: "Leaves & Holidays",
+    ledger: "Employee Ledger",
     syncing: "Syncing...",
     synced: "Saved in Sheets",
     syncError: "Sync Error!",
@@ -2345,7 +2357,7 @@ export default function App() {
     benefitSlipsText: "Auto-calculate pro-rated salaries, deductions, overtime, and generate beautiful printable receipts.",
   };
 
-  // 1. Loading Portal Session state
+  //1. Loading Portal Session state
   if (!portalUser && isLoadingAuth) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center">
@@ -2355,7 +2367,7 @@ export default function App() {
     );
   }
 
-  // 2. Render Custom Login Screen if not authenticated via Portal
+  //2. Render Custom Login Screen if not authenticated via Portal
   if (!portalUser) {
     const formattedTime = liveTime.toLocaleTimeString('en-US', { 
       timeZone: 'Asia/Kolkata',
@@ -2383,8 +2395,7 @@ export default function App() {
                 src={getDirectImageUrl(adminSettings.companyLogo)} 
                 alt="Logo" 
                 className="w-5 h-5 rounded object-cover shadow-md ring-1 ring-emerald-400/25"
-                referrerPolicy="no-referrer"
-              />
+                referrerPolicy="no-referrer" />
               <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-100 font-display">
                 {adminSettings.companyName || 'Rathi Build Mart'}
               </span>
@@ -2395,7 +2406,7 @@ export default function App() {
               onClick={toggleLanguage}
               className="px-1.5 py-0.5 rounded text-[8px] font-black bg-slate-900 border border-slate-800 text-slate-200 transition-all duration-150 cursor-pointer shrink-0"
             >
-              🌐 {language === 'en' ? 'हिन्दी' : 'EN'}
+              🌐 {'English'}
             </button>
           </div>
 
@@ -2410,7 +2421,7 @@ export default function App() {
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              🔑 {language === 'en' ? 'Sign In' : 'लॉगिन'}
+              🔑 {'Sign In'}
             </button>
             <button
               type="button"
@@ -2421,7 +2432,7 @@ export default function App() {
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              📢 {language === 'en' ? 'Notices & Info' : 'सूचना और जानकारी'}
+              📢 {'Notices & Info'}
             </button>
           </div>
         </div>
@@ -2433,7 +2444,7 @@ export default function App() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-slate-900/80 backdrop-blur-md hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 transition-all duration-150 cursor-pointer shadow-md active:scale-95"
           >
             <Globe className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{language === 'en' ? 'हिन्दी (Hindi)' : 'English (अंग्रेजी)'}</span>
+            <span>{'English'}</span>
           </button>
         </div>
 
@@ -2451,52 +2462,47 @@ export default function App() {
               src={getDirectImageUrl(adminSettings.companyLogo)} 
               alt={adminSettings.companyName || 'Rathi Buildmart'} 
               className="w-10 h-10 rounded-2xl object-cover shadow-lg shadow-emerald-500/20 ring-1 ring-emerald-400/25"
-              referrerPolicy="no-referrer"
-            />
+              referrerPolicy="no-referrer" />
             <div>
               <h1 className="text-sm font-black uppercase tracking-widest text-slate-100 font-display">
                 {adminSettings.companyName || 'Rathi Build Mart'}
               </h1>
               <p className="text-[9px] font-black tracking-widest uppercase text-emerald-400 font-mono mt-0.5">
-                {language === 'en' ? 'Secure Payroll Portal' : 'सुरक्षित वेतन पोर्टल'}
+                {'Secure Payroll Portal'}
               </p>
             </div>
           </div>
 
-          {/* Middle Content - Display Header / Stats */}
+          {/* Middle Content - Display HeaderStats */}
           <div className="my-auto py-3 md:py-8 lg:py-0 relative z-10 max-w-sm">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-2 uppercase tracking-wider">
               <Sparkles className="w-3 h-3 animate-pulse" />
-              {language === 'en' ? 'SaaS Level Security' : 'SaaS स्तर की सुरक्षा'}
+              {'SaaS Level Security'}
             </span>
             <h2 className="text-xl md:text-2xl lg:text-4xl font-black text-white font-display tracking-tight leading-tight">
-              {language === 'en' 
-                ? 'Modern payroll & attendance workspace.' 
-                : 'आधुनिक वेतन और उपस्थिति कार्यक्षेत्र।'}
+              {'Modern payroll & attendance workspace.'}
             </h2>
             <p className="mt-2 text-[10.5px] md:text-xs text-slate-400 leading-relaxed font-semibold">
-              {language === 'en'
-                ? 'Empowering employees with self-service receipt printing, real-time leaves requests, and secure administrator portal ledger reviews.'
-                : 'कर्मचारियों को वेतन पर्ची मुद्रण, वास्तविक समय छुट्टी अनुरोधों और सुरक्षित प्रशासनिक पोर्टल बहीखाता समीक्षाओं के साथ सशक्त बनाना।'}
+              {'Empowering employees with self-service receipt printing, real-time leaves requests, and secure administrator portal ledger reviews.'}
             </p>
  
             {/* Quick Live stats cards */}
             <div className="grid grid-cols-2 gap-2 mt-4 md:mt-8">
               <div className="bg-slate-900/60 backdrop-blur-xs border border-slate-800/80 p-2.5 rounded-lg">
                 <span className="text-[8px] font-black uppercase tracking-wider text-slate-500 block">
-                  {language === 'en' ? 'Active Roster' : 'सक्रिय कर्मचारी'}
+                  {'Active Roster'}
                 </span>
                 <span className="text-xs font-black text-white font-mono block mt-0.5">
-                  {employees.filter(e => e.isActive !== false).length} {language === 'en' ? 'Staff' : 'कर्मचारी'}
+                  {employees.filter(e => e.isActive !== false).length} {'Staff'}
                 </span>
               </div>
               <div className="bg-slate-900/60 backdrop-blur-xs border border-slate-800/80 p-2.5 rounded-lg">
                 <span className="text-[8px] font-black uppercase tracking-wider text-slate-500 block">
-                  {language === 'en' ? 'System Status' : 'सिस्टम की स्थिति'}
+                  {'System Status'}
                 </span>
                 <span className="inline-flex items-center gap-1 text-[10.5px] font-black text-emerald-400 mt-1">
                   <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                  {language === 'en' ? 'Operational' : 'सक्रिय है'}
+                  {'Operational'}
                 </span>
               </div>
             </div>
@@ -2514,7 +2520,7 @@ export default function App() {
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  📢 {language === 'en' ? 'Notices' : 'सूचनाएँ'}
+                  📢 {'Notices'}
                 </button>
                 <button
                   type="button"
@@ -2525,7 +2531,7 @@ export default function App() {
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  👤 {language === 'en' ? 'HR Help' : 'एचआर सहायता'}
+                  👤 {'HR Help'}
                 </button>
                 <button
                   type="button"
@@ -2536,7 +2542,7 @@ export default function App() {
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  💻 {language === 'en' ? 'IT Mgmt' : 'आईटी प्रबंधन'}
+                  💻 {'IT Mgmt'}
                 </button>
                 <button
                   type="button"
@@ -2547,7 +2553,7 @@ export default function App() {
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  ⏱️ {language === 'en' ? 'Timings' : 'समय नियम'}
+                  ⏱️ {'Timings'}
                 </button>
               </div>
 
@@ -2557,10 +2563,10 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
                       <Megaphone className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                      {language === 'en' ? 'Notice Board & Circulars' : 'सूचना पट्ट और परिपत्र'}
+                      {'Notice Board & Circulars'}
                     </span>
                     <span className="text-[7.5px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      {announcements.filter(a => (!a.scheduledDate || a.scheduledDate <= new Date().toISOString().split('T')[0]) && (!a.expiryDate || a.expiryDate >= new Date().toISOString().split('T')[0])).length} {language === 'en' ? 'Active' : 'सक्रिय'}
+                      {announcements.filter(a => (!a.scheduledDate || a.scheduledDate <= new Date().toISOString().split('T')[0]) && (!a.expiryDate || a.expiryDate >= new Date().toISOString().split('T')[0])).length} {'Active'}
                     </span>
                   </div>
 
@@ -2576,7 +2582,7 @@ export default function App() {
                       if (activeList.length === 0) {
                         return (
                           <p className="text-[10px] text-slate-500 italic">
-                            {language === 'en' ? 'No active company announcements at this time.' : 'इस समय कोई सक्रिय कंपनी घोषणाएं नहीं हैं।'}
+                            {'No active company announcements at this time.'}
                           </p>
                         );
                       }
@@ -2601,8 +2607,7 @@ export default function App() {
                             </div>
                             <RichTextRenderer
                               content={language === 'en' ? ann.content : ann.contentHi}
-                              className="text-[9.5px] text-slate-300 dark:text-slate-300 mt-1"
-                            />
+                              className="text-[9.5px] text-slate-300 dark:text-slate-300 mt-1" />
                             <div className="flex justify-between items-center mt-1.5 pt-1 border-t border-slate-800/40">
                               <span className="text-[8px] font-mono text-slate-500">📅 {ann.scheduledDate || ann.date}</span>
                               {ann.attachmentUrl ? (
@@ -2626,21 +2631,19 @@ export default function App() {
                 <div className="space-y-2">
                   <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
                     <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                    {language === 'en' ? 'Human Resources (HR) Support' : 'एचआर हेल्पलाइन व सहायता'}
+                    {'Human Resources (HR) Support'}
                   </span>
                   <div className="bg-slate-900/40 border border-slate-800/80 p-2.5 rounded-lg space-y-2.5 max-h-[170px] md:max-h-[150px] overflow-y-auto custom-scrollbar">
                     {/* Managed By Info */}
                     <div>
                       <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-500 block">
-                        {language === 'en' ? 'HR Department Head' : 'एचआर विभाग प्रमुख'}
+                        {'HR Department Head'}
                       </span>
                       <p className="text-[10px] font-bold text-slate-200 mt-0.5">
                         {adminSettings.hrContactManager || 'Rathi HR Helpdesk'}
                       </p>
                       <p className="text-[9px] text-slate-400 mt-0.5 leading-normal">
-                        {language === 'en' 
-                          ? 'Contact HR for salary slip queries, leave approvals, attendance records, and company policies.' 
-                          : 'वेतन पर्ची, छुट्टी स्वीकृति, उपस्थिति रिकॉर्ड और कंपनी नीतियों के लिए एचआर से संपर्क करें।'}
+                        {'Contact HR for salary slip queries, leave approvals, attendance records, and company policies.'}
                       </p>
                     </div>
 
@@ -2651,7 +2654,7 @@ export default function App() {
                         className="flex items-center justify-center gap-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-[9.5px] py-2 px-2.5 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer text-center"
                       >
                         <PhoneCall className="w-3.5 h-3.5 shrink-0 text-white" />
-                        <span>{language === 'en' ? 'Call HR' : 'कॉल करें'}: {adminSettings.hrContactPhone || '+91 91111 22222'}</span>
+                        <span>{'Call HR'}: {adminSettings.hrContactPhone || '+91 91111 22222'}</span>
                       </a>
 
                       <a
@@ -2659,7 +2662,7 @@ export default function App() {
                         className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-750 text-emerald-300 hover:text-white font-bold text-[9.5px] py-2 px-2.5 rounded-lg border border-slate-700/80 transition-all active:scale-95 cursor-pointer truncate text-center"
                       >
                         <Mail className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-                        <span className="truncate">{language === 'en' ? 'Email HR' : 'ईमेल करें'}</span>
+                        <span className="truncate">{'Email HR'}</span>
                       </a>
                     </div>
                   </div>
@@ -2671,21 +2674,19 @@ export default function App() {
                 <div className="space-y-2">
                   <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
                     <Monitor className="w-3.5 h-3.5 text-teal-400" />
-                    {language === 'en' ? 'IT Management & System Desk' : 'आईटी प्रबंधन व टेक सहायता'}
+                    {'IT Management & System Desk'}
                   </span>
                   <div className="bg-slate-900/40 border border-slate-800/80 p-2.5 rounded-lg space-y-2.5 max-h-[170px] md:max-h-[150px] overflow-y-auto custom-scrollbar">
                     {/* Managed By Info */}
                     <div>
                       <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-500 block">
-                        {language === 'en' ? 'IT Manager / Tech Desk' : 'आईटी प्रमुख / टेक सहायता'}
+                        {'IT ManagerTech Desk'}
                       </span>
                       <p className="text-[10px] font-bold text-slate-200 mt-0.5">
                         {adminSettings.itContactManager || 'Rathi IT Management Desk'}
                       </p>
                       <p className="text-[9px] text-slate-400 mt-0.5 leading-normal">
-                        {language === 'en' 
-                          ? 'Contact IT Management for login issues, password reset, device restriction unblock, and software support.' 
-                          : 'लॉगिन समस्याओं, पासवर्ड रीसेट, डिवाइस लॉक हटाने और सॉफ्टवेयर सहायता के लिए आईटी प्रबंधन से संपर्क करें।'}
+                        {'Contact IT Management for login issues, password reset, device restriction unblock, and software support.'}
                       </p>
                     </div>
 
@@ -2696,7 +2697,7 @@ export default function App() {
                         className="flex items-center justify-center gap-1.5 bg-teal-600/90 hover:bg-teal-500 text-white font-bold text-[9.5px] py-2 px-2.5 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer text-center"
                       >
                         <PhoneCall className="w-3.5 h-3.5 shrink-0 text-white" />
-                        <span>{language === 'en' ? 'Call IT Desk' : 'कॉल आईटी डेस्क'}: {adminSettings.itContactPhone || '+91 98888 77777'}</span>
+                        <span>{'Call IT Desk'}: {adminSettings.itContactPhone || '+91 98888 77777'}</span>
                       </a>
 
                       <a
@@ -2704,7 +2705,7 @@ export default function App() {
                         className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-750 text-teal-300 hover:text-white font-bold text-[9.5px] py-2 px-2.5 rounded-lg border border-slate-700/80 transition-all active:scale-95 cursor-pointer truncate text-center"
                       >
                         <Mail className="w-3.5 h-3.5 shrink-0 text-teal-400" />
-                        <span className="truncate">{language === 'en' ? 'Email IT Desk' : 'ईमेल करें'}</span>
+                        <span className="truncate">{'Email IT Desk'}</span>
                       </a>
                     </div>
                   </div>
@@ -2716,21 +2717,21 @@ export default function App() {
                 <div className="space-y-2">
                   <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">
                     <Clock className="w-3.5 h-3.5 text-amber-400" />
-                    {language === 'en' ? 'Attendance Policies & Shifts' : 'उपस्थिति और समय नियम'}
+                    {'Attendance Policies & Shifts'}
                   </span>
                   <div className="bg-slate-900/40 border border-slate-800/80 p-2.5 rounded-lg space-y-2 max-h-[150px] md:max-h-[130px] overflow-y-auto custom-scrollbar">
                     {/* Timings */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-[9.5px]">
-                        <span className="text-slate-400 font-bold">{language === 'en' ? 'Standard Shift' : 'मानक पाली'}</span>
+                        <span className="text-slate-400 font-bold">{'Standard Shift'}</span>
                         <span className="text-emerald-400 font-mono font-black">{adminSettings.rulesShiftTiming || '09:30 AM - 06:30 PM'}</span>
                       </div>
                       <div className="flex items-center justify-between text-[9.5px]">
-                        <span className="text-slate-400 font-bold">{language === 'en' ? 'Half-Day Slot' : 'हाफ-डे स्लॉट'}</span>
+                        <span className="text-slate-400 font-bold">{'Half-Day Slot'}</span>
                         <span className="text-amber-400 font-mono font-black">
                           {language === 'en' 
                             ? (adminSettings.rulesHalfDaySlot || 'Before 01:30 PM')
-                            : (adminSettings.rulesHalfDaySlot === 'Before 01:30 PM' || !adminSettings.rulesHalfDaySlot ? 'दोपहर 01:30 से पूर्व' : adminSettings.rulesHalfDaySlot)}
+                            : (adminSettings.rulesHalfDaySlot === 'Before 01:30 PM' || !adminSettings.rulesHalfDaySlot ? 'Before 01:30 PM' : adminSettings.rulesHalfDaySlot)}
                         </span>
                       </div>
                     </div>
@@ -2738,23 +2739,17 @@ export default function App() {
                     {/* Rule points */}
                     <div className="border-t border-slate-800/50 pt-2 space-y-1">
                       <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-500 block">
-                        {language === 'en' ? 'Crucial Punch Policies' : 'पंच नीतियां'}
+                        {'Crucial Punch Policies'}
                       </span>
                       <ul className="list-disc pl-3 text-[9px] text-slate-400 space-y-0.5 font-semibold">
                         <li>
-                          {language === 'en' 
-                            ? `Clock in by ${adminSettings.rulesLatePunchGrace || '09:45 AM'} to avoid auto late flag.` 
-                            : `ऑटो लेट मार्क से बचने के लिए सुबह ${adminSettings.rulesLatePunchGrace || '09:45 AM'} से पहले पंच करें।`}
+                          {`Clock in by ${adminSettings.rulesLatePunchGrace || '09:45 AM'} to avoid auto late flag.`}
                         </li>
                         <li>
-                          {language === 'en' 
-                            ? 'Every 3 late punches will mark a automatic half-day.' 
-                            : 'प्रत्येक 3 लेट पंच होने पर स्वचालित रूप से आधा दिन काटा जाएगा।'}
+                          {'Every 3 late punches will mark a automatic half-day.'}
                         </li>
                         <li>
-                          {language === 'en' 
-                            ? `Check out after ${adminSettings.rulesShiftTiming?.split('-')?.[1]?.trim() || '06:30 PM'} to complete the standard day roster.` 
-                            : `शिफ्ट पूर्ण करने के लिए शाम ${adminSettings.rulesShiftTiming?.split('-')?.[1]?.trim() || '06:30 PM'} के बाद ही पंच-आउट करें।`}
+                          {`Check out after ${adminSettings.rulesShiftTiming?.split('-')?.[1]?.trim() || '06:30 PM'} to complete the standard day roster.`}
                         </li>
                       </ul>
                     </div>
@@ -2767,7 +2762,7 @@ export default function App() {
           {/* Bottom Live Workspace Clock */}
           <div className="relative z-10 border-t border-slate-800/60 pt-3.5 mt-4 md:pt-6 md:mt-6 lg:mt-0 pb-12 lg:pb-0">
             <span className="text-[8px] font-black uppercase tracking-wider text-slate-500 block mb-1">
-              {language === 'en' ? 'System Reference Time' : 'सिस्टम संदर्भ समय'}
+              {'System Reference Time'}
             </span>
             <div className="flex items-center gap-2">
               <div className="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg font-mono text-[10.5px] font-bold text-emerald-400 tracking-wider shadow-sm flex items-center justify-center min-w-[95px]">
@@ -2775,7 +2770,7 @@ export default function App() {
               </div>
               <div className="text-[9px] text-slate-400 font-bold leading-tight">
                 <span className="block">{formattedDate}</span>
-                <span className="text-slate-500 text-[8px] font-semibold">IST (UTC+05:30) • {language === 'en' ? 'Secure Connection' : 'सुरक्षित कनेक्शन'}</span>
+                <span className="text-slate-500 text-[8px] font-semibold">IST (UTC+05:30) • {'Secure Connection'}</span>
               </div>
             </div>
           </div>
@@ -2798,19 +2793,17 @@ export default function App() {
               <div className="space-y-1.5 text-center sm:text-left">
                 <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest bg-emerald-950/50 text-emerald-400 border border-emerald-900/30">
                   <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                  {language === 'en' ? 'Secure Gateway' : 'सुरक्षित गेटवे'}
+                  {'Secure Gateway'}
                 </div>
                 <h3 className="text-2xl font-black text-white font-display tracking-tight mt-2 leading-none">
-                  {language === 'en' ? 'Sign In to Portal' : 'पोर्टल में लॉगिन करें'}
+                  {'Sign In to Portal'}
                 </h3>
                 <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
-                  {language === 'en' 
-                    ? 'Enter your unique Employee ID or administrator credentials to enter the workspace.' 
-                    : 'कार्यक्षेत्र में प्रवेश करने के लिए अपनी कर्मचारी आईडी या एडमिनिस्ट्रेटर क्रेडेंशियल दर्ज करें।'}
+                  {'Enter your unique Employee ID or administrator credentials to enter the workspace.'}
                 </p>
               </div>
 
-              {/* Login Screen Announcement / Notice Banner */}
+              {/* Login Screen AnnouncementNotice Banner */}
               {showLoginNotice && (
                 <div className="mt-4 bg-gradient-to-r from-emerald-950/80 via-slate-900 to-indigo-950/80 border border-emerald-500/30 rounded-xl p-3.5 shadow-md relative group animate-fadeIn">
                   <div className="flex items-start justify-between gap-2">
@@ -2821,15 +2814,13 @@ export default function App() {
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 font-mono">
-                            {language === 'en' ? 'Portal Notice & Operational Update' : 'पोर्टल सूचना एवं संचालन अपडेट'}
+                            {'Portal Notice & Operational Update'}
                           </span>
                           <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                         </div>
                         <p className="text-[11px] font-semibold text-slate-200 leading-snug">
                           {adminSettings.noticeMessage || (
-                            language === 'en'
-                              ? '📢 Monthly Payroll & Attendance logs updated for current cycle. Sign in using your Employee ID or request Email OTP.'
-                              : '📢 वर्तमान चक्र के लिए मासिक पेरोल और उपस्थिति लॉग अपडेट किए गए। अपनी कर्मचारी आईडी या ईमेल ओटीपी से साइन इन करें।'
+                            '📢 Monthly Payroll & Attendance logs updated for current cycle. Sign in using your Employee ID or request Email OTP.'
                           )}
                         </p>
                       </div>
@@ -2856,9 +2847,7 @@ export default function App() {
                   {fallbackOtpPayload && (
                     <div className="pt-2 border-t border-rose-500/10 flex flex-col gap-2">
                       <p className="text-[10px] text-slate-300 font-medium">
-                        {language === 'en' 
-                          ? 'SMTP Dispatch failed. You can bypass this using the Developer Fallback Sandbox:'
-                          : 'SMTP प्रेषण विफल रहा। आप डेवलपर फ़ॉलबैक सैंडबॉक्स का उपयोग करके इसे बायपास कर सकते हैं:'}
+                        {'SMTP Dispatch failed. You can bypass this using the Developer Fallback Sandbox:'}
                       </p>
                       <button
                         type="button"
@@ -2877,7 +2866,7 @@ export default function App() {
                         }}
                         className="self-start text-[10px] px-3 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-lg cursor-pointer font-bold uppercase tracking-wider transition-all"
                       >
-                        {language === 'en' ? 'Bypass & View OTP in Sandbox' : 'बायपास करें और सैंडबॉक्स में ओटीपी देखें'}
+                        {'Bypass & View OTP in Sandbox'}
                       </button>
                     </div>
                   )}
@@ -2892,12 +2881,10 @@ export default function App() {
                       <Lock className="w-5 h-5 animate-pulse" />
                     </div>
                     <h4 className="text-sm font-black text-white uppercase tracking-wider font-mono">
-                      {language === 'en' ? 'First-Time Login Security Setup' : 'फर्स्ट-टाइम लॉगिन सुरक्षा सेटअप'}
+                      {'First-Time Login Security Setup'}
                     </h4>
                     <p className="text-[11px] text-slate-400 leading-normal font-semibold">
-                      {language === 'en'
-                        ? 'For your security, you must bind your device on your first login. Please choose one verification method below.'
-                        : 'आपकी सुरक्षा के लिए, आपको पहले लॉगिन पर अपना डिवाइस बाइंड करना होगा। कृपया नीचे से कोई एक सत्यापन तरीका चुनें।'}
+                      {'For your security, you must bind your device on your first login. Please choose one verification method below.'}
                     </p>
                   </div>
 
@@ -2909,9 +2896,7 @@ export default function App() {
                         onClick={async () => {
                           setLoginErr(null);
                           if (!firstLoginEmployee.email || !firstLoginEmployee.email.trim()) {
-                            setLoginErr(language === 'en'
-                              ? 'No email address registered. Please use HR/Admin approval.'
-                              : 'कोई ईमेल पता पंजीकृत नहीं है। कृपया एचआर/एडमिन स्वीकृति का उपयोग करें।');
+                            setLoginErr('No email address registered. Please use HR/Admin approval.');
                             return;
                           }
 
@@ -2920,7 +2905,7 @@ export default function App() {
                           setFirstLoginSendingOtp(true);
 
                           try {
-                            const res = await fetch('/api/send-otp', {
+                            const res = await fetch(' //api/send-otp', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
@@ -2969,7 +2954,7 @@ export default function App() {
                           } catch (err: any) {
                             console.error('[First Login Security OTP Send Error]', err);
                             setFirstLoginSendingOtp(false);
-                            setLoginErr(language === 'en' ? `Network error sending OTP: ${err.message || err}` : `ओटीपी भेजने में नेटवर्क त्रुटि: ${err.message || err}`);
+                            setLoginErr(`Network error sending OTP: ${err.message || err}`);
                           }
                         }}
                         disabled={firstLoginSendingOtp}
@@ -2981,12 +2966,10 @@ export default function App() {
                           </div>
                           <div>
                             <span className="block text-xs font-black text-white font-mono uppercase tracking-wider">
-                              {language === 'en' ? 'Option 1: Email OTP' : 'विकल्प 1: ईमेल ओटीपी'}
+                              {'Option 1: Email OTP'}
                             </span>
                             <span className="block text-[10px] text-slate-400 font-semibold mt-0.5">
-                              {language === 'en' 
-                                ? `Send code to ${firstLoginEmployee.email ? firstLoginEmployee.email.replace(/(.{3})(.*)(@.*)/, "$1***$3") : 'registered email'}`
-                                : `कोड भेजें: ${firstLoginEmployee.email ? firstLoginEmployee.email.replace(/(.{3})(.*)(@.*)/, "$1***$3") : 'पंजीकृत ईमेल पर'}`}
+                              {`Send code to ${firstLoginEmployee.email ? firstLoginEmployee.email.replace(/(.{3})(.*)(@.*)/, "$1***$3") : 'registered email'}`}
                             </span>
                           </div>
                         </div>
@@ -3011,7 +2994,7 @@ export default function App() {
                           setFirstLoginEmployee(updated);
                           setFirstLoginStep('admin_approval');
 
-                          // Sync to server immediately so the Admin sees it
+                          //Sync to server immediately so the Admin sees it
                           try {
                             const updatedEmps = employees.map(e => e.id === updated.id ? updated : e);
                             setEmployees(updatedEmps);
@@ -3036,12 +3019,10 @@ export default function App() {
                           </div>
                           <div>
                             <span className="block text-xs font-black text-white font-mono uppercase tracking-wider">
-                              {language === 'en' ? 'Option 2: HR/Admin Approval' : 'विकल्प 2: एचआर/एडमिन मंजूरी'}
+                              {'Option 2: HR/Admin Approval'}
                             </span>
                             <span className="block text-[10px] text-slate-400 font-semibold mt-0.5">
-                              {language === 'en'
-                                ? 'Generate request code to share with HR/Admin'
-                                : 'एचआर/एडमिन के साथ साझा करने के लिए अनुरोध कोड बनाएं'}
+                              {'Generate request code to share with HR/Admin'}
                             </span>
                           </div>
                         </div>
@@ -3057,7 +3038,7 @@ export default function App() {
                         }}
                         className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 mt-2 py-2 cursor-pointer transition-colors"
                       >
-                        {language === 'en' ? 'Cancel & Return to Login' : 'रद्द करें और लॉगिन पर वापस जाएं'}
+                        {'Cancel & Return to Login'}
                       </button>
                     </div>
                   )}
@@ -3073,7 +3054,7 @@ export default function App() {
                           approvedDeviceId: currentDeviceId
                         }, currentDeviceId);
 
-                        // Sync updated employee to database
+                        //Sync updated employee to database
                         const updatedEmps = employees.map(emp => emp.id === updatedEmp.id ? updatedEmp : emp);
                         setEmployees(updatedEmps);
                         try {
@@ -3090,7 +3071,7 @@ export default function App() {
                           console.warn("Failed to sync approved employee to Firestore:", err);
                         }
 
-                        // Success Login
+                        //Success Login
                         const empUser: PortalUser = {
                           id: updatedEmp.id,
                           name: updatedEmp.name,
@@ -3103,18 +3084,16 @@ export default function App() {
                         setFirstLoginEmployee(null);
                         setLoginErr(null);
                       } else {
-                        setLoginErr(language === 'en' ? 'Invalid OTP. Please try again.' : 'अमान्य ओटीपी। कृपया पुनः प्रयास करें।');
+                        setLoginErr('Invalid OTP. Please try again.');
                       }
                     }} className="space-y-4 animate-fadeIn">
                       <div className="bg-emerald-950/20 text-emerald-300 border border-emerald-900/30 p-3.5 rounded-xl text-[11px] font-semibold leading-normal">
-                        📧 {language === 'en' 
-                          ? `A security OTP has been sent to ${firstLoginEmployee.email?.replace(/(.{3})(.*)(@.*)/, "$1***$3")}. Please enter the code below.`
-                          : `एक सुरक्षा ओटीपी ${firstLoginEmployee.email?.replace(/(.{3})(.*)(@.*)/, "$1***$3")} पर भेजा गया है। कृपया नीचे कोड दर्ज करें।`}
+                        📧 {`A security OTP has been sent to ${firstLoginEmployee.email?.replace(/(.{3})(.*)(@.*)/, "$1***$3")}. Please enter the code below.`}
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                          {language === 'en' ? '6-Digit Verification OTP' : '6-अंकीय सत्यापन ओटीपी'}
+                          {'6-Digit Verification OTP'}
                         </label>
                         <input
                           type="text"
@@ -3123,15 +3102,14 @@ export default function App() {
                           value={firstLoginEnteredOtp}
                           onChange={(e) => setFirstLoginEnteredOtp(e.target.value)}
                           placeholder="e.g. 123456"
-                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
-                        />
+                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono" />
                       </div>
 
                       <button
                         type="submit"
                         className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
                       >
-                        {language === 'en' ? 'Verify & Sign In' : 'सत्यापित करें और साइन इन करें'}
+                        {'Verify & Sign In'}
                       </button>
 
                       <button
@@ -3142,7 +3120,7 @@ export default function App() {
                         }}
                         className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 transition-colors py-1 cursor-pointer"
                       >
-                        {language === 'en' ? 'Back' : 'पीछे'}
+                        {'Back'}
                       </button>
                     </form>
                   )}
@@ -3152,7 +3130,7 @@ export default function App() {
                       e.preventDefault();
                       setLoginErr(null);
 
-                      // Load latest employees list from Firestore to verify any changes
+                      //Load latest employees list from Firestore to verify any changes
                       let latestEmployees = employees;
                       try {
                         const result = await loadFromFirestore();
@@ -3166,13 +3144,13 @@ export default function App() {
 
                       const currentEmp = latestEmployees.find(emp => emp.id === firstLoginEmployee.id);
                       if (!currentEmp) {
-                        setLoginErr(language === 'en' ? 'Employee not found.' : 'कर्मचारी नहीं मिला।');
+                        setLoginErr('Employee not found.');
                         return;
                       }
 
                       const currentDeviceId = getDeviceFingerprint();
 
-                      // Auto login if already approved by Admin directly on their dashboard
+                      //Auto login if already approved by Admin directly on their dashboard
                       const isAlreadyApproved = currentEmp.approvedDeviceId === currentDeviceId;
                       const enteredOtpMatches = firstLoginAdminCode.trim() && currentEmp.pendingDeviceApprovalOtp && (firstLoginAdminCode.trim() === currentEmp.pendingDeviceApprovalOtp.trim());
 
@@ -3212,34 +3190,30 @@ export default function App() {
                         setFirstLoginEmployee(null);
                         setLoginErr(null);
                       } else {
-                        setLoginErr(language === 'en' 
-                          ? 'Invalid Admin Approval OTP code. Please ask Admin/HR to generate the OTP, or wait for them to click Approve on their dashboard.' 
-                          : 'अमान्य एडमिन स्वीकृति ओटीपी कोड। कृपया एडमिन/एचआर से ओटीपी जनरेट करने के लिए कहें, या उनके डैशबोर्ड पर मंजूर करें पर क्लिक करने की प्रतीक्षा करें।');
+                        setLoginErr('Invalid Admin Approval OTP code. Please ask Admin/HR to generate the OTP, or wait for them to click Approve on their dashboard.');
                       }
                     }} className="space-y-4 animate-fadeIn">
                       <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3.5">
                         <div className="text-center">
                           <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                            {language === 'en' ? 'Your Request Share Code' : 'आपका अनुरोध शेयर कोड'}
+                            {'Your Request Share Code'}
                           </span>
                           <span className="block text-2xl font-black text-emerald-400 font-mono tracking-wider mt-1 bg-slate-950 py-2.5 px-4 rounded-lg inline-block border border-slate-800">
                             {firstLoginEmployee.pendingDeviceApprovalCode}
                           </span>
                         </div>
                         <p className="text-[10px] text-slate-400 font-semibold leading-relaxed text-center">
-                          {language === 'en'
-                            ? 'Provide this code to HR/Admin. Once they approve your request, they will share an OTP with you or approve it directly.'
-                            : 'एचआर/एडमिन को यह कोड प्रदान करें। एक बार जब वे आपके अनुरोध को मंजूरी दे देंगे, तो वे आपके साथ एक ओटीपी साझा करेंगे या सीधे मंजूर करेंगे।'}
+                          {'Provide this code to HR/Admin. Once they approve your request, they will share an OTP with you or approve it directly.'}
                         </p>
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono flex justify-between items-center">
-                          <span>{language === 'en' ? '6-Digit Admin Approval OTP' : '6-अंकीय एडमिन स्वीकृति ओटीपी'}</span>
+                          <span>{'6-Digit Admin Approval OTP'}</span>
                           <button
                             type="button"
                             onClick={async () => {
-                              // Reload latest status from DB
+                              //Reload latest status from DB
                               try {
                                 const result = await loadFromFirestore();
                                 if (result && result.success && result.data && result.data.employees) {
@@ -3247,7 +3221,7 @@ export default function App() {
                                   setEmployees(latestEmps);
                                   const match = latestEmps.find(e => e.id === firstLoginEmployee.id);
                                   if (match && match.approvedDeviceId === getDeviceFingerprint()) {
-                                    // Already approved directly by admin!
+                                    //Already approved directly by admin!
                                     const empUser: PortalUser = {
                                       id: match.id,
                                       name: match.name,
@@ -3267,7 +3241,7 @@ export default function App() {
                             }}
                             className="text-[9px] text-emerald-400 uppercase font-black tracking-widest font-mono hover:text-emerald-300 transition-colors"
                           >
-                            🔄 {language === 'en' ? 'Check Status' : 'स्थिति जांचें'}
+                            🔄 {'Check Status'}
                           </button>
                         </label>
                         <input
@@ -3277,15 +3251,14 @@ export default function App() {
                           value={firstLoginAdminCode}
                           onChange={(e) => setFirstLoginAdminCode(e.target.value)}
                           placeholder="e.g. 123456"
-                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
-                        />
+                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono" />
                       </div>
 
                       <button
                         type="submit"
                         className="w-full bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
                       >
-                        {language === 'en' ? 'Verify Approval & Sign In' : 'मंजूरी सत्यापित करें और साइन इन करें'}
+                        {'Verify Approval & Sign In'}
                       </button>
 
                       <button
@@ -3296,7 +3269,7 @@ export default function App() {
                         }}
                         className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 transition-colors py-1 cursor-pointer"
                       >
-                        {language === 'en' ? 'Back' : 'पीछे'}
+                        {'Back'}
                       </button>
                     </form>
                   )}
@@ -3320,7 +3293,7 @@ export default function App() {
                           : 'border-transparent text-slate-500 hover:text-slate-300'
                       }`}
                     >
-                      🔑 {language === 'en' ? 'Password Login' : 'पासवर्ड लॉगिन'}
+                      🔑 {'Password Login'}
                     </button>
                     <button
                       type="button"
@@ -3336,7 +3309,7 @@ export default function App() {
                           : 'border-transparent text-slate-500 hover:text-slate-300'
                       }`}
                     >
-                      📨 {language === 'en' ? 'Email OTP Login' : 'ईमेल ओटीपी लॉगिन'}
+                      📨 {'Email OTP Login'}
                     </button>
                   </div>
 
@@ -3421,18 +3394,16 @@ export default function App() {
                       setPasswordLoginPendingUser(null);
                       setPasswordLoginEnteredOtp('');
                     } else {
-                      setLoginErr(language === 'en' ? 'Invalid 2FA OTP. Please try again.' : 'अमान्य 2FA ओटीपी। कृपया पुनः प्रयास करें।');
+                      setLoginErr('Invalid 2FA OTP. Please try again.');
                     }
                   }} className="space-y-4 mt-6 animate-fadeIn">
                     <div className="bg-emerald-950/20 text-emerald-300 border border-emerald-900/30 p-3 rounded-xl text-[11px] font-semibold leading-normal animate-pulse">
-                      🛡️ {language === 'en' 
-                        ? `Two-Factor Authentication is active. A secure login OTP has been sent to ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")}.`
-                        : `टू-फैक्टर ऑथेंटिकेशन सक्रिय है। एक सुरक्षित लॉगिन ओटीपी ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")} पर भेजा गया है।`}
+                      🛡️ {`Two-Factor Authentication is active. A secure login OTP has been sent to ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")}.`}
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? '6-Digit OTP Code' : '6-अंकीय ओटीपी कोड'}
+                        {'6-Digit OTP Code'}
                       </label>
                       <input
                         type="text"
@@ -3441,8 +3412,7 @@ export default function App() {
                         value={passwordLoginEnteredOtp}
                         onChange={(e) => setPasswordLoginEnteredOtp(e.target.value)}
                         placeholder="e.g. 123456"
-                        className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
-                      />
+                        className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono" />
                     </div>
 
                     <button
@@ -3451,8 +3421,8 @@ export default function App() {
                       className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider disabled:opacity-50"
                     >
                       {isSendingPasswordLoginOtp
-                        ? (language === 'en' ? 'Verifying...' : 'सत्यापित किया जा रहा है...')
-                        : (language === 'en' ? 'Verify & Sign In' : 'सत्यापित करें और साइन इन करें')}
+                        ? ('Verifying...')
+                        : ('Verify & Sign In')}
                     </button>
 
                     <button
@@ -3465,7 +3435,7 @@ export default function App() {
                       }}
                       className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 mt-1 transition-colors"
                     >
-                      {language === 'en' ? 'Back' : 'पीछे'}
+                      {'Back'}
                     </button>
                   </form>
                 ) : (
@@ -3474,7 +3444,7 @@ export default function App() {
                     const inputID = loginId.trim();
                     const inputPass = loginPass;
                     if (!inputID || !inputPass) {
-                      setLoginErr(language === 'en' ? 'Please fill in all fields.' : 'कृपया सभी फ़ील्ड भरें।');
+                      setLoginErr('Please fill in all fields.');
                       return;
                     }
 
@@ -3486,7 +3456,7 @@ export default function App() {
                       localStorage.removeItem('payroll_remembered_login_id');
                     }
 
-                    // Load latest employees list from Firestore to verify correct and updated device lock and multi-device status
+                    //Load latest employees list from Firestore to verify correct and updated device lock and multi-device status
                     let latestEmployees = employees;
                     try {
                       const result = await loadFromFirestore();
@@ -3520,7 +3490,7 @@ export default function App() {
                         }
                       } else {
                         recordUnsuccessfulLogin(inputID, 'Admin Incorrect Password');
-                        setLoginErr(language === 'en' ? 'Incorrect Administrator password.' : 'अमान्य एडमिनिस्ट्रेटर पासवर्ड।');
+                        setLoginErr('Incorrect Administrator password.');
                       }
                     } else {
                       const roleAccounts = adminSettings.roleAccounts || [];
@@ -3540,9 +3510,7 @@ export default function App() {
                           if (adminSettings.enablePasswordLoginOtp) {
                             const email = matchedRoleAcc.email || '';
                             if (!email || !email.trim()) {
-                              setLoginErr(language === 'en'
-                                ? 'Email address is not configured for this user. Please contact administrator.'
-                                : 'इस उपयोगकर्ता के लिए ईमेल पता कॉन्फ़िगर नहीं किया गया है। कृपया एडमिनिस्ट्रेटर से संपर्क करें।');
+                              setLoginErr('Email address is not configured for this user. Please contact administrator.');
                               return;
                             }
                             await sendPassword2faOtp(email, matchedRoleAcc, 'role', matchedRoleAcc.name);
@@ -3555,7 +3523,7 @@ export default function App() {
                           }
                         } else {
                           recordUnsuccessfulLogin(inputID, 'Incorrect Password');
-                          setLoginErr(language === 'en' ? 'Incorrect Password.' : 'गलत पासवर्ड।');
+                          setLoginErr('Incorrect Password.');
                         }
                       } else {
                         const emp = latestEmployees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
@@ -3566,30 +3534,26 @@ export default function App() {
                             : (inputPass.trim() === '123456' || inputPass.trim().toLowerCase() === emp.id.trim().toLowerCase());
 
                           if (isCorrectPass) {
-                            // 1. Approval Check
+                            //1. Approval Check
                             if (emp.isApproved === false) {
                               recordUnsuccessfulLogin(inputID, 'Account pending approval');
                               setLoginErr(
-                                language === 'en'
-                                  ? "Login blocked. HR or Administrator approval is required before your first login."
-                                  : "लॉगिन अवरुद्ध। आपकी पहली लॉगिन से पहले एचआर या प्रशासक की मंजूरी आवश्यक है।"
+                                "Login blocked. HR or Administrator approval is required before your first login."
                               );
                               return;
                             }
 
-                            // 2. Device Fingerprint Check
+                            //2. Device Fingerprint Check
                             const currentDeviceId = getDeviceFingerprint();
                             if (emp.approvedDeviceId && emp.approvedDeviceId !== currentDeviceId && !emp.allowMultipleDevices) {
                               recordUnsuccessfulLogin(inputID, 'Device lock active');
                               setLoginErr(
-                                language === 'en'
-                                  ? "Login blocked. Device restriction is active. You can only log in from your registered device. Please contact HR/Admin."
-                                  : "लॉगिन अवरुद्ध। डिवाइस लॉक सक्रिय है। आप केवल अपने पंजीकृत डिवाइस से लॉगिन कर सकते हैं। कृपया एचआर/एडमिन से संपर्क करें।"
+                                "Login blocked. Device restriction is active. You can only log in from your registered device. Please contact HR/Admin."
                               );
                               return;
                             }
 
-                            // If no device bound yet, enforce mandatory first-time verification flow
+                            //If no device bound yet, enforce mandatory first-time verification flow
                             if (!emp.approvedDeviceId) {
                               setFirstLoginEmployee(emp);
                               setIsFirstLoginVerification(true);
@@ -3601,13 +3565,11 @@ export default function App() {
                               return;
                             }
 
-                            // If OTP is enabled, send OTP
+                            //If OTP is enabled, send OTP
                             if (adminSettings.enablePasswordLoginOtp) {
                               const email = emp.email || '';
                               if (!email || !email.trim()) {
-                                setLoginErr(language === 'en'
-                                  ? 'Email address is not configured for this user. Please contact HR.'
-                                  : 'इस उपयोगकर्ता के लिए ईमेल पता कॉन्फ़िगर नहीं किया गया है। कृपया एचआर से संपर्क करें।');
+                                setLoginErr('Email address is not configured for this user. Please contact HR.');
                                 return;
                               }
                               await sendPassword2faOtp(email, emp, 'employee', emp.name);
@@ -3643,11 +3605,11 @@ export default function App() {
                             }
                           } else {
                             recordUnsuccessfulLogin(inputID, 'Incorrect Password');
-                            setLoginErr(language === 'en' ? "Incorrect Password! Standard password is your Employee ID or '123456'." : "गलत पासवर्ड! मानक पासवर्ड आपकी कर्मचारी आईडी या '123456' है।");
+                            setLoginErr("Incorrect Password! Standard password is your Employee ID or '123456'.");
                           }
                         } else {
                           recordUnsuccessfulLogin(inputID, 'User ID not found');
-                          setLoginErr(language === 'en' ? "User ID / Employee ID not found. Contact administration." : "उपयोगकर्ता आईडी / कर्मचारी आईडी नहीं मिली। प्रशासन से संपर्क करें।");
+                          setLoginErr("User IDEmployee ID not found. Contact administration.");
                         }
                       }
                     }
@@ -3656,7 +3618,7 @@ export default function App() {
                     {/* User ID Field */}
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'User ID / Employee ID' : 'उपयोगकर्ता आईडी / कर्मचारी आईडी'}
+                        {'User IDEmployee ID'}
                       </label>
                       <div className="relative">
                         <LucideUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -3665,9 +3627,8 @@ export default function App() {
                           required
                           value={loginId}
                           onChange={(e) => setLoginId(e.target.value)}
-                          placeholder={language === 'en' ? 'e.g., admin or EMP001' : 'उदा., admin या EMP001'}
-                          className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
-                        />
+                          placeholder={'e.g., admin or EMP001'}
+                          className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono" />
                       </div>
                     </div>
 
@@ -3675,7 +3636,7 @@ export default function App() {
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                          {language === 'en' ? 'Password' : 'पासवर्ड'}
+                          {'Password'}
                         </label>
                         <button
                           type="button"
@@ -3690,7 +3651,7 @@ export default function App() {
                           }}
                           className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
                         >
-                          {language === 'en' ? 'Forgot Password?' : 'पासवर्ड भूल गए?'}
+                          {'Forgot Password?'}
                         </button>
                       </div>
                       <div className="relative">
@@ -3712,8 +3673,7 @@ export default function App() {
                           onBlur={() => setIsCapsLockOn(false)}
                           onChange={(e) => setLoginPass(e.target.value)}
                           placeholder="••••••••"
-                          className="w-full border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-sans"
-                        />
+                          className="w-full border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-sans" />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
@@ -3727,12 +3687,12 @@ export default function App() {
                       {isCapsLockOn && (
                         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/90 border border-amber-600/70 text-amber-300 text-[10px] font-bold font-mono animate-pulse shadow-sm mt-1">
                           <span className="text-xs font-black">⇪</span>
-                          <span>{language === 'en' ? 'CAPS LOCK IS ON' : 'कैप्स लॉक चालू है'}</span>
+                          <span>{'CAPS LOCK IS ON'}</span>
                         </div>
                       )}
                     </div>
 
-                    {/* Remember Me / Save Login ID Checkbox */}
+                    {/* Remember MeSave Login ID Checkbox */}
                     <div className="flex items-center justify-between pt-0.5">
                       <label className="flex items-center gap-2 cursor-pointer select-none text-slate-300 hover:text-white transition-colors">
                         <input
@@ -3749,10 +3709,9 @@ export default function App() {
                               localStorage.removeItem('payroll_remembered_login_id');
                             }
                           }}
-                          className="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 cursor-pointer accent-emerald-500"
-                        />
+                          className="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 cursor-pointer accent-emerald-500" />
                         <span className="text-[10px] font-bold text-slate-300">
-                          {language === 'en' ? 'Remember Me / Save Login ID' : 'मुझे याद रखें (लॉगिन आईडी सहेजें)'}
+                          {'Remember MeSave Login ID'}
                         </span>
                       </label>
                       {rememberMe && loginId.trim() && (
@@ -3767,12 +3726,12 @@ export default function App() {
                       type="submit"
                       className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg shadow-emerald-950/40 hover:shadow-emerald-500/10 transition-all duration-200 text-center uppercase tracking-wider active:scale-98 mt-2"
                     >
-                      {language === 'en' ? 'Sign In to Workspace' : 'कार्यक्षेत्र में साइन इन करें'}
+                      {'Sign In to Workspace'}
                     </button>
                   </form>
                 )
               ) : (
-                // OTP Login Form
+                //OTP Login Form
                 <div className="mt-6 animate-fadeIn">
                   {loginOtpStep === 'request_otp' ? (
                     <form onSubmit={(e) => {
@@ -3780,20 +3739,18 @@ export default function App() {
                       setLoginErr(null);
                       const inputID = loginId.trim();
                       if (!inputID) {
-                        setLoginErr(language === 'en' ? 'Please enter your Employee ID.' : 'कृपया अपनी कर्मचारी आईडी दर्ज करें।');
+                        setLoginErr('Please enter your Employee ID.');
                         return;
                       }
 
                       const emp = employees.find(e => e.id.trim().toLowerCase() === inputID.trim().toLowerCase());
                       if (!emp) {
-                        setLoginErr(language === 'en' ? 'Employee ID not found.' : 'कर्मचारी आईडी नहीं मिली।');
+                        setLoginErr('Employee ID not found.');
                         return;
                       }
 
                       if (!emp.email || !emp.email.trim()) {
-                        setLoginErr(language === 'en' 
-                          ? 'Email address is not configured for this user. Please use password login or contact HR.' 
-                          : 'इस उपयोगकर्ता के लिए ईमेल पता कॉन्फ़िगर नहीं किया गया है। कृपया पासवर्ड लॉगिन का उपयोग करें या एचआर से संपर्क करें।');
+                        setLoginErr('Email address is not configured for this user. Please use password login or contact HR.');
                         return;
                       }
 
@@ -3804,7 +3761,7 @@ export default function App() {
 
                       const triggerSendOtp = async () => {
                         try {
-                          const res = await fetch('/api/send-otp', {
+                          const res = await fetch(' //api/send-otp', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -3853,7 +3810,7 @@ export default function App() {
                         } catch (err: any) {
                           console.error('[Standard Login OTP Send Error]', err);
                           setIsSendingLoginOtp(false);
-                          setLoginErr(language === 'en' ? `Network error sending OTP: ${err.message || err}` : `ओटीपी भेजने में नेटवर्क त्रुटि: ${err.message || err}`);
+                          setLoginErr(`Network error sending OTP: ${err.message || err}`);
                         }
                       };
                       triggerSendOtp();
@@ -3861,7 +3818,7 @@ export default function App() {
                       
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                          {language === 'en' ? 'Employee ID (Required)' : 'कर्मचारी आईडी (आवश्यक)'}
+                          {'Employee ID (Required)'}
                         </label>
                         <div className="relative">
                           <LucideUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -3871,8 +3828,7 @@ export default function App() {
                             value={loginId}
                             onChange={(e) => setLoginId(e.target.value)}
                             placeholder="e.g. EMP001"
-                            className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono uppercase"
-                          />
+                            className="w-full border border-slate-800 rounded-xl pl-10 pr-3.5 py-3 text-xs font-bold bg-slate-900/60 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono uppercase" />
                         </div>
                       </div>
 
@@ -3882,8 +3838,8 @@ export default function App() {
                         className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider disabled:opacity-50"
                       >
                         {isSendingLoginOtp 
-                          ? (language === 'en' ? 'Dispatching OTP...' : 'ओटीपी भेजा जा रहा है...') 
-                          : (language === 'en' ? 'Get Login OTP' : 'लॉगिन ओटीपी प्राप्त करें')}
+                          ? ('Dispatching OTP...') 
+                          : ('Get Login OTP')}
                       </button>
                     </form>
                   ) : (
@@ -3891,7 +3847,7 @@ export default function App() {
                       e.preventDefault();
                       setLoginErr(null);
                       if (loginEnteredOtp.trim() === loginGeneratedOtp) {
-                        // Load latest employees list from Firestore to verify correct and updated device lock and multi-device status
+                        //Load latest employees list from Firestore to verify correct and updated device lock and multi-device status
                         let latestEmployees = employees;
                         try {
                           const result = await loadFromFirestore();
@@ -3905,30 +3861,26 @@ export default function App() {
 
                         const emp = latestEmployees.find(e => e.id.trim().toLowerCase() === loginId.trim().toLowerCase());
                         if (emp) {
-                          // 1. Approval Check
+                          //1. Approval Check
                           if (emp.isApproved === false) {
                             recordUnsuccessfulLogin(emp.id, 'Account pending approval');
                             setLoginErr(
-                              language === 'en'
-                                ? "Login blocked. HR or Administrator approval is required before your first login."
-                                : "लॉगिन अवरुद्ध। आपकी पहली लॉगिन से पहले एचआर या प्रशासक की मंजूरी आवश्यक है।"
+                              "Login blocked. HR or Administrator approval is required before your first login."
                             );
                             return;
                           }
 
-                          // 2. Device Fingerprint Check
+                          //2. Device Fingerprint Check
                           const currentDeviceId = getDeviceFingerprint();
                           if (emp.approvedDeviceId && emp.approvedDeviceId !== currentDeviceId && !emp.allowMultipleDevices) {
                             recordUnsuccessfulLogin(emp.id, 'Device lock active');
                             setLoginErr(
-                              language === 'en'
-                                ? "Login blocked. Device restriction is active. You can only log in from your registered device. Please contact HR/Admin."
-                                : "लॉगिन अवरुद्ध। डिवाइस लॉक सक्रिय है। आप केवल अपने पंजीकृत डिवाइस से लॉगिन कर सकते हैं। कृपया एचआर/एडमिन से संपर्क करें।"
+                              "Login blocked. Device restriction is active. You can only log in from your registered device. Please contact HR/Admin."
                             );
                             return;
                           }
 
-                          // If no device bound yet, enforce mandatory first-time verification flow
+                          //If no device bound yet, enforce mandatory first-time verification flow
                           if (!emp.approvedDeviceId) {
                             setFirstLoginEmployee(emp);
                             setIsFirstLoginVerification(true);
@@ -3973,19 +3925,17 @@ export default function App() {
                           setLoginErr(null);
                         }
                       } else {
-                        setLoginErr(language === 'en' ? 'Invalid OTP. Please try again.' : 'अमान्य ओटीपी। कृपया पुनः प्रयास करें।');
+                        setLoginErr('Invalid OTP. Please try again.');
                       }
                     }} className="space-y-4">
                       
                       <div className="bg-emerald-950/20 text-emerald-300 border border-emerald-900/30 p-3 rounded-xl text-[11px] font-semibold leading-normal animate-pulse">
-                        📧 {language === 'en' 
-                          ? `A secure login OTP has been sent to ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")}. Please enter the code below to sign in.`
-                          : `एक सुरक्षित लॉगिन ओटीपी ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")} पर भेजा गया है। साइन इन करने के लिए कृपया नीचे कोड दर्ज करें।`}
+                        📧 {`A secure login OTP has been sent to ${loginOtpEmail.replace(/(.{3})(.*)(@.*)/, "$1***$3")}. Please enter the code below to sign in.`}
                       </div>
 
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                          {language === 'en' ? '6-Digit OTP Code' : '6-अंकीय ओटीपी कोड'}
+                          {'6-Digit OTP Code'}
                         </label>
                         <input
                           type="text"
@@ -3994,15 +3944,14 @@ export default function App() {
                           value={loginEnteredOtp}
                           onChange={(e) => setLoginEnteredOtp(e.target.value)}
                           placeholder="e.g. 123456"
-                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
-                        />
+                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono" />
                       </div>
 
                       <button
                         type="submit"
                         className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
                       >
-                        {language === 'en' ? 'Verify & Sign In' : 'सत्यापित करें और साइन इन करें'}
+                        {'Verify & Sign In'}
                       </button>
 
                       <button
@@ -4013,7 +3962,7 @@ export default function App() {
                         }}
                         className="w-full text-center text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 mt-1 transition-colors"
                       >
-                        {language === 'en' ? 'Back' : 'पीछे'}
+                        {'Back'}
                       </button>
                     </form>
                   )}
@@ -4031,7 +3980,7 @@ export default function App() {
                 >
                   <span className="flex items-center gap-1.5">
                     <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
-                    {language === 'en' ? 'Struggling with Sign In?' : 'लॉगिन करने में समस्या?'}
+                    {'Struggling with Sign In?'}
                   </span>
                   <span className="text-[12px] font-bold text-slate-500">{showLoginHelp ? '−' : '+'}</span>
                 </button>
@@ -4039,25 +3988,19 @@ export default function App() {
                 {showLoginHelp && (
                   <div className="mt-3 p-3 bg-slate-900/80 rounded-xl border border-slate-800/60 text-[10px] text-slate-400 font-semibold space-y-2 leading-relaxed animate-fadeIn">
                     <p>
-                      💡 <strong className="text-slate-200">{language === 'en' ? 'Standard Employees:' : 'मानक कर्मचारी:'}</strong>{' '}
-                      {language === 'en' 
-                        ? "Your standard default password is your unique Employee ID (e.g., EMP001) or '123456' unless modified by admin."
-                        : "आपका मानक डिफ़ॉल्ट पासवर्ड आपकी विशिष्ट कर्मचारी आईडी (जैसे, EMP001) या '123456' है जब तक कि एडमिन द्वारा बदला न गया हो।"}
+                      💡 <strong className="text-slate-200">{'Standard Employees:'}</strong>{' '}
+                      {"Your standard default password is your unique Employee ID (e.g., EMP001) or '123456' unless modified by admin."}
                     </p>
                     <p>
-                      ⚙️ <strong className="text-slate-200">{language === 'en' ? 'System Administrator:' : 'सिस्टम एडमिनिस्ट्रेटर:'}</strong>{' '}
-                      {language === 'en'
-                        ? "Login with username 'admin' and standard password to enter admin workspace."
-                        : "प्रशासनिक कार्यक्षेत्र में प्रवेश करने के लिए उपयोगकर्ता नाम 'admin' और मानक पासवर्ड के साथ लॉगिन करें।"}
+                      ⚙️ <strong className="text-slate-200">{'System Administrator:'}</strong>{' '}
+                      {"Login with username 'admin' and standard password to enter admin workspace."}
                     </p>
                     <p className="text-slate-500 text-[9px] italic border-t border-slate-800/40 pt-1.5 font-mono">
-                      {language === 'en' 
-                        ? 'All unsuccessful sign-in attempts are logged securely in our Firestore security audit database.' 
-                        : 'सभी असफल लॉगिन प्रयास हमारे फ़ायरस्टोर सुरक्षा ऑडिट डेटाबेस में सुरक्षित रूप से दर्ज किए जाते हैं।'}
+                      {'All unsuccessful sign-in attempts are logged securely in our Firestore security audit database.'}
                     </p>
                     <div className="border-t border-slate-800/40 pt-2.5 mt-1.5 space-y-2">
                       <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 block text-center font-mono">
-                        {language === 'en' ? 'Direct Help Contacts' : 'प्रत्यक्ष सहायता संपर्क'}
+                        {'Direct Help Contacts'}
                       </span>
                       <div className="grid grid-cols-2 gap-2">
                         <a
@@ -4106,7 +4049,7 @@ export default function App() {
                         className="w-full bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 mt-1"
                       >
                         <LifeBuoy className="w-3 h-3 shrink-0 text-emerald-400" />
-                        {language === 'en' ? 'Submit Support Ticket' : 'सपोर्ट टिकट भेजें'}
+                        {'Submit Support Ticket'}
                       </button>
                     </div>
                   </div>
@@ -4117,14 +4060,14 @@ export default function App() {
               <div className="mt-5 pt-4 border-t border-slate-800/80 space-y-2.5">
                 <div className="flex items-center justify-between text-[10px] font-mono">
                   <span className="text-slate-400 font-bold uppercase tracking-wider">
-                    {language === 'en' ? 'Live Gateway Security:' : 'लाइव गेटवे सुरक्षा:'}
+                    {'Live Gateway Security:'}
                   </span>
                   <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 font-black">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    <span>{language === 'en' ? '🟢 Operational' : '🟢 कार्यशील'}</span>
+                    <span>{'🟢 Operational'}</span>
                   </span>
                 </div>
 
@@ -4133,7 +4076,7 @@ export default function App() {
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                     <div>
                       <span className="block text-slate-200 font-bold leading-none">
-                        {language === 'en' ? '2FA & Device Guard' : '2FA और डिवाइस लॉक'}
+                        {'2FA & Device Guard'}
                       </span>
                       <span className="text-[8.5px] text-emerald-400/90 font-mono">
                         {adminSettings.enablePasswordLoginOtp ? 'Strict 2FA Active' : 'AES-256 Protected'}
@@ -4145,7 +4088,7 @@ export default function App() {
                     <Database className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                     <div>
                       <span className="block text-slate-200 font-bold leading-none">
-                        {language === 'en' ? 'Google Sheets Sync' : 'गूगल शीट्स सिंक'}
+                        {'Google Sheets Sync'}
                       </span>
                       <span className="text-[8.5px] text-indigo-300/90 font-mono">
                         {spreadsheetId ? 'Cloud Live Synced' : 'Auto-Sync Ready'}
@@ -4159,7 +4102,7 @@ export default function App() {
 
             {/* Subtle Footer branding info */}
             <p className="text-center text-[10px] text-slate-500 font-semibold mt-6 uppercase tracking-wider">
-              © {new Date().getFullYear()} {adminSettings.companyName || 'Rathi Build Mart'} • {language === 'en' ? 'All Rights Reserved' : 'सर्वाधिकार सुरक्षित'}
+              © {new Date().getFullYear()} {adminSettings.companyName || 'Rathi Build Mart'} • {'All Rights Reserved'}
             </p>
 
           </div>
@@ -4188,12 +4131,10 @@ export default function App() {
                   </div>
                   <div className="space-y-1.5">
                     <h3 className="text-base font-black text-white">
-                      {language === 'en' ? 'Password Reset Successfully!' : 'पासवर्ड सफलतापूर्वक रीसेट!'}
+                      {'Password Reset Successfully!'}
                     </h3>
                     <p className="text-[11px] text-slate-400 font-semibold leading-relaxed max-w-xs mx-auto">
-                      {language === 'en' 
-                        ? 'Your password has been changed successfully. You can now use your new password to sign into the Employee Portal.'
-                        : 'आपका पासवर्ड सफलतापूर्वक बदल गया है। अब आप कर्मचारी पोर्टल में लॉग इन करने के लिए अपने नए पासवर्ड का उपयोग कर सकते हैं।'}
+                      {'Your password has been changed successfully. You can now use your new password to sign into the Employee Portal.'}
                     </p>
                   </div>
                   <button
@@ -4210,7 +4151,7 @@ export default function App() {
                     }}
                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all cursor-pointer"
                   >
-                    {language === 'en' ? 'Return to Login' : 'लॉगिन पर लौटें'}
+                    {'Return to Login'}
                   </button>
                 </div>
               ) : (
@@ -4218,10 +4159,10 @@ export default function App() {
                   <div className="space-y-1">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest bg-emerald-950/50 text-emerald-400 border border-emerald-900/30">
                       <KeyRound className="w-3 h-3 text-emerald-400" />
-                      {language === 'en' ? 'Self-Service Reset' : 'स्वयं-सेवा रीसेट'}
+                      {'Self-Service Reset'}
                     </div>
                     <h3 className="text-lg font-black text-white font-display tracking-tight mt-1.5">
-                      {language === 'en' ? 'Reset Your Password' : 'अपना पासवर्ड रीसेट करें'}
+                      {'Reset Your Password'}
                     </h3>
                   </div>
 
@@ -4234,9 +4175,7 @@ export default function App() {
                       {fallbackOtpPayload && (
                         <div className="pt-2 border-t border-rose-500/10 flex flex-col gap-1.5">
                           <p className="text-[9px] text-slate-300 font-medium">
-                            {language === 'en' 
-                              ? 'SMTP Dispatch failed. You can bypass this using the Developer Fallback Sandbox:'
-                              : 'SMTP प्रेषण विफल रहा। आप डेवलपर फ़ॉलबैक सैंडबॉक्स का उपयोग करके इसे बायपास कर सकते हैं:'}
+                            {'SMTP Dispatch failed. You can bypass this using the Developer Fallback Sandbox:'}
                           </p>
                           <button
                             type="button"
@@ -4249,7 +4188,7 @@ export default function App() {
                             }}
                             className="self-start text-[9px] px-2.5 py-0.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 rounded-lg cursor-pointer font-bold uppercase tracking-wider transition-all"
                           >
-                            {language === 'en' ? 'Bypass & View OTP' : 'बायपास करें और ओटीपी देखें'}
+                            {'Bypass & View OTP'}
                           </button>
                         </div>
                       )}
@@ -4262,27 +4201,23 @@ export default function App() {
                       setForgotError(null);
                       const targetEmp = employees.find(emp => emp.id.trim().toLowerCase() === forgotEmpId.trim().toLowerCase());
                       if (!targetEmp) {
-                        setForgotError(language === 'en' 
-                          ? "Employee ID not found in Rathi Build Mart roster." 
-                          : "राठी बिल्डमार्ट रजिस्टर में कर्मचारी आईडी नहीं मिली।");
+                        setForgotError("Employee ID not found in Rathi Build Mart roster.");
                         return;
                       }
 
                       if (!targetEmp.email || targetEmp.email.trim().toLowerCase() !== forgotEmail.trim().toLowerCase()) {
-                        setForgotError(language === 'en'
-                          ? "Registered email address does not match this Employee ID."
-                          : "पंजीकृत ईमेल पता इस कर्मचारी आईडी से मेल नहीं खाता है।");
+                        setForgotError("Registered email address does not match this Employee ID.");
                         return;
                       }
 
-                      // Generate OTP
+                      //Generate OTP
                       const otp = Math.floor(100000 + Math.random() * 900000).toString();
                       setForgotGeneratedOtp(otp);
                       setIsSendingForgotOtp(true);
 
                       const triggerForgotSendOtp = async () => {
                         try {
-                          const res = await fetch('/api/send-otp', {
+                          const res = await fetch(' //api/send-otp', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -4331,21 +4266,19 @@ export default function App() {
                         } catch (err: any) {
                           console.error('[Forgot Password OTP Send Error]', err);
                           setIsSendingForgotOtp(false);
-                          setForgotError(language === 'en' ? `Network error while sending OTP: ${err.message || err}` : `ओटीपी भेजने के दौरान नेटवर्क त्रुटि: ${err.message || err}`);
+                          setForgotError(`Network error while sending OTP: ${err.message || err}`);
                         }
                       };
                       triggerForgotSendOtp();
                     }} className="space-y-4">
                       <p className="text-[11px] text-slate-400 font-semibold leading-normal">
-                        {language === 'en' 
-                          ? 'Enter your employee details below. We will send a secure 6-digit verification code to your registered email.'
-                          : 'नीचे अपना कर्मचारी विवरण दर्ज करें। हम आपके पंजीकृत ईमेल पर एक सुरक्षित 6-अंकीय सत्यापन कोड भेजेंगे।'}
+                        {'Enter your employee details below. We will send a secure 6-digit verification code to your registered email.'}
                       </p>
 
                       <div className="space-y-3">
                         <div className="space-y-1">
                           <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                            {language === 'en' ? 'Employee ID (User ID)' : 'कर्मचारी आईडी (यूज़र आईडी)'}
+                            {'Employee ID (User ID)'}
                           </label>
                           <input
                             type="text"
@@ -4353,13 +4286,12 @@ export default function App() {
                             value={forgotEmpId}
                             onChange={(e) => setForgotEmpId(e.target.value)}
                             placeholder="e.g. EMP001"
-                            className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono uppercase"
-                          />
+                            className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono uppercase" />
                         </div>
 
                         <div className="space-y-1">
                           <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                            {language === 'en' ? 'Registered Email Address' : 'पंजीकृत ईमेल पता'}
+                            {'Registered Email Address'}
                           </label>
                           <input
                             type="email"
@@ -4367,13 +4299,12 @@ export default function App() {
                             value={forgotEmail}
                             onChange={(e) => setForgotEmail(e.target.value)}
                             placeholder="e.g. staff@rathibuildmart.com"
-                            className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans"
-                          />
+                            className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans" />
                         </div>
 
                         <div className="space-y-1">
                           <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                            {language === 'en' ? 'Mobile Number' : 'मोबाइल नंबर'}
+                            {'Mobile Number'}
                           </label>
                           <input
                             type="tel"
@@ -4381,8 +4312,7 @@ export default function App() {
                             value={forgotMobile}
                             onChange={(e) => setForgotMobile(e.target.value)}
                             placeholder="e.g. 9876543210"
-                            className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
-                          />
+                            className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono" />
                         </div>
                       </div>
 
@@ -4392,8 +4322,8 @@ export default function App() {
                         className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider disabled:opacity-50"
                       >
                         {isSendingForgotOtp 
-                          ? (language === 'en' ? 'Sending Code...' : 'कोड भेजा जा रहा है...') 
-                          : (language === 'en' ? 'Send Verification OTP' : 'सत्यापन ओटीपी भेजें')}
+                          ? ('Sending Code...') 
+                          : ('Send Verification OTP')}
                       </button>
                     </form>
                   )}
@@ -4405,18 +4335,16 @@ export default function App() {
                         setForgotStep('new_password');
                         setForgotError(null);
                       } else {
-                        setForgotError(language === 'en' ? 'Invalid 6-digit OTP code.' : 'अमान्य 6-अंकीय ओटीपी कोड।');
+                        setForgotError('Invalid 6-digit OTP code.');
                       }
                     }} className="space-y-4">
                       <p className="text-[11px] text-slate-400 font-semibold leading-normal">
-                        {language === 'en' 
-                          ? `A secure verification OTP has been sent to ${forgotEmail}. Please enter the 6-digit code below.`
-                          : `एक सुरक्षित सत्यापन ओटीपी ${forgotEmail} पर भेजा गया है। कृपया नीचे 6-अंकीय कोड दर्ज करें।`}
+                        {`A secure verification OTP has been sent to ${forgotEmail}. Please enter the 6-digit code below.`}
                       </p>
 
                       <div className="space-y-1">
                         <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                          {language === 'en' ? '6-Digit Verification Code' : '6-अंकीय सत्यापन कोड'}
+                          {'6-Digit Verification Code'}
                         </label>
                         <input
                           type="text"
@@ -4425,15 +4353,14 @@ export default function App() {
                           value={forgotEnteredOtp}
                           onChange={(e) => setForgotEnteredOtp(e.target.value)}
                           placeholder="e.g. 123456"
-                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-2.5 font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
-                        />
+                          className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-2.5 font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono" />
                       </div>
 
                       <button
                         type="submit"
                         className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
                       >
-                        {language === 'en' ? 'Verify OTP Code' : 'ओटीपी कोड सत्यापित करें'}
+                        {'Verify OTP Code'}
                       </button>
 
                       <button
@@ -4444,7 +4371,7 @@ export default function App() {
                         }}
                         className="w-full text-center text-[10px] uppercase font-bold text-slate-400 hover:text-white mt-1 transition-colors"
                       >
-                        {language === 'en' ? 'Back' : 'पीछे'}
+                        {'Back'}
                       </button>
                     </form>
                   )}
@@ -4453,7 +4380,7 @@ export default function App() {
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       if (forgotNewPass.trim().length < 4) {
-                        setForgotError(language === 'en' ? 'Password must be at least 4 characters.' : 'पासवर्ड कम से कम 4 अक्षरों का होना चाहिए।');
+                        setForgotError('Password must be at least 4 characters.');
                         return;
                       }
 
@@ -4462,7 +4389,7 @@ export default function App() {
                         const updatedEmp = { ...targetEmp, password: forgotNewPass.trim() };
                         handleUpdateEmployee(updatedEmp);
 
-                        // Also add an audit log
+                        //Also add an audit log
                         const newReq = {
                           id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
                           empId: forgotEmpId.trim().toUpperCase(),
@@ -4479,14 +4406,12 @@ export default function App() {
                       }
                     }} className="space-y-4">
                       <p className="text-[11px] text-slate-400 font-semibold leading-normal">
-                        {language === 'en' 
-                          ? 'Your identity is verified! Please enter your new secure password below to update your account.'
-                          : 'आपकी पहचान सत्यापित हो गई है! अपने खाते को अपडेट करने के लिए कृपया नीचे अपना नया सुरक्षित पासवर्ड दर्ज करें।'}
+                        {'Your identity is verified! Please enter your new secure password below to update your account.'}
                       </p>
 
                       <div className="space-y-1">
                         <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                          {language === 'en' ? 'Choose New Password' : 'नया पासवर्ड चुनें'}
+                          {'Choose New Password'}
                         </label>
                         <input
                           type="password"
@@ -4494,15 +4419,14 @@ export default function App() {
                           value={forgotNewPass}
                           onChange={(e) => setForgotNewPass(e.target.value)}
                           placeholder="••••••••"
-                          className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans"
-                        />
+                          className="w-full border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans" />
                       </div>
 
                       <button
                         type="submit"
                         className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider"
                       >
-                        {language === 'en' ? 'Update & Reset Password' : 'पासवर्ड अपडेट और रीसेट करें'}
+                        {'Update & Reset Password'}
                       </button>
                     </form>
                   )}
@@ -4547,15 +4471,13 @@ export default function App() {
                   <div className="space-y-1">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest bg-emerald-950/50 text-emerald-400 border border-emerald-900/30">
                       <LifeBuoy className="w-3 h-3 text-emerald-400" />
-                      {language === 'en' ? 'HR Helpdesk' : 'एचआर हेल्पडेस्क'}
+                      {'HR Helpdesk'}
                     </div>
                     <h3 className="text-lg font-black text-white font-display tracking-tight mt-1.5 font-sans">
-                      {language === 'en' ? 'Contact HR Helpdesk' : 'एचआर हेल्पडेस्क से संपर्क करें'}
+                      {'Contact HR Helpdesk'}
                     </h3>
                     <p className="text-[11px] text-slate-400 font-semibold leading-normal">
-                      {language === 'en' 
-                        ? 'Having issues with attendance logs, salary slips, or profile registrations? Contact HR or IT directly below or submit a support ticket.'
-                        : 'उपस्थिति लॉग, वेतन पर्ची या प्रोफ़ाइल में समस्या आ रही है? सीधे नीचे एचआर या आईटी से संपर्क करें या एक सहायता टिकट जमा करें।'}
+                      {'Having issues with attendance logs, salary slips, or profile registrations? Contact HR or IT directly below or submit a support ticket.'}
                     </p>
 
                     {/* Direct Contact Bar for HR & IT */}
@@ -4609,7 +4531,7 @@ export default function App() {
                   <div className="space-y-3 mt-4 overflow-y-auto max-h-[300px] pr-1">
                     <div className="space-y-1">
                       <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'Full Name' : 'पूरा नाम'}
+                        {'Full Name'}
                       </label>
                       <input
                         type="text"
@@ -4617,26 +4539,24 @@ export default function App() {
                         value={supportName}
                         onChange={(e) => setSupportName(e.target.value)}
                         placeholder="e.g. Amit Kumar"
-                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                      />
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
                     </div>
 
                     <div className="space-y-1">
                       <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'Employee ID (Optional)' : 'कर्मचारी आईडी (वैकल्पिक)'}
+                        {'Employee ID (Optional)'}
                       </label>
                       <input
                         type="text"
                         value={supportEmpId}
                         onChange={(e) => setSupportEmpId(e.target.value)}
                         placeholder="e.g. EMP001"
-                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono uppercase"
-                      />
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono uppercase" />
                     </div>
 
                     <div className="space-y-1">
                       <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'Contact Email' : 'संपर्क ईमेल'}
+                        {'Contact Email'}
                       </label>
                       <input
                         type="email"
@@ -4644,39 +4564,37 @@ export default function App() {
                         value={supportEmail}
                         onChange={(e) => setSupportEmail(e.target.value)}
                         placeholder="e.g. amit@rathibuildmart.com"
-                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                      />
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
                     </div>
 
                     <div className="space-y-1">
                       <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'Issue Category' : 'समस्या की श्रेणी'}
+                        {'Issue Category'}
                       </label>
                       <select
                         value={supportCategory}
                         onChange={(e) => setSupportCategory(e.target.value)}
                         className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer"
                       >
-                        <option value="Attendance / Punch Issue">{language === 'en' ? 'Attendance / Punch Issue' : 'उपस्थिति / पंच समस्या'}</option>
-                        <option value="Salary Slip Discrepancy">{language === 'en' ? 'Salary Slip Discrepancy' : 'वेतन पर्ची विसंगति'}</option>
-                        <option value="Login / Password Problem">{language === 'en' ? 'Login / Password Problem' : 'लॉगिन / पासवर्ड समस्या'}</option>
-                        <option value="Profile Registration Error">{language === 'en' ? 'Profile Registration Error' : 'प्रोफ़ाइल पंजीकरण त्रुटि'}</option>
-                        <option value="Other HR General Query">{language === 'en' ? 'Other HR General Query' : 'अन्य एचआर सामान्य प्रश्न'}</option>
+                        <option value="AttendancePunch Issue">{'AttendancePunch Issue'}</option>
+                        <option value="Salary Slip Discrepancy">{'Salary Slip Discrepancy'}</option>
+                        <option value="LoginPassword Problem">{'LoginPassword Problem'}</option>
+                        <option value="Profile Registration Error">{'Profile Registration Error'}</option>
+                        <option value="Other HR General Query">{'Other HR General Query'}</option>
                       </select>
                     </div>
 
                     <div className="space-y-1">
                       <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                        {language === 'en' ? 'Message / Support Description' : 'संदेश / विवरण'}
+                        {'MessageSupport Description'}
                       </label>
                       <textarea
                         required
                         rows={3}
                         value={supportMsg}
                         onChange={(e) => setSupportMsg(e.target.value)}
-                        placeholder={language === 'en' ? "Describe your issue in detail..." : "अपनी समस्या का विस्तार से वर्णन करें..."}
-                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
-                      />
+                        placeholder={"Describe your issue in detail..."}
+                        className="w-full border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none" />
                     </div>
                   </div>
 
@@ -4685,7 +4603,7 @@ export default function App() {
                     className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-2.5 px-4 rounded-xl cursor-pointer shadow-lg transition-all duration-200 text-center uppercase tracking-wider flex items-center justify-center gap-1.5"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    {language === 'en' ? 'Send Support Ticket' : 'सपोर्ट टिकट भेजें'}
+                    {'Send Support Ticket'}
                   </button>
                 </form>
               ) : (
@@ -4695,12 +4613,10 @@ export default function App() {
                   </div>
                   <div className="space-y-1.5">
                     <h3 className="text-base font-black text-white">
-                      {language === 'en' ? 'Support Ticket Dispatched!' : 'सपोर्ट टिकट भेजा गया!'}
+                      {'Support Ticket Dispatched!'}
                     </h3>
                     <p className="text-[11px] text-slate-400 font-semibold leading-relaxed max-w-xs mx-auto">
-                      {language === 'en' 
-                        ? 'Your support inquiry has been submitted. The HR helpdesk team will review your ticket and reach out to you via your registered contact coordinates shortly.'
-                        : 'आपकी सहायता पूछताछ सबमिट कर दी गई है। एचआर हेल्पडेस्क टीम आपके टिकट की समीक्षा करेगी और जल्द ही आपके पंजीकृत संपर्क विवरणों के माध्यम से आपसे संपर्क करेगी।'}
+                      {'Your support inquiry has been submitted. The HR helpdesk team will review your ticket and reach out to you via your registered contact coordinates shortly.'}
                     </p>
                   </div>
                   <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/80 text-[10px] font-mono text-slate-500">
@@ -4711,7 +4627,7 @@ export default function App() {
                     onClick={() => setShowSupportModal(false)}
                     className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-2 px-4 rounded-xl transition-all cursor-pointer"
                   >
-                    {language === 'en' ? 'Return to Login' : 'लॉगिन पर लौटें'}
+                    {'Return to Login'}
                   </button>
                 </div>
               )}
@@ -4723,7 +4639,7 @@ export default function App() {
     );
   }
 
-  // 3. Render Employee Portal if user is logged in as employee
+  //3. Render Employee Portal if user is logged in as employee
   if (portalUser?.role === 'employee') {
     return (
       <div className="min-h-screen bg-[#f8fafc] text-[#1e293b] flex flex-col font-sans max-w-full overflow-x-hidden">
@@ -4734,8 +4650,7 @@ export default function App() {
               src={getDirectImageUrl(adminSettings.companyLogo)} 
               alt="Logo" 
               className="w-7 h-7 md:w-8 md:h-8 rounded-lg object-cover" 
-              referrerPolicy="no-referrer"
-            />
+              referrerPolicy="no-referrer" />
             <div className="min-w-0">
               <h1 className="text-[10px] md:text-sm font-black uppercase tracking-widest truncate">{adminSettings.companyName || 'Rathi Build Mart'}</h1>
               <p className="text-[7px] md:text-[9px] font-mono font-bold text-emerald-400 tracking-wider">Employee Workspace Portal</p>
@@ -4757,7 +4672,7 @@ export default function App() {
               className="bg-rose-600/10 hover:bg-rose-600 hover:text-white border border-rose-600/20 text-rose-400 text-[10px] md:text-xs font-bold px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg cursor-pointer flex items-center gap-1 transition-all"
             >
               <LogOut className="w-3 h-3 md:w-3.5 md:h-3.5" />
-              <span>{language === 'en' ? 'Sign Out' : 'लॉग आउट'}</span>
+              <span>{'Sign Out'}</span>
             </button>
           </div>
         </header>
@@ -4772,8 +4687,7 @@ export default function App() {
             adminSettings={adminSettings}
             onUpdateAttendanceRecords={handleUpdateAttendanceRecords}
             leaveRequests={leaveRequests}
-            onAddLeaveRequest={handleAddLeaveRequest}
-          />
+            onAddLeaveRequest={handleAddLeaveRequest} />
         </main>
 
         <footer className="bg-white border-t border-slate-200 py-3 text-center text-[9px] font-mono text-gray-400 font-semibold no-print shrink-0">
@@ -4796,13 +4710,13 @@ export default function App() {
                   onClick={confirmDialog.onConfirm}
                   className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md hover:shadow-lg active:scale-97"
                 >
-                  {language === 'en' ? 'Yes, Proceed' : 'हाँ, आगे बढ़ें'}
+                  {'Yes, Proceed'}
                 </button>
                 <button
                   onClick={() => setConfirmDialog(null)}
                   className="w-full bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-97"
                 >
-                  {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                  {'Cancel'}
                 </button>
               </div>
             </div>
@@ -4812,7 +4726,7 @@ export default function App() {
     );
   }
 
-  // Filter data for Branch Manager, Director & Sub Admin restrictions
+  //Filter data for Branch Manager, Director & Sub Admin restrictions
   const filteredEmployees = (() => {
     if (portalUser?.role !== 'branch_manager' && portalUser?.role !== 'director' && portalUser?.role !== 'sub_admin') return employees;
     
@@ -4827,7 +4741,7 @@ export default function App() {
       return employees.filter(emp => (emp.branch || '').trim().toLowerCase() === singleLower);
     }
     
-    return employees; // If no branches or branch is restricted, allow all branches
+    return employees; //If no branches or branch is restricted, allow all branches
   })();
 
   const filteredEmployeesIds = new Set(filteredEmployees.map(e => e.id));
@@ -4842,26 +4756,40 @@ export default function App() {
 
   const renderSidebarContent = (isMobile: boolean) => {
     const showExpanded = isMobile || isSidebarHovered;
-    const isManagerRole = portalUser?.role && ['admin', 'director', 'sub_admin', 'hr', 'branch_manager'].includes(portalUser.role);
-    const allowedTabs = portalUser?.role === 'admin'
-      ? ['dashboard', 'employees', 'attendance', 'payroll', 'leaves', 'ledger', 'admin', 'notices_support']
-      : [
-          ...(adminSettings.rolePermissions?.[portalUser?.role || 'employee'] || []),
-          ...(isManagerRole ? ['notices_support'] : [])
-        ];
+    const userRole = portalUser?.role || 'employee';
+    const defaultRolePermissions: Record<string, string[]> = {
+      super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+      admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
+      director: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      sub_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'leaves', 'notices_support'],
+      hr: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'notices_support'],
+      recruiter: ['dashboard', 'hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
+      branch_manager: ['dashboard', 'employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
+      employee: ['dashboard', 'attendance', 'leaves', 'notices_support']
+    };
 
-    const pendingPasswordRequests = passwordRequests.filter(r => r.status === 'Pending').length;
-    const pendingTickets = hrTickets.filter(tk => tk.status === 'Pending').length;
+    const allowedTabs = (userRole === 'super_admin' || userRole === 'admin')
+      ? ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support']
+      : (adminSettings.rolePermissions?.[userRole] ?? defaultRolePermissions[userRole] ?? []);
+
+    const isPasswordGatewayAllowed = ['super_admin', 'admin', 'hr', 'sub_admin', 'director'].includes(userRole);
+    const isTicketsAllowed = userRole !== 'recruiter';
+
+    const pendingPasswordRequests = isPasswordGatewayAllowed ? passwordRequests.filter(r => r.status === 'Pending').length : 0;
+    const pendingTickets = isTicketsAllowed ? hrTickets.filter(tk => tk.status === 'Pending').length : 0;
     const totalPending = pendingPasswordRequests + pendingTickets;
 
     const tabs = [
       { id: 'dashboard' as const, label: uiTexts.dashboard, icon: TrendingUp },
       { id: 'employees' as const, label: uiTexts.employees, icon: Users },
+      { id: 'hiring_onboarding' as const, label: 'Hiring & Onboarding', icon: UserPlus },
+      { id: 'employee_lifecycle' as const, label: 'Lifecycle & Assets', icon: Award },
       { id: 'attendance' as const, label: uiTexts.attendance, icon: Calendar },
       { id: 'payroll' as const, label: uiTexts.payroll, icon: CreditCard },
       { id: 'leaves' as const, label: uiTexts.leaves, icon: CalendarDays },
+      { id: 'exit_management' as const, label: 'Exit & Clearance', icon: UserX },
       { id: 'ledger' as const, label: uiTexts.ledger, icon: FileSpreadsheet },
-      { id: 'notices_support' as const, label: language === 'en' ? 'Notices & HR Support Helpdesk' : 'घोषणाएँ और एचआर सहायता हेल्पडेस्क', icon: Megaphone },
+      { id: 'notices_support' as const, label: userRole === 'recruiter' ? ('Company Notices & Circulars') : ('Notices & HR Support Helpdesk'), icon: Megaphone },
       { id: 'admin' as const, label: uiTexts.adminSettings, icon: SettingsIcon },
     ].filter(item => allowedTabs.includes(item.id) || allowedTabs.some(p => p.startsWith(item.id + ':')));
 
@@ -4876,8 +4804,7 @@ export default function App() {
                   src={getDirectImageUrl(adminSettings.companyLogo)} 
                   alt={adminSettings.companyName || 'Rathi Buildmart'} 
                   className="w-full h-full object-cover" 
-                  referrerPolicy="no-referrer"
-                />
+                  referrerPolicy="no-referrer" />
                 {!showExpanded && (
                   <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-white border border-[#10b981]/20 p-2 rounded-xl shadow-xl pointer-events-none z-50 text-[11px] font-bold whitespace-nowrap">
                     {uiTexts.appName}
@@ -4989,7 +4916,7 @@ export default function App() {
                           <div className="flex items-center gap-2 min-w-0">
                             <Megaphone className="w-3.5 h-3.5 shrink-0" />
                             <span className="text-[10px] font-bold truncate">
-                              {language === 'en' ? 'Manage Announcements' : 'घोषणाओं का प्रबंधन'}
+                              {'Manage Announcements'}
                             </span>
                           </div>
                           <span className="px-1.5 py-0.25 text-[8px] font-bold rounded-full bg-slate-800 text-slate-300 font-mono">
@@ -4998,58 +4925,62 @@ export default function App() {
                         </button>
 
                         {/* Sub-item: Forgot Password Gateways */}
-                        <button
-                          onClick={() => {
-                            navigateToTab('notices_support', 'passwords');
-                            if (isMobile) {
-                              setIsMobileMenuOpen(false);
-                            }
-                          }}
-                          className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
-                            isActive && activeNoticeSubTab === 'passwords'
-                              ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
-                              : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <KeyRound className="w-3.5 h-3.5 shrink-0" />
-                            <span className="text-[10px] font-bold truncate">
-                              {language === 'en' ? 'Forgot Password Gateways' : 'पासवर्ड रीसेट कतार'}
-                            </span>
-                          </div>
-                          {pendingPasswordRequests > 0 && (
-                            <span className="px-1.5 py-0.25 text-[8px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
-                              {pendingPasswordRequests}
-                            </span>
-                          )}
-                        </button>
+                        {isPasswordGatewayAllowed && (
+                          <button
+                            onClick={() => {
+                              navigateToTab('notices_support', 'passwords');
+                              if (isMobile) {
+                                setIsMobileMenuOpen(false);
+                              }
+                            }}
+                            className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
+                              isActive && activeNoticeSubTab === 'passwords'
+                                ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
+                                : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <KeyRound className="w-3.5 h-3.5 shrink-0" />
+                              <span className="text-[10px] font-bold truncate">
+                                {'Forgot Password Gateways'}
+                              </span>
+                            </div>
+                            {pendingPasswordRequests > 0 && (
+                              <span className="px-1.5 py-0.25 text-[8px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
+                                {pendingPasswordRequests}
+                              </span>
+                            )}
+                          </button>
+                        )}
 
                         {/* Sub-item: HR Helpdesk Support Tickets */}
-                        <button
-                          onClick={() => {
-                            navigateToTab('notices_support', 'tickets');
-                            if (isMobile) {
-                              setIsMobileMenuOpen(false);
-                            }
-                          }}
-                          className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
-                            isActive && activeNoticeSubTab === 'tickets'
-                              ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
-                              : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <LifeBuoy className="w-3.5 h-3.5 shrink-0" />
-                            <span className="text-[10px] font-bold truncate">
-                              {language === 'en' ? 'HR Helpdesk Support Tickets' : 'सहायता हेल्पडेस्क टिकट'}
-                            </span>
-                          </div>
-                          {pendingTickets > 0 && (
-                            <span className="px-1.5 py-0.25 text-[8px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
-                              {pendingTickets}
-                            </span>
-                          )}
-                        </button>
+                        {isTicketsAllowed && (
+                          <button
+                            onClick={() => {
+                              navigateToTab('notices_support', 'tickets');
+                              if (isMobile) {
+                                setIsMobileMenuOpen(false);
+                              }
+                            }}
+                            className={`flex items-center justify-between w-full h-8 px-2.5 rounded-xl transition-all duration-200 text-left ${
+                              isActive && activeNoticeSubTab === 'tickets'
+                                ? 'bg-emerald-500/10 text-[#10b981] font-bold border border-emerald-500/20'
+                                : 'text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <LifeBuoy className="w-3.5 h-3.5 shrink-0" />
+                              <span className="text-[10px] font-bold truncate">
+                                {'HR Helpdesk Support Tickets'}
+                              </span>
+                            </div>
+                            {pendingTickets > 0 && (
+                              <span className="px-1.5 py-0.25 text-[8px] font-black rounded-full bg-rose-500 text-white font-mono animate-pulse">
+                                {pendingTickets}
+                              </span>
+                            )}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -5160,15 +5091,15 @@ export default function App() {
               {showExpanded && (
                 <span className="text-[11px] font-bold text-slate-300 ml-3.5 whitespace-nowrap animate-fadeIn">
                   {themeMode === 'dark' 
-                    ? (language === 'en' ? 'Dark Mode' : 'डार्क मोड') 
-                    : (language === 'en' ? 'Light Mode' : 'लाइट मोड')}
+                    ? ('Dark Mode') 
+                    : ('Light Mode')}
                 </span>
               )}
               {!showExpanded && (
                 <div className="absolute left-16 scale-0 group-hover:scale-100 transition-all duration-200 origin-left bg-[#021810] text-[#cbd5e1] border border-[#10b981]/20 text-[10px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-xl pointer-events-none z-50">
                   {themeMode === 'dark' 
-                    ? (language === 'en' ? 'Dark Mode Active' : 'डार्क मोड सक्रिय') 
-                    : (language === 'en' ? 'Light Mode Active' : 'लाइट मोड सक्रिय')}
+                    ? ('Dark Mode Active') 
+                    : ('Light Mode Active')}
                 </div>
               )}
             </div>
@@ -5212,15 +5143,13 @@ export default function App() {
                 src={user.photoURL}
                 alt="Profile"
                 className="w-10 h-10 rounded-2xl border-2 border-emerald-500/30 object-cover shadow-md hover:border-emerald-400 cursor-pointer transition-all duration-300 shrink-0"
-                referrerPolicy="no-referrer"
-              />
+                referrerPolicy="no-referrer" />
             ) : (
               <img
                 src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=150&q=80"
                 alt="Premium User"
                 className="w-10 h-10 rounded-2xl border-2 border-emerald-500/30 object-cover shadow-md transition-all duration-300 hover:border-emerald-400 cursor-pointer shrink-0"
-                referrerPolicy="no-referrer"
-              />
+                referrerPolicy="no-referrer" />
             )}
             {showExpanded && (
               <div className="flex flex-col min-w-0 animate-fadeIn">
@@ -5245,7 +5174,168 @@ export default function App() {
     );
   };
 
-  // 3. Render Dashboard / Workspace after Login
+  //Role-Specific Actionable System Notifications Engine
+  const userNotifications = (() => {
+    const userRole = portalUser?.role || 'employee';
+    const list: Array<{
+      id: string;
+      title: string;
+      description: string;
+      category: string;
+      color: 'emerald' | 'amber' | 'blue' | 'rose' | 'purple';
+      targetTab: 'dashboard' | 'employees' | 'hiring_onboarding' | 'attendance' | 'payroll' | 'leaves' | 'exit_management' | 'notices_support' | 'admin';
+      subTab?: 'announcements' | 'passwords' | 'tickets';
+      badgeCount?: number;
+    }> = [];
+
+    if (userRole === 'recruiter') {
+      let candidates: any[] = [];
+      try {
+        const saved = localStorage.getItem('payroll_candidates');
+        if (saved) candidates = JSON.parse(saved);
+      } catch (e) {}
+      const openApplicants = candidates.filter(c => c.status === 'Applied' || c.status === 'Screening');
+      if (openApplicants.length > 0) {
+        list.push({
+          id: 'n-rec-cand',
+          title: `${openApplicants.length} New Candidate Applications`,
+          description: 'Applicants waiting for screening & scorecards',
+          category: 'Recruitment',
+          color: 'blue',
+          targetTab: 'hiring_onboarding',
+          badgeCount: openApplicants.length
+        });
+      }
+
+      let offers: any[] = [];
+      try {
+        const saved = localStorage.getItem('payroll_offers');
+        if (saved) offers = JSON.parse(saved);
+      } catch (e) {}
+      if (offers.length > 0) {
+        list.push({
+          id: 'n-rec-off',
+          title: `${offers.length} Active Offer Letters`,
+          description: 'Candidate offer rollouts & onboarding tracking',
+          category: 'Onboarding',
+          color: 'emerald',
+          targetTab: 'hiring_onboarding'
+        });
+      }
+
+      let exits: any[] = [];
+      try {
+        const saved = localStorage.getItem('payroll_exit_records');
+        if (saved) exits = JSON.parse(saved);
+      } catch (e) {}
+      const activeExits = exits.filter(e => e.status !== 'Relieved' && e.status !== 'Rejected');
+      if (activeExits.length > 0) {
+        list.push({
+          id: 'n-rec-ext',
+          title: `${activeExits.length} Pending Exit Clearances`,
+          description: 'Staff resignation and No-Dues clearance tasks',
+          category: 'Separation',
+          color: 'rose',
+          targetTab: 'exit_management',
+          badgeCount: activeExits.length
+        });
+      }
+    } else if (['super_admin', 'admin', 'hr', 'sub_admin', 'director'].includes(userRole)) {
+      const pendingPwd = (passwordRequests || []).filter(p => p.status === 'Pending');
+      if (pendingPwd.length > 0) {
+        list.push({
+          id: 'n-pwd-req',
+          title: `${pendingPwd.length} Password Reset Requests`,
+          description: 'Employee requests for portal login credential reset',
+          category: 'Security Gateway',
+          color: 'amber',
+          targetTab: 'notices_support',
+          subTab: 'passwords',
+          badgeCount: pendingPwd.length
+        });
+      }
+
+      const pendingLeaves = (leaveRequests || []).filter(l => l.status === 'Pending');
+      if (pendingLeaves.length > 0) {
+        list.push({
+          id: 'n-leaves-req',
+          title: `${pendingLeaves.length} Pending Leave Applications`,
+          description: 'Staff leave applications awaiting approval',
+          category: 'Leave Approvals',
+          color: 'blue',
+          targetTab: 'leaves',
+          badgeCount: pendingLeaves.length
+        });
+      }
+
+      const pendingTkts = (hrTickets || []).filter(t => t.status === 'Pending');
+      if (pendingTkts.length > 0) {
+        list.push({
+          id: 'n-tkts-req',
+          title: `${pendingTkts.length} HR Support Tickets`,
+          description: 'Grievance or payroll support tickets raised by staff',
+          category: 'HR Helpdesk',
+          color: 'purple',
+          targetTab: 'notices_support',
+          subTab: 'tickets',
+          badgeCount: pendingTkts.length
+        });
+      }
+
+      if ((failedLogins || []).length > 0) {
+        list.push({
+          id: 'n-failed-logins',
+          title: `${failedLogins.length} SecurityDevice Lock Logs`,
+          description: 'Failed login attempts or mobile device lock alerts',
+          category: 'Audit',
+          color: 'rose',
+          targetTab: 'admin'
+        });
+      }
+    } else if (userRole === 'branch_manager') {
+      const pendingLeaves = (leaveRequests || []).filter(l => l.status === 'Pending');
+      if (pendingLeaves.length > 0) {
+        list.push({
+          id: 'n-bm-leaves',
+          title: `${pendingLeaves.length} Branch Staff Leaves`,
+          description: 'Leave applications from your branch team',
+          category: 'Branch',
+          color: 'blue',
+          targetTab: 'leaves',
+          badgeCount: pendingLeaves.length
+        });
+      }
+    } else {
+      const myLeaves = (leaveRequests || []).filter(l => l.employeeId === portalUser?.employee?.id || l.employeeName === portalUser?.name);
+      if (myLeaves.length > 0) {
+        list.push({
+          id: 'n-emp-leaves',
+          title: 'My Leave Applications',
+          description: 'Track approval status of submitted leave requests',
+          category: 'My Portal',
+          color: 'emerald',
+          targetTab: 'leaves'
+        });
+      }
+    }
+
+    const activeAnns = (announcements || []).filter(a => !a.expiryDate || a.expiryDate >= new Date().toISOString().split('T')[0]);
+    if (activeAnns.length > 0) {
+      list.push({
+        id: 'n-active-anns',
+        title: `${activeAnns.length} Company Circulars`,
+        description: 'Latest policy updates and general announcements',
+        category: 'Circulars',
+        color: 'emerald',
+        targetTab: 'notices_support',
+        subTab: 'announcements'
+      });
+    }
+
+    return list;
+  })();
+
+  //3. Render DashboardWorkspace after Login
   return (
     <div className={`h-screen w-screen flex overflow-hidden font-sans transition-colors duration-300 ${
       themeMode === 'dark' ? 'bg-[#0a120e] text-slate-100 dark' : 'bg-[#f1f5f9] text-[#1e293b]'
@@ -5255,8 +5345,7 @@ export default function App() {
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 md:hidden animate-fadeIn"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
+          onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
       {/* Mobile Sidebar Navigation Drawer */}
@@ -5297,7 +5386,7 @@ export default function App() {
             </button>
 
             <span className="text-[11px] font-semibold text-gray-500 hidden sm:inline">
-              {language === 'en' ? 'Database:' : 'डेटाबेस:'}
+              {'Database:'}
             </span>
             <span className="bg-emerald-50 text-emerald-800 border border-emerald-100 text-[10px] font-mono px-2 py-0.5 rounded font-bold max-w-[120px] sm:max-w-[200px] truncate">
               {spreadsheetId ? 'Google Sheet & Firestore' : 'Cloud Firestore (Active)'}
@@ -5310,7 +5399,7 @@ export default function App() {
                 : 'bg-amber-50 text-amber-700 border-amber-200'
             }`}>
               <span className={`w-1 h-1 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-              {isOnline ? (language === 'en' ? 'Online' : 'ऑनलाइन') : (language === 'en' ? 'Offline' : 'ऑफ़लाइन')}
+              {isOnline ? ('Online') : ('Offline')}
             </span>
 
             {/* Live Compact Storage Indicator */}
@@ -5324,13 +5413,35 @@ export default function App() {
                 adminSettings={adminSettings}
                 emailLogs={emailLogs}
                 announcements={announcements}
-                failedLogins={failedLogins}
-              />
+                failedLogins={failedLogins} />
             )}
           </div>
 
           {/* Controls Area */}
           <div className="flex items-center gap-3 relative">
+            
+            {/* Super Admin Role Switcher Dropdown - ONLY Visible to Super Admin */}
+            {(portalUser?.isPrimarySuperAdmin || portalUser?.role === 'super_admin' || portalUser?.id === 'admin') && (
+              <div className="relative inline-flex items-center">
+                <div className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-slate-50 dark:from-emerald-950/40 dark:via-teal-950/40 dark:to-slate-900/60 border border-emerald-500/30 rounded-xl px-2.5 py-1 text-slate-800 dark:text-slate-200 shadow-3xs">
+                  <span className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-1 font-mono">
+                    👑 {'Role:'}
+                  </span>
+                  <select
+                    value={portalUser?.role || 'super_admin'}
+                    onChange={(e) => handleRoleSwitch(e.target.value as UserRole)}
+                    className="bg-transparent text-[11px] font-black text-slate-900 dark:text-emerald-300 border-none outline-none cursor-pointer pr-1 font-sans focus:ring-0"
+                  >
+                    <option value="super_admin" className="dark:bg-[#11221b] text-slate-900 dark:text-white">1. Super Admin</option>
+                    <option value="admin" className="dark:bg-[#11221b] text-slate-900 dark:text-white">2. Admin</option>
+                    <option value="hr" className="dark:bg-[#11221b] text-slate-900 dark:text-white">3. HR</option>
+                    <option value="recruiter" className="dark:bg-[#11221b] text-slate-900 dark:text-white">4. Recruiter</option>
+                    <option value="branch_manager" className="dark:bg-[#11221b] text-slate-900 dark:text-white">5. Branch Manager</option>
+                    <option value="director" className="dark:bg-[#11221b] text-slate-900 dark:text-white">6. Director</option>
+                  </select>
+                </div>
+              </div>
+            )}
             
             {/* Sync Badge Button */}
             <button
@@ -5342,7 +5453,7 @@ export default function App() {
                     ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' 
                     : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
               }`}
-              title={language === 'en' ? 'Click to view Sync History & Log' : 'सिंक इतिहास और लॉग देखने के लिए क्लिक करें'}
+              title={'Click to view Sync History & Log'}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${
                 syncStatus === 'synced' 
@@ -5365,21 +5476,24 @@ export default function App() {
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingData ? 'animate-spin text-blue-600' : ''}`} />
             </button>
 
-            {/* Notification Bell */}
-            {portalUser?.role === 'admin' && (
+            {/* Role-Aware System Notifications Bell */}
+            {portalUser && (
               <div className="relative flex items-center">
                 <button
                   onClick={() => setIsBellPopoverOpen(!isBellPopoverOpen)}
                   className={`p-1.5 rounded-lg border shadow-xxs cursor-pointer transition-all active:scale-95 relative ${
-                    needsAuth
-                      ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
+                    userNotifications.length > 0
+                      ? 'bg-emerald-50/80 text-[#03623c] border-emerald-200/80 hover:bg-emerald-100'
                       : 'bg-white text-gray-400 hover:text-gray-600 hover:bg-gray-100 border-gray-200'
                   }`}
-                  title={language === 'en' ? 'Database Notifications' : 'डेटाबेस सूचनाएं'}
+                  title={'System Notifications'}
+                  id="btn-bell-notifications"
                 >
-                  <Bell className={`w-3.5 h-3.5 ${needsAuth ? 'animate-bounce' : ''}`} />
-                  {needsAuth && (
-                    <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full border border-white" />
+                  <Bell className={`w-3.5 h-3.5 ${userNotifications.length > 0 ? 'text-[#03623c]' : ''}`} />
+                  {userNotifications.length > 0 && (
+                    <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[9px] font-black bg-rose-500 text-white rounded-full border border-white font-mono shadow-xs">
+                      {userNotifications.length}
+                    </span>
                   )}
                 </button>
 
@@ -5387,59 +5501,83 @@ export default function App() {
                   <>
                     <div 
                       className="fixed inset-0 z-40 cursor-default" 
-                      onClick={() => setIsBellPopoverOpen(false)}
-                    />
-                    <div className="absolute right-0 top-10 w-80 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-4 space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-200">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">
-                          {language === 'en' ? 'Database Notification' : 'डेटाबेस सूचना'}
-                        </span>
+                      onClick={() => setIsBellPopoverOpen(false)} />
+                    <div className="absolute right-0 top-10 w-80 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 p-4 space-y-3 text-left animate-in fade-in slide-in-from-top-2 duration-200 max-h-[85vh] flex flex-col">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100 shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-black text-slate-800 uppercase tracking-wider">
+                            {'Notifications'}
+                          </span>
+                          <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-emerald-100 text-emerald-800 uppercase font-mono">
+                            {(portalUser.role || 'user').replace('_', ' ')}
+                          </span>
+                        </div>
                         <button 
                           onClick={() => setIsBellPopoverOpen(false)}
-                          className="text-slate-400 hover:text-slate-600 text-xs font-bold px-1 rounded"
+                          className="text-slate-400 hover:text-slate-600 text-xs font-bold p-1 rounded-lg hover:bg-slate-100 transition-colors"
                         >
-                          ✕
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                       
-                      <div className="space-y-3 font-sans">
-                        <div className="flex items-start gap-2.5 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
-                          <Database className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                          <div className="space-y-0.5">
-                            <p className="text-[11px] font-bold text-slate-800 leading-tight">
-                              {language === 'en' ? 'Cloud Firestore Active' : 'क्लाउड फ़ायरस्टोर सक्रिय है'}
+                      <div className="space-y-2.5 font-sans overflow-y-auto pr-1 flex-1 scrollbar-none">
+                        {/* Cloud status card for super adminsadmins */}
+                        {['super_admin', 'admin'].includes(portalUser.role) && (
+                          <div className="flex items-start gap-2.5 bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-100">
+                            <Database className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <div className="space-y-0.5">
+                              <p className="text-[11px] font-bold text-slate-800 leading-tight">
+                                {'Cloud Firestore Active'}
+                              </p>
+                              <p className="text-[9px] text-slate-500 leading-normal font-semibold">
+                                {'Database synced with Cloud Firestore. Google Sheets integration optional.'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {userNotifications.length === 0 ? (
+                          <div className="text-center py-6 text-slate-400 space-y-1">
+                            <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-500 opacity-80" />
+                            <p className="text-[11px] font-bold text-slate-600">
+                              {'All caught up!'}
                             </p>
-                            <p className="text-[9px] text-slate-500 leading-normal font-semibold">
-                              {language === 'en' 
-                                ? 'Your database is securely connected and active on Cloud Firestore. Google Sheets integration is optional.'
-                                : 'आपका डेटाबेस क्लाउड फ़ायरस्टोर पर सुरक्षित रूप से कनेक्ट और सक्रिय है। गूगल शीट्स जोड़ना वैकल्पिक है।'}
+                            <p className="text-[9px] text-slate-400 font-semibold">
+                              {'No pending tasks requiring immediate action'}
                             </p>
                           </div>
-                        </div>
-
-                        {needsAuth && (
-                          <div className="bg-amber-50/70 p-2.5 rounded-xl border border-amber-100 space-y-2">
-                            <p className="text-[9px] text-amber-800 leading-normal font-semibold">
-                              {language === 'en'
-                                ? 'Connect your Google Account to automatically sync & backup all records to a live Google Sheet.'
-                                : 'सभी रिकॉर्ड को लाइव Google शीट में स्वचालित रूप से सिंक और बैकअप करने के लिए अपने Google खाते को कनेक्ट करें।'}
-                            </p>
-                            <button
+                        ) : (
+                          userNotifications.map((notif) => (
+                            <div 
+                              key={notif.id}
                               onClick={() => {
                                 setIsBellPopoverOpen(false);
-                                handleLogin();
+                                navigateToTab(notif.targetTab, notif.subTab);
                               }}
-                              disabled={isLoggingIn}
-                              className="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-black uppercase tracking-wider py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-3xs"
+                              className="p-3 rounded-xl border border-slate-100 hover:border-emerald-200 bg-slate-50/50 hover:bg-emerald-50/30 transition-all cursor-pointer group space-y-1"
                             >
-                              {isLoggingIn ? (
-                                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Database className="w-3 h-3" />
-                              )}
-                              <span>{language === 'en' ? 'Connect Google Sheets' : 'गूगल शीट्स कनेक्ट करें'}</span>
-                            </button>
-                          </div>
+                              <div className="flex items-center justify-between">
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono ${
+                                  notif.color === 'rose' ? 'bg-rose-100 text-rose-700' :
+                                  notif.color === 'amber' ? 'bg-amber-100 text-amber-700' :
+                                  notif.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                                  notif.color === 'purple' ? 'bg-purple-100 text-purple-700' :
+                                  'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {notif.category}
+                                </span>
+                                <span className="text-[9px] font-bold text-emerald-700 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                                  {'Open'} <ChevronRight className="w-3 h-3" />
+                                </span>
+                              </div>
+                              <p className="text-[11px] font-bold text-slate-800 leading-tight">
+                                {notif.title}
+                              </p>
+                              <p className="text-[9.5px] text-slate-500 font-semibold leading-normal">
+                                {notif.description}
+                              </p>
+                            </div>
+                          ))
                         )}
                       </div>
                     </div>
@@ -5454,8 +5592,7 @@ export default function App() {
                 {/* Backdrop overlay to close when clicking outside */}
                 <div 
                   className="fixed inset-0 z-40 cursor-default" 
-                  onClick={() => setIsSyncPanelOpen(false)}
-                />
+                  onClick={() => setIsSyncPanelOpen(false)} />
                 
                 {/* Panel Container */}
                 <div className="absolute right-0 top-10 w-96 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 p-4 space-y-4 text-left overflow-hidden font-sans animate-in fade-in slide-in-from-top-2 duration-200">
@@ -5464,7 +5601,7 @@ export default function App() {
                     <div className="flex items-center gap-2">
                       <Database className="w-4 h-4 text-slate-500" />
                       <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                        {language === 'en' ? 'Database Sync Control' : 'डेटाबेस सिंक नियंत्रण'}
+                        {'Database Sync Control'}
                       </h4>
                     </div>
                     <button
@@ -5478,7 +5615,7 @@ export default function App() {
                   {/* Connection Details */}
                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
                     <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      <span>{language === 'en' ? 'Connection Status' : 'कनेक्शन स्थिति'}</span>
+                      <span>{'Connection Status'}</span>
                       <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
                         token 
                           ? 'bg-green-100 text-green-700' 
@@ -5487,17 +5624,17 @@ export default function App() {
                             : 'bg-rose-100 text-rose-700'
                       }`}>
                         {token 
-                          ? (language === 'en' ? 'Google Sheets & Firestore Connected' : 'गूगल शीट्स और फ़ायरस्टोर कनेक्टेड')
+                          ? ('Google Sheets & Firestore Connected')
                           : isOnline
-                            ? (language === 'en' ? 'Firestore Cloud Online (Sheet Unlinked)' : 'फ़ायरस्टोर क्लाउड ऑनलाइन (शीट अनलिंक्ड)')
-                            : (language === 'en' ? 'Offline Mode (Local Cache)' : 'ऑफ़लाइन मोड (लोकल कैश)')}
+                            ? ('Firestore Cloud Online (Sheet Unlinked)')
+                            : ('Offline Mode (Local Cache)')}
                       </span>
                     </div>
 
                     {spreadsheetId && (
                       <div className="space-y-1">
                         <div className="flex justify-between text-xs text-slate-600">
-                          <span className="font-semibold">{language === 'en' ? 'Spreadsheet ID:' : 'स्प्रेडशीट आईडी:'}</span>
+                          <span className="font-semibold">{'Spreadsheet ID:'}</span>
                           <span className="font-mono text-[10px] text-slate-500 truncate max-w-[180px]" title={spreadsheetId}>
                             {spreadsheetId}
                           </span>
@@ -5533,14 +5670,14 @@ export default function App() {
                               <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2 C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.761H12.545z" />
                             </svg>
                           )}
-                          <span>{language === 'en' ? 'Link Google Sheets Account' : 'गूगल शीट्स अकाउंट लिंक करें'}</span>
+                          <span>{'Link Google Sheets Account'}</span>
                         </button>
                       </div>
                     )}
 
                     {/* Last Sync Time */}
                     <div className="flex justify-between items-center text-xs text-slate-600 border-t border-slate-100 pt-2 mt-2">
-                      <span className="font-semibold">{language === 'en' ? 'Last Successful Sync:' : 'अंतिम सफल सिंक:'}</span>
+                      <span className="font-semibold">{'Last Successful Sync:'}</span>
                       <span className="font-mono text-[11px] font-bold text-slate-700">
                         {lastSuccessfulSyncTime ? (
                           new Date(lastSuccessfulSyncTime).toLocaleTimeString(undefined, {
@@ -5552,7 +5689,7 @@ export default function App() {
                             day: 'numeric'
                           })
                         ) : (
-                          language === 'en' ? 'Never' : 'कभी नहीं'
+                          'Never'
                         )}
                       </span>
                     </div>
@@ -5566,7 +5703,7 @@ export default function App() {
                       className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white border border-emerald-800 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-3xs active:scale-95 disabled:opacity-50"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isLoadingData ? 'animate-spin' : ''}`} />
-                      {language === 'en' ? 'Force Sync Now' : 'अभी सिंक करें'}
+                      {'Force Sync Now'}
                     </button>
                     <button
                       onClick={() => {
@@ -5576,7 +5713,7 @@ export default function App() {
                             timestamp: new Date().toISOString(),
                             operation: 'Log Cleared',
                             status: 'success',
-                            details: language === 'en' ? 'Recent sync log cleared.' : 'हालिया सिंक लॉग साफ कर दिया गया।'
+                            details: 'Recent sync log cleared.'
                           }
                         ]);
                         localStorage.setItem('payroll_sync_logs', JSON.stringify([{
@@ -5584,12 +5721,12 @@ export default function App() {
                           timestamp: new Date().toISOString(),
                           operation: 'Log Cleared',
                           status: 'success',
-                          details: language === 'en' ? 'Recent sync log cleared.' : 'हालिया सिंक लॉग साफ कर दिया गया।'
+                          details: 'Recent sync log cleared.'
                         }]));
                       }}
                       className="bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer"
                     >
-                      {language === 'en' ? 'Clear Logs' : 'लॉग साफ़ करें'}
+                      {'Clear Logs'}
                     </button>
                   </div>
 
@@ -5597,9 +5734,7 @@ export default function App() {
                   {syncStatus === 'error' && (
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2 font-sans">
                       <p className="text-[10px] text-amber-800 leading-normal font-semibold">
-                        {language === 'en' 
-                          ? 'Persistent "Failed to Fetch" or "Sync Error"? Click below to dismiss error, or reset session.'
-                          : 'लगातार "Failed to Fetch" या "सिंक त्रुटि"? त्रुटि हटाने या सत्र रीसेट करने के लिए नीचे क्लिक करें।'}
+                        {'Persistent "Failed to Fetch" or "Sync Error"? Click below to dismiss error, or reset session.'}
                       </p>
                       <button
                         type="button"
@@ -5608,21 +5743,19 @@ export default function App() {
                         }}
                         className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 shadow-3xs"
                       >
-                        ✓ {language === 'en' ? 'Dismiss Error & Use Active Database' : 'त्रुटि हटाएं और सक्रिय डेटाबेस का उपयोग करें'}
+                        ✓ {'Dismiss Error & Use Active Database'}
                       </button>
                       <button
                         type="button"
                         onClick={() => {
                           handleClearSheetsSession();
                           setSyncStatus('synced');
-                          alert(language === 'en'
-                            ? 'Google Sheets cache cleared. Working safely with Firestore & Local storage.'
-                            : 'Google Sheets कैश साफ़ कर दिया गया है। फ़ायरस्टोर और स्थानीय स्टोरेज के साथ काम किया जा रहा है।');
+                          alert('Google Sheets cache cleared. Working safely with Firestore & Local storage.');
                         }}
                         className="w-full bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 shadow-3xs"
                       >
                         <RefreshCw className="w-3 h-3 animate-spin" style={{ animationDuration: '3s' }} />
-                        {language === 'en' ? 'Reset Google Sheets Session & Relogin' : 'Google Sheets सत्र रीसेट करें और पुनः लॉगिन करें'}
+                        {'Reset Google Sheets Session & Relogin'}
                       </button>
                     </div>
                   )}
@@ -5630,13 +5763,13 @@ export default function App() {
                   {/* Sync Logs list */}
                   <div className="space-y-2">
                     <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      {language === 'en' ? 'Recent Operations Log' : 'हालिया संचालन लॉग'}
+                      {'Recent Operations Log'}
                     </h5>
                     
                     <div className="max-h-56 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50 bg-slate-50/50">
                       {syncLogs.length === 0 ? (
                         <div className="p-4 text-center text-xs text-slate-400 font-medium">
-                          {language === 'en' ? 'No recent logs' : 'कोई हालिया लॉग नहीं'}
+                          {'No recent logs'}
                         </div>
                       ) : (
                         syncLogs.map((log) => {
@@ -5703,7 +5836,7 @@ export default function App() {
                   onUpdateEmployee={handleUpdateEmployee}
                   leaveRequests={leaveRequests}
                   onUpdateLeaveRequestStatus={handleUpdateLeaveRequestStatus}
-                />
+                  userRole={portalUser?.role || 'employee'} />
               )}
               {currentTab === 'employees' && (
                 <EmployeeList 
@@ -5714,7 +5847,25 @@ export default function App() {
                   onBulkAddEmployees={handleBulkAddEmployees}
                   language={language} 
                   adminSettings={adminSettings}
-                />
+                  portalUser={portalUser} />
+              )}
+              {currentTab === 'hiring_onboarding' && (
+                <HiringOnboarding 
+                  employees={filteredEmployees}
+                  language={language}
+                  adminSettings={adminSettings}
+                  spreadsheetId={spreadsheetId}
+                  googleToken={token} />
+              )}
+              {currentTab === 'employee_lifecycle' && (
+                <EmployeeLifecycleModule 
+                  employees={filteredEmployees}
+                  language={language} />
+              )}
+              {currentTab === 'exit_management' && (
+                <ExitManagementModule 
+                  employees={filteredEmployees}
+                  language={language} />
               )}
               {currentTab === 'attendance' && (
                 <AttendanceTracker 
@@ -5726,8 +5877,7 @@ export default function App() {
                   adminSettings={adminSettings}
                   portalUser={portalUser}
                   auditLogs={auditLogs}
-                  onAddAuditLogs={handleAddAuditLogs}
-                />
+                  onAddAuditLogs={handleAddAuditLogs} />
               )}
               {currentTab === 'payroll' && (
                 <PayrollCalculator 
@@ -5738,8 +5888,7 @@ export default function App() {
                   onUpdateEmployees={handleBulkAddEmployees}
                   language={language} 
                   adminSettings={adminSettings}
-                  portalUser={portalUser}
-                />
+                  portalUser={portalUser} />
               )}
               {currentTab === 'leaves' && (
                 <LeavesHolidays 
@@ -5751,16 +5900,14 @@ export default function App() {
                   portalUser={portalUser}
                   leaveRequests={leaveRequests}
                   onAddLeaveRequest={handleAddLeaveRequest}
-                  onUpdateLeaveRequestStatus={handleUpdateLeaveRequestStatus}
-                />
+                  onUpdateLeaveRequestStatus={handleUpdateLeaveRequestStatus} />
               )}
               {currentTab === 'ledger' && (
                 <EmployeeLedger 
                   employees={filteredEmployees}
                   payrollRecords={filteredPayroll}
                   language={language}
-                  adminSettings={adminSettings}
-                />
+                  adminSettings={adminSettings} />
               )}
               {currentTab === 'notices_support' && (
                 <NoticesSupport 
@@ -5773,8 +5920,7 @@ export default function App() {
                   setPasswordRequests={setPasswordRequests}
                   portalUser={portalUser}
                   activeSubTab={activeNoticeSubTab}
-                  setActiveSubTab={setActiveNoticeSubTab}
-                />
+                  setActiveSubTab={setActiveNoticeSubTab} />
               )}
               {currentTab === 'admin' && (
                 <Settings 
@@ -5800,8 +5946,7 @@ export default function App() {
                   emailLogs={emailLogs}
                   onClearEmailLogs={handleClearEmailLogs}
                   onSendTestEmail={handleSendTestEmail}
-                  onResendEmail={handleResendEmail}
-                />
+                  onResendEmail={handleResendEmail} />
               )}
             </div>
           )}
@@ -5861,13 +6006,13 @@ export default function App() {
                 onClick={confirmDialog.onConfirm}
                 className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md hover:shadow-lg active:scale-97"
               >
-                {language === 'en' ? 'Yes, Proceed' : 'हाँ, आगे बढ़ें'}
+                {'Yes, Proceed'}
               </button>
               <button
                 onClick={() => setConfirmDialog(null)}
                 className="w-full bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-97"
               >
-                {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                {'Cancel'}
               </button>
             </div>
           </div>
@@ -5889,10 +6034,10 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-xs font-black uppercase tracking-widest text-[#10b981] font-mono">
-                    {language === 'en' ? 'Action Required' : 'कार्रवाई आवश्यक'}
+                    {'Action Required'}
                   </h3>
                   <h4 className="text-sm font-bold text-slate-100 tracking-tight">
-                    {language === 'en' ? 'Unresolved Action Items' : 'अनसुलझे लंबित मामले'}
+                    {'Unresolved Action Items'}
                   </h4>
                 </div>
               </div>
@@ -5912,9 +6057,7 @@ export default function App() {
               <div className="bg-gradient-to-r from-rose-500/10 to-transparent border border-rose-500/20 rounded-xl p-3.5 flex gap-3 items-start text-xs text-rose-200 leading-relaxed">
                 <AlertCircle className="w-4.5 h-4.5 text-rose-500 shrink-0 mt-0.5" />
                 <div>
-                  {language === 'en'
-                    ? 'Outstanding items require immediate attention. Employees may be locked out of their accounts, or have pressing payroll and helpdesk queries.'
-                    : 'लंबित मदों पर तत्काल ध्यान देने की आवश्यकता है। कर्मचारियों के खाते लॉक हो सकते हैं, या उनके पास महत्वपूर्ण पेरोल और सहायता संबंधी प्रश्न हो सकते हैं।'}
+                  {'Outstanding items require immediate attention. Employees may be locked out of their accounts, or have pressing payroll and helpdesk queries.'}
                 </div>
               </div>
 
@@ -5926,7 +6069,7 @@ export default function App() {
                     {passwordRequests.filter(r => r.status === 'Pending').length}
                   </span>
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-1.5 block">
-                    {language === 'en' ? 'Password Resets' : 'पासवर्ड रीसेट'}
+                    {'Password Resets'}
                   </span>
                 </div>
                 <div className="bg-slate-900/60 border border-emerald-500/20 p-4 rounded-2xl text-center shadow-inner relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-300">
@@ -5935,7 +6078,7 @@ export default function App() {
                     {hrTickets.filter(r => r.status === 'Pending').length}
                   </span>
                   <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-1.5 block">
-                    {language === 'en' ? 'Support Tickets' : 'सहायता टिकट'}
+                    {'Support Tickets'}
                   </span>
                 </div>
               </div>
@@ -5945,7 +6088,7 @@ export default function App() {
                 <div className="space-y-2.5">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 font-mono pl-1">
                     <KeyRound className="w-4 h-4 text-amber-500" />
-                    {language === 'en' ? 'Password Reset Queue' : 'पासवर्ड रीसेट अनुरोध'}
+                    {'Password Reset Queue'}
                   </h4>
                   <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                     {passwordRequests.filter(r => r.status === 'Pending').map((req: any) => (
@@ -5968,7 +6111,7 @@ export default function App() {
                 <div className="space-y-2.5">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 font-mono pl-1">
                     <LifeBuoy className="w-4 h-4 text-emerald-400" />
-                    {language === 'en' ? 'Active Support Tickets' : 'सहायता टिकट'}
+                    {'Active Support Tickets'}
                   </h4>
                   <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                     {hrTickets.filter(r => r.status === 'Pending').map((tkt: any) => (
@@ -6000,7 +6143,7 @@ export default function App() {
                 }}
                 className="w-full sm:w-auto bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-850 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer text-center duration-200"
               >
-                {language === 'en' ? 'Acknowledge' : 'स्वीकार करें'}
+                {'Acknowledge'}
               </button>
               <button
                 onClick={() => {
@@ -6010,7 +6153,7 @@ export default function App() {
                 }}
                 className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-slate-950 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(16,185,129,0.25)] hover:scale-[1.02]"
               >
-                <span>{language === 'en' ? 'Resolve Now' : 'अभी समाधान करें'}</span>
+                <span>{'Resolve Now'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -6027,7 +6170,7 @@ export default function App() {
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <h3 className="text-[10px] font-black uppercase tracking-wider text-emerald-400 font-mono">
-                {language === 'en' ? 'Sandbox Email Terminal' : 'सैंडबॉक्स ईमेल टर्मिनल'}
+                {'Sandbox Email Terminal'}
               </h3>
             </div>
             <button
@@ -6045,19 +6188,18 @@ export default function App() {
             </div>
             <div className="bg-slate-950 rounded-xl border border-slate-800/60 overflow-hidden">
               <div className="bg-slate-900 px-3 py-1 text-[8px] font-black uppercase text-slate-500 font-mono tracking-widest border-b border-slate-800/40 flex justify-between items-center">
-                <span>{language === 'en' ? 'Rendered HTML Email Content' : 'ईमेल HTML सामग्री'}</span>
-                <span className="text-[9px] text-emerald-400 font-semibold">{language === 'en' ? 'Simulated' : 'सिम्युलेटेड'}</span>
+                <span>{'Rendered HTML Email Content'}</span>
+                <span className="text-[9px] text-emerald-400 font-semibold">{'Simulated'}</span>
               </div>
               <div 
                 className="p-4 text-xs bg-slate-950/45 text-slate-300 leading-relaxed overflow-y-auto max-h-48 custom-scrollbar scrollbar-thin scrollbar-thumb-emerald-800/30 scrollbar-track-transparent"
-                dangerouslySetInnerHTML={{ __html: lastSentEmail.html }}
-              />
+                dangerouslySetInnerHTML={{ __html: lastSentEmail.html }} />
             </div>
             <button
               onClick={() => setShowEmailViewer(false)}
               className="w-full bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/20 text-emerald-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all cursor-pointer"
             >
-              {language === 'en' ? 'Acknowledge & Close' : 'स्वीकार करें और बंद करें'}
+              {'Acknowledge & Close'}
             </button>
           </div>
         </div>
@@ -6071,8 +6213,7 @@ export default function App() {
           adminName={portalUser.name || 'Boss'}
           role={portalUser.role}
           language={language}
-          companyName={adminSettings.companyName}
-        />
+          companyName={adminSettings.companyName} />
       )}
 
     </div>

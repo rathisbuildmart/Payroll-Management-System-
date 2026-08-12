@@ -38,7 +38,7 @@ export default function EmployeePortal({
   const [activePayslip, setActivePayslip] = useState<any | null>(null);
   const [showMoreSheet, setShowMoreSheet] = useState(false);
 
-  // Self Attendance & GPS Geofencing States
+  //Self Attendance & GPS Geofencing States
   const [currentGpsCoords, setCurrentGpsCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gpsError, setGpsError] = useState<string>('');
   const [isDetectingGps, setIsDetectingGps] = useState(false);
@@ -71,7 +71,7 @@ export default function EmployeePortal({
 
     const handleFailure = (error: GeolocationPositionError) => {
       console.warn("High accuracy GPS failed in portal, retrying with low accuracy...", error);
-      // Retry with low accuracy
+      //Retry with low accuracy
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setCurrentGpsCoords({
@@ -83,7 +83,7 @@ export default function EmployeePortal({
         (fallbackError) => {
           console.warn("GPS error in portal fallback:", fallbackError);
           
-          // Fall back to a mock/simulated coordinate matching the employee's assigned branch or Bangalore HQ
+          //Fall back to a mock/simulated coordinate matching the employee's assigned branch or Bangalore HQ
           const outlets = adminSettings.geofenceOutlets || [];
           const employeeBranchName = employee.branch || '';
           const matchedOutlet = outlets.find(o => o.name.toLowerCase().trim() === employeeBranchName.toLowerCase().trim()) || outlets[0];
@@ -94,13 +94,11 @@ export default function EmployeePortal({
               longitude: matchedOutlet.longitude + 0.0001
             });
             console.log("Mock coordinates applied as fallback for sandboxed/demo environment:", matchedOutlet.name);
-            setPunchSuccessMsg(language === 'en'
-              ? "Location simulated for sandboxed preview."
-              : "सैंडबॉक्स पूर्वावलोकन के लिए सिम्युलेटेड स्थान।"
+            setPunchSuccessMsg("Location simulated for sandboxed preview."
             );
           } else {
             setCurrentGpsCoords({
-              latitude: 12.9716, // Bangalore HQ fallback
+              latitude: 12.9716, //Bangalore HQ fallback
               longitude: 77.5946
             });
             console.log("Default coordinates applied as fallback");
@@ -118,7 +116,7 @@ export default function EmployeePortal({
   };
 
   const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371000; // Radius of the earth in meters
+    const R = 6371000; //Radius of the earth in meters
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
@@ -143,12 +141,12 @@ export default function EmployeePortal({
       return { isAllowed: false, nearestOutlet: null, distanceMeters: 0, requiredRadius: 0, needsGps: true };
     }
 
-    // Identify if the employee has a specific branch assigned
+    //Identify if the employee has a specific branch assigned
     const employeeBranchName = employee.branch || '';
     const employeeBranchGeofence = outlets.find(o => o.name.toLowerCase().trim() === employeeBranchName.toLowerCase().trim());
 
     if (employeeBranchName && employeeBranchGeofence) {
-      // The employee has a specific branch and there is a geofence configured for it. Enforce checking against this branch only!
+      //The employee has a specific branch and there is a geofence configured for it. Enforce checking against this branch only!
       const dist = getDistanceInMeters(
         currentGpsCoords.latitude,
         currentGpsCoords.longitude,
@@ -166,7 +164,7 @@ export default function EmployeePortal({
       };
     }
 
-    // Otherwise, fall back to checking all geofences
+    //Otherwise, fall back to checking all geofences
     let nearestOutlet = outlets[0];
     let minDistance = Infinity;
     let isWithinAny = false;
@@ -203,14 +201,10 @@ export default function EmployeePortal({
     const checkResult = getOutletCheckResult();
     if (!checkResult.isAllowed) {
       if (checkResult.isSpecificBranchRequired) {
-        setPunchErrorMsg(language === 'en'
-          ? `Outside registered branch geofence! You must be inside your assigned branch "${checkResult.nearestOutlet?.name}" (Current distance is ${checkResult.distanceMeters.toFixed(1)}m, Allowed: ${checkResult.requiredRadius}m).`
-          : `रजिस्टर्ड शाखा जियोफेंस से बाहर! आपको अपनी आवंटित शाखा "${checkResult.nearestOutlet?.name}" के भीतर होना चाहिए (वर्तमान दूरी ${checkResult.distanceMeters.toFixed(1)}मी है, अनुमत: ${checkResult.requiredRadius}मी)।`
+        setPunchErrorMsg(`Outside registered branch geofence! You must be inside your assigned branch "${checkResult.nearestOutlet?.name}" (Current distance is ${checkResult.distanceMeters.toFixed(1)}m, Allowed: ${checkResult.requiredRadius}m).`
         );
       } else {
-        setPunchErrorMsg(language === 'en' 
-          ? "Outside verified geofence! Please ensure you are inside an authorized branch premises."
-          : "सत्यापित जियोफेंस से बाहर! कृपया सुनिश्चित करें कि आप किसी अधिकृत शाखा परिसर के अंदर हैं।"
+        setPunchErrorMsg("Outside verified geofence! Please ensure you are inside an authorized branch premises."
         );
       }
       return;
@@ -248,14 +242,14 @@ export default function EmployeePortal({
 
       if (onUpdateAttendanceRecords) {
         await onUpdateAttendanceRecords([newRecord]);
-        setPunchSuccessMsg(language === 'en' ? 'Punched In successfully!' : 'आगमन उपस्थिति (Punch In) सफलतापूर्वक दर्ज की गई!');
+        setPunchSuccessMsg('Punched In successfully!');
         setPunchRemarks('');
       } else {
         setPunchErrorMsg('Update handler not registered.');
       }
     } catch (err: any) {
       console.error(err);
-      setPunchErrorMsg(language === 'en' ? 'Failed to record punch.' : 'उपस्थिति दर्ज करने में विफल।');
+      setPunchErrorMsg('Failed to record punch.');
     } finally {
       setIsSubmittingPunch(false);
     }
@@ -266,21 +260,17 @@ export default function EmployeePortal({
     const todayRecord = attendanceRecords.find(r => r.employeeId === employee.id && r.date === todayStr);
 
     if (!todayRecord) {
-      setPunchErrorMsg(language === 'en' ? "Punch In record not found for today." : "आज के लिए कोई आगमन रिकॉर्ड नहीं मिला। पहले पंच-इन करें।");
+      setPunchErrorMsg("Punch In record not found for today.");
       return;
     }
 
     const checkResult = getOutletCheckResult();
     if (!checkResult.isAllowed) {
       if (checkResult.isSpecificBranchRequired) {
-        setPunchErrorMsg(language === 'en'
-          ? `Outside registered branch geofence! You must be inside your assigned branch "${checkResult.nearestOutlet?.name}" (Current distance is ${checkResult.distanceMeters.toFixed(1)}m, Allowed: ${checkResult.requiredRadius}m).`
-          : `रजिस्टर्ड शाखा जियोफेंस से बाहर! आपको अपनी आवंटित शाखा "${checkResult.nearestOutlet?.name}" के भीतर होना चाहिए (वर्तमान दूरी ${checkResult.distanceMeters.toFixed(1)}मी है, अनुमत: ${checkResult.requiredRadius}मी)।`
+        setPunchErrorMsg(`Outside registered branch geofence! You must be inside your assigned branch "${checkResult.nearestOutlet?.name}" (Current distance is ${checkResult.distanceMeters.toFixed(1)}m, Allowed: ${checkResult.requiredRadius}m).`
         );
       } else {
-        setPunchErrorMsg(language === 'en' 
-          ? "Outside verified geofence! Please ensure you are inside an authorized branch premises."
-          : "सत्यापित जियोफेंस से बाहर! कृपया सुनिश्चित करें कि आप किसी अधिकृत शाखा परिसर के अंदर हैं।"
+        setPunchErrorMsg("Outside verified geofence! Please ensure you are inside an authorized branch premises."
         );
       }
       return;
@@ -326,20 +316,20 @@ export default function EmployeePortal({
 
       if (onUpdateAttendanceRecords) {
         await onUpdateAttendanceRecords([updatedRecord]);
-        setPunchSuccessMsg(language === 'en' ? 'Punched Out successfully!' : 'प्रस्थान उपस्थिति (Punch Out) सफलतापूर्वक दर्ज की गई!');
+        setPunchSuccessMsg('Punched Out successfully!');
         setPunchRemarks('');
       } else {
         setPunchErrorMsg('Update handler not registered.');
       }
     } catch (err: any) {
       console.error(err);
-      setPunchErrorMsg(language === 'en' ? 'Failed to record punch.' : 'उपस्थिति दर्ज करने में विफल।');
+      setPunchErrorMsg('Failed to record punch.');
     } finally {
       setIsSubmittingPunch(false);
     }
   };
 
-  // Miss punch ticket raising states
+  //Miss punch ticket raising states
   const [showRaiseModal, setShowRaiseModal] = useState(false);
   const [raiseDate, setRaiseDate] = useState('');
   const [raiseCheckIn, setRaiseCheckIn] = useState('09:00');
@@ -355,7 +345,7 @@ export default function EmployeePortal({
     setTicketSuccess('');
 
     if (!raiseDate) {
-      setTicketError(language === 'en' ? 'Please select a date' : 'कृपया तिथि चुनें');
+      setTicketError('Please select a date');
       return;
     }
 
@@ -374,7 +364,7 @@ export default function EmployeePortal({
         };
 
         await onUpdateAttendanceRecords([newRecord]);
-        setTicketSuccess(language === 'en' ? 'Missed punch ticket raised successfully!' : 'मिस पंच टिकट सफलतापूर्वक दर्ज कर लिया गया है!');
+        setTicketSuccess('Missed punch ticket raised successfully!');
         setTimeout(() => {
           setShowRaiseModal(false);
           setTicketSuccess('');
@@ -385,7 +375,7 @@ export default function EmployeePortal({
       }
     } catch (err) {
       console.error(err);
-      setTicketError(language === 'en' ? 'Failed to raise ticket' : 'टिकट दर्ज करने में विफल');
+      setTicketError('Failed to raise ticket');
     } finally {
       setIsSubmittingTicket(false);
     }
@@ -393,13 +383,13 @@ export default function EmployeePortal({
 
   const t = {
     en: {
-      dashboard: language === 'en' ? "Home Dashboard" : "होम डैशबोर्ड",
-      profile: language === 'en' ? "My Profile" : "मेरी प्रोफ़ाइल",
-      attendance: language === 'en' ? "Attendance Log" : "उपस्थिति लॉग",
-      payslips: language === 'en' ? "My Salary Slips" : "मेरी सैलरी स्लिप",
-      exceptions: language === 'en' ? "My Exceptions" : "मेरी विसंगतियां",
-      leaves: language === 'en' ? "Leaves & Holidays" : "अवकाश और छुट्टियां",
-      calendar: language === 'en' ? "Calendar Report" : "कैलेंडर रिपोर्ट",
+      dashboard: "Home Dashboard",
+      profile: "My Profile",
+      attendance: "Attendance Log",
+      payslips: "My Salary Slips",
+      exceptions: "My Exceptions",
+      leaves: "Leaves & Holidays",
+      calendar: "Calendar Report",
       personalInfo: "Personal & Contact Information",
       bankingInfo: "Bank Account Details",
       statutoryInfo: "Statutory Registry & IDs",
@@ -477,36 +467,36 @@ export default function EmployeePortal({
       noExceptions: "No missed punch or half-day logs found. You are all caught up!",
       exceptionType: "Log Type",
       approvalStatus: "Approval Status",
-      adminRemarks: "Approver Notes / Remarks"
+      adminRemarks: "Approver NotesRemarks"
     }
   }['en'];
 
-  // Helper arrays
+  //Helper arrays
   const YEARS = ['2025', '2026', '2027', '2028'];
   const MONTHS = [
-    { name: 'January', hindi: 'जनवरी', value: '01' },
-    { name: 'February', hindi: 'फरवरी', value: '02' },
-    { name: 'March', hindi: 'मार्च', value: '03' },
-    { name: 'April', hindi: 'अप्रैल', value: '04' },
-    { name: 'May', hindi: 'मई', value: '05' },
-    { name: 'June', hindi: 'जून', value: '06' },
-    { name: 'July', hindi: 'जुलाई', value: '07' },
-    { name: 'August', hindi: 'अगस्त', value: '08' },
-    { name: 'September', hindi: 'सितंबर', value: '09' },
-    { name: 'October', hindi: 'अक्टूबर', value: '10' },
-    { name: 'November', hindi: 'नवंबर', value: '11' },
-    { name: 'December', hindi: 'दिसंबर', value: '12' },
+    { name: 'January', hindi: "", value: '01' },
+    { name: 'February', hindi: "", value: '02' },
+    { name: 'March', hindi: "", value: '03' },
+    { name: 'April', hindi: "", value: '04' },
+    { name: 'May', hindi: "", value: '05' },
+    { name: 'June', hindi: "", value: '06' },
+    { name: 'July', hindi: "", value: '07' },
+    { name: 'August', hindi: "", value: '08' },
+    { name: 'September', hindi: "", value: '09' },
+    { name: 'October', hindi: "", value: '10' },
+    { name: 'November', hindi: "", value: '11' },
+    { name: 'December', hindi: "", value: '12' },
   ];
 
-  // Selected period formatting
+  //Selected period formatting
   const selectedPeriod = `${attendanceYear}-${attendanceMonth}`;
 
-  // Filter attendance for the logged-in employee & selected period
+  //Filter attendance for the logged-in employee & selected period
   const empAttendanceList = attendanceRecords
     .filter(r => r.employeeId === employee.id && r.date.startsWith(selectedPeriod))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Compute attendance stats
+  //Compute attendance stats
   const daysPresent = empAttendanceList.filter(r => r.status === 'Present').length;
   const daysHalfDay = empAttendanceList.filter(r => r.status === 'Half Day').length;
   const daysLeave = empAttendanceList.filter(r => r.status === 'Leave').length;
@@ -514,12 +504,12 @@ export default function EmployeePortal({
   const workedDays = daysPresent + (0.5 * daysHalfDay) + daysLeave;
   const overtimeHoursTotal = empAttendanceList.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
 
-  // Filter payroll records for this employee
+  //Filter payroll records for this employee
   const empPayslips = payrollRecords
     .filter(r => r.employeeId === employee.id)
     .sort((a, b) => b.monthYear.localeCompare(a.monthYear));
 
-  // Open active payslip details
+  //Open active payslip details
   const handleOpenPayslip = (record: PayrollRecord) => {
     const periodStr = record.monthYear;
     const periodAtt = attendanceRecords.filter(r => r.employeeId === employee.id && r.date.startsWith(periodStr));
@@ -531,7 +521,7 @@ export default function EmployeePortal({
     const oHours = periodAtt.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
 
     const workedVal = pDays + (0.5 * hDays) + lDays;
-    const workingDaysCount = 26; // assume standard 26 days
+    const workingDaysCount = 26; //assume standard 26 days
     const earnedRatio = Math.min(1, workedVal / workingDaysCount);
     const earnedBasic = Math.round(record.basicSalary * (workedVal === 0 ? 0 : earnedRatio));
 
@@ -550,7 +540,7 @@ export default function EmployeePortal({
     });
   };
 
-  // PDF Generation Helper (same as admin's export style)
+  //PDF Generation Helper (same as admin's export style)
   const downloadPayslipPDF = (record: PayrollRecord, emp: Employee) => {
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -558,31 +548,31 @@ export default function EmployeePortal({
       format: 'a4'
     });
 
-    const navyColor = [15, 23, 42]; // Slate-900 theme
-    const lightGray = [248, 250, 252]; // Slate-50 background
+    const navyColor = [15, 23, 42]; //Slate-900 theme
+    const lightGray = [248, 250, 252]; //Slate-50 background
     
-    // Header banner
+    //Header banner
     doc.setFillColor(navyColor[0], navyColor[1], navyColor[2]);
     doc.rect(0, 0, 210, 18, 'F');
     
-    // Header Text
+    //Header Text
     doc.setTextColor(255, 255, 255);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(14);
     doc.text('RATHI BUILD MART - PAYSLIP', 105, 11, { align: 'center' });
 
-    // Company address
+    //Company address
     doc.setTextColor(100, 116, 139);
     doc.setFontSize(8);
     doc.setFont('Helvetica', 'normal');
     doc.text('Headquarters: NH-6, Rathi Estate, Raipur, Chhattisgarh, India', 105, 24, { align: 'center' });
     doc.text(`Salary Slip for the Pay Period: ${record.monthYear}`, 105, 28, { align: 'center' });
 
-    // Separator line
+    //Separator line
     doc.setDrawColor(226, 232, 240);
     doc.line(10, 32, 200, 32);
 
-    // Section 1: Employee metadata
+    //Section 1: Employee metadata
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(navyColor[0], navyColor[1], navyColor[2]);
@@ -592,23 +582,23 @@ export default function EmployeePortal({
     doc.setFontSize(8);
     doc.setTextColor(51, 65, 85);
     
-    // Column 1
+    //Column 1
     doc.text(`Employee ID: ${record.employeeId}`, 10, 45);
     doc.text(`Employee Name: ${emp.name || 'N/A'}`, 10, 50);
     doc.text(`Designation: ${emp.designation || 'N/A'}`, 10, 55);
     doc.text(`Department: ${emp.department || 'N/A'}`, 10, 60);
     doc.text(`Joining Date: ${emp.joiningDate || 'N/A'}`, 10, 65);
 
-    // Column 2
+    //Column 2
     doc.text(`Bank Account No: ${emp.bankAccountNo || 'N/A'}`, 110, 45);
     doc.text(`Bank Name: ${emp.bankName || 'N/A'}`, 110, 50);
     doc.text(`IFSC Code: ${emp.ifscCode || 'N/A'}`, 110, 55);
     doc.text(`PAN Number: ${emp.panNo || 'N/A'}`, 110, 60);
-    doc.text(`UAN / PF Number: ${emp.uan || emp.pfAccountNo || 'N/A'}`, 110, 65);
+    doc.text(`UANPF Number: ${emp.uan || emp.pfAccountNo || 'N/A'}`, 110, 65);
 
     doc.line(10, 70, 200, 70);
 
-    // Attendance Overview for PDF
+    //Attendance Overview for PDF
     const periodAtt = attendanceRecords.filter(r => r.employeeId === employee.id && r.date.startsWith(record.monthYear));
     const pDays = periodAtt.filter(r => r.status === 'Present').length;
     const hDays = periodAtt.filter(r => r.status === 'Half Day').length;
@@ -625,7 +615,7 @@ export default function EmployeePortal({
 
     doc.line(10, 85, 200, 85);
 
-    // Header of breakdown table
+    //Header of breakdown table
     doc.setFillColor(navyColor[0], navyColor[1], navyColor[2]);
     doc.rect(10, 90, 90, 7, 'F');
     doc.rect(110, 90, 90, 7, 'F');
@@ -638,7 +628,7 @@ export default function EmployeePortal({
     doc.text('STATUTORY DEDUCTIONS', 115, 95);
     doc.text('AMOUNT (₹)', 180, 95);
 
-    // Custom allowances/deductions values
+    //Custom allowances/deductions values
     const hra = record.hra !== undefined ? record.hra : Math.round(record.basicSalary * 0.40);
     const da = record.da !== undefined ? record.da : 0;
     const conv = record.conveyanceAllowance !== undefined ? record.conveyanceAllowance : 0;
@@ -661,7 +651,7 @@ export default function EmployeePortal({
       { name: 'Conveyance Allowance', amount: conv },
       { name: 'Standard Allowances', amount: standardAllowances },
       { name: 'Overtime Earnings', amount: record.overtimePay },
-      { name: 'Festival / Diwali Bonus', amount: festBonus },
+      { name: 'FestivalDiwali Bonus', amount: festBonus },
       { name: 'Performance Incentives', amount: perfInc },
       { name: 'CL/EL Leave Adjustment', amount: leaveAdj },
     ];
@@ -723,7 +713,7 @@ export default function EmployeePortal({
     doc.setTextColor(2, 24, 16);
     doc.setFontSize(9.5);
     doc.text('NET SALARY DISBURSED:', 15, currentY);
-    doc.text(`Rs. ${netSalaryPay.toLocaleString('en-IN')}  /-  (Rupees Only)`, 110, currentY);
+    doc.text(`Rs. ${netSalaryPay.toLocaleString('en-IN')}(Rupees Only)`, 110, currentY);
 
     currentY += 15;
     doc.setTextColor(100, 116, 139);
@@ -756,11 +746,11 @@ export default function EmployeePortal({
             className="flex items-center gap-1 text-xs font-black text-emerald-400 hover:text-emerald-300 bg-slate-800/80 px-2 py-1.5 rounded-lg border border-slate-700/50 cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4 shrink-0" />
-            <span>{language === 'en' ? "Back" : "पीछे"}</span>
+            <span>{"Back"}</span>
           </button>
           <span className="text-xs font-black uppercase tracking-wider text-slate-100 truncate pr-4">
             {activeTab === 'profile' && t.profile}
-            {activeTab === 'self_attendance' && (language === 'en' ? "Punch" : "पंच")}
+            {activeTab === 'self_attendance' && ("Punch")}
             {activeTab === 'attendance' && t.attendance}
             {activeTab === 'calendar' && t.calendar}
             {activeTab === 'exceptions' && t.exceptions}
@@ -782,8 +772,7 @@ export default function EmployeePortal({
               src={parseGoogleDriveImageUrl(employee.photoUrl)} 
               alt={employee.name} 
               className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-2xl object-cover border border-emerald-500/30 shadow-md shrink-0"
-              referrerPolicy="no-referrer"
-            />
+              referrerPolicy="no-referrer" />
           ) : (
             <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-tr from-emerald-600 to-indigo-600 text-white font-black text-lg sm:text-2xl flex items-center justify-center border border-emerald-500/30 shrink-0">
               {employee.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
@@ -838,7 +827,7 @@ export default function EmployeePortal({
               }`}
             >
               <MapPin className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{language === 'en' ? "Self Attendance" : "स्वयं उपस्थिति"}</span>
+              <span className="truncate">{"Self Attendance"}</span>
             </button>
           )}
           <button
@@ -913,13 +902,13 @@ export default function EmployeePortal({
           const todayRecord = attendanceRecords.find(r => r.employeeId === employee.id && r.date === todayStr);
           const checkResult = getOutletCheckResult();
           
-          // Let's find latest 3 attendance logs
+          //Let's find latest 3 attendance logs
           const recentLogs = [...attendanceRecords]
             .filter(r => r.employeeId === employee.id)
             .sort((a, b) => b.date.localeCompare(a.date))
             .slice(0, 3);
 
-          // Let's get the latest payslip if any
+          //Let's get the latest payslip if any
           const latestPayslip = empPayslips[0];
 
           return (
@@ -929,25 +918,21 @@ export default function EmployeePortal({
                 <div className="space-y-1 text-center sm:text-left">
                   <h2 className="text-base sm:text-lg font-black text-slate-800 flex items-center justify-center sm:justify-start gap-1.5">
                     <span>
-                      {language === 'en' 
-                        ? `Welcome back, ${employee.name.split(' ')[0]}!` 
-                        : `सुस्वागतम, ${employee.name.split(' ')[0]}!`}
+                      {`Welcome back, ${employee.name.split(' ')[0]}!`}
                     </span>
                     <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
                   </h2>
                   <p className="text-[11px] sm:text-xs text-slate-500 font-semibold max-w-xl">
-                    {language === 'en' 
-                      ? "Keep track of your monthly attendance logs, apply for roster leaves, download payroll salary certificates, and punch shift times securely."
-                      : "अपनी मासिक उपस्थिति दर्ज करें, छुट्टी के लिए आवेदन करें, सैलरी स्लिप प्राप्त करें और अपने शिफ्ट के समय को आसानी से ट्रैक करें।"}
+                    {"Keep track of your monthly attendance logs, apply for roster leaves, download payroll salary certificates, and punch shift times securely."}
                   </p>
                 </div>
                 <div className="bg-white border border-slate-200/70 shadow-xxs rounded-xl px-4 py-2 text-center shrink-0 min-w-[150px]">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{language === 'en' ? "Today's Status" : "आज की स्थिति"}</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{"Today's Status"}</span>
                   <p className="text-xs font-black font-mono text-slate-800 mt-0.5">
                     {todayRecord ? (
-                      <span className="text-emerald-700 font-extrabold">{language === 'en' ? "Punched In Today" : "आज उपस्थिति दर्ज है"}</span>
+                      <span className="text-emerald-700 font-extrabold">{"Punched In Today"}</span>
                     ) : (
-                      <span className="text-rose-600 font-extrabold">{language === 'en' ? "Pending Punch" : "पंच लंबित है"}</span>
+                      <span className="text-rose-600 font-extrabold">{"Pending Punch"}</span>
                     )}
                   </p>
                 </div>
@@ -964,10 +949,10 @@ export default function EmployeePortal({
                       </div>
                       <div>
                         <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                          {language === 'en' ? "Quick Self Attendance Lock" : "तुरंत स्वयं उपस्थिति लॉक"}
+                          {"Quick Self Attendance Lock"}
                         </h3>
                         <p className="text-[10px] text-slate-400 font-bold">
-                          {language === 'en' ? "GPS Geofencing Active Detection" : "जीपीएस स्थान सत्यापन आधारित सीधा पंच"}
+                          {"GPS Geofencing Active Detection"}
                         </p>
                       </div>
                     </div>
@@ -983,7 +968,7 @@ export default function EmployeePortal({
                         className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 text-[10px] font-extrabold rounded-lg border border-slate-200 flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         <Locate className={`w-3 h-3 ${isDetectingGps ? 'animate-spin' : ''}`} />
-                        <span>{language === 'en' ? "GPS" : "लोकेशन"}</span>
+                        <span>{"GPS"}</span>
                       </button>
                     </div>
                   </div>
@@ -1000,16 +985,14 @@ export default function EmployeePortal({
                       ) : !currentGpsCoords ? (
                         <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center space-y-2.5">
                           <p className="text-[11px] text-slate-500 font-medium">
-                            {language === 'en' 
-                              ? "We need your physical location coordinates to verify you are currently at your branch premises before submitting your attendance."
-                              : "उपस्थिति दर्ज करने से पहले यह सत्यापित करने के लिए कि आप अभी अपनी आवंटित शाखा में हैं, हमें आपकी भौगोलिक स्थिति (GPS) की आवश्यकता है।"}
+                            {"We need your physical location coordinates to verify you are currently at your branch premises before submitting your attendance."}
                           </p>
                           <button
                             type="button"
                             onClick={detectGpsAndVerifyOutlet}
                             className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
                           >
-                            {language === 'en' ? "Detect Location & Unlock Punch" : "लोकेशन प्राप्त कर पंच अनलॉक करें"}
+                            {"Detect Location & Unlock Punch"}
                           </button>
                         </div>
                       ) : (
@@ -1019,14 +1002,12 @@ export default function EmployeePortal({
                               <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                               <div className="text-[11px] text-emerald-800">
                                 <span className="font-bold block">
-                                  {language === 'en' ? "Geofence Verification Successful" : "जियोफेंस स्थान सत्यापित!"}
+                                  {"Geofence Verification Successful"}
                                 </span>
                                 <span className="text-[10px] text-emerald-600 font-medium block mt-0.5">
                                   {checkResult.isBypassed
-                                    ? (language === 'en' ? "GPS checks bypassed by Admin. Location recording enabled." : "जीपीएस चेक एडमिन द्वारा बायपास है। स्थान रिकॉर्ड किया जा रहा है।")
-                                    : (language === 'en'
-                                      ? `You are inside "${checkResult.nearestOutlet?.name || 'Verified branch'}" boundary (${checkResult.distanceMeters.toFixed(1)}m away).`
-                                      : `आप अपनी आवंटित शाखा "${checkResult.nearestOutlet?.name || 'सुरक्षित शाखा'}" के भीतर हैं (दूरी ${checkResult.distanceMeters.toFixed(1)}मी)।`
+                                    ? ("GPS checks bypassed by Admin. Location recording enabled.")
+                                    : (`You are inside "${checkResult.nearestOutlet?.name || 'Verified branch'}" boundary (${checkResult.distanceMeters.toFixed(1)}m away).`
                                     )}
                                 </span>
                               </div>
@@ -1036,12 +1017,10 @@ export default function EmployeePortal({
                               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                               <div className="text-[11px] text-rose-800">
                                 <span className="font-bold block">
-                                  {language === 'en' ? "Geofence Verification Failed!" : "जियोफेंस स्थान सत्यापन विफल!"}
+                                  {"Geofence Verification Failed!"}
                                 </span>
                                 <span className="text-[10px] text-rose-600 font-medium leading-normal block mt-0.5">
-                                  {language === 'en'
-                                    ? `Your assigned branch "${checkResult.nearestOutlet?.name || 'Registered Branch'}" is ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(1) + 'km' : checkResult.distanceMeters.toFixed(0) + 'm'} away (Permitted radius is ${checkResult.requiredRadius}m).`
-                                    : `आपकी आवंटित शाखा "${checkResult.nearestOutlet?.name || 'सुरक्षित शाखा'}" आपसे ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(1) + 'किमी' : checkResult.distanceMeters.toFixed(0) + 'मी'} दूर है (अनुमत सीमा ${checkResult.requiredRadius}मी)।`}
+                                  {`Your assigned branch "${checkResult.nearestOutlet?.name || 'Registered Branch'}" is ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(1) + 'km' : checkResult.distanceMeters.toFixed(0) + 'm'} away (Permitted radius is ${checkResult.requiredRadius}m).`}
                                 </span>
                                 <div className="flex items-center gap-2 mt-2">
                                   <button
@@ -1049,9 +1028,9 @@ export default function EmployeePortal({
                                     onClick={detectGpsAndVerifyOutlet}
                                     className="px-2.5 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-900 text-[10px] font-black rounded border border-rose-200 cursor-pointer"
                                   >
-                                    {language === 'en' ? "Re-Check GPS" : "लोकेशन पुनः जाचें"}
+                                    {"Re-Check GPS"}
                                   </button>
-                                  <span className="text-[9px] text-rose-500 font-bold">{language === 'en' ? "* Please come inside the branch to mark attendance." : "* कृपया उपस्थिति दर्ज करने के लिए परिसर के भीतर आएं।"}</span>
+                                  <span className="text-[9px] text-rose-500 font-bold">{"* Please come inside the branch to mark attendance."}</span>
                                 </div>
                               </div>
                             </div>
@@ -1059,7 +1038,7 @@ export default function EmployeePortal({
                         </div>
                       )}
 
-                      {/* Success / Error Messages */}
+                      {/* SuccessError Messages */}
                       {punchSuccessMsg && (
                         <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px] font-bold">
                           {punchSuccessMsg}
@@ -1078,9 +1057,8 @@ export default function EmployeePortal({
                             type="text"
                             value={punchRemarks}
                             onChange={(e) => setPunchRemarks(e.target.value)}
-                            placeholder={language === 'en' ? "Activity notes / remarks (optional)..." : "कार्य विवरण / रिमार्क्स (वैकल्पिक)..."}
-                            className="w-full border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-slate-50"
-                          />
+                            placeholder={"Activity notesremarks (optional)..."}
+                            className="w-full border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-slate-50" />
                         </div>
                       )}
 
@@ -1090,11 +1068,11 @@ export default function EmployeePortal({
                         {todayRecord && todayRecord.checkIn ? (
                           <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between">
                             <div>
-                              <span className="block text-[9px] font-bold text-slate-400 uppercase">{language === 'en' ? "Punched In At" : "आगमन समय"}</span>
+                              <span className="block text-[9px] font-bold text-slate-400 uppercase">{"Punched In At"}</span>
                               <span className="text-sm font-black font-mono text-emerald-700">{todayRecord.checkIn}</span>
                             </div>
                             <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-250">
-                              {todayRecord.punchInOutlet || (language === 'en' ? "Branch" : "शाखा")}
+                              {todayRecord.punchInOutlet || ("Branch")}
                             </span>
                           </div>
                         ) : (
@@ -1105,7 +1083,7 @@ export default function EmployeePortal({
                             className="py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors border border-emerald-500/20 shadow-sm"
                           >
                             <Check className="w-4 h-4 shrink-0" />
-                            <span>{language === 'en' ? "Punch In (आगमन दर्ज करें)" : "आगमन (Punch In)"}</span>
+                            <span>{"Punch In"}</span>
                           </button>
                         )}
 
@@ -1113,11 +1091,11 @@ export default function EmployeePortal({
                         {todayRecord && todayRecord.checkOut ? (
                           <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between">
                             <div>
-                              <span className="block text-[9px] font-bold text-slate-400 uppercase">{language === 'en' ? "Punched Out At" : "प्रस्थान समय"}</span>
+                              <span className="block text-[9px] font-bold text-slate-400 uppercase">{"Punched Out At"}</span>
                               <span className="text-sm font-black font-mono text-slate-600">{todayRecord.checkOut}</span>
                             </div>
                             <span className="text-[10px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded border border-slate-250">
-                              {todayRecord.punchOutOutlet || (language === 'en' ? "Branch" : "शाखा")}
+                              {todayRecord.punchOutOutlet || ("Branch")}
                             </span>
                           </div>
                         ) : (
@@ -1128,7 +1106,7 @@ export default function EmployeePortal({
                             className="py-3 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-slate-900 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm"
                           >
                             <Locate className="w-4 h-4 shrink-0" />
-                            <span>{language === 'en' ? "Punch Out (प्रस्थान दर्ज करें)" : "प्रस्थान (Punch Out)"}</span>
+                            <span>{"Punch Out"}</span>
                           </button>
                         )}
                       </div>
@@ -1136,55 +1114,51 @@ export default function EmployeePortal({
                   ) : (
                     <div className="p-4 bg-amber-50 border border-amber-150 rounded-xl text-center">
                       <p className="text-xs text-amber-800 font-bold">
-                        {language === 'en'
-                          ? "Mobile GPS attendance is currently disabled by Admin or for your profile."
-                          : "जीपीएस आधारित मोबाइल उपस्थिति व्यवस्था वर्तमान में एडमिन द्वारा आपके लिए बंद है।"}
+                        {"Mobile GPS attendance is currently disabled by Admin or for your profile."}
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* 2. Shift Info / Branch Desk Quick Card */}
+                {/* 2. Shift InfoBranch Desk Quick Card */}
                 <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-md flex flex-col justify-between border border-slate-800 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
                   
                   <div className="space-y-4">
                     <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-                      <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{language === 'en' ? "Shift & Premises info" : "शिफ्ट और परिसर विवरण"}</h4>
+                      <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{"Shift & Premises info"}</h4>
                       <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-black px-2.5 py-0.5 rounded-full border border-indigo-500/30">
-                        {employee.employmentType || (language === 'en' ? "Permanent" : "स्थायी")}
+                        {employee.employmentType || ("Permanent")}
                       </span>
                     </div>
 
                     <div className="space-y-3.5 pt-1">
                       <div>
-                        <span className="block text-[10px] text-slate-400 font-semibold">{language === 'en' ? "Assigned Workstation" : "आवंटित शाखा कार्यालय"}</span>
+                        <span className="block text-[10px] text-slate-400 font-semibold">{"Assigned Workstation"}</span>
                         <span className="text-xs font-extrabold text-slate-100 flex items-center gap-1.5 mt-0.5">
                           <Building className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                          <span>{employee.branch || (language === 'en' ? "Not Assigned" : "आवंटित नहीं")}</span>
+                          <span>{employee.branch || ("Not Assigned")}</span>
                         </span>
                       </div>
                       <div>
-                        <span className="block text-[10px] text-slate-400 font-semibold">{language === 'en' ? "Scheduled Timing" : "ड्यूटी शिफ्ट समय"}</span>
+                        <span className="block text-[10px] text-slate-400 font-semibold">{"Scheduled Timing"}</span>
                         <span className="text-xs font-extrabold text-slate-100 flex items-center gap-1.5 mt-0.5">
                           <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                           <span>{employee.workTiming || "09:00 AM - 06:00 PM"}</span>
                         </span>
                       </div>
                       <div>
-                        <span className="block text-[10px] text-slate-400 font-semibold">{language === 'en' ? "Reporting To" : "रिपोर्टिंग मैनेजर"}</span>
+                        <span className="block text-[10px] text-slate-400 font-semibold">{"Reporting To"}</span>
                         <span className="text-xs font-extrabold text-slate-100 flex items-center gap-1.5 mt-0.5">
                           <User className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                          <span>{employee.reportingTo || "Mr. Rathi (MD / HR)"}</span>
+                          <span>{employee.reportingTo || "Mr. Rathi (MDHR)"}</span>
                         </span>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-5 pt-3 border-t border-slate-800 text-[10px] text-indigo-200/80 font-medium">
-                    {language === 'en'
-                      ? "Contact HR department if workstation branch or roster shift hours require correction."
-                      : "यदि आवंटित शाखा या ड्यूटी समय में सुधार की आवश्यकता है तो कृपया तुरंत HR से संपर्क करें।"}
+                    {"Contact HR department if workstation branch or roster shift hours require correction."}
                   </div>
                 </div>
               </div>
@@ -1197,7 +1171,7 @@ export default function EmployeePortal({
                     <span className="p-1 bg-emerald-50 text-emerald-700 rounded-lg"><Check className="w-3.5 h-3.5" /></span>
                   </div>
                   <p className="text-3xl font-black text-emerald-600 font-mono mt-2">{daysPresent}</p>
-                  <span className="text-[9px] text-slate-400 font-bold mt-1">{language === 'en' ? 'Present this month' : 'इस महीने उपस्थित'}</span>
+                  <span className="text-[9px] text-slate-400 font-bold mt-1">{'Present this month'}</span>
                 </div>
 
                 <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-xs flex flex-col justify-between hover:border-amber-200 transition-colors">
@@ -1206,7 +1180,7 @@ export default function EmployeePortal({
                     <span className="p-1 bg-amber-50 text-amber-600 rounded-lg"><AlertCircle className="w-3.5 h-3.5" /></span>
                   </div>
                   <p className="text-3xl font-black text-amber-500 font-mono mt-2">{daysHalfDay}</p>
-                  <span className="text-[9px] text-slate-400 font-bold mt-1">{language === 'en' ? 'Half-day records' : 'हाफ-डे उपस्थिति'}</span>
+                  <span className="text-[9px] text-slate-400 font-bold mt-1">{'Half-day records'}</span>
                 </div>
 
                 <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-xs flex flex-col justify-between hover:border-indigo-200 transition-colors">
@@ -1215,7 +1189,7 @@ export default function EmployeePortal({
                     <span className="p-1 bg-indigo-50 text-indigo-700 rounded-lg"><TrendingUp className="w-3.5 h-3.5" /></span>
                   </div>
                   <p className="text-3xl font-black text-indigo-600 font-mono mt-2">{overtimeHoursTotal} <span className="text-xs font-bold font-sans">hrs</span></p>
-                  <span className="text-[9px] text-slate-400 font-bold mt-1">{language === 'en' ? 'Overtime approved' : 'मंजूर ओवरटाइम घंटे'}</span>
+                  <span className="text-[9px] text-slate-400 font-bold mt-1">{'Overtime approved'}</span>
                 </div>
 
                 <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-xs flex flex-col justify-between hover:border-rose-200 transition-colors">
@@ -1224,7 +1198,7 @@ export default function EmployeePortal({
                     <span className="p-1 bg-rose-50 text-rose-600 rounded-lg"><AlertCircle className="w-3.5 h-3.5" /></span>
                   </div>
                   <p className="text-3xl font-black text-rose-500 font-mono mt-2">{daysAbsent}</p>
-                  <span className="text-[9px] text-slate-400 font-bold mt-1">{language === 'en' ? 'Unmarked / Absent' : 'अनुपस्थित दिवस'}</span>
+                  <span className="text-[9px] text-slate-400 font-bold mt-1">{'UnmarkedAbsent'}</span>
                 </div>
               </div>
 
@@ -1236,7 +1210,7 @@ export default function EmployeePortal({
                   <div>
                     <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
                       <Sparkles className="w-4 h-4 text-emerald-600" />
-                      <span>{language === 'en' ? "Quick Access Launchpad" : "क्विक एक्सेस लॉन्चपैड"}</span>
+                      <span>{"Quick Access Launchpad"}</span>
                     </h3>
 
                     <div className="grid grid-cols-1 gap-2 pt-3">
@@ -1257,8 +1231,8 @@ export default function EmployeePortal({
                           <Plus className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="block font-black text-slate-800 group-hover:text-emerald-900">{language === 'en' ? "Raise Missed Punch Ticket" : "मिस पंच रिक्वेस्ट दर्ज करें"}</span>
-                          <span className="text-[9px] text-slate-400 group-hover:text-emerald-650 font-bold">{language === 'en' ? "Forgot to punch arrival/departure" : "आगमन या प्रस्थान पंच भूल जाने पर"}</span>
+                          <span className="block font-black text-slate-800 group-hover:text-emerald-900">{"Raise Missed Punch Ticket"}</span>
+                          <span className="text-[9px] text-slate-400 group-hover:text-emerald-650 font-bold">{"Forgot to punch arrival/departure"}</span>
                         </div>
                       </button>
 
@@ -1271,8 +1245,8 @@ export default function EmployeePortal({
                           <CalendarDays className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="block font-black text-slate-800 group-hover:text-blue-900">{language === 'en' ? "Request Casual/Sick Leave" : "छुट्टी (Leave) के लिए आवेदन करें"}</span>
-                          <span className="text-[9px] text-slate-400 group-hover:text-blue-655 font-bold">{language === 'en' ? "Submit leave request to HR/Manager" : "बीमारी या निजी काम की छुट्टी"}</span>
+                          <span className="block font-black text-slate-800 group-hover:text-blue-900">{"Request Casual/Sick Leave"}</span>
+                          <span className="text-[9px] text-slate-400 group-hover:text-blue-655 font-bold">{"Submit leave request to HR/Manager"}</span>
                         </div>
                       </button>
 
@@ -1287,7 +1261,7 @@ export default function EmployeePortal({
                           </div>
                           <div>
                             <span className="block font-black text-slate-800 group-hover:text-indigo-900">
-                              {language === 'en' ? `Get ${latestPayslip.monthYear} Payslip PDF` : `${latestPayslip.monthYear} सैलरी स्लिप डाउनलोड`}
+                              {`Get ${latestPayslip.monthYear} Payslip PDF`}
                             </span>
                             <span className="text-[9px] text-slate-400 group-hover:text-indigo-650 font-bold">
                               ₹{latestPayslip.netSalary !== undefined ? latestPayslip.netSalary.toLocaleString('en-IN') : latestPayslip.totalSalary.toLocaleString('en-IN')} payout • {latestPayslip.paymentStatus}
@@ -1304,8 +1278,8 @@ export default function EmployeePortal({
                             <FileText className="w-4 h-4" />
                           </div>
                           <div>
-                            <span className="block font-black text-slate-400">{language === 'en' ? "Payslips Unavailable" : "सैलरी स्लिप अनुपलब्ध"}</span>
-                            <span className="text-[9px] text-slate-400 font-bold">{language === 'en' ? "No payslips disbursed yet" : "अभी कोई सैलरी स्लिप जारी नहीं हुई"}</span>
+                            <span className="block font-black text-slate-400">{"Payslips Unavailable"}</span>
+                            <span className="text-[9px] text-slate-400 font-bold">{"No payslips disbursed yet"}</span>
                           </div>
                         </button>
                       )}
@@ -1313,9 +1287,7 @@ export default function EmployeePortal({
                   </div>
 
                   <div className="pt-3 border-t border-slate-100 text-[10px] text-slate-400 font-semibold leading-relaxed">
-                    {language === 'en' 
-                      ? "* Your direct clock-ins sync instantly to the cloud database and reflect on administrative panels in real time."
-                      : "* आपका पंच डाटा तुरंत क्लाउड डेटाबेस में सुरक्षित रूप से दर्ज होकर एडमिन को दिखाई देता है।"}
+                    {"* Your direct clock-ins sync instantly to the cloud database and reflect on administrative panels in real time."}
                   </div>
                 </div>
 
@@ -1323,7 +1295,7 @@ export default function EmployeePortal({
                 <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm space-y-4 lg:col-span-2">
                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
                     <Calendar className="w-4 h-4 text-emerald-600" />
-                    <span>{language === 'en' ? "Recent Activity Stream" : "हालिया गतिविधि स्ट्रीम"}</span>
+                    <span>{"Recent Activity Stream"}</span>
                   </h3>
 
                   {recentLogs.length > 0 ? (
@@ -1360,7 +1332,7 @@ export default function EmployeePortal({
                               {/* Exceptions or special warnings */}
                               {isLate && (
                                 <span className="text-[9px] bg-rose-50 text-rose-600 border border-rose-150 px-1.5 py-0.5 rounded font-black uppercase">
-                                  {language === 'en' ? 'Late' : 'देरी'}
+                                  {'Late'}
                                 </span>
                               )}
 
@@ -1392,14 +1364,14 @@ export default function EmployeePortal({
                     <div className="flex items-center gap-2">
                       <CalendarDays className="w-4 h-4 text-emerald-600" />
                       <span className="font-extrabold text-slate-700">
-                        {language === 'en' ? "Leaves & Holidays Overview" : "अवकाश एवं छुट्टियों का संक्षिप्त विवरण"}
+                        {"Leaves & Holidays Overview"}
                       </span>
                     </div>
                     <button
                       onClick={() => setActiveTab('leaves')}
                       className="text-[11px] font-black text-emerald-700 hover:text-emerald-800 cursor-pointer flex items-center gap-0.5"
                     >
-                      <span>{language === 'en' ? "Open Roster" : "कैलेंडर खोलें"}</span>
+                      <span>{"Open Roster"}</span>
                       <span>&rarr;</span>
                     </button>
                   </div>
@@ -1420,12 +1392,12 @@ export default function EmployeePortal({
               {/* Left & Middle Column: Punch Form & Live Verification */}
               <div className="lg:col-span-2 space-y-6">
                 
-                {/* Geofence Status Header / Alert Card */}
+                {/* Geofence Status HeaderAlert Card */}
                 <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm space-y-4">
                   {employee.branch && (
                     <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs font-sans">
                       <span className="font-bold text-slate-600">
-                        {language === 'en' ? "Your Assigned Branch:" : "आपकी आवंटित शाखा:"}
+                        {"Your Assigned Branch:"}
                       </span>
                       <span className="bg-[#03623c] text-white font-black px-2.5 py-1 rounded-lg text-[11px]">
                         {employee.branch}
@@ -1440,10 +1412,10 @@ export default function EmployeePortal({
                       </div>
                       <div>
                         <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                          {language === 'en' ? "Secure Mobile Attendance Lock" : "सुरक्षित मोबाइल उपस्थिति लॉक"}
+                          {"Secure Mobile Attendance Lock"}
                         </h2>
                         <p className="text-[10px] text-slate-400 font-bold">
-                          {language === 'en' ? "GPS Geofencing Active Verification" : "जीपीएस जियोफेंसिंग सक्रिय स्थान सत्यापन"}
+                          {"GPS Geofencing Active Verification"}
                         </p>
                       </div>
                     </div>
@@ -1455,7 +1427,7 @@ export default function EmployeePortal({
                       className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 text-xs font-extrabold rounded-xl border border-emerald-200/50 flex items-center justify-center gap-1.5 cursor-pointer transition-all shrink-0"
                     >
                       <Locate className={`w-3.5 h-3.5 ${isDetectingGps ? 'animate-spin' : ''}`} />
-                      <span>{isDetectingGps ? (language === 'en' ? "Verifying..." : "सत्यापित कर रहा है...") : (language === 'en' ? "Refresh GPS" : "जीपीएस रिफ्रेश करें")}</span>
+                      <span>{isDetectingGps ? ("Verifying...") : ("Refresh GPS")}</span>
                     </button>
                   </div>
 
@@ -1465,7 +1437,7 @@ export default function EmployeePortal({
                       <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                       <div className="space-y-1">
                         <span className="block text-xs font-black text-rose-900">
-                          {language === 'en' ? "GPS Location Unavailable" : "जीपीएस लोकेशन अनुपलब्ध"}
+                          {"GPS Location Unavailable"}
                         </span>
                         <p className="text-[10px] text-rose-700 font-medium leading-relaxed">{gpsError}</p>
                       </div>
@@ -1477,12 +1449,10 @@ export default function EmployeePortal({
                       </div>
                       <div className="max-w-md mx-auto space-y-1">
                         <span className="block text-xs font-extrabold text-slate-800">
-                          {language === 'en' ? "Location Permission Required" : "स्थान का पता लगाने की आवश्यकता है"}
+                          {"Location Permission Required"}
                         </span>
                         <p className="text-[10px] text-slate-400 font-medium">
-                          {language === 'en' 
-                            ? "We need your physical location coordinates to verify you are currently at your branch premises before submitting your attendance."
-                            : "उपस्थिति दर्ज करने से पहले यह सत्यापित करने के लिए कि आप अभी अपनी आवंटित शाखा में हैं, हमें आपकी भौगोलिक स्थिति (GPS) की आवश्यकता है।"}
+                          {"We need your physical location coordinates to verify you are currently at your branch premises before submitting your attendance."}
                         </p>
                       </div>
                       <button
@@ -1490,7 +1460,7 @@ export default function EmployeePortal({
                         onClick={detectGpsAndVerifyOutlet}
                         className="mt-1 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer transition-colors"
                       >
-                        {language === 'en' ? "Verify My Location Now" : "लोकेशन सत्यापित करें"}
+                        {"Verify My Location Now"}
                       </button>
                     </div>
                   ) : (
@@ -1503,7 +1473,7 @@ export default function EmployeePortal({
                         <span className="ml-auto text-slate-400 bg-white border border-slate-200 px-1.5 rounded text-[9px] uppercase tracking-wide">Verified Coords</span>
                       </div>
 
-                      {/* Distance / Outlet Match status card */}
+                      {/* DistanceOutlet Match status card */}
                       {checkResult.isAllowed ? (
                         <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-3">
                           <div className="p-1.5 bg-emerald-500 rounded-lg text-white mt-0.5 shrink-0">
@@ -1511,21 +1481,15 @@ export default function EmployeePortal({
                           </div>
                           <div className="space-y-1">
                             <span className="block text-xs font-black text-emerald-900">
-                              {language === 'en' ? "Geofence Verification Successful" : "स्थान सत्यापन सफल - आप सुरक्षित क्षेत्र में हैं"}
+                              {"Geofence Verification Successful"}
                             </span>
                             <p className="text-[10px] text-emerald-700 font-semibold leading-relaxed">
                               {checkResult.isBypassed ? (
-                                language === 'en'
-                                  ? "Geofencing restrictions are bypassed for you by Administrator permission. Location logging remains active."
-                                  : "जियोफेंसिंग प्रतिबंध आपके लिए एडमिन अनुमति द्वारा बायपास कर दिए गए हैं। स्थान लॉगिंग सक्रिय है।"
+                                "Geofencing restrictions are bypassed for you by Administrator permission. Location logging remains active."
                               ) : adminSettings.enableGeofencing ? (
-                                language === 'en'
-                                  ? `You are within the authorized boundaries of branch: "${checkResult.nearestOutlet?.name || 'Verified branch'}". Current distance is ${checkResult.distanceMeters.toFixed(1)} meters (Allowed: ${checkResult.requiredRadius}m).`
-                                  : `आप अधिकृत शाखा के सुरक्षित दायरे में हैं: "${checkResult.nearestOutlet?.name || 'सुरक्षित शाखा'}"। आपकी दूरी ${checkResult.distanceMeters.toFixed(1)} मीटर है (अनुमत: ${checkResult.requiredRadius}मी)।`
+                                `You are within the authorized boundaries of branch: "${checkResult.nearestOutlet?.name || 'Verified branch'}". Current distance is ${checkResult.distanceMeters.toFixed(1)} meters (Allowed: ${checkResult.requiredRadius}m).`
                               ) : (
-                                language === 'en'
-                                  ? "Geofencing restrictions are currently disabled by Admin settings. Location logging remains active."
-                                  : "जीपीएस प्रतिबंध वर्तमान में एडमिन द्वारा निष्क्रिय हैं। स्थान का रिकॉर्ड दर्ज किया जाएगा।"
+                                "Geofencing restrictions are currently disabled by Admin settings. Location logging remains active."
                               )}
                             </p>
                           </div>
@@ -1537,15 +1501,13 @@ export default function EmployeePortal({
                           </div>
                           <div className="space-y-1">
                             <span className="block text-xs font-black text-rose-900">
-                              {language === 'en' ? "Geofence Access Denied!" : "स्थान सत्यापन विफल - आप सुरक्षित क्षेत्र से बाहर हैं"}
+                              {"Geofence Access Denied!"}
                             </span>
                             <p className="text-[10px] text-rose-700 font-bold leading-relaxed">
-                              {language === 'en'
-                                ? `Your current position is outside the branch geofence boundary. Your assigned branch geofence: "${checkResult.nearestOutlet?.name || 'Registered Branch'}" is ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(2) + ' km' : checkResult.distanceMeters.toFixed(1) + ' meters'} away. (Your permitted radius is ${checkResult.requiredRadius}m).`
-                                : `आपकी वर्तमान स्थिति आवंटित सुरक्षित शाखा के दायरे से बाहर है। आपकी आवंटित शाखा: "${checkResult.nearestOutlet?.name || 'मुख्य शाखा'}" आपसे ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(2) + ' किमी' : checkResult.distanceMeters.toFixed(1) + ' मीटर'} दूर है। (अनुमत सीमा ${checkResult.requiredRadius}मी है)।`}
+                              {`Your current position is outside the branch geofence boundary. Your assigned branch geofence: "${checkResult.nearestOutlet?.name || 'Registered Branch'}" is ${checkResult.distanceMeters > 1000 ? (checkResult.distanceMeters/1000).toFixed(2) + ' km' : checkResult.distanceMeters.toFixed(1) + ' meters'} away. (Your permitted radius is ${checkResult.requiredRadius}m).`}
                             </p>
                             <span className="block text-[9px] font-black uppercase text-rose-800 mt-1">
-                              {language === 'en' ? "Please come inside your assigned branch premises to mark your attendance." : "कृपया उपस्थिति दर्ज करने के लिए अपनी आवंटित शाखा कार्यालय परिसर के भीतर आएं।"}
+                              {"Please come inside your assigned branch premises to mark your attendance."}
                             </span>
                           </div>
                         </div>
@@ -1559,9 +1521,9 @@ export default function EmployeePortal({
                   
                   {/* Visual Digital Clock */}
                   <div className="text-center space-y-1 bg-slate-50 border border-slate-100 rounded-2xl px-8 py-5 shadow-xs max-w-sm w-full">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'en' ? "Live System Time (IST)" : "लाइव डिजिटल क्लॉक"}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{"Live System Time (IST)"}</span>
                     <h3 className="text-3xl font-black text-slate-800 font-mono tracking-tight">{currentTime}</h3>
-                    <p className="text-[11px] text-slate-500 font-extrabold">{new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'hi-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <p className="text-[11px] text-slate-500 font-extrabold">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                   </div>
 
                   {/* Feedback alerts */}
@@ -1583,15 +1545,14 @@ export default function EmployeePortal({
                   {(!todayRecord || !todayRecord.checkOut) && (
                     <div className="w-full max-w-md">
                       <label className="block text-xs font-bold text-slate-600 mb-1">
-                        {language === 'en' ? "Punch Remarks / Activity (Optional)" : "पंच रिमार्क्स / कार्य विवरण (वैकल्पिक)"}
+                        {"Punch RemarksActivity (Optional)"}
                       </label>
                       <input 
                         type="text"
                         value={punchRemarks}
                         onChange={(e) => setPunchRemarks(e.target.value)}
-                        placeholder={language === 'en' ? "e.g., Arrived for Morning Shift..." : "जैसे, रायपुर ऑफिस आगमन..."}
-                        className="w-full border border-slate-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-slate-50/50"
-                      />
+                        placeholder={"e.g., Arrived for Morning Shift..."}
+                        className="w-full border border-slate-200 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-slate-50/50" />
                     </div>
                   )}
 
@@ -1600,9 +1561,9 @@ export default function EmployeePortal({
                     {/* Punch In */}
                     {todayRecord && todayRecord.checkIn ? (
                       <div className="p-4 bg-emerald-50 border border-emerald-150 rounded-2xl flex flex-col items-center justify-center text-center space-y-1">
-                        <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">{language === 'en' ? "Punched In Today" : "आगमन दर्ज है!"}</span>
+                        <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">{"Punched In Today"}</span>
                         <span className="text-lg font-black font-mono text-emerald-700">{todayRecord.checkIn}</span>
-                        <span className="text-[9px] text-emerald-500 font-bold">{todayRecord.punchInOutlet || employee.branch || (language === 'en' ? "Branch" : "शाखा")}</span>
+                        <span className="text-[9px] text-emerald-500 font-bold">{todayRecord.punchInOutlet || employee.branch || ("Branch")}</span>
                       </div>
                     ) : (
                       <button
@@ -1611,17 +1572,17 @@ export default function EmployeePortal({
                         disabled={isSubmittingPunch || !currentGpsCoords || !checkResult.isAllowed}
                         className="py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:hover:bg-emerald-600 text-white font-black text-sm rounded-2xl shadow-sm flex flex-col items-center justify-center gap-1 cursor-pointer transition-all border border-emerald-500/25"
                       >
-                        <span className="uppercase text-[10px] tracking-widest leading-none text-emerald-100 font-extrabold">{language === 'en' ? "Register Punch" : "शाखा आगमन"}</span>
-                        <span>{language === 'en' ? "PUNCH IN (आगमन)" : "आगमन (Punch In)"}</span>
+                        <span className="uppercase text-[10px] tracking-widest leading-none text-emerald-100 font-extrabold">{"Register Punch"}</span>
+                        <span>{"PUNCH IN"}</span>
                       </button>
                     )}
 
                     {/* Punch Out */}
                     {todayRecord && todayRecord.checkOut ? (
                       <div className="p-4 bg-slate-100 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center space-y-1">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{language === 'en' ? "Punched Out Today" : "प्रस्थान दर्ज है!"}</span>
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{"Punched Out Today"}</span>
                         <span className="text-lg font-black font-mono text-slate-600">{todayRecord.checkOut}</span>
-                        <span className="text-[9px] text-slate-400 font-bold">{todayRecord.punchOutOutlet || employee.branch || (language === 'en' ? "Branch" : "शाखा")}</span>
+                        <span className="text-[9px] text-slate-400 font-bold">{todayRecord.punchOutOutlet || employee.branch || ("Branch")}</span>
                       </div>
                     ) : (
                       <button
@@ -1630,17 +1591,15 @@ export default function EmployeePortal({
                         disabled={isSubmittingPunch || !currentGpsCoords || !checkResult.isAllowed || !todayRecord || !todayRecord.checkIn}
                         className="py-4 px-6 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-slate-900 text-white font-black text-sm rounded-2xl shadow-sm flex flex-col items-center justify-center gap-1 cursor-pointer transition-all"
                       >
-                        <span className="uppercase text-[10px] tracking-widest leading-none text-slate-400 font-extrabold">{language === 'en' ? "Register Departure" : "शाखा प्रस्थान"}</span>
-                        <span>{language === 'en' ? "PUNCH OUT (प्रस्थान)" : "प्रस्थान (Punch Out)"}</span>
+                        <span className="uppercase text-[10px] tracking-widest leading-none text-slate-400 font-extrabold">{"Register Departure"}</span>
+                        <span>{"PUNCH OUT"}</span>
                       </button>
                     )}
                   </div>
 
                   {/* Simple Help Line */}
                   <span className="text-[9px] font-semibold text-slate-400 max-w-sm text-center">
-                    {language === 'en'
-                      ? "* Standard shift work timings and overtime rates are automatically calculated upon punch checkout."
-                      : "* आपके कार्य घंटों और ओवरटाइम भत्तों की गणना कंपनी नियमों के अनुसार प्रस्थान दर्ज करने पर की जाती है।"}
+                    {"* Standard shift work timings and overtime rates are automatically calculated upon punch checkout."}
                   </span>
                 </div>
               </div>
@@ -1652,14 +1611,12 @@ export default function EmployeePortal({
                 <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm space-y-4">
                   <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
                     <Building className="w-4 h-4 text-emerald-600" />
-                    <span>{language === 'en' ? "Authorized Branch Zones" : "अधिकृत सुरक्षित शाखाएं"}</span>
+                    <span>{"Authorized Branch Zones"}</span>
                   </h4>
 
                   {(!adminSettings.geofenceOutlets || adminSettings.geofenceOutlets.length === 0) ? (
                     <p className="text-[10px] text-slate-400 font-medium">
-                      {language === 'en' 
-                        ? "No geofenced branches configured. You can punch attendance from any location." 
-                        : "कोई जियोफेंस शाखा कॉन्फ़िगर नहीं है। आप किसी भी स्थान से अपनी उपस्थिति दर्ज कर सकते हैं।"}
+                      {"No geofenced branches configured. You can punch attendance from any location."}
                     </p>
                   ) : (
                     <div className="space-y-3">
@@ -1670,7 +1627,7 @@ export default function EmployeePortal({
                             <span className="text-[9px] text-slate-400 font-mono font-bold block">Lat: {outlet.latitude.toFixed(4)}, Lng: {outlet.longitude.toFixed(4)}</span>
                           </div>
                           <span className="bg-emerald-50 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-150 shrink-0">
-                            {outlet.radiusMeters}m {language === 'en' ? "Lock" : "लॉक"}
+                            {outlet.radiusMeters}m {"Lock"}
                           </span>
                         </div>
                       ))}
@@ -1682,27 +1639,21 @@ export default function EmployeePortal({
                 <div className="bg-gradient-to-tr from-slate-900 to-slate-950 text-white p-5 rounded-2xl shadow-md space-y-4">
                   <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4" />
-                    <span>{language === 'en' ? "Geofence Guidelines" : "सुरक्षित उपस्थिति नियम"}</span>
+                    <span>{"Geofence Guidelines"}</span>
                   </h4>
 
                   <div className="space-y-3 text-[10px] text-slate-300 font-medium leading-relaxed">
                     <div className="flex gap-2">
                       <span className="text-emerald-400 font-bold">1.</span>
-                      <p>{language === 'en' 
-                        ? "Ensure GPS location/Wifi is enabled on your phone before clicking Punch In/Out." 
-                        : "पंच करने से पहले अपने फोन का जीपीएस लोकेशन और इंटरनेट वाई-फाई अवश्य चालू रखें।"}</p>
+                      <p>{"Ensure GPS location/Wifi is enabled on your phone before clicking Punch In/Out."}</p>
                     </div>
                     <div className="flex gap-2">
                       <span className="text-emerald-400 font-bold">2.</span>
-                      <p>{language === 'en'
-                        ? "You must be physically present inside your branch's geofenced boundary (e.g. within 100 meters)."
-                        : "उपस्थिति दर्ज करने के लिए आपका शारीरिक रूप से अपनी आवंटित शाखा कार्यालय परिसर के भीतर होना अनिवार्य है।"}</p>
+                      <p>{"You must be physically present inside your branch's geofenced boundary (e.g. within 100 meters)."}</p>
                     </div>
                     <div className="flex gap-2">
                       <span className="text-emerald-400 font-bold">3.</span>
-                      <p>{language === 'en'
-                        ? "Attempts to spoof coordinates, use location fake software, or punch out of bounds are blocked automatically and flagged in security audits."
-                        : "गलत लोकेशन का उपयोग करने या फर्जी जीपीएस सॉफ्टवेयर का उपयोग करने पर उपस्थिति स्वतः ही निरस्त हो जाएगी।"}</p>
+                      <p>{"Attempts to spoof coordinates, use location fake software, or punch out of bounds are blocked automatically and flagged in security audits."}</p>
                     </div>
                   </div>
                 </div>
@@ -1822,7 +1773,7 @@ export default function EmployeePortal({
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
                     <span className="text-slate-500 font-bold">{t.hourlyRate}</span>
-                    <span className="font-mono text-slate-800 font-bold">₹{employee.hourlyRate || 150}/hr</span>
+                    <span className="font-mono text-slate-800 font-bold">₹{employee.hourlyRate || 150} /hr</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5">
                     <span className="text-slate-500 font-bold">{t.paymentMethod}</span>
@@ -2006,7 +1957,7 @@ export default function EmployeePortal({
                                   {isLate && (
                                     <span className="text-[9px] text-rose-500 font-extrabold flex items-center gap-0.5 mt-0.5">
                                       <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></span>
-                                      <span>{language === 'en' ? 'Late' : 'देरी'}</span>
+                                      <span>{'Late'}</span>
                                     </span>
                                   )}
                                 </div>
@@ -2017,7 +1968,7 @@ export default function EmployeePortal({
                                   {isEarly && (
                                     <span className="text-[9px] text-amber-500 font-extrabold flex items-center gap-0.5 mt-0.5">
                                       <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>
-                                      <span>{language === 'en' ? 'Early' : 'जल्दी'}</span>
+                                      <span>{'Early'}</span>
                                     </span>
                                   )}
                                 </div>
@@ -2063,7 +2014,7 @@ export default function EmployeePortal({
                                 <span>{rec.checkIn || '--:--'}</span>
                                 {isLate && (
                                   <span className="text-[9px] bg-rose-50 text-rose-500 border border-rose-100 px-1 py-0.2 rounded font-extrabold">
-                                    {language === 'en' ? 'Late' : 'देरी'}
+                                    {'Late'}
                                   </span>
                                 )}
                               </div>
@@ -2074,7 +2025,7 @@ export default function EmployeePortal({
                                 <span>{rec.checkOut || '--:--'}</span>
                                 {isEarly && (
                                   <span className="text-[9px] bg-amber-50 text-amber-500 border border-amber-100 px-1 py-0.2 rounded font-extrabold">
-                                    {language === 'en' ? 'Early' : 'जल्दी'}
+                                    {'Early'}
                                   </span>
                                 )}
                               </div>
@@ -2218,7 +2169,7 @@ export default function EmployeePortal({
           </div>
         )}
 
-        {/* EXCEPTIONS (MISS PUNCH / HALF DAY) TAB */}
+        {/* EXCEPTIONS (MISS PUNCHHALF DAY) TAB */}
         {activeTab === 'exceptions' && (
           <div className="space-y-4">
             <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2242,7 +2193,7 @@ export default function EmployeePortal({
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer transition-all self-start md:self-auto shadow-md"
               >
                 <Plus className="w-4 h-4 shrink-0" />
-                <span>{language === 'en' ? 'Raise Missed Punch Ticket' : 'मिस पंच टिकट दर्ज करें'}</span>
+                <span>{'Raise Missed Punch Ticket'}</span>
               </button>
             </div>
 
@@ -2253,7 +2204,7 @@ export default function EmployeePortal({
                   <div className="flex justify-between items-center pb-2 border-b border-slate-100">
                     <h3 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-emerald-600 animate-pulse" />
-                      <span>{language === 'en' ? 'Raise Missed Punch' : 'मिस पंच अनुरोध'}</span>
+                      <span>{'Raise Missed Punch'}</span>
                     </h3>
                     <button
                       onClick={() => setShowRaiseModal(false)}
@@ -2277,56 +2228,52 @@ export default function EmployeePortal({
 
                     <div className="space-y-1">
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        {language === 'en' ? 'Date of Missed Punch' : 'मिस पंच की तिथि'}
+                        {'Date of Missed Punch'}
                       </label>
                       <input
                         type="date"
                         required
                         value={raiseDate}
                         onChange={(e) => setRaiseDate(e.target.value)}
-                        className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-xs text-slate-700"
-                      />
+                        className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-xs text-slate-700" />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          {language === 'en' ? 'Check-In Time' : 'आगमन समय (In)'}
+                          {'Check-In Time'}
                         </label>
                         <input
                           type="time"
                           required
                           value={raiseCheckIn}
                           onChange={(e) => setRaiseCheckIn(e.target.value)}
-                          className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-xs text-slate-700"
-                        />
+                          className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-xs text-slate-700" />
                       </div>
                       <div className="space-y-1">
                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          {language === 'en' ? 'Check-Out Time' : 'प्रस्थान समय (Out)'}
+                          {'Check-Out Time'}
                         </label>
                         <input
                           type="time"
                           required
                           value={raiseCheckOut}
                           onChange={(e) => setRaiseCheckOut(e.target.value)}
-                          className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-xs text-slate-700"
-                        />
+                          className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-xs text-slate-700" />
                       </div>
                     </div>
 
                     <div className="space-y-1">
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        {language === 'en' ? 'Reason / Explanation' : 'मिस पंच का कारण'}
+                        {'ReasonExplanation'}
                       </label>
                       <textarea
                         required
                         rows={3}
                         value={raiseRemarks}
                         onChange={(e) => setRaiseRemarks(e.target.value)}
-                        placeholder={language === 'en' ? 'e.g. Card forgotten, Biometric reader error' : 'उदा. आरएफआईडी कार्ड भूल गए, मशीन खराब थी'}
-                        className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none text-xs text-slate-700"
-                      />
+                        placeholder={'e.g. Card forgotten, Biometric reader error'}
+                        className="w-full border border-slate-200 px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none text-xs text-slate-700" />
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
@@ -2335,14 +2282,14 @@ export default function EmployeePortal({
                         onClick={() => setShowRaiseModal(false)}
                         className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg cursor-pointer transition-all"
                       >
-                        {language === 'en' ? 'Cancel' : 'रद्द करें'}
+                        {'Cancel'}
                       </button>
                       <button
                         type="submit"
                         disabled={isSubmittingTicket}
                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5"
                       >
-                        {isSubmittingTicket ? (language === 'en' ? 'Submitting...' : 'भेजा जा रहा है...') : (language === 'en' ? 'Submit Ticket' : 'टिकट भेजें')}
+                        {isSubmittingTicket ? ('Submitting...') : ('Submit Ticket')}
                       </button>
                     </div>
                   </form>
@@ -2360,7 +2307,7 @@ export default function EmployeePortal({
                         <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                           <th className="py-4 px-6">{t.date}</th>
                           <th className="py-4 px-6">{t.exceptionType}</th>
-                          <th className="py-4 px-6">{t.checkIn} / {t.checkOut}</th>
+                          <th className="py-4 px-6">{t.checkIn}{t.checkOut}</th>
                           <th className="py-4 px-6 text-center">{t.approvalStatus}</th>
                           <th className="py-4 px-6">{t.adminRemarks}</th>
                         </tr>
@@ -2493,8 +2440,7 @@ export default function EmployeePortal({
               employeeId={employee.id}
               leaveRequests={leaveRequests}
               onAddLeaveRequest={onAddLeaveRequest}
-              adminSettings={adminSettings}
-            />
+              adminSettings={adminSettings} />
           </div>
         )}
 
@@ -2505,8 +2451,7 @@ export default function EmployeePortal({
             attendanceRecords={attendanceRecords}
             adminSettings={adminSettings}
             language={language}
-            currentEmployee={employee}
-          />
+            currentEmployee={employee} />
         )}
 
       </div>
@@ -2757,7 +2702,7 @@ export default function EmployeePortal({
           }`}
         >
           <Sparkles className="w-5 h-5 shrink-0" />
-          <span className="text-[9px] tracking-tight">{language === 'en' ? 'Home' : 'मुख्य'}</span>
+          <span className="text-[9px] tracking-tight">{'Home'}</span>
         </button>
 
         {adminSettings.enableMobileAttendance !== false && employee.enableMobileAttendance !== false ? (
@@ -2772,7 +2717,7 @@ export default function EmployeePortal({
             }`}
           >
             <Locate className="w-5 h-5 shrink-0" />
-            <span className="text-[9px] tracking-tight">{language === 'en' ? 'Punch' : 'पंच'}</span>
+            <span className="text-[9px] tracking-tight">{'Punch'}</span>
           </button>
         ) : (
           <button
@@ -2785,7 +2730,7 @@ export default function EmployeePortal({
             }`}
           >
             <Calendar className="w-5 h-5 shrink-0" />
-            <span className="text-[9px] tracking-tight">{language === 'en' ? 'Logs' : 'लॉग्स'}</span>
+            <span className="text-[9px] tracking-tight">{'Logs'}</span>
           </button>
         )}
 
@@ -2799,7 +2744,7 @@ export default function EmployeePortal({
           }`}
         >
           <CalendarDays className="w-5 h-5 shrink-0" />
-          <span className="text-[9px] tracking-tight">{language === 'en' ? 'Calendar' : 'कैलेंडर'}</span>
+          <span className="text-[9px] tracking-tight">{'Calendar'}</span>
         </button>
 
         <button
@@ -2812,7 +2757,7 @@ export default function EmployeePortal({
           }`}
         >
           <Check className="w-5 h-5 shrink-0" />
-          <span className="text-[9px] tracking-tight">{language === 'en' ? 'Leaves' : 'अवकाश'}</span>
+          <span className="text-[9px] tracking-tight">{'Leaves'}</span>
         </button>
 
         <button
@@ -2824,7 +2769,7 @@ export default function EmployeePortal({
           }`}
         >
           <Briefcase className="w-5 h-5 shrink-0" />
-          <span className="text-[9px] tracking-tight">{language === 'en' ? 'More' : 'अधिक'}</span>
+          <span className="text-[9px] tracking-tight">{'More'}</span>
         </button>
       </div>
 
@@ -2843,7 +2788,7 @@ export default function EmployeePortal({
             {/* Sheet Title */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
-                {language === 'en' ? "Workspace Shortcuts" : "कार्यक्षेत्र शॉर्टकट"}
+                {"Workspace Shortcuts"}
               </h3>
               <button 
                 onClick={() => setShowMoreSheet(false)}

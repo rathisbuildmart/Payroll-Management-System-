@@ -12,7 +12,7 @@ interface MonthlyCalendarReportProps {
   attendanceRecords: Attendance[];
   adminSettings: AdminSettings;
   language: 'en' | 'hi';
-  currentEmployee?: Employee; // Required if !isAdmin
+  currentEmployee?: Employee; //Required if !isAdmin
 }
 
 export default function MonthlyCalendarReport({
@@ -23,16 +23,16 @@ export default function MonthlyCalendarReport({
   language,
   currentEmployee
 }: MonthlyCalendarReportProps) {
-  // Determine who we are viewing
+  //Determine who we are viewing
   const initialEmpId = isAdmin 
     ? (employeeList.length > 0 ? employeeList[0].id : '')
     : (currentEmployee?.id || '');
 
   const [selectedEmpId, setSelectedEmpId] = useState<string>(initialEmpId);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1); // 1-12
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1); //1-12
 
-  // Multi-language translation dictionary
+  //Multi-language translation dictionary
   const t = {
     en: {
       title: "Monthly Attendance Calendar",
@@ -49,11 +49,11 @@ export default function MonthlyCalendarReport({
       statsLate: "Late In",
       statsEarly: "Early Out",
       legendTitle: "Color Codes & Indicators",
-      legendPresent: "Present (In / Out times)",
+      legendPresent: "Present (InOut times)",
       legendAbsent: "Absent",
       legendHalfDay: "Half Day worked",
-      legendLeave: "Approved Leave / Holiday",
-      legendMissPunch: "Missed Punch (Forgot Out / In)",
+      legendLeave: "Approved LeaveHoliday",
+      legendMissPunch: "Missed Punch (Forgot OutIn)",
       legendLate: "Late Arrival (Grace Exceeded)",
       legendEarly: "Early Leaving",
       notSpecified: "No employee selected",
@@ -62,70 +62,70 @@ export default function MonthlyCalendarReport({
       calendarHeader: "Shift Ledger Grid"
     },
     hi: {
-      title: "मासिक उपस्थिति कैलेंडर",
-      subtitle: "दैनिक लॉग स्थिति, समय और विसंगतियों को दर्शाने वाला विस्तृत कैलेंडर दृश्य।",
-      selectEmployee: "रिपोर्ट देखने के लिए कर्मचारी चुनें",
-      selectMonth: "महीना",
-      selectYear: "वर्ष",
-      statsSummary: "मासिक मुख्य सांख्यिकी",
-      statsPresent: "उपस्थित दिन",
-      statsAbsent: "अनुपस्थित दिन",
-      statsHalfDay: "हाफ डे",
-      statsLeave: "सवैतनिक अवकाश",
-      statsMissPunch: "मिस पंच",
-      statsLate: "देरी से आगमन",
-      statsEarly: "जल्दी प्रस्थान",
-      legendTitle: "कलर कोड और संकेतक",
-      legendPresent: "उपस्थित (आगमन / प्रस्थान समय)",
-      legendAbsent: "अनुपस्थित",
-      legendHalfDay: "आधा दिन काम किया",
-      legendLeave: "स्वीकृत अवकाश / छुट्टी",
-      legendMissPunch: "मिस पंच (चेक-आउट भूल गए)",
-      legendLate: "देरी से आगमन (अनुमति सीमा पार)",
-      legendEarly: "जल्दी प्रस्थान",
-      notSpecified: "कोई कर्मचारी नहीं चुना गया",
-      allCaughtUp: "सब ठीक है! सभी दैनिक विवरण सुचारू रूप से संकलित हैं।",
-      noRecords: "इस महीने के लिए कोई लॉग दर्ज नहीं किया गया है।",
-      calendarHeader: "शिफ्ट लेजर ग्रिड"
+      title: "Monthly Attendance Calendar",
+      subtitle: "Detailed calendar view showing daily log statuses, timings, and exceptions.",
+      selectEmployee: "Select Employee to View Report",
+      selectMonth: "Month",
+      selectYear: "Year",
+      statsSummary: "Monthly Highlights",
+      statsPresent: "Present",
+      statsAbsent: "Absent",
+      statsHalfDay: "Half Day",
+      statsLeave: "Paid Leaves",
+      statsMissPunch: "Miss Punch",
+      statsLate: "Late In",
+      statsEarly: "Early Out",
+      legendTitle: "Color Codes & Indicators",
+      legendPresent: "Present (InOut times)",
+      legendAbsent: "Absent",
+      legendHalfDay: "Half Day worked",
+      legendLeave: "Approved LeaveHoliday",
+      legendMissPunch: "Missed Punch (Forgot OutIn)",
+      legendLate: "Late Arrival (Grace Exceeded)",
+      legendEarly: "Early Leaving",
+      notSpecified: "No employee selected",
+      allCaughtUp: "Looks good! All daily states compiled cleanly.",
+      noRecords: "No logs registered for this month yet.",
+      calendarHeader: "Shift Ledger Grid"
     }
   }[language];
 
-  // Helper arrays
+  //Helper arrays
   const YEARS = [2025, 2026, 2027, 2028];
   const MONTHS = [
-    { name: 'January', hindi: 'जनवरी', value: 1 },
-    { name: 'February', hindi: 'फरवरी', value: 2 },
-    { name: 'March', hindi: 'मार्च', value: 3 },
-    { name: 'April', hindi: 'अप्रैल', value: 4 },
-    { name: 'May', hindi: 'मई', value: 5 },
-    { name: 'June', hindi: 'जून', value: 6 },
-    { name: 'July', hindi: 'जुलाई', value: 7 },
-    { name: 'August', hindi: 'अगस्त', value: 8 },
-    { name: 'September', hindi: 'सितंबर', value: 9 },
-    { name: 'October', hindi: 'अक्टूबर', value: 10 },
-    { name: 'November', hindi: 'नवंबर', value: 11 },
-    { name: 'December', hindi: 'दिसंबर', value: 12 },
+    { name: 'January', hindi: "", value: 1 },
+    { name: 'February', hindi: "", value: 2 },
+    { name: 'March', hindi: "", value: 3 },
+    { name: 'April', hindi: "", value: 4 },
+    { name: 'May', hindi: "", value: 5 },
+    { name: 'June', hindi: "", value: 6 },
+    { name: 'July', hindi: "", value: 7 },
+    { name: 'August', hindi: "", value: 8 },
+    { name: 'September', hindi: "", value: 9 },
+    { name: 'October', hindi: "", value: 10 },
+    { name: 'November', hindi: "", value: 11 },
+    { name: 'December', hindi: "", value: 12 },
   ];
 
   const WEEKDAYS = language === 'en' 
     ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    : ['रवि', 'सोम', 'मंगल', 'बुध', 'गुरु', 'शुक्र', 'शनि'];
+    : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  // Find currently selected employee
+  //Find currently selected employee
   const selectedEmployee = isAdmin 
     ? employeeList.find(e => e.id === selectedEmpId)
     : currentEmployee;
 
-  // Format monthYear string (e.g. "2026-07")
+  //Format monthYear string (e.g. "2026-07")
   const formattedPeriod = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
-  // Filter attendance records for current employee & month
+  //Filter attendance records for current employee & month
   const monthlyLogs = attendanceRecords.filter(r => 
     r.employeeId === selectedEmployee?.id && 
     r.date.startsWith(formattedPeriod)
   );
 
-  // Stats Counters
+  //Stats Counters
   const countPresent = monthlyLogs.filter(r => r.status === 'Present' || (r.status === 'Miss Punch' && r.approvalStatus === 'Approved')).length;
   const countAbsent = monthlyLogs.filter(r => r.status === 'Absent').length;
   const countHalfDay = monthlyLogs.filter(r => r.status === 'Half Day').length;
@@ -140,17 +140,17 @@ export default function MonthlyCalendarReport({
     isAttendanceEarlyGoing(r, selectedEmployee?.workTiming, adminSettings?.defaultCheckOut || '18:00')
   ).length;
 
-  // Calendar Construction logic
+  //Calendar Construction logic
   const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-  const startDayOfWeek = new Date(selectedYear, selectedMonth - 1, 1).getDay(); // 0 = Sunday, 1 = Monday ...
+  const startDayOfWeek = new Date(selectedYear, selectedMonth - 1, 1).getDay(); //0 = Sunday, 1 = Monday ...
 
-  // Create grid cells
+  //Create grid cells
   const gridCells = [];
-  // 1. Padding for previous month's ending
+  //1. Padding for previous month's ending
   for (let i = 0; i < startDayOfWeek; i++) {
     gridCells.push({ isEmpty: true, dayNum: 0, dateStr: '' });
   }
-  // 2. Days of current month
+  //2. Days of current month
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     gridCells.push({
@@ -160,7 +160,7 @@ export default function MonthlyCalendarReport({
     });
   }
 
-  // Navigate months
+  //Navigate months
   const handlePrevMonth = () => {
     if (selectedMonth === 1) {
       setSelectedMonth(12);
@@ -195,13 +195,13 @@ export default function MonthlyCalendarReport({
       rows.push([
         `"${r.date}"`,
         `"${r.employeeId}"`,
-        `"${(emp?.name || '').replace(/"/g, '""')}"`,
+        `"${(emp?.name || '').replace(/" /g, '""')}"`,
         `"${r.status || ''}"`,
         `"${r.checkIn || ''}"`,
         `"${r.checkOut || ''}"`,
         `"${late}"`,
         `"${early}"`,
-        `"${(r.remarks || '').replace(/"/g, '""')}"`
+        `"${(r.remarks || '').replace(/" /g, '""')}"`
       ]);
     });
 
@@ -228,7 +228,7 @@ export default function MonthlyCalendarReport({
           <p className="text-xs text-slate-400 font-medium">{t.subtitle}</p>
         </div>
 
-        {/* Navigation / Selection controls */}
+        {/* NavigationSelection controls */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Month Stepper */}
           <div className="inline-flex items-center bg-slate-50 dark:bg-[#0c1a14] border border-slate-200 dark:border-[#1e3a2f] rounded-xl p-1 shadow-3xs">
@@ -284,7 +284,7 @@ export default function MonthlyCalendarReport({
               title="Download Monthly Attendance CSV"
             >
               <Download className="w-3.5 h-3.5 text-emerald-200" />
-              <span>{language === 'en' ? 'Export CSV' : 'सीएसवी निर्यात'}</span>
+              <span>{'Export CSV'}</span>
             </button>
           </div>
         </div>
@@ -387,14 +387,14 @@ export default function MonthlyCalendarReport({
                   );
                 }
 
-                // Look up record
+                //Look up record
                 const rec = monthlyLogs.find(r => r.date === cell.dateStr);
 
-                // Check late & early flags
+                //Check late & early flags
                 const isLate = rec ? isAttendanceLate(rec, selectedEmployee.workTiming, adminSettings?.defaultCheckIn || '09:00') : false;
                 const isEarly = rec ? isAttendanceEarlyGoing(rec, selectedEmployee.workTiming, adminSettings?.defaultCheckOut || '18:00') : false;
 
-                // Cell styling based on status
+                //Cell styling based on status
                 let cellBg = 'bg-white dark:bg-[#11221b] hover:bg-slate-50/70 dark:hover:bg-[#183328]';
                 let statusLabel = '';
                 let statusColor = '';
@@ -404,27 +404,27 @@ export default function MonthlyCalendarReport({
                   switch (effectiveStatus) {
                     case 'Present':
                       cellBg = 'bg-emerald-50/15 dark:bg-emerald-950/30 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/40';
-                      statusLabel = language === 'en' ? 'P' : 'उप';
+                      statusLabel = 'P';
                       statusColor = 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/50 dark:bg-emerald-900/60 border-emerald-200 dark:border-emerald-700';
                       break;
                     case 'Absent':
                       cellBg = 'bg-rose-50/20 dark:bg-rose-950/30 hover:bg-rose-50/30 dark:hover:bg-rose-900/40';
-                      statusLabel = language === 'en' ? 'A' : 'अनु';
+                      statusLabel = 'A';
                       statusColor = 'text-rose-600 dark:text-rose-300 bg-rose-100/50 dark:bg-rose-900/60 border-rose-200 dark:border-rose-700';
                       break;
                     case 'Half Day':
                       cellBg = 'bg-amber-50/20 dark:bg-amber-950/30 hover:bg-amber-50/30 dark:hover:bg-amber-900/40';
-                      statusLabel = language === 'en' ? 'HD' : 'आधा';
+                      statusLabel = 'HD';
                       statusColor = 'text-amber-700 dark:text-amber-300 bg-amber-100/50 dark:bg-amber-900/60 border-amber-200 dark:border-amber-700';
                       break;
                     case 'Leave':
                       cellBg = 'bg-blue-50/15 dark:bg-blue-950/30 hover:bg-blue-50/30 dark:hover:bg-blue-900/40';
-                      statusLabel = language === 'en' ? 'L' : 'छुट्टी';
+                      statusLabel = 'L';
                       statusColor = 'text-blue-700 dark:text-blue-300 bg-blue-100/50 dark:bg-blue-900/60 border-blue-200 dark:border-blue-700';
                       break;
                     case 'Miss Punch':
                       cellBg = 'bg-orange-50/15 dark:bg-orange-950/30 hover:bg-orange-50/30 dark:hover:bg-orange-900/40';
-                      statusLabel = language === 'en' ? 'MP' : 'मिस';
+                      statusLabel = 'MP';
                       statusColor = 'text-slate-700 dark:text-slate-200 bg-orange-100/50 dark:bg-orange-900/60 border-orange-200 dark:border-orange-700 border-dashed';
                       break;
                   }
@@ -490,7 +490,7 @@ export default function MonthlyCalendarReport({
                       )}
                     </div>
 
-                    {/* Bottom row: Mini badge icons for late / early */}
+                    {/* Bottom row: Mini badge icons for lateearly */}
                     <div className="flex flex-wrap gap-0.5 justify-center min-h-[10px] sm:min-h-[14px]">
                       {isLate && (
                         <span className="bg-orange-50 dark:bg-orange-950/90 text-orange-600 dark:text-orange-300 text-[7px] sm:text-[8px] font-black px-0.5 sm:px-1 rounded-sm border border-orange-200/50 dark:border-orange-800 scale-90 uppercase">
@@ -549,11 +549,9 @@ export default function MonthlyCalendarReport({
               <div className="flex items-start gap-2 text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
                 <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="font-extrabold text-slate-700 dark:text-slate-200">{t.legendLate} / {t.legendEarly}</p>
+                  <p className="font-extrabold text-slate-700 dark:text-slate-200">{t.legendLate}{t.legendEarly}</p>
                   <p className="leading-relaxed">
-                    {language === 'en' 
-                      ? "Late badge is triggered if check-in exceeds the allowed shift start grace period. Early badge is shown if checkout is before the end of the shift."
-                      : "शिफ्ट के निर्धारित आगमन समय और ग्रेस पीरियड से अधिक देरी होने पर 'Late' बैज दिखाई देता है। शिफ्ट समाप्त होने से पहले प्रस्थान करने पर 'Early' बैज दिखाई देता है।"
+                    {"Late badge is triggered if check-in exceeds the allowed shift start grace period. Early badge is shown if checkout is before the end of the shift."
                     }
                   </p>
                 </div>
