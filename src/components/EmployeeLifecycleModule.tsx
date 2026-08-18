@@ -35,111 +35,42 @@ export default function EmployeeLifecycleModule({ employees, language = 'en' }: 
   const [reviews, setReviews] = useState<PerformanceReview[]>(() => {
     const saved = localStorage.getItem('payroll_performance_reviews');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(r => !['REV-001', 'REV-002'].includes(r.id));
+        }
+      } catch (e) { console.error(e); }
     }
-    return [
-      {
-        id: 'REV-001',
-        employeeId: 'EMP001',
-        employeeName: 'Rajesh Kumar',
-        department: 'Management',
-        reviewPeriod: 'Annual 2025-2026',
-        rating: 5,
-        keyAchievements: 'Exceeded regional sales targets by 18%. Managed site logistics efficiently.',
-        areasOfImprovement: 'Improve digital report submissions on portal.',
-        goalsForNextPeriod: 'Expand B2B dealership network by 10 new partners.',
-        reviewerName: 'DirectorAdmin',
-        reviewDate: '2026-03-31',
-        status: 'Approved'
-      },
-      {
-        id: 'REV-002',
-        employeeId: 'EMP002',
-        employeeName: 'Sunita Sharma',
-        department: 'Finance',
-        reviewPeriod: 'Annual 2025-2026',
-        rating: 4,
-        keyAchievements: 'Zero reconciliation errors in monthly GST filing and ledger audit.',
-        areasOfImprovement: 'Speed up vendor payment voucher processing time.',
-        goalsForNextPeriod: 'Implement automated bank reconciliation system.',
-        reviewerName: 'DirectorAdmin',
-        reviewDate: '2026-03-31',
-        status: 'Approved'
-      }
-    ];
+    return [];
   });
 
   //Assets
   const [assets, setAssets] = useState<CompanyAsset[]>(() => {
     const saved = localStorage.getItem('payroll_company_assets');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(a => !['AST-001', 'AST-002', 'AST-003'].includes(a.id));
+        }
+      } catch (e) { console.error(e); }
     }
-    return [
-      {
-        id: 'AST-001',
-        assetTag: 'AST-LAP-01',
-        name: 'Dell Latitude 3420 Laptop',
-        category: 'Laptop',
-        serialNumber: 'DL3420X9912',
-        assignedToEmployeeId: 'EMP002',
-        assignedToEmployeeName: 'Sunita Sharma',
-        assignedDate: '2025-06-16',
-        condition: 'Good',
-        status: 'Assigned',
-        notes: 'Includes charger and laptop bag.'
-      },
-      {
-        id: 'AST-002',
-        assetTag: 'AST-MOB-02',
-        name: 'Samsung Galaxy M14 5G',
-        category: 'Mobile Phone',
-        serialNumber: 'SSG5G88102',
-        assignedToEmployeeId: 'EMP001',
-        assignedToEmployeeName: 'Rajesh Kumar',
-        assignedDate: '2025-01-11',
-        condition: 'Good',
-        status: 'Assigned',
-        notes: 'Company SIM card included.'
-      },
-      {
-        id: 'AST-003',
-        assetTag: 'AST-VEH-01',
-        name: 'Hero Splendor Plus (CG 04 XY 1234)',
-        category: 'Vehicle',
-        serialNumber: 'ENG9981273',
-        condition: 'Good',
-        status: 'Available',
-        notes: 'Assigned for site visits.'
-      }
-    ];
+    return [];
   });
 
   //Transfers & Promotions
   const [transfers, setTransfers] = useState<TransferPromotionRecord[]>(() => {
     const saved = localStorage.getItem('payroll_transfers_promotions');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(t => t.id !== 'TPR-001');
+        }
+      } catch (e) { console.error(e); }
     }
-    return [
-      {
-        id: 'TPR-001',
-        employeeId: 'EMP001',
-        employeeName: 'Rajesh Kumar',
-        type: 'Promotion',
-        currentDepartment: 'Operations',
-        newDepartment: 'Management',
-        currentDesignation: 'Site Supervisor',
-        newDesignation: 'Senior Supervisor',
-        currentSalary: 32000,
-        newSalary: 38000,
-        effectiveDate: '2026-01-01',
-        status: 'Approved',
-        approvedBy: 'Director',
-        reason: 'Outstanding performance and leadership in project execution.',
-        createdDate: '2025-12-20'
-      }
-    ];
+    return [];
   });
 
   //Save to local storage

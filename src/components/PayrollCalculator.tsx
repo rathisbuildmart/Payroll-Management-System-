@@ -68,48 +68,16 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
   const [oneTimeDeductions, setOneTimeDeductions] = useState<OneTimeDeduction[]>(() => {
     try {
       const saved = localStorage.getItem('payroll_one_time_deductions');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(d => !['REF001', 'REF002', 'REF003'].includes(d.id));
+        }
+      }
     } catch (e) {
       console.error(e);
     }
-    //Pre-populate with beautiful standard demo data so the report lists items by default
-    const defaultDeductions: OneTimeDeduction[] = [
-      {
-        id: 'REF001',
-        employeeId: 'EMP001',
-        type: 'Uniform',
-        totalAmount: 3000,
-        monthlyRefundInstallment: 500,
-        refundedAmount: 1000,
-        createdAt: '2026-04-10',
-        status: 'Partially Refunded',
-        description: 'Standard uniform deduction (Refunded in 6 parts)'
-      },
-      {
-        id: 'REF002',
-        employeeId: 'EMP002',
-        type: 'Tour',
-        totalAmount: 5000,
-        monthlyRefundInstallment: 1000,
-        refundedAmount: 5000,
-        createdAt: '2026-02-15',
-        status: 'Fully Refunded',
-        description: 'Tour allowance initial one-time charge (Refunded in 5 parts)'
-      },
-      {
-        id: 'REF003',
-        employeeId: 'EMP003',
-        type: 'Uniform',
-        totalAmount: 3000,
-        monthlyRefundInstallment: 600,
-        refundedAmount: 0,
-        createdAt: '2026-07-01',
-        status: 'Pending',
-        description: 'Factory protective gear charge'
-      }
-    ];
-    localStorage.setItem('payroll_one_time_deductions', JSON.stringify(defaultDeductions));
-    return defaultDeductions;
+    return [];
   });
 
   //Track the deductions in localStorage on updates

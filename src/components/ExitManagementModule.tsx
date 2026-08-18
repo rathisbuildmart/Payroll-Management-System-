@@ -111,105 +111,25 @@ export default function ExitManagementModule({ employees, language = 'en' }: Exi
     if (saved) {
       try { 
         const parsed: ExitRecord[] = JSON.parse(saved); 
-        //Migrate old records to have customChecklist if missing
-        return parsed.map(rec => {
-          if (!rec.customChecklist || rec.customChecklist.length === 0) {
-            const checklist = DEFAULT_CLEARANCE_TASKS.map((t, idx) => ({
-              ...t,
-              id: `TASK-${rec.id}-${idx + 1}`,
-              status: idx === 0 && rec.clearance?.itAssets ? 'Completed' :
-                      idx === 2 && rec.clearance?.financeDues ? 'Completed' :
-                      idx === 3 && rec.clearance?.hrDocuments ? 'Completed' :
-                      idx === 5 && rec.clearance?.departmentManager ? 'Completed' : 'Pending'
-            })) as ClearanceTaskItem[];
-            return { ...rec, customChecklist: checklist };
-          }
-          return rec;
-        });
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter(rec => rec.id !== 'EXT-001');
+          return filtered.map(rec => {
+            if (!rec.customChecklist || rec.customChecklist.length === 0) {
+              const checklist = DEFAULT_CLEARANCE_TASKS.map((t, idx) => ({
+                ...t,
+                id: `TASK-${rec.id}-${idx + 1}`,
+                status: 'Pending'
+              })) as ClearanceTaskItem[];
+              return { ...rec, customChecklist: checklist };
+            }
+            return rec;
+          });
+        }
       } catch (e) { 
         console.error(e); 
       }
     }
-
-    //Default mock data with initialized checklists
-    return [
-      {
-        id: 'EXT-001',
-        employeeId: 'EMP003',
-        employeeName: 'Amit Patel',
-        department: 'Operations',
-        designation: 'Dispatch Officer',
-        resignationDate: '2026-07-01',
-        lastWorkingDay: '2026-07-31',
-        reason: 'Better Opportunity',
-        status: 'In Clearance',
-        noticePeriodDays: 30,
-        exitInterviewNotes: 'Moving to an MNC in logistics domain. No grievances recorded.',
-        clearance: {
-          departmentManager: true,
-          itAssets: true,
-          financeDues: false,
-          hrDocuments: true
-        },
-        customChecklist: [
-          {
-            id: 'TASK-EXT-001-1',
-            title: 'IT Asset Return (Dell Laptop, Mouse, Charger)',
-            department: 'IT',
-            assignedTo: 'Ramesh Kumar (IT)',
-            status: 'Completed',
-            completedAt: '2026-07-28 14:30',
-            completedBy: 'Ramesh Kumar',
-            notes: 'Laptop returned in good condition',
-            requiredForFnF: true
-          },
-          {
-            id: 'TASK-EXT-001-2',
-            title: 'ID Badge & Gate Access Card Submission',
-            department: 'Security',
-            assignedTo: 'Security Head',
-            status: 'Completed',
-            completedAt: '2026-07-29 10:15',
-            completedBy: 'Security Head',
-            notes: 'Access card deactivated',
-            requiredForFnF: true
-          },
-          {
-            id: 'TASK-EXT-001-3',
-            title: 'Finance Travel Advance Settlement & Audit',
-            department: 'Finance',
-            assignedTo: 'Suresh Verma (Finance)',
-            status: 'Pending',
-            notes: 'Checking pending petty cash vouchers',
-            requiredForFnF: true
-          },
-          {
-            id: 'TASK-EXT-001-4',
-            title: 'HR Resignation Acceptance & Exit Interview',
-            department: 'HR',
-            assignedTo: 'Pooja Sharma (HR)',
-            status: 'Completed',
-            completedAt: '2026-07-25 16:00',
-            completedBy: 'Pooja Sharma',
-            notes: 'Exit survey submitted online',
-            requiredForFnF: true
-          },
-          {
-            id: 'TASK-EXT-001-5',
-            title: 'Company SIM Card & Email Revocation',
-            department: 'IT',
-            assignedTo: 'IT Admin',
-            status: 'Pending',
-            notes: 'Scheduled for last working day',
-            requiredForFnF: false
-          }
-        ],
-        fnfAmount: 18500,
-        fnfStatus: 'Pending',
-        relievingLetterIssued: false,
-        createdDate: '2026-07-01'
-      }
-    ];
+    return [];
   });
 
   useEffect(() => {

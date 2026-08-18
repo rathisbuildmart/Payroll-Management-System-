@@ -25,10 +25,11 @@ import {
   ArrowRight,
   Users
 } from 'lucide-react';
-import { JobPosting, Candidate, CandidateFollowUp, OnboardingTask, OfferLetter, Employee, AdminSettings } from '../types';
+import { JobPosting, Candidate, CandidateFollowUp, OnboardingTask, OfferLetter, Employee, AdminSettings, ArchivedCandidateRecord } from '../types';
 import RecruitmentKanbanBoard from './RecruitmentKanbanBoard';
 import HiringScorecard from './HiringScorecard';
 import JobOpeningsModule from './JobOpeningsModule';
+import { syncArchivedCandidatesToSheets } from '../services/sheets';
 
 interface HiringOnboardingProps {
   employees: Employee[];
@@ -47,211 +48,53 @@ export default function HiringOnboarding({ employees, language = 'en', adminSett
   const [jobs, setJobs] = useState<JobPosting[]>(() => {
     const saved = localStorage.getItem('payroll_jobs');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(j => !['JOB-001', 'JOB-002', 'JOB-003', 'JOB-004'].includes(j.id));
+        }
+      } catch (e) { console.error(e); }
     }
-    return [
-      {
-        id: 'JOB-001',
-        title: 'Senior Sales Executive',
-        department: 'Sales',
-        location: 'Raipur HQ',
-        type: 'Full-time',
-        openings: 2,
-        status: 'Open',
-        postedDate: '2026-07-15',
-        description: 'Responsible for driving building material sales across Chhattisgarh region.',
-        requirements: '3+ years experience in B2B building materials sales.',
-        targetCtcMin: 25000,
-        targetCtcMax: 35000,
-        hiringManager: 'Sales Director',
-        urgency: 'High'
-      },
-      {
-        id: 'JOB-002',
-        title: 'AccountantBilling Clerk',
-        department: 'Finance',
-        location: 'Raipur HQ',
-        type: 'Full-time',
-        openings: 1,
-        status: 'Open',
-        postedDate: '2026-07-20',
-        description: 'Manage daily invoicing, Tally data entry, and GST filing support.',
-        requirements: 'Proficiency in Tally Prime and Excel.',
-        targetCtcMin: 18000,
-        targetCtcMax: 24000,
-        hiringManager: 'Finance Controller',
-        urgency: 'Medium'
-      },
-      {
-        id: 'JOB-003',
-        title: 'Warehouse & Logistics Supervisor',
-        department: 'Operations',
-        location: 'Bhilai Depot',
-        type: 'Full-time',
-        openings: 1,
-        status: 'Open',
-        postedDate: '2026-06-10',
-        description: 'Oversee inventory stock movement, truck loading, dispatch logs and warehouse safety.',
-        requirements: 'Experience in dispatch management & cement/steel stock handling.',
-        targetCtcMin: 22000,
-        targetCtcMax: 28000,
-        hiringManager: 'Logistics Head',
-        urgency: 'High'
-      },
-      {
-        id: 'JOB-004',
-        title: 'IT & Tally Administrator',
-        department: 'IT',
-        location: 'Raipur HQ',
-        type: 'Full-time',
-        openings: 1,
-        status: 'Closed',
-        postedDate: '2026-05-01',
-        description: 'Maintain network servers, employee Tally user permissions & IT assets.',
-        requirements: 'Degree in CS/IT or Hardware networking certification.',
-        targetCtcMin: 25000,
-        targetCtcMax: 32000,
-        hiringManager: 'IT Manager',
-        urgency: 'Low'
-      }
-    ];
+    return [];
   });
 
   const [candidates, setCandidates] = useState<Candidate[]>(() => {
     const saved = localStorage.getItem('payroll_candidates');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(c => !['CAN-001', 'CAN-002', 'CAN-003', 'CAN-004', 'CAN-005'].includes(c.id));
+        }
+      } catch (e) { console.error(e); }
     }
-    return [
-      {
-        id: 'CAN-001',
-        jobId: 'JOB-001',
-        jobTitle: 'Senior Sales Executive',
-        name: 'Vikas Sahu',
-        email: 'vikas.sahu@gmail.com',
-        phone: '9827100021',
-        experienceYears: 4,
-        stage: 'HR Interview',
-        appliedDate: '2026-07-22',
-        interviewDate: '2026-08-10',
-        notes: 'Good communication skills, strong local network in Raipur market.',
-        expectedSalary: 28000
-      },
-      {
-        id: 'CAN-002',
-        jobId: 'JOB-002',
-        jobTitle: 'AccountantBilling Clerk',
-        name: 'Pooja Verma',
-        email: 'pooja.v@gmail.com',
-        phone: '9827100034',
-        experienceYears: 2,
-        stage: 'Offered',
-        appliedDate: '2026-07-25',
-        expectedSalary: 20000,
-        notes: 'Passed technical accounting round with 95% score.'
-      },
-      {
-        id: 'CAN-003',
-        jobId: 'JOB-003',
-        jobTitle: 'Warehouse & Logistics Supervisor',
-        name: 'Ramesh Sharma',
-        email: 'ramesh.sharma@gmail.com',
-        phone: '9425200112',
-        experienceYears: 5,
-        stage: 'Hired',
-        appliedDate: '2026-06-15',
-        expectedSalary: 25000,
-        notes: 'Joined Bhilai Depot on July 1st, 2026.'
-      },
-      {
-        id: 'CAN-004',
-        jobId: 'JOB-004',
-        jobTitle: 'IT & Tally Administrator',
-        name: 'Amit Agrawal',
-        email: 'amit.a@gmail.com',
-        phone: '9826133445',
-        experienceYears: 3,
-        stage: 'Hired',
-        appliedDate: '2026-05-10',
-        expectedSalary: 30000,
-        notes: 'Joined Raipur HQ IT team on June 1st, 2026.'
-      },
-      {
-        id: 'CAN-005',
-        jobId: 'JOB-001',
-        jobTitle: 'Senior Sales Executive',
-        name: 'Deepak Patel',
-        email: 'deepak.patel@gmail.com',
-        phone: '9827111223',
-        experienceYears: 3,
-        stage: 'Screening',
-        appliedDate: '2026-08-01',
-        expectedSalary: 26000,
-        notes: 'Resume under evaluation by Sales Director.'
-      }
-    ];
+    return [];
   });
 
   const [onboardingTasks, setOnboardingTasks] = useState<OnboardingTask[]>(() => {
     const saved = localStorage.getItem('payroll_onboarding_tasks');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(t => !['ONT-001', 'ONT-002', 'ONT-003'].includes(t.id));
+        }
+      } catch (e) { console.error(e); }
     }
-    return [
-      {
-        id: 'ONT-001',
-        employeeId: 'EMP004',
-        employeeName: 'Suresh Kumar',
-        taskName: 'Submit Aadhaar & PAN Card Copies',
-        category: 'Documents',
-        dueDate: '2026-08-10',
-        status: 'Completed',
-        assignedTo: 'HR Manager',
-        completedDate: '2026-08-01'
-      },
-      {
-        id: 'ONT-002',
-        employeeId: 'EMP004',
-        employeeName: 'Suresh Kumar',
-        taskName: 'Configure Work Email & Tally Login',
-        category: 'IT Setup',
-        dueDate: '2026-08-12',
-        status: 'In Progress',
-        assignedTo: 'IT Admin'
-      },
-      {
-        id: 'ONT-003',
-        employeeId: 'EMP004',
-        employeeName: 'Suresh Kumar',
-        taskName: 'Company Safety Policy Orientation',
-        category: 'HR Orientation',
-        dueDate: '2026-08-15',
-        status: 'Pending',
-        assignedTo: 'HR Team'
-      }
-    ];
+    return [];
   });
 
   const [offerLetters, setOfferLetters] = useState<OfferLetter[]>(() => {
     const saved = localStorage.getItem('payroll_offer_letters');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(o => o.id !== 'OFF-001');
+        }
+      } catch (e) { console.error(e); }
     }
-    return [
-      {
-        id: 'OFF-001',
-        candidateName: 'Pooja Verma',
-        email: 'pooja.v@gmail.com',
-        phone: '9827100034',
-        department: 'Finance',
-        designation: 'Accounts Executive',
-        offeredCtc: 240000,
-        joiningDate: '2026-08-16',
-        status: 'Sent',
-        issuedDate: '2026-08-01',
-        termsNotes: 'Includes 6 months probation period and standard company perks.'
-      }
-    ];
+    return [];
   });
 
   //Sync state to local storage
@@ -407,17 +250,21 @@ export default function HiringOnboarding({ employees, language = 'en', adminSett
 
   const handleUpdateCandidateStage = (candidateId: string, newStage: Candidate['stage'], newNotes?: string) => {
     const todayStr = new Date().toISOString().slice(0, 10);
-    setCandidates(candidates.map(c => {
+    let rejectedCandidateObj: Candidate | null = null;
+
+    const updatedCandidates = candidates.map(c => {
       if (c.id === candidateId) {
         if (newStage === 'Rejected') {
-          return {
+          const rej: Candidate = {
             ...c,
             stage: 'Rejected',
             isArchived: true,
             rejectedDate: todayStr,
-            rejectionReason: newNotes || 'Offer DeclinedCandidate Rejected',
+            rejectionReason: newNotes || 'Offer Declined / Candidate Rejected',
             notes: newNotes !== undefined ? newNotes : c.notes
           };
+          rejectedCandidateObj = rej;
+          return rej;
         }
         return {
           ...c,
@@ -427,7 +274,49 @@ export default function HiringOnboarding({ employees, language = 'en', adminSett
         };
       }
       return c;
-    }));
+    });
+
+    setCandidates(updatedCandidates);
+    localStorage.setItem('payroll_candidates', JSON.stringify(updatedCandidates));
+
+    // Automatically sync rejected candidate to Central Archived Candidates Storage & Google Sheet
+    if (rejectedCandidateObj) {
+      try {
+        const canObj = rejectedCandidateObj as Candidate;
+        const currentArchived: ArchivedCandidateRecord[] = JSON.parse(localStorage.getItem('cached_archived_candidates') || '[]');
+        const filtered = currentArchived.filter(a => a.id !== candidateId);
+        const newArchivedRecord: ArchivedCandidateRecord = {
+          id: canObj.id,
+          name: canObj.name,
+          jobTitle: canObj.jobTitle || 'General Pool',
+          phone: canObj.phone,
+          email: canObj.email,
+          stage: 'Rejected',
+          rejectionReason: canObj.rejectionReason || 'Declined',
+          archivedAt: new Date().toISOString(),
+          archivedBy: canObj.hrName || 'HR Recruiter',
+          candidateData: canObj
+        };
+        const updatedArchived = [newArchivedRecord, ...filtered];
+        localStorage.setItem('cached_archived_candidates', JSON.stringify(updatedArchived));
+
+        // Asynchronously push to Google Sheets Archive_Candidates tab
+        const token = googleToken || (typeof window !== 'undefined' ? localStorage.getItem('google_access_token') : null);
+        const sheetId = spreadsheetId || (typeof window !== 'undefined' ? localStorage.getItem('google_spreadsheet_id') : null);
+        if (token && sheetId) {
+          let targetArchiveSheetId = sheetId;
+          try {
+            const s = JSON.parse(localStorage.getItem('payroll_admin_settings') || '{}');
+            if (s.useDedicatedArchiveSheet && s.archiveSpreadsheetId) {
+              targetArchiveSheetId = s.archiveSpreadsheetId;
+            }
+          } catch (e) {}
+          syncArchivedCandidatesToSheets(targetArchiveSheetId, token, updatedArchived).catch(e => console.warn('Background archive sync:', e));
+        }
+      } catch (e) {
+        console.warn('Error archiving rejected candidate:', e);
+      }
+    }
   };
 
   const handleAddFollowUp = (candidateId: string, followUp: CandidateFollowUp) => {
@@ -449,11 +338,11 @@ export default function HiringOnboarding({ employees, language = 'en', adminSett
   };
 
   const handleRestoreCandidate = (candidateId: string) => {
-    setCandidates(candidates.map(c => {
+    const updatedCandidates = candidates.map(c => {
       if (c.id === candidateId) {
         return {
           ...c,
-          stage: 'Applied',
+          stage: 'Applied' as const,
           isArchived: false,
           rejectionReason: undefined,
           rejectedDate: undefined,
@@ -461,7 +350,32 @@ export default function HiringOnboarding({ employees, language = 'en', adminSett
         };
       }
       return c;
-    }));
+    });
+
+    setCandidates(updatedCandidates);
+    localStorage.setItem('payroll_candidates', JSON.stringify(updatedCandidates));
+
+    // Remove from cached_archived_candidates
+    try {
+      const currentArchived: ArchivedCandidateRecord[] = JSON.parse(localStorage.getItem('cached_archived_candidates') || '[]');
+      const updatedArchived = currentArchived.filter(a => a.id !== candidateId);
+      localStorage.setItem('cached_archived_candidates', JSON.stringify(updatedArchived));
+
+      const token = googleToken || (typeof window !== 'undefined' ? localStorage.getItem('google_access_token') : null);
+      const sheetId = spreadsheetId || (typeof window !== 'undefined' ? localStorage.getItem('google_spreadsheet_id') : null);
+      if (token && sheetId) {
+        let targetArchiveSheetId = sheetId;
+        try {
+          const s = JSON.parse(localStorage.getItem('payroll_admin_settings') || '{}');
+          if (s.useDedicatedArchiveSheet && s.archiveSpreadsheetId) {
+            targetArchiveSheetId = s.archiveSpreadsheetId;
+          }
+        } catch (e) {}
+        syncArchivedCandidatesToSheets(targetArchiveSheetId, token, updatedArchived).catch(e => console.warn('Background restore sync:', e));
+      }
+    } catch (e) {
+      console.warn('Error removing restored candidate from archive cache:', e);
+    }
   };
 
   const handleCreateTask = (e: React.FormEvent) => {

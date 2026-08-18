@@ -35,9 +35,9 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
-import { Candidate, JobPosting, AdminSettings, CandidateFollowUp } from '../types';
+import { Candidate, JobPosting, AdminSettings, CandidateFollowUp, ArchivedCandidateRecord } from '../types';
 import { WhatsAppModal } from './WhatsAppModal';
-import { syncRecruitmentToSheets } from '../services/sheets';
+import { syncRecruitmentToSheets, syncArchivedCandidatesToSheets } from '../services/sheets';
 
 interface RecruitmentKanbanBoardProps {
   candidates: Candidate[];
@@ -146,18 +146,49 @@ export default function RecruitmentKanbanBoard({
     const sheetIdToUse = spreadsheetId || localStorage.getItem('google_spreadsheet_id');
 
     if (!sheetIdToUse || !tokenToUse) {
-      alert('Google Sheets is not connected. Please connect your Google Account in Settings to sync recruitment data.');
+      alert('Google Sheets is not connected. Please connect your Google Account in Settings to sync recruitment & archive data.');
       return;
     }
 
     setIsSyncingSheets(true);
-    const result = await syncRecruitmentToSheets(sheetIdToUse, tokenToUse, jobPostings, candidates);
-    setIsSyncingSheets(false);
+    try {
+      // 1. Sync Recruitment tables (Job_Openings, Active_Candidates, Candidate_FollowUps, Rejected_Candidates)
+      const result = await syncRecruitmentToSheets(sheetIdToUse, tokenToUse, jobPostings, candidates);
 
-    if (result.success) {
-      alert(`✅ ${result.message}`);
-    } else {
-      alert(`❌ Sync Failed: ${result.message}`);
+      // 2. Sync Rejected candidates to dedicated Archive_Candidates sheet
+      const rejectedList = candidates.filter(c => c.stage === 'Rejected' || c.isArchived);
+      let targetArchiveSheetId = sheetIdToUse;
+      try {
+        const savedSettings = JSON.parse(localStorage.getItem('payroll_admin_settings') || '{}');
+        if (savedSettings.useDedicatedArchiveSheet && savedSettings.archiveSpreadsheetId) {
+          targetArchiveSheetId = savedSettings.archiveSpreadsheetId;
+        }
+      } catch (e) {}
+
+      const archivedRecords: ArchivedCandidateRecord[] = rejectedList.map(can => ({
+        id: can.id,
+        name: can.name,
+        jobTitle: can.jobTitle || 'General Pool',
+        phone: can.phone,
+        email: can.email,
+        stage: can.stage,
+        rejectionReason: can.rejectionReason || 'Declined / Not Suitable',
+        archivedAt: can.rejectedDate || new Date().toISOString(),
+        archivedBy: can.hrName || 'HR Recruiter',
+        candidateData: can
+      }));
+
+      await syncArchivedCandidatesToSheets(targetArchiveSheetId, tokenToUse, archivedRecords);
+
+      setIsSyncingSheets(false);
+      if (result.success) {
+        alert(`✅ Synchronized successfully! All Active Candidates, Job Openings, and ${rejectedList.length} Rejected Candidates have been synced to Google Sheet (Archive_Candidates & Recruitment sheets).`);
+      } else {
+        alert(`❌ Sync Failed: ${result.message}`);
+      }
+    } catch (err: any) {
+      setIsSyncingSheets(false);
+      alert(`Sync notice: ${err.message || 'Error occurred while syncing'}`);
     }
   };
 

@@ -137,137 +137,14 @@ export default function AssetManagementModule({
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter(a => !['AST-001', 'AST-002', 'AST-003', 'AST-004', 'AST-005'].includes(a.id) && !['AST-LAP-001', 'AST-MOB-002', 'AST-VEH-001', 'AST-TAB-001', 'AST-PER-001'].includes(a.assetTag));
+        }
       } catch (e) {
         console.error('Failed to parse assets from localStorage', e);
       }
     }
-    return [
-      {
-        id: 'AST-001',
-        assetTag: 'AST-LAP-001',
-        name: 'Dell Latitude 3420 Laptop',
-        category: 'Laptop',
-        serialNumber: 'DL3420X9912',
-        brand: 'Dell',
-        model: 'Latitude 3420 (i5 11th Gen, 16GB RAM)',
-        purchaseDate: '2024-04-15',
-        purchasePrice: 62000,
-        warrantyExpiryDate: '2027-04-15',
-        vendorName: 'CompuTech Solutions',
-        assignedToEmployeeId: 'EMP002',
-        assignedToEmployeeName: 'Sunita Sharma',
-        assignedDate: '2025-06-16',
-        condition: 'Good',
-        status: 'Assigned',
-        notes: 'Includes original 65W USB-C charger and laptop bag.',
-        allocationHistory: [
-          {
-            id: 'HIS-001',
-            assetId: 'AST-001',
-            employeeId: 'EMP002',
-            employeeName: 'Sunita Sharma',
-            assignedDate: '2025-06-16',
-            assignedCondition: 'New',
-            handoverNotes: 'Handed over on onboarding.',
-            status: 'Active'
-          }
-        ]
-      },
-      {
-        id: 'AST-002',
-        assetTag: 'AST-MOB-002',
-        name: 'Samsung Galaxy M14 5G',
-        category: 'Mobile Phone',
-        serialNumber: 'SSG5G88102',
-        brand: 'Samsung',
-        model: 'Galaxy M14 5G (128GB)',
-        purchaseDate: '2024-08-10',
-        purchasePrice: 14500,
-        warrantyExpiryDate: '2025-08-10',
-        vendorName: 'Samsung Official Store',
-        assignedToEmployeeId: 'EMP001',
-        assignedToEmployeeName: 'Rajesh Kumar',
-        assignedDate: '2025-01-11',
-        condition: 'Good',
-        status: 'Assigned',
-        notes: 'Company SIM inserted for site co-ordination.',
-        allocationHistory: [
-          {
-            id: 'HIS-002',
-            assetId: 'AST-002',
-            employeeId: 'EMP001',
-            employeeName: 'Rajesh Kumar',
-            assignedDate: '2025-01-11',
-            assignedCondition: 'New',
-            handoverNotes: 'Site supervision official mobile.',
-            status: 'Active'
-          }
-        ]
-      },
-      {
-        id: 'AST-003',
-        assetTag: 'AST-VEH-001',
-        name: 'Hero Splendor Plus (CG 04 XY 1234)',
-        category: 'Vehicle',
-        serialNumber: 'ENG9981273',
-        brand: 'Hero',
-        model: 'Splendor Plus 110cc',
-        purchaseDate: '2023-01-20',
-        purchasePrice: 78000,
-        warrantyExpiryDate: '2028-01-20',
-        vendorName: 'Raipur Auto Dealer',
-        condition: 'Good',
-        status: 'Available',
-        notes: 'Stored at Main Yard. Helmet & key in office safe.',
-        allocationHistory: []
-      },
-      {
-        id: 'AST-004',
-        assetTag: 'AST-TAB-001',
-        name: 'Apple iPad 10th Gen',
-        category: 'Tablet',
-        serialNumber: 'APL9822101',
-        brand: 'Apple',
-        model: 'iPad 10th Gen 64GB Wi-Fi',
-        purchaseDate: '2025-02-01',
-        purchasePrice: 38000,
-        warrantyExpiryDate: '2026-02-01',
-        vendorName: 'Imagine Apple Reseller',
-        condition: 'New',
-        status: 'Available',
-        notes: 'Unassigned in IT Store. Comes with Apple Pencil.',
-        allocationHistory: []
-      },
-      {
-        id: 'AST-005',
-        assetTag: 'AST-PER-001',
-        name: 'Logitech MK270 Wireless Keyboard & Mouse',
-        category: 'Peripheral',
-        serialNumber: 'LGT7722109',
-        brand: 'Logitech',
-        model: 'MK270 Combo',
-        purchaseDate: '2024-11-05',
-        purchasePrice: 1800,
-        warrantyExpiryDate: '2027-11-05',
-        vendorName: 'CompuTech Solutions',
-        condition: 'Damaged',
-        status: 'Maintenance',
-        notes: 'Mouse scroll wheel erratic. Under repair ticket #MT-881.',
-        maintenanceLogs: [
-          {
-            id: 'MNT-001',
-            assetId: 'AST-005',
-            issueDescription: 'Mouse scroll wheel slipping & key stuck',
-            loggedDate: '2026-08-01',
-            vendorName: 'Logitech Care Center',
-            cost: 350,
-            status: 'In Progress',
-            notes: 'Awaiting warranty replacement module.'
-          }
-        ]
-      }
-    ];
+    return [];
   });
 
   // Sync to localStorage

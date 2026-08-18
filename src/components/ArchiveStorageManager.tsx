@@ -499,27 +499,30 @@ export default function ArchiveStorageManager({
 
       // Non-blocking sync to Google Sheets
       const targetArchiveId = effectiveArchiveSpreadsheetId;
-      if (spreadsheetId && googleToken) {
-        try {
-          await saveEmployees(spreadsheetId, remainingEmployees, googleToken);
-        } catch (sErr) {
-          console.warn('Google Sheets saveEmployees warning:', sErr);
+      const validToken = await obtainValidToken();
+      if (validToken) {
+        if (spreadsheetId) {
+          try {
+            await saveEmployees(spreadsheetId, remainingEmployees, validToken);
+          } catch (sErr) {
+            console.warn('Google Sheets saveEmployees warning:', sErr);
+          }
         }
-      }
 
-      if (targetArchiveId && googleToken) {
-        try {
-          await syncArchivedEmployeesToSheets(targetArchiveId, googleToken, updatedArchivedEmployees);
-          await appendArchiveLogToSheets(
-            targetArchiveId,
-            googleToken,
-            'Archive Left Employees',
-            inactiveEmployees.length,
-            'SUCCESS',
-            `Transferred ${inactiveEmployees.length} ex-employees to Archive_Employees`
-          );
-        } catch (aErr) {
-          console.warn('Google Sheets syncArchivedEmployees warning:', aErr);
+        if (targetArchiveId) {
+          try {
+            await syncArchivedEmployeesToSheets(targetArchiveId, validToken, updatedArchivedEmployees);
+            await appendArchiveLogToSheets(
+              targetArchiveId,
+              validToken,
+              'Archive Left Employees',
+              inactiveEmployees.length,
+              'SUCCESS',
+              `Transferred ${inactiveEmployees.length} ex-employees to Archive_Employees`
+            );
+          } catch (aErr) {
+            console.warn('Google Sheets syncArchivedEmployees warning:', aErr);
+          }
         }
       }
 
@@ -598,28 +601,31 @@ export default function ArchiveStorageManager({
       localStorage.setItem('payroll_candidates', JSON.stringify(remainingCandidates));
 
       const targetArchiveId = effectiveArchiveSpreadsheetId;
-      if (spreadsheetId && googleToken) {
-        try {
-          const jobs = JSON.parse(localStorage.getItem('payroll_jobs') || '[]');
-          await syncRecruitmentToSheets(spreadsheetId, googleToken, jobs, remainingCandidates);
-        } catch (rErr) {
-          console.warn('Recruitment sync warning:', rErr);
+      const validToken = await obtainValidToken();
+      if (validToken) {
+        if (spreadsheetId) {
+          try {
+            const jobs = JSON.parse(localStorage.getItem('payroll_jobs') || '[]');
+            await syncRecruitmentToSheets(spreadsheetId, validToken, jobs, remainingCandidates);
+          } catch (rErr) {
+            console.warn('Recruitment sync warning:', rErr);
+          }
         }
-      }
 
-      if (targetArchiveId && googleToken) {
-        try {
-          await syncArchivedCandidatesToSheets(targetArchiveId, googleToken, updatedArchivedCandidates);
-          await appendArchiveLogToSheets(
-            targetArchiveId,
-            googleToken,
-            'Archive Rejected Candidates',
-            rejectedCandidates.length,
-            'SUCCESS',
-            `Transferred ${rejectedCandidates.length} candidates to Archive_Candidates`
-          );
-        } catch (aErr) {
-          console.warn('Candidate archive sync warning:', aErr);
+        if (targetArchiveId) {
+          try {
+            await syncArchivedCandidatesToSheets(targetArchiveId, validToken, updatedArchivedCandidates);
+            await appendArchiveLogToSheets(
+              targetArchiveId,
+              validToken,
+              'Archive Rejected Candidates',
+              rejectedCandidates.length,
+              'SUCCESS',
+              `Transferred ${rejectedCandidates.length} candidates to Archive_Candidates`
+            );
+          } catch (aErr) {
+            console.warn('Candidate archive sync warning:', aErr);
+          }
         }
       }
 
@@ -696,26 +702,29 @@ export default function ArchiveStorageManager({
           localStorage.setItem('cached_employees', JSON.stringify(remainingEmployees));
 
           const targetArchiveId = effectiveArchiveSpreadsheetId;
-          if (spreadsheetId && googleToken) {
-            try {
-              await saveEmployees(spreadsheetId, remainingEmployees, googleToken);
-            } catch (e) {
-              console.warn(e);
+          const validToken = await obtainValidToken();
+          if (validToken) {
+            if (spreadsheetId) {
+              try {
+                await saveEmployees(spreadsheetId, remainingEmployees, validToken);
+              } catch (e) {
+                console.warn(e);
+              }
             }
-          }
-          if (targetArchiveId && googleToken) {
-            try {
-              await syncArchivedEmployeesToSheets(targetArchiveId, googleToken, updatedArchivedEmployees);
-              await appendArchiveLogToSheets(
-                targetArchiveId,
-                googleToken,
-                'Archive Employee',
-                1,
-                'SUCCESS',
-                `Transferred ${emp.name} (${emp.id}) to Archive_Employees`
-              );
-            } catch (e) {
-              console.warn(e);
+            if (targetArchiveId) {
+              try {
+                await syncArchivedEmployeesToSheets(targetArchiveId, validToken, updatedArchivedEmployees);
+                await appendArchiveLogToSheets(
+                  targetArchiveId,
+                  validToken,
+                  'Archive Employee',
+                  1,
+                  'SUCCESS',
+                  `Transferred ${emp.name} (${emp.id}) to Archive_Employees`
+                );
+              } catch (e) {
+                console.warn(e);
+              }
             }
           }
 
@@ -765,27 +774,30 @@ export default function ArchiveStorageManager({
           localStorage.setItem('payroll_candidates', JSON.stringify(remainingCandidates));
 
           const targetArchiveId = effectiveArchiveSpreadsheetId;
-          if (spreadsheetId && googleToken) {
-            try {
-              const jobs = JSON.parse(localStorage.getItem('payroll_jobs') || '[]');
-              await syncRecruitmentToSheets(spreadsheetId, googleToken, jobs, remainingCandidates);
-            } catch (e) {
-              console.warn(e);
+          const validToken = await obtainValidToken();
+          if (validToken) {
+            if (spreadsheetId) {
+              try {
+                const jobs = JSON.parse(localStorage.getItem('payroll_jobs') || '[]');
+                await syncRecruitmentToSheets(spreadsheetId, validToken, jobs, remainingCandidates);
+              } catch (e) {
+                console.warn(e);
+              }
             }
-          }
-          if (targetArchiveId && googleToken) {
-            try {
-              await syncArchivedCandidatesToSheets(targetArchiveId, googleToken, updatedArchivedCandidates);
-              await appendArchiveLogToSheets(
-                targetArchiveId,
-                googleToken,
-                'Archive Candidate',
-                1,
-                'SUCCESS',
-                `Transferred ${can.name} to Archive_Candidates`
-              );
-            } catch (e) {
-              console.warn(e);
+            if (targetArchiveId) {
+              try {
+                await syncArchivedCandidatesToSheets(targetArchiveId, validToken, updatedArchivedCandidates);
+                await appendArchiveLogToSheets(
+                  targetArchiveId,
+                  validToken,
+                  'Archive Candidate',
+                  1,
+                  'SUCCESS',
+                  `Transferred ${can.name} to Archive_Candidates`
+                );
+              } catch (e) {
+                console.warn(e);
+              }
             }
           }
 
@@ -839,18 +851,21 @@ export default function ArchiveStorageManager({
         localStorage.setItem('cached_archived_employees', JSON.stringify(updatedArchivedEmployees));
         localStorage.setItem('cached_employees', JSON.stringify(remainingEmployees));
 
-        if (spreadsheetId && googleToken) {
-          try {
-            await saveEmployees(spreadsheetId, remainingEmployees, googleToken);
-          } catch (e) {
-            console.warn(e);
+        const validToken = await obtainValidToken();
+        if (validToken) {
+          if (spreadsheetId) {
+            try {
+              await saveEmployees(spreadsheetId, remainingEmployees, validToken);
+            } catch (e) {
+              console.warn(e);
+            }
           }
-        }
-        if (effectiveArchiveSpreadsheetId && googleToken) {
-          try {
-            await syncArchivedEmployeesToSheets(effectiveArchiveSpreadsheetId, googleToken, updatedArchivedEmployees);
-          } catch (e) {
-            console.warn(e);
+          if (effectiveArchiveSpreadsheetId) {
+            try {
+              await syncArchivedEmployeesToSheets(effectiveArchiveSpreadsheetId, validToken, updatedArchivedEmployees);
+            } catch (e) {
+              console.warn(e);
+            }
           }
         }
       }
@@ -879,28 +894,32 @@ export default function ArchiveStorageManager({
         localStorage.setItem('cached_archived_candidates', JSON.stringify(updatedArchivedCandidates));
         localStorage.setItem('payroll_candidates', JSON.stringify(remainingCandidates));
 
-        if (spreadsheetId && googleToken) {
-          try {
-            const jobs = JSON.parse(localStorage.getItem('payroll_jobs') || '[]');
-            await syncRecruitmentToSheets(spreadsheetId, googleToken, jobs, remainingCandidates);
-          } catch (e) {
-            console.warn(e);
+        const validToken = await obtainValidToken();
+        if (validToken) {
+          if (spreadsheetId) {
+            try {
+              const jobs = JSON.parse(localStorage.getItem('payroll_jobs') || '[]');
+              await syncRecruitmentToSheets(spreadsheetId, validToken, jobs, remainingCandidates);
+            } catch (e) {
+              console.warn(e);
+            }
           }
-        }
-        if (effectiveArchiveSpreadsheetId && googleToken) {
-          try {
-            await syncArchivedCandidatesToSheets(effectiveArchiveSpreadsheetId, googleToken, updatedArchivedCandidates);
-          } catch (e) {
-            console.warn(e);
+          if (effectiveArchiveSpreadsheetId) {
+            try {
+              await syncArchivedCandidatesToSheets(effectiveArchiveSpreadsheetId, validToken, updatedArchivedCandidates);
+            } catch (e) {
+              console.warn(e);
+            }
           }
         }
       }
 
-      if (effectiveArchiveSpreadsheetId && googleToken) {
+      const validToken = await obtainValidToken();
+      if (effectiveArchiveSpreadsheetId && validToken) {
         try {
           await appendArchiveLogToSheets(
             effectiveArchiveSpreadsheetId,
-            googleToken,
+            validToken,
             'Auto-Archive Retention Due Transfer',
             totalDue,
             'SUCCESS',
@@ -965,27 +984,30 @@ export default function ArchiveStorageManager({
       localStorage.setItem('cached_attendance', JSON.stringify(remainingAttendance));
 
       const targetArchiveId = effectiveArchiveSpreadsheetId;
-      if (spreadsheetId && googleToken) {
-        try {
-          await saveAttendance(spreadsheetId, remainingAttendance, googleToken);
-        } catch (e) {
-          console.warn(e);
+      const validToken = await obtainValidToken();
+      if (validToken) {
+        if (spreadsheetId) {
+          try {
+            await saveAttendance(spreadsheetId, remainingAttendance, validToken);
+          } catch (e) {
+            console.warn(e);
+          }
         }
-      }
 
-      if (targetArchiveId && googleToken) {
-        try {
-          await syncArchivedAttendanceToSheets(targetArchiveId, googleToken, updatedArchivedAttendance);
-          await appendArchiveLogToSheets(
-            targetArchiveId,
-            googleToken,
-            'Archive Old Attendance',
-            oldAttendanceRecords.length,
-            'SUCCESS',
-            `Transferred ${oldAttendanceRecords.length} attendance logs older than ${cutoffDateStr}`
-          );
-        } catch (e) {
-          console.warn(e);
+        if (targetArchiveId) {
+          try {
+            await syncArchivedAttendanceToSheets(targetArchiveId, validToken, updatedArchivedAttendance);
+            await appendArchiveLogToSheets(
+              targetArchiveId,
+              validToken,
+              'Archive Old Attendance',
+              oldAttendanceRecords.length,
+              'SUCCESS',
+              `Transferred ${oldAttendanceRecords.length} attendance logs older than ${cutoffDateStr}`
+            );
+          } catch (e) {
+            console.warn(e);
+          }
         }
       }
 
@@ -1092,27 +1114,30 @@ export default function ArchiveStorageManager({
           localStorage.setItem('cached_archived_employees', JSON.stringify(updatedArchivedEmployees));
 
           const targetArchiveId = effectiveArchiveSpreadsheetId;
-          if (spreadsheetId && googleToken) {
-            try {
-              await saveEmployees(spreadsheetId, updatedActiveEmployees, googleToken);
-            } catch (e) {
-              console.warn(e);
+          const validToken = await obtainValidToken();
+          if (validToken) {
+            if (spreadsheetId) {
+              try {
+                await saveEmployees(spreadsheetId, updatedActiveEmployees, validToken);
+              } catch (e) {
+                console.warn(e);
+              }
             }
-          }
 
-          if (targetArchiveId && googleToken) {
-            try {
-              await syncArchivedEmployeesToSheets(targetArchiveId, googleToken, updatedArchivedEmployees);
-              await appendArchiveLogToSheets(
-                targetArchiveId,
-                googleToken,
-                'Restore Employee',
-                1,
-                'SUCCESS',
-                `Restored ${archivedEmp.name} (${archivedEmp.id}) to active roster`
-              );
-            } catch (e) {
-              console.warn(e);
+            if (targetArchiveId) {
+              try {
+                await syncArchivedEmployeesToSheets(targetArchiveId, validToken, updatedArchivedEmployees);
+                await appendArchiveLogToSheets(
+                  targetArchiveId,
+                  validToken,
+                  'Restore Employee',
+                  1,
+                  'SUCCESS',
+                  `Restored ${archivedEmp.name} (${archivedEmp.id}) to active roster`
+                );
+              } catch (e) {
+                console.warn(e);
+              }
             }
           }
 
@@ -1154,28 +1179,31 @@ export default function ArchiveStorageManager({
           localStorage.setItem('cached_archived_candidates', JSON.stringify(updatedArchivedCandidates));
 
           const targetArchiveId = effectiveArchiveSpreadsheetId;
-          if (spreadsheetId && googleToken) {
-            try {
-              const jobs = JSON.parse(localStorage.getItem('payroll_jobs') || '[]');
-              await syncRecruitmentToSheets(spreadsheetId, googleToken, jobs, updatedActiveCandidates);
-            } catch (e) {
-              console.warn(e);
+          const validToken = await obtainValidToken();
+          if (validToken) {
+            if (spreadsheetId) {
+              try {
+                const jobs = JSON.parse(localStorage.getItem('payroll_jobs') || '[]');
+                await syncRecruitmentToSheets(spreadsheetId, validToken, jobs, updatedActiveCandidates);
+              } catch (e) {
+                console.warn(e);
+              }
             }
-          }
 
-          if (targetArchiveId && googleToken) {
-            try {
-              await syncArchivedCandidatesToSheets(targetArchiveId, googleToken, updatedArchivedCandidates);
-              await appendArchiveLogToSheets(
-                targetArchiveId,
-                googleToken,
-                'Restore Candidate',
-                1,
-                'SUCCESS',
-                `Restored candidate ${archivedCan.name} to active recruitment`
-              );
-            } catch (e) {
-              console.warn(e);
+            if (targetArchiveId) {
+              try {
+                await syncArchivedCandidatesToSheets(targetArchiveId, validToken, updatedArchivedCandidates);
+                await appendArchiveLogToSheets(
+                  targetArchiveId,
+                  validToken,
+                  'Restore Candidate',
+                  1,
+                  'SUCCESS',
+                  `Restored candidate ${archivedCan.name} to active recruitment`
+                );
+              } catch (e) {
+                console.warn(e);
+              }
             }
           }
 

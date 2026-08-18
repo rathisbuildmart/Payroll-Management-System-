@@ -361,115 +361,40 @@ export default function App() {
 
   //Application Data States (with local cache fallbacks for instant offline load)
   const [employees, setEmployees] = useState<Employee[]>(() => {
-    const defaultEmployees: Employee[] = [
-      {
-        id: 'EMP001',
-        name: 'Rajesh Kumar',
-        department: 'Management',
-        designation: 'Senior Supervisor',
-        joiningDate: '2025-01-10',
-        basicSalary: 38000,
-        allowances: 3500,
-        deductions: 1500,
-        hourlyRate: 150,
-        paymentMethod: 'Bank Transfer',
-        isActive: true,
-        enableMobileAttendance: true,
-      },
-      {
-        id: 'EMP002',
-        name: 'Sunita Sharma',
-        department: 'Finance',
-        designation: 'Accounts Executive',
-        joiningDate: '2025-06-15',
-        basicSalary: 28000,
-        allowances: 2000,
-        deductions: 1000,
-        hourlyRate: 120,
-        paymentMethod: 'Bank Transfer',
-        isActive: true,
-        enableMobileAttendance: true,
-      },
-      {
-        id: 'EMP003',
-        name: 'Amit Patel',
-        department: 'Operations',
-        designation: 'Dispatch Officer',
-        joiningDate: '2026-02-01',
-        basicSalary: 18000,
-        allowances: 1500,
-        deductions: 800,
-        hourlyRate: 100,
-        paymentMethod: 'Cash',
-        isActive: true,
-        enableMobileAttendance: true,
-      },
-      {
-        id: 'EMP004',
-        name: 'Suresh Kumar',
-        department: 'Sales',
-        designation: 'Sales Executive',
-        joiningDate: '2026-04-01',
-        basicSalary: 19000,
-        allowances: 1600,
-        deductions: 900,
-        hourlyRate: 105,
-        paymentMethod: 'Bank Transfer',
-        isActive: true,
-        password: '123456',
-        enableMobileAttendance: true,
-      }
-    ];
-
     const saved = localStorage.getItem('cached_employees');
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as Employee[];
-        if (parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          const MOCK_EMP_IDS = new Set(['EMP001', 'EMP002', 'EMP003', 'EMP004']);
+          const MOCK_EMP_NAMES = new Set(['Rajesh Kumar', 'Sunita Sharma', 'Amit Patel', 'Suresh Kumar']);
+          const realOnly = parsed.filter(e => !(MOCK_EMP_IDS.has(e.id) && MOCK_EMP_NAMES.has(e.name)));
+          localStorage.setItem('cached_employees', JSON.stringify(realOnly));
+          return realOnly;
         }
       } catch (err) {
         console.error("Error parsing cached employees", err);
       }
     }
-    
-    localStorage.setItem('cached_employees', JSON.stringify(defaultEmployees));
-    return defaultEmployees;
+    return [];
   });
 
   const [attendance, setAttendance] = useState<Attendance[]>(() => {
     const saved = localStorage.getItem('cached_attendance');
     if (saved) {
       try {
-        return JSON.parse(saved) as Attendance[];
+        const parsed = JSON.parse(saved) as Attendance[];
+        if (Array.isArray(parsed)) {
+          const MOCK_EMP_IDS = new Set(['EMP001', 'EMP002', 'EMP003', 'EMP004']);
+          const realOnly = parsed.filter(a => !(MOCK_EMP_IDS.has(a.employeeId) && (a.remarks === 'Sick leave' || a.remarks === 'Personal chore' || a.remarks === 'On-time')));
+          localStorage.setItem('cached_attendance', JSON.stringify(realOnly));
+          return realOnly;
+        }
       } catch (err) {
         console.error("Error parsing cached attendance", err);
       }
     }
-
-    const currentMonth = new Date().toISOString().slice(0, 7); //YYYY-MM
-    const sampleAttendance: Attendance[] = [];
-    const empIds = ['EMP001', 'EMP002', 'EMP003'];
-    
-    for (let day = 1; day <= 15; day++) {
-      const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
-      empIds.forEach((id, index) => {
-        const isAbsent = day === 3 && index === 2;
-        const isHalfDay = day === 4 && index === 1;
-
-        sampleAttendance.push({
-          date: dateStr,
-          employeeId: id,
-          status: isAbsent ? 'Absent' : isHalfDay ? 'Half Day' : 'Present',
-          checkIn: isAbsent ? '' : '09:00',
-          checkOut: isAbsent ? '' : isHalfDay ? '13:30' : '18:30',
-          overtimeHours: (!isAbsent && !isHalfDay && index === 0) ? 0.5 : 0,
-          remarks: isAbsent ? 'Sick leave' : isHalfDay ? 'Personal chore' : 'On-time'
-        });
-      });
-    }
-    localStorage.setItem('cached_attendance', JSON.stringify(sampleAttendance));
-    return sampleAttendance;
+    return [];
   });
 
   const [payroll, setPayroll] = useState<PayrollRecord[]>(() => {
@@ -739,38 +664,15 @@ export default function App() {
 
   const [announcements, setAnnouncements] = useState<any[]>(() => {
     const saved = localStorage.getItem('payroll_announcements');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: 'ann-1',
-        title: 'Implementation of Biometric Punch System',
-        titleHi: "",
-        date: '2026-07-12',
-        content: 'All departments must ensure staff punches via the integrated biometric portal. Late punches after standard 15-min grace period will record automatic late penalty checks.',
-        contentHi: "",
-        badge: 'Critical',
-        badgeHi: ""
-      },
-      {
-        id: 'ann-2',
-        title: 'Upcoming Public Holiday Notice',
-        titleHi: "",
-        date: '2026-07-20',
-        content: 'The workspace will remain closed on July 25th in observation of the regional festival. Off-duty profiles are auto-applied.',
-        contentHi: "",
-        badge: 'Holiday',
-        badgeHi: ""
-      },
-      {
-        id: 'ann-3',
-        title: 'Revised Provident Fund Policies',
-        titleHi: "",
-        date: '2026-07-08',
-        content: 'Effective from this payroll cycle, PF calculations adhere to the updated 12% statutory caps. Review your salary slips structure under settings.',
-        contentHi: "",
-        badge: 'Policy',
-        badgeHi: ""
-      }
-    ];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(a => !['ann-1', 'ann-2', 'ann-3'].includes(a.id));
+        }
+      } catch (e) {}
+    }
+    return [];
   });
 
   useEffect(() => {
@@ -779,30 +681,15 @@ export default function App() {
 
   const [hrTickets, setHrTickets] = useState<any[]>(() => {
     const saved = localStorage.getItem('payroll_hr_tickets');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: 'TKT-8274',
-        name: 'Rohan Sharma',
-        empId: 'EMP001',
-        email: 'rohan@rathibuildmart.com',
-        category: 'Attendance Adjustment',
-        categoryHi: "",
-        message: 'Forgot to punch out yesterday due to emergency on-site meeting. Please approve my miss punch adjustment request.',
-        date: '2026-07-12T14:30:00Z',
-        status: 'Pending'
-      },
-      {
-        id: 'TKT-3921',
-        name: 'Sunita Verma',
-        empId: 'EMP003',
-        email: 'sunita@rathibuildmart.com',
-        category: 'Salary Discrepancy',
-        categoryHi: "",
-        message: 'My PF contribution seems to have a mismatch of 200 INR. Kindly assist.',
-        date: '2026-07-10T11:15:00Z',
-        status: 'Resolved'
-      }
-    ];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(t => !['TKT-8274', 'TKT-3921'].includes(t.id));
+        }
+      } catch (e) {}
+    }
+    return [];
   });
 
   useEffect(() => {
@@ -813,39 +700,15 @@ export default function App() {
     const saved = localStorage.getItem('payroll_leave_requests');
     if (saved) {
       try {
-        return JSON.parse(saved) as LeaveRequest[];
+        const parsed = JSON.parse(saved) as LeaveRequest[];
+        if (Array.isArray(parsed)) {
+          return parsed.filter(r => !['LRQ-1001', 'LRQ-1002'].includes(r.id));
+        }
       } catch (e) {
         console.error("Error parsing leave requests", e);
       }
     }
-    return [
-      {
-        id: 'LRQ-1001',
-        employeeId: 'EMP001',
-        employeeName: 'Rohan Sharma',
-        leaveType: 'Vacation',
-        startDate: '2026-07-22',
-        endDate: '2026-07-24',
-        durationDays: 3,
-        reason: 'Going to native village for a family ritual.',
-        status: 'Pending',
-        appliedOn: '2026-07-18'
-      },
-      {
-        id: 'LRQ-1002',
-        employeeId: 'EMP003',
-        employeeName: 'Sunita Verma',
-        leaveType: 'Sick',
-        startDate: '2026-07-19',
-        endDate: '2026-07-19',
-        durationDays: 1,
-        reason: 'High fever and cold. Doctor advised complete bed rest.',
-        status: 'Approved',
-        appliedOn: '2026-07-18',
-        approvedBy: 'Admin',
-        remarks: 'Get well soon. Approved.'
-      }
-    ];
+    return [];
   });
 
   useEffect(() => {
@@ -854,16 +717,15 @@ export default function App() {
 
   const [passwordRequests, setPasswordRequests] = useState<any[]>(() => {
     const saved = localStorage.getItem('payroll_password_requests');
-    return saved ? JSON.parse(saved) : [
-      {
-        id: 'REQ-4819',
-        empId: 'EMP002',
-        email: 'amit@rathibuildmart.com',
-        mobile: '9876543210',
-        date: '2026-07-13T09:12:00Z',
-        status: 'Pending'
-      }
-    ];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(r => r.id !== 'REQ-4819');
+        }
+      } catch (e) {}
+    }
+    return [];
   });
 
   useEffect(() => {
