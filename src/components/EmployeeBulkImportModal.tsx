@@ -613,13 +613,14 @@ export default function EmployeeBulkImportModal({
     document.body.removeChild(link);
   };
 
-  // Export current existing employees to CSV
+  // Export current existing active employees to CSV
   const exportExistingEmployees = () => {
-    if (existingEmployees.length === 0) return;
+    const activeExisting = existingEmployees.filter(e => e.isActive !== false);
+    if (activeExisting.length === 0) return;
     const exportFields = EMPLOYEE_FIELDS.filter(f => f.key !== 'skip');
     const headers = exportFields.map(f => f.label);
     
-    const rows = existingEmployees.map(emp => {
+    const rows = activeExisting.map(emp => {
       return exportFields.map(f => {
         const val = (emp as any)[f.key];
         if (val === undefined || val === null) return '';
@@ -632,7 +633,7 @@ export default function EmployeeBulkImportModal({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `HRMS_Existing_Employees_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `HRMS_Active_Employees_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -743,7 +744,7 @@ export default function EmployeeBulkImportModal({
               className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg shadow-xxs cursor-pointer"
             >
               <Download className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Export Existing ({existingEmployees.length})</span>
+              <span>Export Active ({existingEmployees.filter(e => e.isActive !== false).length})</span>
             </button>
             <button
               type="button"

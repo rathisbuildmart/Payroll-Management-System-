@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders, Smartphone, Key, UserCog, ArrowUpDown, ArrowUp, ArrowDown, Trash2, Link2 } from 'lucide-react';
+import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Calendar, Building, DollarSign, Upload, Download, AlertCircle, Camera, Clock, ChevronLeft, ChevronRight, Users, Eye, Sliders, Smartphone, Key, UserCog, ArrowUpDown, ArrowUp, ArrowDown, Trash2, Link2, RotateCcw } from 'lucide-react';
 import { Employee, AdminSettings, getCurrentBasicSalary } from '../types';
 import { getCostCenterPrefix, generateNextEmployeeId } from '../utils/costCenterUtils';
 import { parseGoogleDriveImageUrl } from '../utils/driveUtils';
@@ -324,6 +324,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     return ['All', ...Array.from(branches)];
   }, [employees]);
 
+  const activeEmps = useMemo(() => employees.filter(e => e.isActive !== false), [employees]);
   const inactiveEmps = useMemo(() => employees.filter(e => !e.isActive), [employees]);
 
   const employeeOptions = useMemo(() => {
@@ -1092,7 +1093,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(val => `"${String(val).replace(/" /g, '""')}"`).join(','))
+      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
     ].join('\n');
 
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1100,7 +1101,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     const link = document.createElement('a');
     link.setAttribute('href', url);
     const dateStr = new Date().toISOString().split('T')[0];
-    const fileName = customPrefix ? `${customPrefix}_${dateStr}.csv` : (selectedStatus === 'Inactive' ? `inactive_employees_backup_${dateStr}.csv` : `all_employees_export_${dateStr}.csv`);
+    const fileName = customPrefix ? `${customPrefix}_${dateStr}.csv` : `active_employees_export_${dateStr}.csv`;
     link.setAttribute('download', fileName);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
@@ -1551,9 +1552,9 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
               </div>
               <div>
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {'Total Employees'}
+                  {'Total Active Employees'}
                 </div>
-                <div className="text-xl font-black text-slate-800">{employees.length}</div>
+                <div className="text-xl font-black text-slate-800">{activeEmps.length}</div>
               </div>
             </div>
 
@@ -1568,7 +1569,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       {'Locked Devices'}
                     </div>
                     <div className="text-xl font-black text-purple-700">
-                      {employees.filter(e => e.approvedDeviceId).length}
+                      {activeEmps.filter(e => e.approvedDeviceId).length}
                     </div>
                   </div>
                 </div>
@@ -1582,7 +1583,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       {'Multi-Device Allowed'}
                     </div>
                     <div className="text-xl font-black text-indigo-700">
-                      {employees.filter(e => e.allowMultipleDevices).length}
+                      {activeEmps.filter(e => e.allowMultipleDevices).length}
                     </div>
                   </div>
                 </div>
@@ -1596,7 +1597,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
                       {'Pending Approval'}
                     </div>
                     <div className="text-xl font-black text-rose-700">
-                      {employees.filter(e => e.isApproved === false).length}
+                      {activeEmps.filter(e => e.isApproved === false).length}
                     </div>
                   </div>
                 </div>
@@ -1605,234 +1606,303 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
           </div>
 
           {/* Search and Filters panel */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-1 flex-col sm:flex-row gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-              <Search className="w-5 h-5" />
-            </span>
-            <input
-              type="text"
-              placeholder={"Search by Name, ID, Department, Designation or Phone..."}
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-10 pr-9 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm"
-              id="emp-search" />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('');
-                  setCurrentPage(1);
-                }}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                title="Clear search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+          {(() => {
+            const activeFilterCount = (searchTerm.trim() ? 1 : 0) + 
+              (selectedDept !== 'All' ? 1 : 0) + 
+              (selectedBranch !== 'All' ? 1 : 0) + 
+              (selectedEmployeeId !== 'All' ? 1 : 0) + 
+              (selectedStatus !== 'Active' ? 1 : 0);
 
-          {/* Department Filter */}
-          <div className="relative flex-1 min-w-[150px]">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-              <Filter className="w-4 h-4" />
-            </span>
-            <select
-              value={selectedDept}
-              onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
-              id="dept-filter"
-            >
-              <option value="All">{t.filterDept}</option>
-              {(adminSettings?.departments || DEPARTMENTS).map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
-          </div>
+            const handleResetFilters = () => {
+              setSearchTerm('');
+              setSelectedDept('All');
+              setSelectedBranch('All');
+              setSelectedEmployeeId('All');
+              setSelectedStatus('Active');
+              setCurrentPage(1);
+            };
 
-          {/* Branch Filter */}
-          <div className="relative flex-1 min-w-[150px]">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-              <Building className="w-4 h-4" />
-            </span>
-            <select
-              value={selectedBranch}
-              onChange={(e) => { setSelectedBranch(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
-              id="branch-filter"
-            >
-              <option value="All">{'All Branches'}</option>
-              {branchOptions.filter(b => b !== 'All').map(b => (
-                <option key={b} value={b}>{b}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Employee ID Filter */}
-          <div className="relative flex-1 min-w-[150px]">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-              <Users className="w-4 h-4" />
-            </span>
-            <select
-              value={selectedEmployeeId}
-              onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
-              id="emp-filter"
-            >
-              <option value="All">{'All Employees'}</option>
-              {employeeOptions.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Active Status Filter */}
-          <div className="relative flex-1 min-w-[150px]">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-              <UserCheck className="w-4 h-4" />
-            </span>
-            <select
-              value={selectedStatus}
-              onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c] text-sm appearance-none bg-white font-medium text-slate-700 cursor-pointer"
-              id="status-filter"
-            >
-              <option value="Active">{'Active Employees'}</option>
-              <option value="Inactive">{'LeftInactive'}</option>
-              <option value="All">{'All (Active & Left)'}</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Column Visibility Selector Button with Popover */}
-          <div className="relative">
-            <button
-              onClick={() => setShowColumnDropdown(!showColumnDropdown)}
-              className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-              type="button"
-              id="btn-column-selector"
-            >
-              <Sliders className="w-4 h-4 text-[#03623c]" />
-              <span>{'Columns'}</span>
-              <span className="bg-emerald-50 text-[#03623c] font-bold text-[10px] px-1.5 py-0.2 rounded-full border border-emerald-100">
-                {activeVisibleColumns.length}
-              </span>
-            </button>
-
-            {showColumnDropdown && (
-              <>
-                <div 
-                  className="fixed inset-0 z-10" 
-                  onClick={() => setShowColumnDropdown(false)} />
-                <div className="absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-20 p-3 space-y-2">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                      {'ShowHide Columns'}
+            return (
+              <div className="bg-white rounded-2xl border border-gray-200/90 shadow-xs divide-y divide-gray-100 overflow-hidden mb-4">
+                {/* Top Row: Search and Action Buttons */}
+                <div className="p-3 sm:p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white">
+                  {/* Search Box */}
+                  <div className="relative flex-1 min-w-[260px] max-w-2xl">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 pointer-events-none">
+                      <Search className="w-4 h-4" />
                     </span>
-                    <button
-                      onClick={() => {
-                        //Reset to default columns
-                        setVisibleColumns(ALL_COLUMNS.filter(c => c.default).map(c => c.key));
+                    <input
+                      type="text"
+                      placeholder={language === 'hi' ? "नाम, आईडी, विभाग, पद या फ़ोन से खोजें..." : "Search by Name, ID, Department, Designation or Phone..."}
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCurrentPage(1);
                       }}
-                      className="text-[10px] text-blue-600 hover:underline font-bold"
-                    >
-                      {'Reset'}
-                    </button>
+                      className="w-full pl-10 pr-9 py-2 bg-gray-50/70 hover:bg-gray-50 focus:bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#03623c]/20 focus:border-[#03623c] text-xs sm:text-sm font-medium transition-all"
+                      id="emp-search"
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setCurrentPage(1);
+                        }}
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                        title="Clear search"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
-                  <div className="space-y-1.5">
-                    {ALL_COLUMNS.map(col => {
-                      const isVisible = activeVisibleColumns.includes(col.key);
-                      return (
-                        <label 
-                          key={col.key} 
-                          className={`flex items-center gap-2.5 p-1.5 rounded-lg cursor-pointer transition-colors text-xs font-semibold ${
-                            isVisible ? 'bg-emerald-50/40 text-slate-800' : 'text-slate-500 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isVisible}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setVisibleColumns([...visibleColumns, col.key]);
-                              } else {
-                                if (visibleColumns.length > 1) {
-                                  setVisibleColumns(visibleColumns.filter(k => k !== col.key));
-                                }
-                              }
-                            }}
-                            className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer" />
-                          <span>{language === 'en' ? col.labelEn : col.labelHi}</span>
-                        </label>
-                      );
-                    })}
+
+                  {/* Action Buttons Group */}
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {/* Column Visibility Selector Button with Popover */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowColumnDropdown(!showColumnDropdown)}
+                        className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 h-9 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xxs"
+                        type="button"
+                        id="btn-column-selector"
+                      >
+                        <Sliders className="w-3.5 h-3.5 text-[#03623c]" />
+                        <span>{'Columns'}</span>
+                        <span className="bg-emerald-50 text-[#03623c] font-bold text-[10px] px-1.5 py-0.2 rounded-full border border-emerald-100">
+                          {activeVisibleColumns.length}
+                        </span>
+                      </button>
+
+                      {showColumnDropdown && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setShowColumnDropdown(false)} />
+                          <div className="absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-20 p-3 space-y-2">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                              <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                {'Show/Hide Columns'}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setVisibleColumns(ALL_COLUMNS.filter(c => c.default).map(c => c.key));
+                                }}
+                                className="text-[10px] text-blue-600 hover:underline font-bold"
+                              >
+                                {'Reset'}
+                              </button>
+                            </div>
+                            <div className="space-y-1.5">
+                              {ALL_COLUMNS.map(col => {
+                                const isVisible = activeVisibleColumns.includes(col.key);
+                                return (
+                                  <label 
+                                    key={col.key} 
+                                    className={`flex items-center gap-2.5 p-1.5 rounded-lg cursor-pointer transition-colors text-xs font-semibold ${
+                                      isVisible ? 'bg-emerald-50/40 text-slate-800' : 'text-slate-500 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isVisible}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setVisibleColumns([...visibleColumns, col.key]);
+                                        } else {
+                                          if (visibleColumns.length > 1) {
+                                            setVisibleColumns(visibleColumns.filter(k => k !== col.key));
+                                          }
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded cursor-pointer" />
+                                    <span>{language === 'en' ? col.labelEn : col.labelHi}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Export Inactive/Left Employees Backup CSV Button */}
+                    {hasPermission('add') && inactiveEmps.length > 0 && isRoleColumnAllowed(portalUser?.role, 'export_inactive', adminSettings) && (
+                      <button
+                        type="button"
+                        onClick={() => exportEmployeesCSV(inactiveEmps, 'inactive_employees_backup')}
+                        className="border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 h-9 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xxs"
+                        title={`Export backup CSV for ${inactiveEmps.length} inactive/left employees`}
+                        id="btn-export-inactive-csv"
+                      >
+                        <Download className="w-3.5 h-3.5 text-amber-700" />
+                        <span>{`Export Inactive (${inactiveEmps.length})`}</span>
+                      </button>
+                    )}
+
+                    {/* Export Active Employees CSV Button */}
+                    {hasPermission('add') && isRoleColumnAllowed(portalUser?.role, 'export_csv', adminSettings) && (
+                      <button
+                        type="button"
+                        onClick={() => exportEmployeesCSV(activeEmps, 'active_employees')}
+                        className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 h-9 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xxs"
+                        title={`Export active employee records (${activeEmps.length}) for bulk editing`}
+                        id="btn-export-csv-trigger"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>{language === 'hi' ? `एक्टिव डेटा एक्सपोर्ट (${activeEmps.length})` : `Export Active Data (${activeEmps.length})`}</span>
+                      </button>
+                    )}
+
+                    {/* Bulk Import Button */}
+                    {hasPermission('add') && isRoleColumnAllowed(portalUser?.role, 'bulk_import', adminSettings) && (
+                      <button
+                        type="button"
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 h-9 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xxs"
+                        id="btn-bulk-import-trigger"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-gray-500" />
+                        <span>{t.bulkImportBtn}</span>
+                      </button>
+                    )}
+
+                    {/* Add Employee Button */}
+                    {hasPermission('add') && (
+                      <button
+                        onClick={openAddModal}
+                        className="bg-[#03623c] hover:bg-[#024d2e] text-white h-9 px-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-98"
+                        id="btn-add-emp"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>{t.addBtn}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
-              </>
-            )}
-          </div>
 
-          {/* Export InactiveLeft Employees Backup CSV Button */}
-          {hasPermission('add') && inactiveEmps.length > 0 && isRoleColumnAllowed(portalUser?.role, 'export_inactive', adminSettings) && (
-            <button
-              type="button"
-              onClick={() => exportEmployeesCSV(inactiveEmps, 'inactive_employees_backup')}
-              className="border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xxs"
-              title={`Export backup CSV for ${inactiveEmps.length} inactive/left employees`}
-              id="btn-export-inactive-csv"
-            >
-              <Download className="w-3.5 h-3.5 text-amber-700" />
-              {`Export Inactive (${inactiveEmps.length})`}
-            </button>
-          )}
+                {/* Bottom Row: Organized Filter Selectors & Status Counter */}
+                <div className="p-2.5 sm:px-3.5 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 text-slate-600 font-bold uppercase tracking-wider text-[10.5px] mr-1 shrink-0">
+                      <Filter className="w-3.5 h-3.5 text-[#03623c]" />
+                      <span>{'Filters:'}</span>
+                      {activeFilterCount > 0 && (
+                        <span className="min-w-4 h-4 px-1 rounded-full bg-[#03623c] text-white text-[9px] font-black flex items-center justify-center">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </div>
 
-          {/* Export All Employees CSV Button */}
-          {hasPermission('add') && isRoleColumnAllowed(portalUser?.role, 'export_csv', adminSettings) && (
-            <button
-              type="button"
-              onClick={() => exportEmployeesCSV(employees)}
-              className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-              title={'Export all employee records for bulk editing'}
-              id="btn-export-csv-trigger"
-            >
-              <Download className="w-4 h-4 text-emerald-700" />
-              {t.exportDataBtn}
-            </button>
-          )}
+                    {/* Department Filter */}
+                    <div className="relative min-w-[140px] sm:w-44">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-gray-400 pointer-events-none">
+                        <Filter className="w-3.5 h-3.5" />
+                      </span>
+                      <select
+                        value={selectedDept}
+                        onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
+                        className="w-full pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1.5 focus:ring-[#03623c] text-xs appearance-none bg-white font-medium text-slate-700 cursor-pointer shadow-xxs hover:border-gray-300"
+                        id="dept-filter"
+                      >
+                        <option value="All">{t.filterDept || 'All Departments'}</option>
+                        {(adminSettings?.departments || DEPARTMENTS).map(dept => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-400">
+                        <ChevronRight className="w-3 h-3 rotate-90" />
+                      </span>
+                    </div>
 
-          {/* Bulk Import Button */}
-          {hasPermission('add') && isRoleColumnAllowed(portalUser?.role, 'bulk_import', adminSettings) && (
-            <button
-              type="button"
-              onClick={() => setIsImportModalOpen(true)}
-              className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-              id="btn-bulk-import-trigger"
-            >
-              <Upload className="w-4 h-4 text-gray-500" />
-              {t.bulkImportBtn}
-            </button>
-          )}
+                    {/* Branch Filter */}
+                    <div className="relative min-w-[130px] sm:w-40">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-gray-400 pointer-events-none">
+                        <Building className="w-3.5 h-3.5" />
+                      </span>
+                      <select
+                        value={selectedBranch}
+                        onChange={(e) => { setSelectedBranch(e.target.value); setCurrentPage(1); }}
+                        className="w-full pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1.5 focus:ring-[#03623c] text-xs appearance-none bg-white font-medium text-slate-700 cursor-pointer shadow-xxs hover:border-gray-300"
+                        id="branch-filter"
+                      >
+                        <option value="All">{'All Branches'}</option>
+                        {branchOptions.filter(b => b !== 'All').map(b => (
+                          <option key={b} value={b}>{b}</option>
+                        ))}
+                      </select>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-400">
+                        <ChevronRight className="w-3 h-3 rotate-90" />
+                      </span>
+                    </div>
 
-          {/* Add Employee Button */}
-          {hasPermission('add') && (
-            <button
-              onClick={openAddModal}
-              className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-              id="btn-add-emp"
-            >
-              <Plus className="w-4 h-4" />
-              {t.addBtn}
-            </button>
-          )}
-        </div>
-      </div>
+                    {/* Employee Filter */}
+                    <div className="relative min-w-[140px] sm:w-44">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-gray-400 pointer-events-none">
+                        <Users className="w-3.5 h-3.5" />
+                      </span>
+                      <select
+                        value={selectedEmployeeId}
+                        onChange={(e) => { setSelectedEmployeeId(e.target.value); setCurrentPage(1); }}
+                        className="w-full pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1.5 focus:ring-[#03623c] text-xs appearance-none bg-white font-medium text-slate-700 cursor-pointer shadow-xxs hover:border-gray-300 truncate"
+                        id="emp-filter"
+                      >
+                        <option value="All">{'All Employees'}</option>
+                        {employeeOptions.map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+                        ))}
+                      </select>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-400">
+                        <ChevronRight className="w-3 h-3 rotate-90" />
+                      </span>
+                    </div>
+
+                    {/* Active Status Filter */}
+                    <div className="relative min-w-[140px] sm:w-44">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-gray-400 pointer-events-none">
+                        <UserCheck className="w-3.5 h-3.5" />
+                      </span>
+                      <select
+                        value={selectedStatus}
+                        onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
+                        className="w-full pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1.5 focus:ring-[#03623c] text-xs appearance-none bg-white font-medium text-slate-700 cursor-pointer shadow-xxs hover:border-gray-300"
+                        id="status-filter"
+                      >
+                        <option value="Active">{'Active Employees'}</option>
+                        <option value="Inactive">{'Left / Inactive'}</option>
+                        <option value="All">{'All (Active & Left)'}</option>
+                      </select>
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-400">
+                        <ChevronRight className="w-3 h-3 rotate-90" />
+                      </span>
+                    </div>
+
+                    {/* Reset Filters button if any active */}
+                    {activeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetFilters}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer border border-rose-200/60 shrink-0"
+                        title="Reset all filters"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{'Reset'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Showing count indicator */}
+                  <div className="text-[11px] font-semibold text-slate-500 shrink-0 ml-auto flex items-center gap-1.5">
+                    <span>Showing</span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 font-bold font-mono">
+                      {filteredEmployees.length}
+                    </span>
+                    <span>of {selectedStatus === 'Active' ? activeEmps.length : (selectedStatus === 'Inactive' ? inactiveEmps.length : employees.length)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
       {/* Employees Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">

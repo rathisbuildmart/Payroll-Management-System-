@@ -263,7 +263,10 @@ export interface AdminSettings {
   // Archive & Database Storage Optimization Settings
   autoArchiveLeftEmployees?: boolean;
   autoArchiveRejectedCandidates?: boolean;
-  attendanceArchiveRetentionDays?: number; // 0, 90, 180, 365
+  employeeArchiveRetentionDays?: number; // 0, 4, 7, 15, 30, 60, 90
+  candidateArchiveRetentionDays?: number; // 0, 4, 7, 15, 30, 60, 90
+  attendanceArchiveRetentionDays?: number; // 4, 7, 15, 30, 60, 90, 180, 365
+  autoTransferDueArchivesOnLoad?: boolean;
   archiveHistoryLogs?: ArchiveHistoryLog[];
   archiveSpreadsheetId?: string;
   archiveSpreadsheetName?: string;

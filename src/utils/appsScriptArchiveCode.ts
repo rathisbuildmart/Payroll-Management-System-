@@ -32,7 +32,9 @@ var CONFIG = {
   ACTIVE_ATTENDANCE_SHEET: "Attendance",
   ARCHIVE_ATTENDANCE_SHEET: "Archive_Attendance",
   ARCHIVE_LOGS_SHEET: "Archive_Logs",
-  ATTENDANCE_RETENTION_DAYS: 180 // Move attendance older than 180 days to archive
+  EMPLOYEE_RETENTION_DAYS: 30, // Move left employees older than retention days (e.g. 4-30 days, 0 for immediate)
+  CANDIDATE_RETENTION_DAYS: 30, // Move rejected candidates older than retention days (e.g. 4-30 days, 0 for immediate)
+  ATTENDANCE_RETENTION_DAYS: 180 // Move attendance older than retention days to archive
 };
 
 /**
@@ -515,16 +517,45 @@ function logArchiveOperation(op, count, status, details) {
 `;
 
 /**
- * Returns customized Google Apps Script code with the actual dedicated Archive Spreadsheet ID pre-injected.
+ * Returns customized Google Apps Script code with the actual dedicated Archive Spreadsheet ID and retention policies pre-injected.
  */
-export function getAppsScriptArchiveCode(archiveSpreadsheetId?: string | null): string {
-  if (!archiveSpreadsheetId || archiveSpreadsheetId.trim() === '') {
-    return APPS_SCRIPT_ARCHIVE_CODE;
+export function getAppsScriptArchiveCode(
+  archiveSpreadsheetId?: string | null,
+  employeeRetentionDays?: number,
+  candidateRetentionDays?: number,
+  attendanceRetentionDays?: number
+): string {
+  let code = APPS_SCRIPT_ARCHIVE_CODE;
+
+  if (archiveSpreadsheetId && archiveSpreadsheetId.trim() !== '') {
+    code = code.replace(
+      'ARCHIVE_SPREADSHEET_ID: "YOUR_DEDICATED_ARCHIVE_SPREADSHEET_ID_HERE"',
+      `ARCHIVE_SPREADSHEET_ID: "${archiveSpreadsheetId.trim()}"`
+    );
   }
-  return APPS_SCRIPT_ARCHIVE_CODE.replace(
-    'ARCHIVE_SPREADSHEET_ID: "YOUR_DEDICATED_ARCHIVE_SPREADSHEET_ID_HERE"',
-    `ARCHIVE_SPREADSHEET_ID: "${archiveSpreadsheetId.trim()}"`
-  );
+
+  if (employeeRetentionDays !== undefined) {
+    code = code.replace(
+      'EMPLOYEE_RETENTION_DAYS: 30',
+      `EMPLOYEE_RETENTION_DAYS: ${employeeRetentionDays}`
+    );
+  }
+
+  if (candidateRetentionDays !== undefined) {
+    code = code.replace(
+      'CANDIDATE_RETENTION_DAYS: 30',
+      `CANDIDATE_RETENTION_DAYS: ${candidateRetentionDays}`
+    );
+  }
+
+  if (attendanceRetentionDays !== undefined) {
+    code = code.replace(
+      'ATTENDANCE_RETENTION_DAYS: 180',
+      `ATTENDANCE_RETENTION_DAYS: ${attendanceRetentionDays}`
+    );
+  }
+
+  return code;
 }
 
 
