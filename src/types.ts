@@ -260,6 +260,15 @@ export interface AdminSettings {
   rulesShiftTiming?: string;
   rulesHalfDaySlot?: string;
   rulesLatePunchGrace?: string;
+  // Archive & Database Storage Optimization Settings
+  autoArchiveLeftEmployees?: boolean;
+  autoArchiveRejectedCandidates?: boolean;
+  attendanceArchiveRetentionDays?: number; // 0, 90, 180, 365
+  archiveHistoryLogs?: ArchiveHistoryLog[];
+  archiveSpreadsheetId?: string;
+  archiveSpreadsheetName?: string;
+  archiveSpreadsheetLink?: string;
+  useDedicatedArchiveSheet?: boolean;
 }
 
 export interface Attendance {
@@ -598,6 +607,41 @@ export interface ExitRecord {
   fnfStatus?: 'Pending' | 'Approved' | 'Paid';
   relievingLetterIssued: boolean;
   createdDate: string;
+}
+
+export interface ArchivedEmployeeRecord {
+  id: string;
+  name: string;
+  department: string;
+  designation: string;
+  joiningDate: string;
+  leavingDate?: string;
+  exitReason?: string;
+  archivedAt: string;
+  archivedBy?: string;
+  employeeData: Employee;
+}
+
+export interface ArchivedCandidateRecord {
+  id: string;
+  name: string;
+  jobTitle?: string;
+  phone: string;
+  email: string;
+  stage: string;
+  rejectionReason?: string;
+  archivedAt: string;
+  archivedBy?: string;
+  candidateData: Candidate;
+}
+
+export interface ArchiveHistoryLog {
+  id: string;
+  timestamp: string;
+  type: 'employees' | 'candidates' | 'attendance' | 'all';
+  count: number;
+  performedBy: string;
+  details: string;
 }
 
 export interface CustomRole {

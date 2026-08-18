@@ -58,9 +58,12 @@ import {
   savePayrollHistory,
   initHeaders,
   fetchAdminSettings,
-  saveAdminSettings
+  saveAdminSettings,
+  fetchArchivedEmployeesFromSheets,
+  fetchArchivedCandidatesFromSheets,
+  fetchArchivedAttendanceFromSheets
 } from './services/sheets';
-import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog, LeaveRequest, TransactionalEmailLog, UserRole, PortalUser } from './types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog, LeaveRequest, TransactionalEmailLog, UserRole, PortalUser, Candidate, ArchivedEmployeeRecord, ArchivedCandidateRecord } from './types';
 import { saveToFirestore, loadFromFirestore } from './services/firestore';
 
 //Unique device fingerprint generator for browser lock
@@ -490,6 +493,27 @@ export default function App() {
   //User Audit Logs state
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
     const saved = localStorage.getItem('cached_audit_logs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Archive and Storage Optimization States
+  const [archivedEmployees, setArchivedEmployees] = useState<ArchivedEmployeeRecord[]>(() => {
+    const saved = localStorage.getItem('cached_archived_employees');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [archivedCandidates, setArchivedCandidates] = useState<ArchivedCandidateRecord[]>(() => {
+    const saved = localStorage.getItem('cached_archived_candidates');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [archivedAttendance, setArchivedAttendance] = useState<Attendance[]>(() => {
+    const saved = localStorage.getItem('cached_archived_attendance');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [candidates, setCandidates] = useState<Candidate[]>(() => {
+    const saved = localStorage.getItem('payroll_candidates');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -1377,6 +1401,31 @@ export default function App() {
         }
       } catch (e) {
         console.warn('Failed to load/sync settings from Google Sheets:', e);
+      }
+
+      //Load Archived records from Google Sheets (either dedicated Archive Spreadsheet or main spreadsheet)
+      try {
+        const targetArchiveSheetId = (activeSettings.useDedicatedArchiveSheet && activeSettings.archiveSpreadsheetId)
+          ? activeSettings.archiveSpreadsheetId
+          : sheetId;
+
+        const fetchedArchivedEmps = await fetchArchivedEmployeesFromSheets(targetArchiveSheetId, accessToken);
+        if (fetchedArchivedEmps.length > 0) {
+          setArchivedEmployees(fetchedArchivedEmps);
+          localStorage.setItem('cached_archived_employees', JSON.stringify(fetchedArchivedEmps));
+        }
+        const fetchedArchivedCans = await fetchArchivedCandidatesFromSheets(targetArchiveSheetId, accessToken);
+        if (fetchedArchivedCans.length > 0) {
+          setArchivedCandidates(fetchedArchivedCans);
+          localStorage.setItem('cached_archived_candidates', JSON.stringify(fetchedArchivedCans));
+        }
+        const fetchedArchivedAtt = await fetchArchivedAttendanceFromSheets(targetArchiveSheetId, accessToken);
+        if (fetchedArchivedAtt.length > 0) {
+          setArchivedAttendance(fetchedArchivedAtt);
+          localStorage.setItem('cached_archived_attendance', JSON.stringify(fetchedArchivedAtt));
+        }
+      } catch (e) {
+        console.warn('Failed to load archived sheets:', e);
       }
 
       //Sync portalUser with fresh details from Google Sheets
@@ -5938,7 +5987,19 @@ export default function App() {
                   passwordRequests={passwordRequests}
                   setPasswordRequests={setPasswordRequests}
                   employees={employees}
+                  setEmployees={setEmployees}
+                  candidates={candidates}
+                  setCandidates={setCandidates}
                   attendance={attendance}
+                  setAttendance={setAttendance}
+                  archivedEmployees={archivedEmployees}
+                  setArchivedEmployees={setArchivedEmployees}
+                  archivedCandidates={archivedCandidates}
+                  setArchivedCandidates={setArchivedCandidates}
+                  archivedAttendance={archivedAttendance}
+                  setArchivedAttendance={setArchivedAttendance}
+                  spreadsheetId={spreadsheetId}
+                  googleToken={token}
                   payroll={payroll}
                   onImportData={handleImportDatabase}
                   onClearSheetsSession={handleClearSheetsSession}

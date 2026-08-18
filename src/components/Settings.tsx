@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Settings as SettingsIcon, 
   Building, 
@@ -43,14 +43,27 @@ import {
   Info,
   Crown,
   UserPlus,
-  Globe
+  Globe,
+  Shield,
+  Table,
+  Columns,
+  Layers,
+  Users,
+  CheckSquare,
+  FileText,
+  SlidersHorizontal,
+  Check,
+  ShieldCheck,
+  FolderLock,
+  Archive
 } from 'lucide-react';
-import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog, TransactionalEmailLog } from '../types';
+import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog, TransactionalEmailLog, CustomRole } from '../types';
 import AdminWelcomeModal from './AdminWelcomeModal';
 import { getCostCenterPrefix } from '../utils/costCenterUtils';
 import TransactionalEmailHistory from './TransactionalEmailHistory';
 import FirebaseStorageMonitor from './FirebaseStorageMonitor';
 import TemplateManager from './TemplateManager';
+import ArchiveStorageManager from './ArchiveStorageManager';
 import { 
   DEFAULT_WHATSAPP_TEMPLATES, 
   DEFAULT_EMAIL_TEMPLATES, 
@@ -75,7 +88,19 @@ interface SettingsProps {
   setPasswordRequests?: React.Dispatch<React.SetStateAction<any[]>>;
 
   employees?: any[];
+  setEmployees?: React.Dispatch<React.SetStateAction<any[]>>;
+  candidates?: any[];
+  setCandidates?: React.Dispatch<React.SetStateAction<any[]>>;
   attendance?: any[];
+  setAttendance?: React.Dispatch<React.SetStateAction<any[]>>;
+  archivedEmployees?: any[];
+  setArchivedEmployees?: React.Dispatch<React.SetStateAction<any[]>>;
+  archivedCandidates?: any[];
+  setArchivedCandidates?: React.Dispatch<React.SetStateAction<any[]>>;
+  archivedAttendance?: any[];
+  setArchivedAttendance?: React.Dispatch<React.SetStateAction<any[]>>;
+  spreadsheetId?: string | null;
+  googleToken?: string | null;
   payroll?: any[];
   onImportData?: (data: { employees?: any[]; attendance?: any[]; payroll?: any[]; adminSettings?: AdminSettings }) => void;
   onClearSheetsSession?: () => void;
@@ -150,6 +175,25 @@ export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
   { id: 'photoUrl', label: 'Profile Photo', group: 'employment', isHidden: false, isMandatory: false },
 ];
 
+export interface RoleDefinition {
+  id: string;
+  name: string;
+  description: string;
+  isCustom?: boolean;
+}
+
+export const BUILTIN_ROLES: RoleDefinition[] = [
+  { id: 'super_admin', name: 'Super Admin', description: 'Full root access to all modules, reports, system settings and user controls' },
+  { id: 'admin', name: 'Admin', description: 'Complete administrative access across all operational modules, master logs and reports' },
+  { id: 'director', name: 'Director', description: 'Executive level access to reports, finances, attendance, payroll & analytics' },
+  { id: 'hr', name: 'HR Manager', description: 'Full access to employees, hiring, lifecycle, attendance, payroll & leaves' },
+  { id: 'sub_admin', name: 'Sub Admin', description: 'Management of staff records, attendance, assets and leave requests' },
+  { id: 'branch_manager', name: 'Branch Manager', description: 'Branch-specific access to employee logs, attendance & leaves' },
+  { id: 'asset_manager', name: 'Asset Manager', description: 'Dedicated IT & Asset inventory management with non-salary employee view' },
+  { id: 'recruiter', name: 'Recruiter', description: 'Candidate hiring, onboarding & initial registration workflow' },
+  { id: 'employee', name: 'Employee', description: 'Self-service portal for own attendance punch, leaves & payslip' },
+];
+
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   super_admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
   admin: ['dashboard', 'employees', 'hiring_onboarding', 'employee_lifecycle', 'asset_management', 'attendance', 'payroll', 'leaves', 'exit_management', 'ledger', 'admin', 'notices_support'],
@@ -160,6 +204,112 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   recruiter: ['hiring_onboarding', 'exit_management', 'employees', 'notices_support'],
   branch_manager: ['employees', 'hiring_onboarding', 'attendance', 'leaves', 'notices_support'],
   employee: ['attendance', 'leaves', 'notices_support']
+};
+
+export const DEFAULT_ROLE_COLUMN_PERMISSIONS: Record<string, string[]> = {
+  super_admin: ['all'],
+  admin: ['all'],
+  director: ['all'],
+  hr: ['all'],
+  sub_admin: ['id', 'name', 'role', 'branch', 'joiningDate', 'status', 'mobileNo', 'personalDetails', 'gpsAndMobile', 'deviceInfo', 'export_csv', 'export_inactive', 'bulk_import'],
+  branch_manager: ['id', 'name', 'role', 'branch', 'joiningDate', 'status', 'mobileNo', 'personalDetails', 'gpsAndMobile', 'deviceInfo', 'export_csv', 'export_inactive'],
+  recruiter: ['id', 'name', 'role', 'branch', 'joiningDate', 'mobileNo', 'personalDetails', 'bulk_import'],
+  asset_manager: ['id', 'name', 'role', 'branch', 'status', 'mobileNo', 'deviceInfo'],
+  employee: ['id', 'name', 'role', 'branch']
+};
+
+export interface PermissionColumnCategory {
+  category: string;
+  description: string;
+  items: {
+    id: string;
+    label: string;
+    desc: string;
+    sensitive?: boolean;
+  }[];
+}
+
+export const PERMISSION_COLUMNS: PermissionColumnCategory[] = [
+  {
+    category: 'Basic Identity & Profile Info',
+    description: 'General identification and departmental attributes',
+    items: [
+      { id: 'id', label: 'Employee ID', desc: 'Employee Code / Badge Number (e.g. EMP001)' },
+      { id: 'name', label: 'Name & Profile Photo', desc: 'Full Name, Avatar and Work Email' },
+      { id: 'role', label: 'Designation & Department', desc: 'Job Title, Department & Employee Group' },
+      { id: 'branch', label: 'Branch & Cost Center', desc: 'Assigned Branch location & Cost center tag' },
+      { id: 'mobileNo', label: 'Work Mobile & Contact', desc: 'Official phone number & contact info' },
+      { id: 'personalDetails', label: 'Personal Information', desc: 'Personal Mobile, Personal Email, DOB, Gender, Blood Group & Emergency Contact' },
+    ]
+  },
+  {
+    category: 'Employment & Tenure',
+    description: 'Dates and lifecycle status attributes',
+    items: [
+      { id: 'joiningDate', label: 'Joining Date', desc: 'Official date of joining the organization' },
+      { id: 'confirmationDate', label: 'Confirmation Date', desc: 'Probation confirmation / review date' },
+      { id: 'status', label: 'Employment Status (Active/Inactive)', desc: 'Active / Inactive badge and status toggle' },
+    ]
+  },
+  {
+    category: 'Salary & Financials (Highly Sensitive)',
+    description: 'Compensation, breakdown rates, and increment trackers',
+    items: [
+      { id: 'salary', label: 'Monthly Basic Salary & Allowances', desc: 'Basic Pay, HRA, DA, Allowances, Gross Pay & Hourly Rate', sensitive: true },
+      { id: 'paymentMethod', label: 'Payment Method Mode', desc: 'Payment mode (Bank Transfer, Cheque, Cash)', sensitive: true },
+      { id: 'increments_tab', label: 'Salary Increment Tracker History', desc: 'View past appraisals, revisions & increment tracker tab', sensitive: true },
+    ]
+  },
+  {
+    category: 'Banking, Tax & Statutory (Highly Sensitive)',
+    description: 'Government compliance, identity proof, and disbursement details',
+    items: [
+      { id: 'bankDetails', label: 'Bank Account & IFSC Details', desc: 'Bank Name, Account Number & Branch IFSC', sensitive: true },
+      { id: 'identityDetails', label: 'PAN Card & Aadhaar Proof', desc: 'Government identity proof numbers (PAN & Aadhaar)', sensitive: true },
+      { id: 'pfEsicDetails', label: 'PF & ESIC Numbers', desc: 'EPF Account No, UAN & ESIC Insurance Code', sensitive: true },
+    ]
+  },
+  {
+    category: 'Device & Attendance Controls',
+    description: 'Mobile clocking flags and hardware binding locks',
+    items: [
+      { id: 'gpsAndMobile', label: 'GPS Geofencing & Mobile Punch', desc: 'Mobile punch enablement & Geofence toggle' },
+      { id: 'deviceInfo', label: 'Device Binding & Hardware Lock', desc: 'Registered smartphone device ID & fingerprint lock' },
+    ]
+  },
+  {
+    category: 'Reports & Bulk Action Tools',
+    description: 'Data export files, rosters, and bulk spreadsheet tools',
+    items: [
+      { id: 'export_csv', label: 'Export Full Employee CSV Report', desc: 'Ability to download full directory spreadsheet' },
+      { id: 'export_inactive', label: 'Export Inactive Records Archive', desc: 'Ability to export archived ex-employees' },
+      { id: 'bulk_import', label: 'Bulk CSV Import & Upload', desc: 'Ability to bulk import new employee rosters via CSV' },
+    ]
+  }
+];
+
+export const isRoleColumnAllowed = (
+  role: string | undefined,
+  columnKey: string,
+  adminSettings?: AdminSettings
+): boolean => {
+  if (!role) return false;
+  if (role === 'super_admin' || role === 'admin') return true;
+  
+  const configured = adminSettings?.roleColumnPermissions?.[role];
+  if (configured && Array.isArray(configured)) {
+    if (configured.includes('all')) return true;
+    return configured.includes(columnKey);
+  }
+  
+  const defaultList = DEFAULT_ROLE_COLUMN_PERMISSIONS[role];
+  if (defaultList && Array.isArray(defaultList)) {
+    if (defaultList.includes('all')) return true;
+    return defaultList.includes(columnKey);
+  }
+  
+  // Custom roles without explicit config default to standard non-sensitive columns
+  return ['id', 'name', 'role', 'branch', 'status', 'mobileNo'].includes(columnKey);
 };
 
 export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
@@ -243,6 +393,8 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
     }
   ],
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
+  roleColumnPermissions: DEFAULT_ROLE_COLUMN_PERMISSIONS,
+  customRoles: [],
   enableEmployeePayslips: false,
   enableGeofencing: false,
   enableMobileAttendance: true,
@@ -272,7 +424,19 @@ export default function Settings({
   passwordRequests = [],
   setPasswordRequests,
   employees = [],
+  setEmployees = () => {},
+  candidates = [],
+  setCandidates,
   attendance = [],
+  setAttendance = () => {},
+  archivedEmployees = [],
+  setArchivedEmployees = () => {},
+  archivedCandidates = [],
+  setArchivedCandidates = () => {},
+  archivedAttendance = [],
+  setArchivedAttendance = () => {},
+  spreadsheetId,
+  googleToken,
   payroll = [],
   onImportData,
   onClearSheetsSession,
@@ -284,7 +448,7 @@ export default function Settings({
   onSendTestEmail,
   onResendEmail
 }: SettingsProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'roles_permissions' | 'audit_logs' | 'email_smtp' | 'whatsapp_auto' | 'email_logs'>('company');
+  const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'archive_storage' | 'roles_permissions' | 'audit_logs' | 'email_smtp' | 'whatsapp_auto' | 'email_logs'>('company');
   const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
   const [showWelcomePreviewModal, setShowWelcomePreviewModal] = useState(false);
 
@@ -305,7 +469,7 @@ export default function Settings({
   const [newAccPassword, setNewAccPassword] = useState('');
   const [newAccEmail, setNewAccEmail] = useState('');
   const [newAccMobileNo, setNewAccMobileNo] = useState('');
-  const [newAccRole, setNewAccRole] = useState<'admin' | 'director' | 'sub_admin' | 'hr' | 'branch_manager'>('hr');
+  const [newAccRole, setNewAccRole] = useState<string>('hr');
   const [newAccBranch, setNewAccBranch] = useState('');
   const [newAccBranches, setNewAccBranches] = useState<string[]>([]);
   const [roleFormError, setRoleFormError] = useState('');
@@ -314,7 +478,20 @@ export default function Settings({
   const [editingAccount, setEditingAccount] = useState<UserRoleAccount | null>(null);
   const [newMasterVal, setNewMasterVal] = useState<string>('');
   const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes' | 'jobOpeningsList'>>('departments');
-  const [activeConfigRole, setActiveConfigRole] = useState<'director' | 'sub_admin' | 'hr' | 'branch_manager' | 'employee'>('director');
+  const [activeConfigRole, setActiveConfigRole] = useState<string>('super_admin');
+  const [rolesSubSection, setRolesSubSection] = useState<'columns' | 'matrix' | 'accounts' | 'custom_roles'>('columns');
+  
+  //Custom Roles CRUD states
+  const [isNewRoleModalOpen, setIsNewRoleModalOpen] = useState(false);
+  const [newRoleId, setNewRoleId] = useState('');
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRoleDesc, setNewRoleDesc] = useState('');
+  const [newRoleCopyFrom, setNewRoleCopyFrom] = useState('hr');
+  const [roleModalError, setRoleModalError] = useState('');
+  const [editingCustomRole, setEditingCustomRole] = useState<CustomRole | null>(null);
+  const [editRoleName, setEditRoleName] = useState('');
+  const [editRoleDesc, setEditRoleDesc] = useState('');
+
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
@@ -953,9 +1130,197 @@ export default function Settings({
   };
 
   const roleAccounts = localSettings.roleAccounts || [];
+  const customRoles: CustomRole[] = localSettings.customRoles || [];
+
+  const allRoles: RoleDefinition[] = useMemo(() => {
+    const customDefs: RoleDefinition[] = customRoles.map(cr => ({
+      id: cr.id,
+      name: cr.name,
+      description: cr.description || `Custom defined role: ${cr.name}`,
+      isCustom: true
+    }));
+    return [...BUILTIN_ROLES, ...customDefs];
+  }, [customRoles]);
+
   const rolePermissions = {
     ...DEFAULT_ROLE_PERMISSIONS,
     ...(localSettings.rolePermissions || {})
+  };
+
+  const roleColumnPermissions = {
+    ...DEFAULT_ROLE_COLUMN_PERMISSIONS,
+    ...(localSettings.roleColumnPermissions || {})
+  };
+
+  const isColumnChecked = (role: string, columnKey: string): boolean => {
+    if (role === 'super_admin' || role === 'admin') return true;
+    const list = roleColumnPermissions[role] || DEFAULT_ROLE_COLUMN_PERMISSIONS[role] || [];
+    if (list.includes('all')) return true;
+    return list.includes(columnKey);
+  };
+
+  const handleToggleColumnPermission = (role: string, columnKey: string) => {
+    if (role === 'super_admin' || role === 'admin') return;
+    const currentList = [...(roleColumnPermissions[role] || DEFAULT_ROLE_COLUMN_PERMISSIONS[role] || [])];
+    
+    let updatedList: string[] = [];
+    if (currentList.includes('all')) {
+      const allItemIds = PERMISSION_COLUMNS.flatMap(cat => cat.items.map(it => it.id));
+      updatedList = allItemIds.filter(id => id !== columnKey);
+    } else if (currentList.includes(columnKey)) {
+      updatedList = currentList.filter(id => id !== columnKey);
+    } else {
+      updatedList = [...currentList, columnKey];
+    }
+
+    setLocalSettings({
+      ...localSettings,
+      roleColumnPermissions: {
+        ...roleColumnPermissions,
+        [role]: updatedList
+      }
+    });
+  };
+
+  const handleSelectAllColumnsForRole = (role: string) => {
+    setLocalSettings({
+      ...localSettings,
+      roleColumnPermissions: {
+        ...roleColumnPermissions,
+        [role]: ['all']
+      }
+    });
+  };
+
+  const handleHideSensitiveForRole = (role: string) => {
+    const nonSensitiveIds = PERMISSION_COLUMNS.flatMap(cat => 
+      cat.items.filter(it => !it.sensitive).map(it => it.id)
+    );
+    setLocalSettings({
+      ...localSettings,
+      roleColumnPermissions: {
+        ...roleColumnPermissions,
+        [role]: nonSensitiveIds
+      }
+    });
+  };
+
+  const handleResetColumnPermissions = (role: string) => {
+    const defaultCols = DEFAULT_ROLE_COLUMN_PERMISSIONS[role] || ['id', 'name', 'role', 'branch', 'status', 'mobileNo'];
+    setLocalSettings({
+      ...localSettings,
+      roleColumnPermissions: {
+        ...roleColumnPermissions,
+        [role]: defaultCols
+      }
+    });
+  };
+
+  const handleAddCustomRole = () => {
+    setRoleModalError('');
+    const cleanId = newRoleId.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const cleanName = newRoleName.trim();
+    if (!cleanId) {
+      setRoleModalError('Role Identifier (code) is required (e.g. auditor, store_manager).');
+      return;
+    }
+    if (!cleanName) {
+      setRoleModalError('Role Display Name is required (e.g. Store Manager).');
+      return;
+    }
+    if (allRoles.some(r => r.id.toLowerCase() === cleanId)) {
+      setRoleModalError(`Role identifier "${cleanId}" already exists. Please choose another.`);
+      return;
+    }
+
+    const newRoleObj: CustomRole = {
+      id: cleanId,
+      name: cleanName,
+      description: newRoleDesc.trim() || `Custom defined role: ${cleanName}`,
+      isCustom: true,
+      createdAt: new Date().toISOString()
+    };
+
+    const templatePermissions = rolePermissions[newRoleCopyFrom] || DEFAULT_ROLE_PERMISSIONS[newRoleCopyFrom] || [];
+    const templateColPermissions = roleColumnPermissions[newRoleCopyFrom] || DEFAULT_ROLE_COLUMN_PERMISSIONS[newRoleCopyFrom] || [];
+
+    setLocalSettings({
+      ...localSettings,
+      customRoles: [...customRoles, newRoleObj],
+      rolePermissions: {
+        ...rolePermissions,
+        [cleanId]: [...templatePermissions]
+      },
+      roleColumnPermissions: {
+        ...roleColumnPermissions,
+        [cleanId]: [...templateColPermissions]
+      }
+    });
+
+    setActiveConfigRole(cleanId);
+    setIsNewRoleModalOpen(false);
+    setNewRoleId('');
+    setNewRoleName('');
+    setNewRoleDesc('');
+    setNewRoleCopyFrom('hr');
+  };
+
+  const handleUpdateCustomRole = () => {
+    if (!editingCustomRole) return;
+    if (!editRoleName.trim()) {
+      alert('Role Name cannot be empty.');
+      return;
+    }
+    const updatedCustomRoles = customRoles.map(cr => {
+      if (cr.id === editingCustomRole.id) {
+        return {
+          ...cr,
+          name: editRoleName.trim(),
+          description: editRoleDesc.trim() || cr.description
+        };
+      }
+      return cr;
+    });
+
+    setLocalSettings({
+      ...localSettings,
+      customRoles: updatedCustomRoles
+    });
+
+    setEditingCustomRole(null);
+  };
+
+  const handleDeleteCustomRole = (roleId: string) => {
+    if (BUILTIN_ROLES.some(br => br.id === roleId)) {
+      alert('Built-in system roles cannot be deleted.');
+      return;
+    }
+    const assignedAccounts = roleAccounts.filter(acc => acc.role === roleId);
+    if (assignedAccounts.length > 0) {
+      alert(`Cannot delete role "${roleId}" because ${assignedAccounts.length} user account(s) (${assignedAccounts.map(a => a.name).join(', ')}) are currently assigned to it. Please reassign their roles first.`);
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete custom role "${roleId}"? All permissions for this role will also be removed.`)) {
+      return;
+    }
+
+    const updatedCustomRoles = customRoles.filter(cr => cr.id !== roleId);
+    const updatedRolePerms = { ...rolePermissions };
+    delete updatedRolePerms[roleId];
+    const updatedColPerms = { ...roleColumnPermissions };
+    delete updatedColPerms[roleId];
+
+    setLocalSettings({
+      ...localSettings,
+      customRoles: updatedCustomRoles,
+      rolePermissions: updatedRolePerms,
+      roleColumnPermissions: updatedColPerms
+    });
+
+    if (activeConfigRole === roleId) {
+      setActiveConfigRole('super_admin');
+    }
   };
 
   const PERMISSION_MODULES = [
@@ -1334,6 +1699,23 @@ export default function Settings({
           >
             <Database className="w-3.5 h-3.5 shrink-0 md:mt-0.5" />
             <span>{t.tabDatabase}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('archive_storage')}
+            className={`flex items-center md:items-start gap-2.5 px-3 py-2 text-xs font-bold rounded-md transition-all text-left whitespace-nowrap md:whitespace-normal cursor-pointer relative ${
+              activeSubTab === 'archive_storage'
+                ? 'bg-[#03623c] text-white shadow-xs border border-[#024d2e] dark:bg-[#03623c] dark:text-white dark:border-emerald-600'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Archive className="w-3.5 h-3.5 shrink-0 md:mt-0.5 text-emerald-400" />
+            <span>{'Archive & Storage'}</span>
+            {(archivedEmployees.length + archivedCandidates.length) > 0 && (
+              <span className="ml-auto bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.2 text-[9px] font-mono rounded-full font-bold">
+                {archivedEmployees.length + archivedCandidates.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -2691,435 +3073,877 @@ export default function Settings({
             </div>
           )}
 
+          {/* Sub Tab: Archive & Storage Optimizer */}
+          {activeSubTab === 'archive_storage' && (
+            <ArchiveStorageManager
+              employees={employees}
+              setEmployees={setEmployees}
+              candidates={candidates}
+              setCandidates={setCandidates}
+              attendance={attendance}
+              setAttendance={setAttendance}
+              archivedEmployees={archivedEmployees}
+              setArchivedEmployees={setArchivedEmployees}
+              archivedCandidates={archivedCandidates}
+              setArchivedCandidates={setArchivedCandidates}
+              archivedAttendance={archivedAttendance}
+              setArchivedAttendance={setArchivedAttendance}
+              settings={localSettings}
+              onSaveSettings={(newSettings) => {
+                setLocalSettings(newSettings);
+                onSaveSettings(newSettings);
+              }}
+              spreadsheetId={spreadsheetId}
+              googleToken={googleToken}
+              portalUser={portalUser}
+              language={language}
+            />
+          )}
+
           {activeSubTab === 'roles_permissions' && (
             <div className="space-y-6">
               <div>
                 <h3 className="text-xs font-bold text-gray-800 border-b border-gray-100 pb-2 flex items-center gap-1.5">
                   <KeyRound className="w-4 h-4 text-emerald-600" />
-                  {'User Roles & Access Permissions'}
+                  {'User Roles, Column Visibility & Access Permissions'}
                 </h3>
                 <p className="text-[10px] text-gray-500 mt-1 leading-normal font-sans">
-                  {'Define custom login accounts for different stakeholders (Admin, Director, HR, Branch Manager) and configure which dashboard modules they are allowed to access.'}
+                  {'Control precisely which roles (Admin, HR, Recruiter, Branch Manager, or Custom Roles) can view specific table columns (Salary, Bank, Aadhaar/PAN, Statutory), manage dashboard modules, or configure custom role definitions.'}
                 </p>
               </div>
 
-              {/* 1. Permissions Matrix */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs font-sans">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      {'Granular Permission Matrix'}
-                    </h4>
-                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
-                      {'Select a user role, then toggle checkboxes to configure granular action-level access (View, Add, Edit, Delete/Approve) for each page module.'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAllForRole(activeConfigRole)}
-                      className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                    >
-                      ✓ Select All Modules
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleResetRolePermissions(activeConfigRole)}
-                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                    >
-                      ↺ Reset to Default
-                    </button>
-                  </div>
-                </div>
+              {/* Roles Sub-Navigation Tabs */}
+              <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 dark:bg-[#11221b] rounded-2xl border border-slate-200 dark:border-[#1e3a2f]">
+                <button
+                  type="button"
+                  onClick={() => setRolesSubSection('columns')}
+                  className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    rolesSubSection === 'columns'
+                      ? 'bg-[#03623c] text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#183126]'
+                  }`}
+                >
+                  <Eye className="w-4 h-4" />
+                  {'1. Column & Report Visibility'}
+                </button>
 
-                {/* Role Selector Tabs */}
-                <div className="flex flex-wrap gap-2 p-1.5 bg-slate-150/50 rounded-xl border border-slate-200">
-                  {[
-                    { id: 'super_admin', label: 'Super Admin' },
-                    { id: 'admin', label: 'Admin' },
-                    { id: 'hr', label: 'HR Manager' },
-                    { id: 'asset_manager', label: 'Asset Manager' },
-                    { id: 'recruiter', label: 'Recruiter' },
-                    { id: 'branch_manager', label: 'Branch Manager' },
-                    { id: 'director', label: 'Director' },
-                    { id: 'employee', label: 'Employee' },
-                  ].map(roleItem => (
-                    <button
-                      key={roleItem.id}
-                      type="button"
-                      onClick={() => setActiveConfigRole(roleItem.id as any)}
-                      className={`flex-1 min-w-[120px] px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                        activeConfigRole === roleItem.id
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                      }`}
-                    >
-                      {roleItem.label}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setRolesSubSection('matrix')}
+                  className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    rolesSubSection === 'matrix'
+                      ? 'bg-[#03623c] text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#183126]'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {'2. Module Action Permissions'}
+                </button>
 
-                <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-3xs">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold text-[10px] uppercase tracking-wider">
-                        <th className="p-3.5 font-black">{'Module Name'}</th>
-                        <th className="p-3.5 text-center">{'1. ViewAccess'}</th>
-                        <th className="p-3.5 text-center">{'2. AddCreate'}</th>
-                        <th className="p-3.5 text-center">{'3. EditModify'}</th>
-                        <th className="p-3.5 text-center">{'4. DeleteAction'}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                      {PERMISSION_MODULES.map((mod) => (
-                        <tr key={mod.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="p-3.5">
-                            <div className="font-bold text-slate-900">{language === 'en' ? mod.labelEn : mod.labelHi}</div>
-                            <div className="text-[9px] text-slate-400 font-mono mt-0.5">ID: {mod.id}</div>
-                          </td>
-                          
-                          {[0, 1, 2, 3].map((colIndex) => {
-                            const act = getActionForColumn(mod.id, colIndex);
-                            return (
-                              <td key={colIndex} className="p-3.5 text-center">
-                                {act ? (
-                                  <div className="flex flex-col items-center justify-center gap-1.5">
-                                    <input
-                                      type="checkbox"
-                                      checked={isPermissionChecked(activeConfigRole, mod.id, act.id)}
-                                      onChange={() => handleToggleFineGrainedPermission(activeConfigRole, mod.id, act.id)}
-                                      className="w-4.5 h-4.5 rounded-md text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all focus:scale-105" />
-                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">
-                                      {act.label}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-300 text-xs font-mono">-</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="text-[9px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg border border-amber-200">
-                  {'* Note: System Administrator ("admin") always has permanent access to all sections and cannot be restricted.'}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setRolesSubSection('custom_roles')}
+                  className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    rolesSubSection === 'custom_roles'
+                      ? 'bg-[#03623c] text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#183126]'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {'3. Custom Roles'}{customRoles.length > 0 ? ` (${customRoles.length})` : ''}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRolesSubSection('accounts')}
+                  className={`flex-1 min-w-[160px] py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    rolesSubSection === 'accounts'
+                      ? 'bg-[#03623c] text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#183126]'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  {'4. User Accounts'}{roleAccounts.length > 0 ? ` (${roleAccounts.length + 1})` : ''}
+                </button>
               </div>
 
-              {/* 2. User Accounts List & Form */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
-                {/* Accounts list table */}
-                <div className="lg:col-span-2 space-y-3">
-                  <h4 className="text-xs font-bold text-slate-800">
-                    {'Active Multi-User Accounts'}
-                  </h4>
-                  
-                  <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-2xs">
+              {/* ------------------------------------------------------------- */}
+              {/* SUBSECTION 1: COLUMN & FIELD VISIBILITY MATRIX */}
+              {/* ------------------------------------------------------------- */}
+              {rolesSubSection === 'columns' && (
+                <div className="space-y-5 font-sans">
+                  {/* Role Selector Header */}
+                  <div className="bg-slate-50 dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl p-4.5 space-y-3 shadow-3xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-emerald-600" />
+                          {'Select Target Role to Configure Column & Field Access'}
+                        </h4>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {'Changes take effect immediately across all Employee Directory views, reports, and detail cards for users with this role.'}
+                        </p>
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectAllColumnsForRole(activeConfigRole)}
+                          className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-3xs"
+                          title="Allow this role to view all columns & reports"
+                        >
+                          ✓ Show All Columns
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleHideSensitiveForRole(activeConfigRole)}
+                          className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-3xs"
+                          title="Instantly hide salary, bank account, aadhaar/pan, and statutory data"
+                        >
+                          🔒 Hide Financial/Sensitive
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleResetColumnPermissions(activeConfigRole)}
+                          className="px-2.5 py-1.5 bg-slate-200/80 hover:bg-slate-300 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-3xs"
+                          title="Reset to recommended standard defaults"
+                        >
+                          ↺ Reset Defaults
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Role selector pill buttons */}
+                    <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-200/70 dark:border-[#1e3a2f]">
+                      {allRoles.map(r => {
+                        const isSuperOrAdmin = r.id === 'super_admin' || r.id === 'admin';
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => setActiveConfigRole(r.id)}
+                            className={`px-3.5 py-2 rounded-xl text-[11px] font-black tracking-wide transition-all cursor-pointer flex items-center gap-1.5 ${
+                              activeConfigRole === r.id
+                                ? 'bg-emerald-700 text-white shadow-xs scale-102'
+                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 hover:border-emerald-400'
+                            }`}
+                          >
+                            <span>{r.name}</span>
+                            {r.isCustom && (
+                              <span className={`text-[8px] font-black px-1.5 py-0.2 rounded uppercase ${
+                                activeConfigRole === r.id ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
+                              }`}>
+                                Custom
+                              </span>
+                            )}
+                            {isSuperOrAdmin && (
+                              <span className={`text-[8px] font-black px-1.5 py-0.2 rounded uppercase ${
+                                activeConfigRole === r.id ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                Unrestricted
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Active Role Banner Notice */}
+                  {(() => {
+                    const activeRoleObj = allRoles.find(r => r.id === activeConfigRole);
+                    const isSuperOrAdmin = activeConfigRole === 'super_admin' || activeConfigRole === 'admin';
+
+                    return (
+                      <div className={`p-4 rounded-2xl border flex items-center justify-between gap-3 ${
+                        isSuperOrAdmin 
+                          ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/60'
+                          : 'bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900/60'
+                      }`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2.5 rounded-xl ${
+                            isSuperOrAdmin ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'
+                          }`}>
+                            <Shield className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h5 className="text-xs font-black text-slate-900 dark:text-white">
+                                {activeRoleObj?.name || activeConfigRole}
+                              </h5>
+                              <span className="text-[9px] font-mono font-bold text-slate-500 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800">
+                                ID: {activeConfigRole}
+                              </span>
+                              {activeRoleObj?.isCustom && (
+                                <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                                  Custom Role
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 font-medium">
+                              {activeRoleObj?.description || 'Role permissions configuration'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {isSuperOrAdmin && (
+                          <div className="text-right shrink-0">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100/90 text-emerald-900 dark:bg-emerald-900/80 dark:text-emerald-100 rounded-xl text-[10px] font-extrabold">
+                              <Lock className="w-3 h-3" />
+                              {'All columns always visible (Master Administrator)'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Column Categories Grid */}
+                  <div className="space-y-4">
+                    {PERMISSION_COLUMNS.map((categoryGroup, idx) => {
+                      const categoryCols = categoryGroup.items;
+                      const enabledCount = categoryCols.filter(c => isColumnChecked(activeConfigRole, c.id)).length;
+                      const allCategoryEnabled = enabledCount === categoryCols.length;
+                      const isSuperOrAdmin = activeConfigRole === 'super_admin' || activeConfigRole === 'admin';
+
+                      return (
+                        <div
+                          key={categoryGroup.category || idx}
+                          className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl overflow-hidden shadow-3xs"
+                        >
+                          {/* Category Header */}
+                          <div className="p-3.5 bg-slate-50/80 dark:bg-[#0b1812] border-b border-slate-200 dark:border-[#1e3a2f] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                              <div>
+                                <h5 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                                  {categoryGroup.category}
+                                </h5>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                  {categoryGroup.description}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2.5 shrink-0">
+                              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800">
+                                {isSuperOrAdmin ? 'All Allowed' : `${enabledCount} / ${categoryCols.length} Enabled`}
+                              </span>
+                              {!isSuperOrAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const targetState = !allCategoryEnabled;
+                                    const rolePermissionsMap = localSettings.roleColumnPermissions || DEFAULT_ROLE_COLUMN_PERMISSIONS;
+                                    const currentAllowed = rolePermissionsMap[activeConfigRole] || DEFAULT_ROLE_COLUMN_PERMISSIONS[activeConfigRole] || [];
+                                    const catKeys = categoryCols.map(c => c.id);
+                                    let newAllowed: string[];
+                                    if (targetState) {
+                                      newAllowed = Array.from(new Set([...currentAllowed, ...catKeys]));
+                                    } else {
+                                      newAllowed = currentAllowed.filter(k => !catKeys.includes(k));
+                                    }
+                                    setLocalSettings({
+                                      ...localSettings,
+                                      roleColumnPermissions: {
+                                        ...rolePermissionsMap,
+                                        [activeConfigRole]: newAllowed
+                                      }
+                                    });
+                                  }}
+                                  className="text-[10px] font-black text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 cursor-pointer transition-all"
+                                >
+                                  {allCategoryEnabled ? 'Disable All in Category' : 'Enable All in Category'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Columns Checklist Grid */}
+                          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {categoryCols.map(col => {
+                              const checked = isColumnChecked(activeConfigRole, col.id);
+                              return (
+                                <label
+                                  key={col.id}
+                                  className={`p-3 rounded-xl border transition-all select-none flex items-start gap-2.5 cursor-pointer ${
+                                    checked
+                                      ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60 shadow-3xs'
+                                      : 'bg-slate-50/40 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 opacity-70 hover:opacity-100'
+                                  } ${isSuperOrAdmin ? 'cursor-not-allowed' : ''}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    disabled={isSuperOrAdmin}
+                                    checked={checked}
+                                    onChange={() => handleToggleColumnPermission(activeConfigRole, col.id)}
+                                    className="mt-0.5 w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-xs font-black text-slate-800 dark:text-slate-100">
+                                        {col.label}
+                                      </span>
+                                      {col.sensitive && (
+                                        <span className="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
+                                          Sensitive
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
+                                      {col.id}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                                      {col.desc}
+                                    </p>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ------------------------------------------------------------- */}
+              {/* SUBSECTION 2: MODULE ACTION PERMISSIONS MATRIX */}
+              {/* ------------------------------------------------------------- */}
+              {rolesSubSection === 'matrix' && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs font-sans">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        {'Granular Module Permission Matrix'}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                        {'Select a user role, then toggle checkboxes to configure granular action-level access (View, Add, Edit, Delete/Approve) for each page module.'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAllForRole(activeConfigRole)}
+                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                      >
+                        ✓ Select All Modules
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleResetRolePermissions(activeConfigRole)}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                      >
+                        ↺ Reset to Default
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Role Selector Tabs */}
+                  <div className="flex flex-wrap gap-2 p-1.5 bg-slate-150/50 rounded-xl border border-slate-200">
+                    {allRoles.map(roleItem => (
+                      <button
+                        key={roleItem.id}
+                        type="button"
+                        onClick={() => setActiveConfigRole(roleItem.id)}
+                        className={`flex-1 min-w-[120px] px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+                          activeConfigRole === roleItem.id
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                        }`}
+                      >
+                        {roleItem.name} {roleItem.isCustom ? '(Custom)' : ''}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-3xs">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold text-[10px] uppercase">
-                          <th className="p-3">{'User Details'}</th>
-                          <th className="p-3">{'Role'}</th>
-                          <th className="p-3">{'Branch'}</th>
-                          <th className="p-3 text-right">{'Action'}</th>
+                        <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-extrabold text-[10px] uppercase tracking-wider">
+                          <th className="p-3.5 font-black">{'Module Name'}</th>
+                          <th className="p-3.5 text-center">{'1. ViewAccess'}</th>
+                          <th className="p-3.5 text-center">{'2. AddCreate'}</th>
+                          <th className="p-3.5 text-center">{'3. EditModify'}</th>
+                          <th className="p-3.5 text-center">{'4. DeleteAction'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                        {/* Always show the main admin */}
-                        <tr className="bg-emerald-50/20">
-                          <td className="p-3">
-                            <p className="font-extrabold text-slate-900">{'Primary Administrator'}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">@{localSettings.adminUsername || 'admin'}</p>
-                            
-                            {editingAccountId === 'admin' ? (
-                              <div className="mt-1.5 flex items-center gap-2 animate-fadeIn">
-                                <input
-                                  type="text"
-                                  value={editingAccountPassword}
-                                  onChange={(e) => setEditingAccountPassword(e.target.value)}
-                                  className="border border-emerald-300 px-2 py-0.5 rounded text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28 bg-white"
-                                  placeholder={'New password'} />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (!editingAccountPassword.trim()) return;
-                                    setLocalSettings({
-                                      ...localSettings,
-                                      adminPassword: editingAccountPassword.trim()
-                                    });
-                                    setEditingAccountId(null);
-                                    setEditingAccountPassword('');
-                                  }}
-                                  className="bg-emerald-600 text-white text-[9px] font-bold px-2 py-1 rounded hover:bg-emerald-700 cursor-pointer"
-                                >
-                                  {'Save'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => { setEditingAccountId(null); setEditingAccountPassword(''); }}
-                                  className="text-slate-400 hover:text-slate-600 text-[9px] font-bold px-1.5 py-1 rounded hover:bg-slate-100 cursor-pointer"
-                                >
-                                  {'Cancel'}
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="mt-1.5 flex items-center gap-1.5">
-                                <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600">
-                                  🔑 ••••••••
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingAccountId('admin');
-                                    setEditingAccountPassword(localSettings.adminPassword || 'admin123');
-                                  }}
-                                  className="text-emerald-600 hover:text-emerald-700 text-[10px] font-black underline cursor-pointer hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all"
-                                >
-                                  {'Edit Pass'}
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-3">
-                            <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-black uppercase">
-                              Admin
-                            </span>
-                          </td>
-                          <td className="p-3 text-slate-400 text-[10px] font-medium">-</td>
-                          <td className="p-3 text-right text-slate-400 text-[10px] font-medium">
-                            {'System Default'}
-                          </td>
-                        </tr>
-
-                        {roleAccounts.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="p-6 text-center text-slate-400 text-[10px] font-medium">
-                              {'No additional user accounts configured.'}
+                        {PERMISSION_MODULES.map((mod) => (
+                          <tr key={mod.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="p-3.5">
+                              <div className="font-bold text-slate-900">{language === 'en' ? mod.labelEn : mod.labelHi}</div>
+                              <div className="text-[9px] text-slate-400 font-mono mt-0.5">ID: {mod.id}</div>
                             </td>
+                            
+                            {[0, 1, 2, 3].map((colIndex) => {
+                              const act = getActionForColumn(mod.id, colIndex);
+                              return (
+                                <td key={colIndex} className="p-3.5 text-center">
+                                  {act ? (
+                                    <div className="flex flex-col items-center justify-center gap-1.5">
+                                      <input
+                                        type="checkbox"
+                                        checked={isPermissionChecked(activeConfigRole, mod.id, act.id)}
+                                        onChange={() => handleToggleFineGrainedPermission(activeConfigRole, mod.id, act.id)}
+                                        className="w-4.5 h-4.5 rounded-md text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer transition-all focus:scale-105" />
+                                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">
+                                        {act.label}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-300 text-xs font-mono">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
                           </tr>
-                        ) : (
-                          roleAccounts.map((acc) => (
-                            <tr key={acc.id} className="hover:bg-slate-50/50">
-                              <td className="p-3">
-                                <p className="font-extrabold text-slate-900">{acc.name}</p>
-                                <p className="text-[10px] text-slate-400 font-mono">@{acc.username}</p>
-                                {acc.email && (
-                                  <p className="text-[10px] text-slate-500 mt-0.5">📧 {acc.email}</p>
-                                )}
-                                {acc.mobileNo && (
-                                  <p className="text-[10px] text-slate-500 mt-0.5">📞 {acc.mobileNo}</p>
-                                )}
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="text-[9px] text-amber-600 font-bold bg-amber-50 p-2 rounded-lg border border-amber-200">
+                    {'* Note: System Administrator ("admin" & "super_admin") always has permanent access to all sections and cannot be restricted.'}
+                  </div>
+                </div>
+              )}
+
+              {/* ------------------------------------------------------------- */}
+              {/* SUBSECTION 3: CUSTOM ROLES MANAGEMENT (ADD, EDIT, DELETE) */}
+              {/* ------------------------------------------------------------- */}
+              {rolesSubSection === 'custom_roles' && (
+                <div className="space-y-5 font-sans">
+                  {/* Header & Add Button */}
+                  <div className="bg-slate-50 dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-3xs">
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-600" />
+                        {'Custom Roles Management'}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {'Define tailored organizational roles (e.g. Auditor, Store Keeper, Site Supervisor, Regional Lead) with specialized column visibility and page permissions.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewRoleId('');
+                        setNewRoleName('');
+                        setNewRoleDesc('');
+                        setRoleModalError('');
+                        setIsNewRoleModalOpen(true);
+                      }}
+                      className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-all shrink-0"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {'Create New Role'}
+                    </button>
+                  </div>
+
+                  {/* Roles Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {allRoles.map(role => {
+                      const userCount = roleAccounts.filter(acc => acc.role === role.id).length + (role.id === 'admin' ? 1 : 0);
+                      const isBuiltin = !role.isCustom;
+
+                      return (
+                        <div
+                          key={role.id}
+                          className="bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#1e3a2f] rounded-2xl p-4.5 space-y-3 shadow-3xs flex flex-col justify-between"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h5 className="text-xs font-black text-slate-900 dark:text-white">
+                                  {role.name}
+                                </h5>
+                                <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                                  role: {role.id}
+                                </p>
+                              </div>
+                              <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                isBuiltin ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                              }`}>
+                                {isBuiltin ? 'Built-In' : 'Custom'}
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                              {role.description}
+                            </p>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-100 dark:border-[#1e3a2f] flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                              👥 {userCount} {userCount === 1 ? 'user' : 'users'} assigned
+                            </span>
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveConfigRole(role.id);
+                                  setRolesSubSection('columns');
+                                }}
+                                className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-800 cursor-pointer"
+                                title="Configure column visibility for this role"
+                              >
+                                Columns ➔
+                              </button>
+
+                              {role.isCustom && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingCustomRole(role);
+                                      setEditRoleName(role.name);
+                                      setEditRoleDesc(role.description || '');
+                                    }}
+                                    className="p-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded cursor-pointer"
+                                    title="Edit Custom Role"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCustomRole(role.id)}
+                                    className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded cursor-pointer"
+                                    title="Delete Custom Role"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ------------------------------------------------------------- */}
+              {/* SUBSECTION 4: MULTI-USER LOGIN ACCOUNTS */}
+              {/* ------------------------------------------------------------- */}
+              {rolesSubSection === 'accounts' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
+                  {/* Accounts list table */}
+                  <div className="lg:col-span-2 space-y-3">
+                    <h4 className="text-xs font-bold text-slate-800">
+                      {'Active Multi-User Accounts'}
+                    </h4>
+                    
+                    <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-2xs">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold text-[10px] uppercase">
+                            <th className="p-3">{'User Details'}</th>
+                            <th className="p-3">{'Assigned Role'}</th>
+                            <th className="p-3">{'Branch Scope'}</th>
+                            <th className="p-3 text-right">{'Action'}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                          {/* Always show the main admin */}
+                          <tr className="bg-emerald-50/20">
+                            <td className="p-3">
+                              <p className="font-extrabold text-slate-900">{'Primary Administrator'}</p>
+                              <p className="text-[10px] text-slate-400 font-mono">@{localSettings.adminUsername || 'admin'}</p>
+                              
+                              {editingAccountId === 'admin' ? (
+                                <div className="mt-1.5 flex items-center gap-2 animate-fadeIn">
+                                  <input
+                                    type="text"
+                                    value={editingAccountPassword}
+                                    onChange={(e) => setEditingAccountPassword(e.target.value)}
+                                    className="border border-emerald-300 px-2 py-0.5 rounded text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 w-28 bg-white"
+                                    placeholder={'New password'} />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!editingAccountPassword.trim()) return;
+                                      setLocalSettings({
+                                        ...localSettings,
+                                        adminPassword: editingAccountPassword.trim()
+                                      });
+                                      setEditingAccountId(null);
+                                      setEditingAccountPassword('');
+                                    }}
+                                    className="bg-emerald-600 text-white text-[9px] font-bold px-2 py-1 rounded hover:bg-emerald-700 cursor-pointer"
+                                  >
+                                    {'Save'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setEditingAccountId(null); setEditingAccountPassword(''); }}
+                                    className="text-slate-400 hover:text-slate-600 text-[9px] font-bold px-1.5 py-1 rounded hover:bg-slate-100 cursor-pointer"
+                                  >
+                                    {'Cancel'}
+                                  </button>
+                                </div>
+                              ) : (
                                 <div className="mt-1.5 flex items-center gap-1.5">
                                   <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600">
                                     🔑 ••••••••
                                   </span>
                                   <button
                                     type="button"
-                                    onClick={() => setEditingAccount(acc)}
+                                    onClick={() => {
+                                      setEditingAccountId('admin');
+                                      setEditingAccountPassword(localSettings.adminPassword || 'admin123');
+                                    }}
                                     className="text-emerald-600 hover:text-emerald-700 text-[10px] font-black underline cursor-pointer hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all"
                                   >
-                                    {'Edit Details'}
+                                    {'Edit Pass'}
                                   </button>
                                 </div>
-                              </td>
-                              <td className="p-3">
-                                <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${
-                                  acc.role === 'admin' 
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : acc.role === 'director'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : acc.role === 'sub_admin'
-                                    ? 'bg-indigo-100 text-indigo-800'
-                                    : acc.role === 'hr'
-                                    ? 'bg-purple-100 text-purple-800'
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                  {acc.role.replace('_', ' ')}
-                                </span>
-                              </td>
-                              <td className="p-3 text-[10px] text-slate-600">
-                                {acc.branches && acc.branches.length > 0 ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {acc.branches.map(b => (
-                                      <span key={b} className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                                        {b}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : acc.branch ? (
-                                  <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                                    {acc.branch}
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400 font-medium">{'All Branches'}</span>
-                                )}
-                              </td>
-                              <td className="p-3 text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => setEditingAccount(acc)}
-                                    className="text-emerald-600 hover:text-emerald-800 p-1 rounded-md hover:bg-emerald-50 cursor-pointer animate-fadeIn"
-                                    title={'Edit Account'}
-                                  >
-                                    <Edit2 className="w-4 h-4 inline" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteRoleAccount(acc.id)}
-                                    className="text-rose-600 hover:text-rose-800 p-1 rounded-md hover:bg-rose-50 cursor-pointer animate-fadeIn"
-                                    title={'Delete Account'}
-                                  >
-                                    <Trash2 className="w-4 h-4 inline" />
-                                  </button>
-                                </div>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-black uppercase">
+                                Super Admin
+                              </span>
+                            </td>
+                            <td className="p-3 text-slate-400 text-[10px] font-medium">-</td>
+                            <td className="p-3 text-right text-slate-400 text-[10px] font-medium">
+                              {'Master Account'}
+                            </td>
+                          </tr>
+
+                          {roleAccounts.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="p-6 text-center text-slate-400 text-[10px] font-medium">
+                                {'No additional user accounts configured.'}
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Form to add new account */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs">
-                  <h4 className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-2">
-                    {'Create User Account'}
-                  </h4>
-
-                  {roleFormError && (
-                    <div className="text-[10px] text-rose-600 font-bold bg-rose-50 p-2.5 rounded border border-rose-200">
-                      {roleFormError}
-                    </div>
-                  )}
-
-                  <div className="space-y-3 text-xs font-semibold">
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">{'Full Name'}</label>
-                      <input
-                        type="text"
-                        value={newAccName}
-                        onChange={(e) => setNewAccName(e.target.value)}
-                        placeholder="Rahul Sharma"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">{'Login Username'}</label>
-                      <input
-                        type="text"
-                        value={newAccUsername}
-                        onChange={(e) => setNewAccUsername(e.target.value)}
-                        placeholder="rahul_hr"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800" />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">{'Password'}</label>
-                      <input
-                        type="text"
-                        value={newAccPassword}
-                        onChange={(e) => setNewAccPassword(e.target.value)}
-                        placeholder="hr1234"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800" />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">{'Email ID'}</label>
-                      <input
-                        type="email"
-                        value={newAccEmail}
-                        onChange={(e) => setNewAccEmail(e.target.value)}
-                        placeholder="rahul@rathi.com"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">{'Mobile No.'}</label>
-                      <input
-                        type="text"
-                        value={newAccMobileNo}
-                        onChange={(e) => setNewAccMobileNo(e.target.value)}
-                        placeholder="9876543210"
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">{'Assigned Role'}</label>
-                      <select
-                        value={newAccRole}
-                        onChange={(e: any) => {
-                          setNewAccRole(e.target.value);
-                          if (e.target.value !== 'branch_manager' && e.target.value !== 'director' && e.target.value !== 'sub_admin') {
-                            setNewAccBranch('');
-                            setNewAccBranches([]);
-                          }
-                        }}
-                        className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-slate-700"
-                      >
-                        <option value="super_admin">{'1. Super Admin'}</option>
-                        <option value="admin">{'2. Admin'}</option>
-                        <option value="hr">{'3. HR'}</option>
-                        <option value="asset_manager">{'4. Asset Manager'}</option>
-                        <option value="recruiter">{'5. Recruiter'}</option>
-                        <option value="branch_manager">{'6. Branch Manager'}</option>
-                        <option value="director">{'7. Director'}</option>
-                      </select>
-                    </div>
-
-                    {newAccRole !== 'super_admin' && (
-                      <div className="space-y-2 border border-slate-100 p-2.5 rounded-lg bg-slate-50/50">
-                        <label className="block text-slate-600 font-bold">
-                          {'Restricted Branches'}
-                        </label>
-                        
-                        <div className="max-h-28 overflow-y-auto space-y-1.5 p-1.5 bg-white border border-slate-200 rounded">
-                          {localSettings.branches.length === 0 ? (
-                            <p className="text-[10px] text-slate-400 italic p-1">No branches configured yet</p>
                           ) : (
-                            localSettings.branches.map((br) => {
-                              const isChecked = newAccBranches.includes(br);
+                            roleAccounts.map((acc) => {
+                              const roleDef = allRoles.find(r => r.id === acc.role);
                               return (
-                                <label key={br} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer select-none text-[11px] font-medium text-slate-700">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      if (isChecked) {
-                                        setNewAccBranches(newAccBranches.filter(b => b !== br));
-                                      } else {
-                                        setNewAccBranches([...newAccBranches, br]);
-                                      }
-                                    }}
-                                    className="w-3.5 h-3.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer" />
-                                  <span>{br}</span>
-                                </label>
+                                <tr key={acc.id} className="hover:bg-slate-50/50">
+                                  <td className="p-3">
+                                    <p className="font-extrabold text-slate-900">{acc.name}</p>
+                                    <p className="text-[10px] text-slate-400 font-mono">@{acc.username}</p>
+                                    {acc.email && (
+                                      <p className="text-[10px] text-slate-500 mt-0.5">📧 {acc.email}</p>
+                                    )}
+                                    {acc.mobileNo && (
+                                      <p className="text-[10px] text-slate-500 mt-0.5">📞 {acc.mobileNo}</p>
+                                    )}
+                                    <div className="mt-1.5 flex items-center gap-1.5">
+                                      <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600">
+                                        🔑 ••••••••
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingAccount(acc)}
+                                        className="text-emerald-600 hover:text-emerald-700 text-[10px] font-black underline cursor-pointer hover:bg-emerald-50 px-1.5 py-0.5 rounded transition-all"
+                                      >
+                                        {'Edit Details'}
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="p-3">
+                                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${
+                                      acc.role === 'admin' || acc.role === 'super_admin'
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : acc.role === 'director'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : acc.role === 'sub_admin'
+                                        ? 'bg-indigo-100 text-indigo-800'
+                                        : acc.role === 'hr'
+                                        ? 'bg-purple-100 text-purple-800'
+                                        : roleDef?.isCustom
+                                        ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                        : 'bg-slate-100 text-slate-800'
+                                    }`}>
+                                      {roleDef?.name || acc.role.replace('_', ' ')}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-[10px] text-slate-600">
+                                    {acc.branches && acc.branches.length > 0 ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {acc.branches.map(b => (
+                                          <span key={b} className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                            {b}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : acc.branch ? (
+                                      <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                        {acc.branch}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400 font-medium">{'All Branches'}</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingAccount(acc)}
+                                        className="text-emerald-600 hover:text-emerald-800 p-1 rounded-md hover:bg-emerald-50 cursor-pointer animate-fadeIn"
+                                        title={'Edit Account'}
+                                      >
+                                        <Edit2 className="w-4 h-4 inline" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteRoleAccount(acc.id)}
+                                        className="text-rose-600 hover:text-rose-800 p-1 rounded-md hover:bg-rose-50 cursor-pointer animate-fadeIn"
+                                        title={'Delete Account'}
+                                      >
+                                        <Trash2 className="w-4 h-4 inline" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
                               );
                             })
                           )}
-                        </div>
-                        <p className="text-[9px] text-slate-400 mt-1 leading-normal">
-                          {'Check the branch(es) this manager is allowed to see. Leave all unchecked to allow viewing ALL branches.'}
-                        </p>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Form to add new account */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-3xs">
+                    <h4 className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-2">
+                      {'Create User Account'}
+                    </h4>
+
+                    {roleFormError && (
+                      <div className="text-[10px] text-rose-600 font-bold bg-rose-50 p-2.5 rounded border border-rose-200">
+                        {roleFormError}
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={handleAddRoleAccount}
-                      className="w-full bg-[#03623c] hover:bg-[#024d2e] text-white text-xs font-black py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs mt-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      {'Add User Account'}
-                    </button>
+                    <div className="space-y-3 text-xs font-semibold">
+                      <div>
+                        <label className="block text-slate-600 font-bold mb-1">{'Full Name'}</label>
+                        <input
+                          type="text"
+                          value={newAccName}
+                          onChange={(e) => setNewAccName(e.target.value)}
+                          placeholder="Rahul Sharma"
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-600 font-bold mb-1">{'Login Username'}</label>
+                        <input
+                          type="text"
+                          value={newAccUsername}
+                          onChange={(e) => setNewAccUsername(e.target.value)}
+                          placeholder="rahul_hr"
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800" />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-600 font-bold mb-1">{'Password'}</label>
+                        <input
+                          type="text"
+                          value={newAccPassword}
+                          onChange={(e) => setNewAccPassword(e.target.value)}
+                          placeholder="hr1234"
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800" />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-600 font-bold mb-1">{'Email ID'}</label>
+                        <input
+                          type="email"
+                          value={newAccEmail}
+                          onChange={(e) => setNewAccEmail(e.target.value)}
+                          placeholder="rahul@rathi.com"
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-600 font-bold mb-1">{'Mobile No.'}</label>
+                        <input
+                          type="text"
+                          value={newAccMobileNo}
+                          onChange={(e) => setNewAccMobileNo(e.target.value)}
+                          placeholder="9876543210"
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800" />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-600 font-bold mb-1">{'Assigned Role'}</label>
+                        <select
+                          value={newAccRole}
+                          onChange={(e: any) => {
+                            setNewAccRole(e.target.value);
+                            if (e.target.value !== 'branch_manager' && e.target.value !== 'director' && e.target.value !== 'sub_admin') {
+                              setNewAccBranch('');
+                              setNewAccBranches([]);
+                            }
+                          }}
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-slate-700"
+                        >
+                          {allRoles.map(r => (
+                            <option key={r.id} value={r.id}>
+                              {r.name} {r.isCustom ? '(Custom Role)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {newAccRole !== 'super_admin' && (
+                        <div className="space-y-2 border border-slate-100 p-2.5 rounded-lg bg-slate-50/50">
+                          <label className="block text-slate-600 font-bold">
+                            {'Restricted Branches'}
+                          </label>
+                          
+                          <div className="max-h-28 overflow-y-auto space-y-1.5 p-1.5 bg-white border border-slate-200 rounded">
+                            {localSettings.branches.length === 0 ? (
+                              <p className="text-[10px] text-slate-400 italic p-1">No branches configured yet</p>
+                            ) : (
+                              localSettings.branches.map((br) => {
+                                const isChecked = newAccBranches.includes(br);
+                                return (
+                                  <label key={br} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer select-none text-[11px] font-medium text-slate-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          setNewAccBranches(newAccBranches.filter(b => b !== br));
+                                        } else {
+                                          setNewAccBranches([...newAccBranches, br]);
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer" />
+                                    <span>{br}</span>
+                                  </label>
+                                );
+                              })
+                            )}
+                          </div>
+                          <p className="text-[9px] text-slate-400 mt-1 leading-normal">
+                            {'Check the branch(es) this manager is allowed to see. Leave all unchecked to allow viewing ALL branches.'}
+                          </p>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleAddRoleAccount}
+                        className="w-full bg-[#03623c] hover:bg-[#024d2e] text-white text-xs font-black py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs mt-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {'Add User Account'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -4027,13 +4851,11 @@ export default function Settings({
                       }}
                       className="w-full border border-gray-200 px-3 py-1.5 rounded focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-slate-700"
                     >
-                      <option value="admin">{'System Admin'}</option>
-                      <option value="director">{'Director'}</option>
-                      <option value="sub_admin">{'Sub Admin'}</option>
-                      <option value="hr">{'HR Manager'}</option>
-                      <option value="branch_manager">{'Branch Manager'}</option>
-                      <option value="asset_manager">{'Asset Manager'}</option>
-                      <option value="recruiter">{'Recruiter'}</option>
+                      {allRoles.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} {r.isCustom ? '(Custom Role)' : ''}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -4103,6 +4925,187 @@ export default function Settings({
                       setEditingAccount(null);
                     }}
                     className="px-4 py-2 text-xs font-bold text-white bg-[#03623c] hover:bg-[#024d2e] rounded-xl cursor-pointer"
+                  >
+                    {'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Custom Role Modal */}
+          {isNewRoleModalOpen && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans">
+              <div className="bg-white dark:bg-[#11221b] rounded-2xl border border-gray-100 dark:border-[#1e3a2f] shadow-2xl max-w-md w-full flex flex-col overflow-hidden">
+                <div className="p-4 border-b border-gray-100 dark:border-[#1e3a2f] flex items-center justify-between bg-gray-50 dark:bg-[#0b1812] rounded-t-2xl shrink-0">
+                  <h3 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    {'Create New Custom Role'}
+                  </h3>
+                  <button 
+                    onClick={() => {
+                      setIsNewRoleModalOpen(false);
+                      setRoleModalError('');
+                    }}
+                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4 text-xs font-semibold">
+                  {roleModalError && (
+                    <div className="text-[10px] text-rose-600 font-bold bg-rose-50 dark:bg-rose-950/50 p-2.5 rounded-lg border border-rose-200 dark:border-rose-900">
+                      {roleModalError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">
+                      {'Role System Identifier (Code)'} <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newRoleId}
+                      onChange={(e) => setNewRoleId(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))}
+                      placeholder="e.g. audit_officer, store_manager"
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-mono text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900" />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {'Lowercase letters, numbers, and underscores only. Used in system permissions.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">
+                      {'Display Name'} <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newRoleName}
+                      onChange={(e) => setNewRoleName(e.target.value)}
+                      placeholder="e.g. Audit Officer, Store Manager"
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900" />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">
+                      {'Role Description'}
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={newRoleDesc}
+                      onChange={(e) => setNewRoleDesc(e.target.value)}
+                      placeholder="e.g. Responsible for store audit, branch verification and stock inspections."
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 resize-none" />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">
+                      {'Clone Permissions From Template'}
+                    </label>
+                    <select
+                      value={newRoleCopyFrom}
+                      onChange={(e) => setNewRoleCopyFrom(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900"
+                    >
+                      <option value="hr">{'HR Manager (Standard HR Access)'}</option>
+                      <option value="asset_manager">{'Asset Manager (Non-Salary Asset Access)'}</option>
+                      <option value="recruiter">{'Recruiter (Hiring & Candidate Access)'}</option>
+                      <option value="branch_manager">{'Branch Manager (Branch Scope)'}</option>
+                      <option value="director">{'Director (Executive Overview)'}</option>
+                      <option value="employee">{'Employee (Self-Service View)'}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-gray-100 dark:border-[#1e3a2f] bg-gray-50 dark:bg-[#0b1812] flex items-center justify-end gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsNewRoleModalOpen(false);
+                      setRoleModalError('');
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-slate-300 hover:text-slate-700 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer"
+                  >
+                    {'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddCustomRole}
+                    className="px-4 py-2 text-xs font-bold text-white bg-[#03623c] hover:bg-[#024d2e] rounded-xl cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {'Create Custom Role'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Custom Role Modal */}
+          {editingCustomRole && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans">
+              <div className="bg-white dark:bg-[#11221b] rounded-2xl border border-gray-100 dark:border-[#1e3a2f] shadow-2xl max-w-md w-full flex flex-col overflow-hidden">
+                <div className="p-4 border-b border-gray-100 dark:border-[#1e3a2f] flex items-center justify-between bg-gray-50 dark:bg-[#0b1812] rounded-t-2xl shrink-0">
+                  <h3 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-2">
+                    <Edit2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    {'Edit Custom Role'}
+                  </h3>
+                  <button 
+                    onClick={() => setEditingCustomRole(null)}
+                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4 text-xs font-semibold">
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">
+                      {'Role System Identifier'}
+                    </label>
+                    <input
+                      type="text"
+                      disabled
+                      value={editingCustomRole.id}
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 cursor-not-allowed" />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">
+                      {'Display Name'} <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editRoleName}
+                      onChange={(e) => setEditRoleName(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900" />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">
+                      {'Role Description'}
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={editRoleDesc}
+                      onChange={(e) => setEditRoleDesc(e.target.value)}
+                      className="w-full border border-gray-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-none text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 resize-none" />
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-gray-100 dark:border-[#1e3a2f] bg-gray-50 dark:bg-[#0b1812] flex items-center justify-end gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setEditingCustomRole(null)}
+                    className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-slate-300 hover:text-slate-700 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer"
+                  >
+                    {'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUpdateCustomRole}
+                    className="px-4 py-2 text-xs font-bold text-white bg-[#03623c] hover:bg-[#024d2e] rounded-xl cursor-pointer shadow-xs"
                   >
                     {'Save Changes'}
                   </button>

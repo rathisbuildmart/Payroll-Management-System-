@@ -1,4 +1,4 @@
-import { Employee, Attendance, PayrollRecord, AdminSettings, JobPosting, Candidate, CandidateFollowUp, CompanyAsset } from '../types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, JobPosting, Candidate, CandidateFollowUp, CompanyAsset, ArchivedEmployeeRecord, ArchivedCandidateRecord, ArchiveHistoryLog } from '../types';
 
 const SPREADSHEET_NAME = 'Payroll_Management_System_Data';
 
@@ -1183,3 +1183,636 @@ export async function fetchAssetsFromSheets(
     return [];
   }
 }
+
+/**
+ * ============================================================================
+ * ARCHIVE GOOGLE SHEETS MANAGEMENT SYSTEM
+ * ============================================================================
+ */
+
+export const ARCHIVE_EMPLOYEE_HEADERS = [
+  'Archived Date', 'Employee ID', 'Full Name', 'Department', 'Designation',
+  'Joining Date', 'Leaving Date', 'Exit Reason', 'Basic Salary', 'Phone', 'Email',
+  'Bank Account No', 'IFSC Code', 'PAN No', 'Aadhaar No', 'Branch', 'Archived By', 'Snapshot JSON'
+];
+
+export const ARCHIVE_CANDIDATE_HEADERS = [
+  'Archived Date', 'Candidate ID', 'Full Name', 'Job Title', 'Phone', 'Email',
+  'Final Stage', 'Rejection Reason', 'Applied Date', 'Experience (Yrs)', 'Expected Salary',
+  'HR Recruiter', 'Notes & Remarks', 'Archived By', 'Snapshot JSON'
+];
+
+export const ARCHIVE_ATTENDANCE_HEADERS = [
+  'Archived Date', 'Attendance Date', 'Employee ID', 'Status', 'Check In', 'Check Out',
+  'Overtime Hours', 'Remarks', 'Approval Status', 'Notes'
+];
+
+export const DEDICATED_ARCHIVE_SPREADSHEET_NAME = 'HRMS_Archive_Database';
+
+/**
+ * Searches Google Drive for an existing dedicated Archive Spreadsheet.
+ */
+export async function findDedicatedArchiveSpreadsheet(
+  token: string,
+  spreadsheetTitle: string = DEDICATED_ARCHIVE_SPREADSHEET_NAME
+): Promise<{ id: string; name: string; webViewLink: string } | null> {
+  try {
+    const query = encodeURIComponent(`name = '${spreadsheetTitle}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`);
+    const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name,webViewLink)`;
+    
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    
+    if (!res.ok) return null;
+    const data = await res.json();
+    
+    if (data.files && data.files.length > 0) {
+      return {
+        id: data.files[0].id,
+        name: data.files[0].name,
+        webViewLink: data.files[0].webViewLink || `https://docs.google.com/spreadsheets/d/${data.files[0].id}/edit`
+      };
+    }
+    return null;
+  } catch (e) {
+    console.error('Error finding dedicated archive spreadsheet:', e);
+    return null;
+  }
+}
+
+/**
+ * Creates a brand-new, dedicated Google Spreadsheet exclusively for Archives
+ * (Left Employees, Rejected Candidates, Past Attendance, and System Audit Logs).
+ */
+export async function createDedicatedArchiveSpreadsheet(
+  token: string,
+  customTitle?: string
+): Promise<{ spreadsheetId: string; webViewLink: string; title: string }> {
+  const title = customTitle?.trim() || DEDICATED_ARCHIVE_SPREADSHEET_NAME;
+  const url = 'https://sheets.googleapis.com/v4/spreadsheets';
+  
+  const body = {
+    properties: {
+      title: title,
+    },
+    sheets: [
+      {
+        properties: {
+          title: 'Archive_Employees',
+          gridProperties: { frozenRowCount: 1 }
+        }
+      },
+      {
+        properties: {
+          title: 'Archive_Candidates',
+          gridProperties: { frozenRowCount: 1 }
+        }
+      },
+      {
+        properties: {
+          title: 'Archive_Attendance',
+          gridProperties: { frozenRowCount: 1 }
+        }
+      },
+      {
+        properties: {
+          title: 'Archive_Logs',
+          gridProperties: { frozenRowCount: 1 }
+        }
+      },
+    ],
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  await checkResponse(res, 'Failed to create dedicated Archive Google Spreadsheet');
+  const data = await res.json();
+  const spreadsheetId = data.spreadsheetId;
+
+  // Initialize all headers in the new dedicated sheet
+  const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`;
+  const payload = {
+    valueInputOption: 'USER_ENTERED',
+    data: [
+      { range: `Archive_Employees!A1:R1`, values: [ARCHIVE_EMPLOYEE_HEADERS] },
+      { range: `Archive_Candidates!A1:O1`, values: [ARCHIVE_CANDIDATE_HEADERS] },
+      { range: `Archive_Attendance!A1:J1`, values: [ARCHIVE_ATTENDANCE_HEADERS] },
+      { range: `Archive_Logs!A1:E1`, values: [['Timestamp', 'Operation', 'Records Moved', 'Status', 'Details']] }
+    ]
+  };
+
+  await fetch(batchUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  // Log initial creation into Archive_Logs
+  const logUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Logs!A2:E2:append?valueInputOption=USER_ENTERED`;
+  await fetch(logUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      range: 'Archive_Logs!A2:E2',
+      majorDimension: 'ROWS',
+      values: [[
+        new Date().toISOString(),
+        'Dedicated Archive Spreadsheet Created',
+        '0',
+        'SUCCESS',
+        `Initialized new archive database: ${title}`
+      ]]
+    })
+  }).catch(() => {});
+
+  const link = await getSpreadsheetLink(spreadsheetId, token);
+
+  return {
+    spreadsheetId,
+    webViewLink: link,
+    title
+  };
+}
+
+/**
+ * Ensures Archive sheets exist in the spreadsheet with custom styled headers
+ */
+export async function ensureArchiveSheetsExist(
+  spreadsheetId: string,
+  token: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
+    const metaRes = await fetch(metaUrl, { headers: { Authorization: `Bearer ${token}` } });
+    if (!metaRes.ok) throw new Error('Failed to fetch spreadsheet metadata');
+    
+    const metaData = await metaRes.json();
+    const existingTitles: string[] = metaData.sheets?.map((s: any) => s.properties?.title) || [];
+    
+    const requiredArchiveSheets = ['Archive_Employees', 'Archive_Candidates', 'Archive_Attendance', 'Archive_Logs'];
+    const sheetsToAdd = requiredArchiveSheets.filter(t => !existingTitles.includes(t));
+    
+    if (sheetsToAdd.length > 0) {
+      const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+      await fetch(updateUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requests: sheetsToAdd.map(title => ({
+            addSheet: { properties: { title } }
+          }))
+        })
+      });
+    }
+
+    // Initialize headers if sheets are newly created or empty
+    const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`;
+    const payload = {
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        { range: `Archive_Employees!A1:R1`, values: [ARCHIVE_EMPLOYEE_HEADERS] },
+        { range: `Archive_Candidates!A1:O1`, values: [ARCHIVE_CANDIDATE_HEADERS] },
+        { range: `Archive_Attendance!A1:J1`, values: [ARCHIVE_ATTENDANCE_HEADERS] },
+        { range: `Archive_Logs!A1:E1`, values: [['Timestamp', 'Operation', 'Records Moved', 'Status', 'Details']] }
+      ]
+    };
+
+    await fetch(batchUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return { success: true, message: 'All Archive sheets verified and ready in Google Sheets!' };
+  } catch (e: any) {
+    console.error('Error ensuring archive sheets:', e);
+    return { success: false, message: e.message || 'Failed to ensure archive sheets.' };
+  }
+}
+
+/**
+ * Saves/Syncs all Archived Employees to Archive_Employees sheet
+ */
+export async function syncArchivedEmployeesToSheets(
+  spreadsheetId: string,
+  token: string,
+  archivedEmployees: ArchivedEmployeeRecord[]
+): Promise<{ success: boolean; message: string }> {
+  try {
+    await ensureArchiveSheetsExist(spreadsheetId, token);
+
+    // Clear old rows
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Employees!A2:R5000:clear`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (archivedEmployees.length === 0) {
+      return { success: true, message: 'Archive_Employees sheet cleared.' };
+    }
+
+    const rows = archivedEmployees.map(rec => {
+      const emp = rec.employeeData || ({} as Employee);
+      return [
+        rec.archivedAt || new Date().toISOString(),
+        rec.id || emp.id || '',
+        rec.name || emp.name || '',
+        rec.department || emp.department || '',
+        rec.designation || emp.designation || '',
+        rec.joiningDate || emp.joiningDate || '',
+        rec.leavingDate || emp.confirmationDate || '',
+        rec.exitReason || 'Resigned / Inactive / Transferred',
+        emp.basicSalary || 0,
+        emp.mobileNo || emp.personalMobileNo || '',
+        emp.email || emp.personalEmail || '',
+        emp.bankAccountNo || '',
+        emp.ifscCode || '',
+        emp.panNo || '',
+        emp.aadhaarNo || '',
+        emp.branch || 'Main Branch',
+        rec.archivedBy || 'System Admin',
+        JSON.stringify(emp)
+      ];
+    });
+
+    const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Employees!A2:R${rows.length + 1}?valueInputOption=USER_ENTERED`;
+    const res = await fetch(batchUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        range: `Archive_Employees!A2:R${rows.length + 1}`,
+        majorDimension: 'ROWS',
+        values: rows
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Google Sheets API Error: ${err}`);
+    }
+
+    return {
+      success: true,
+      message: `Successfully stored ${archivedEmployees.length} Ex-Employees in Archive_Employees sheet!`
+    };
+  } catch (e: any) {
+    console.error('Error syncing archived employees to sheets:', e);
+    return { success: false, message: e.message || 'Failed to sync archived employees.' };
+  }
+}
+
+/**
+ * Fetches Archived Employees from Archive_Employees sheet
+ */
+export async function fetchArchivedEmployeesFromSheets(
+  spreadsheetId: string,
+  token: string
+): Promise<ArchivedEmployeeRecord[]> {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Employees!A2:R5000`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const rows: any[][] = data.values || [];
+    if (rows.length === 0) return [];
+
+    return rows.map((row, idx) => {
+      let empData: Employee;
+      try {
+        empData = row[17] ? JSON.parse(row[17]) : null;
+      } catch (e) {
+        empData = null as any;
+      }
+
+      if (!empData || !empData.id) {
+        empData = {
+          id: row[1] || `ARC-EMP-${idx + 1}`,
+          name: row[2] || '',
+          department: row[3] || 'General',
+          designation: row[4] || 'Staff',
+          joiningDate: row[5] || '',
+          basicSalary: Number(row[8]) || 0,
+          allowances: 0,
+          deductions: 0,
+          hourlyRate: 0,
+          paymentMethod: 'Bank Transfer',
+          isActive: false,
+          mobileNo: row[9] || '',
+          email: row[10] || '',
+          bankAccountNo: row[11] || '',
+          ifscCode: row[12] || '',
+          panNo: row[13] || '',
+          aadhaarNo: row[14] || '',
+          branch: row[15] || ''
+        };
+      }
+
+      return {
+        id: row[1] || empData.id,
+        name: row[2] || empData.name,
+        department: row[3] || empData.department,
+        designation: row[4] || empData.designation,
+        joiningDate: row[5] || empData.joiningDate,
+        leavingDate: row[6] || '',
+        exitReason: row[7] || 'Left / Inactive',
+        archivedAt: row[0] || new Date().toISOString(),
+        archivedBy: row[16] || 'System',
+        employeeData: empData
+      };
+    }).filter(r => r.id);
+  } catch (e) {
+    console.error('Failed to fetch archived employees from sheets:', e);
+    return [];
+  }
+}
+
+/**
+ * Saves/Syncs all Archived Candidates to Archive_Candidates sheet
+ */
+export async function syncArchivedCandidatesToSheets(
+  spreadsheetId: string,
+  token: string,
+  archivedCandidates: ArchivedCandidateRecord[]
+): Promise<{ success: boolean; message: string }> {
+  try {
+    await ensureArchiveSheetsExist(spreadsheetId, token);
+
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Candidates!A2:O5000:clear`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (archivedCandidates.length === 0) {
+      return { success: true, message: 'Archive_Candidates sheet cleared.' };
+    }
+
+    const rows = archivedCandidates.map(rec => {
+      const can = rec.candidateData || ({} as Candidate);
+      return [
+        rec.archivedAt || new Date().toISOString(),
+        rec.id || can.id || '',
+        rec.name || can.name || '',
+        rec.jobTitle || can.jobTitle || 'General Pool',
+        rec.phone || can.phone || '',
+        rec.email || can.email || '',
+        rec.stage || can.stage || 'Rejected',
+        rec.rejectionReason || can.rejectionReason || 'Declined / Archived',
+        can.appliedDate || '',
+        can.experienceYears || 0,
+        can.expectedSalary ? `₹${can.expectedSalary.toLocaleString()}` : '',
+        can.hrName || 'HR Team',
+        can.notes || '',
+        rec.archivedBy || 'System Admin',
+        JSON.stringify(can)
+      ];
+    });
+
+    const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Candidates!A2:O${rows.length + 1}?valueInputOption=USER_ENTERED`;
+    const res = await fetch(batchUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        range: `Archive_Candidates!A2:O${rows.length + 1}`,
+        majorDimension: 'ROWS',
+        values: rows
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Google Sheets API Error: ${err}`);
+    }
+
+    return {
+      success: true,
+      message: `Successfully stored ${archivedCandidates.length} Rejected Candidates in Archive_Candidates sheet!`
+    };
+  } catch (e: any) {
+    console.error('Error syncing archived candidates to sheets:', e);
+    return { success: false, message: e.message || 'Failed to sync archived candidates.' };
+  }
+}
+
+/**
+ * Fetches Archived Candidates from Archive_Candidates sheet
+ */
+export async function fetchArchivedCandidatesFromSheets(
+  spreadsheetId: string,
+  token: string
+): Promise<ArchivedCandidateRecord[]> {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Candidates!A2:O5000`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const rows: any[][] = data.values || [];
+    if (rows.length === 0) return [];
+
+    return rows.map((row, idx) => {
+      let canData: Candidate;
+      try {
+        canData = row[14] ? JSON.parse(row[14]) : null;
+      } catch (e) {
+        canData = null as any;
+      }
+
+      if (!canData || !canData.id) {
+        canData = {
+          id: row[1] || `CAN-ARC-${idx + 1}`,
+          name: row[2] || '',
+          jobTitle: row[3] || 'General Pool',
+          phone: row[4] || '',
+          email: row[5] || '',
+          stage: (row[6] as any) || 'Rejected',
+          rejectionReason: row[7] || '',
+          appliedDate: row[8] || '',
+          experienceYears: Number(row[9]) || 0,
+          expectedSalary: row[10] ? parseFloat(String(row[10]).replace(/[^0-9.]/g, '')) : undefined,
+          hrName: row[11] || '',
+          notes: row[12] || '',
+          isArchived: true
+        };
+      }
+
+      return {
+        id: row[1] || canData.id,
+        name: row[2] || canData.name,
+        jobTitle: row[3] || canData.jobTitle,
+        phone: row[4] || canData.phone,
+        email: row[5] || canData.email,
+        stage: row[6] || canData.stage,
+        rejectionReason: row[7] || canData.rejectionReason,
+        archivedAt: row[0] || new Date().toISOString(),
+        archivedBy: row[13] || 'System',
+        candidateData: canData
+      };
+    }).filter(r => r.id);
+  } catch (e) {
+    console.error('Failed to fetch archived candidates from sheets:', e);
+    return [];
+  }
+}
+
+/**
+ * Saves/Syncs all Archived Attendance to Archive_Attendance sheet
+ */
+export async function syncArchivedAttendanceToSheets(
+  spreadsheetId: string,
+  token: string,
+  archivedAttendance: Attendance[]
+): Promise<{ success: boolean; message: string }> {
+  try {
+    await ensureArchiveSheetsExist(spreadsheetId, token);
+
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Attendance!A2:J10000:clear`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (archivedAttendance.length === 0) {
+      return { success: true, message: 'Archive_Attendance sheet cleared.' };
+    }
+
+    const now = new Date().toISOString();
+    const rows = archivedAttendance.map(att => [
+      now,
+      att.date,
+      att.employeeId,
+      att.status,
+      att.checkIn || '',
+      att.checkOut || '',
+      att.overtimeHours || 0,
+      att.remarks || '',
+      att.approvalStatus || 'Approved',
+      att.punchInOutlet || ''
+    ]);
+
+    const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Attendance!A2:J${rows.length + 1}?valueInputOption=USER_ENTERED`;
+    const res = await fetch(batchUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        range: `Archive_Attendance!A2:J${rows.length + 1}`,
+        majorDimension: 'ROWS',
+        values: rows
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Google Sheets API Error: ${err}`);
+    }
+
+    return {
+      success: true,
+      message: `Successfully stored ${archivedAttendance.length} attendance rows in Archive_Attendance sheet!`
+    };
+  } catch (e: any) {
+    console.error('Error syncing archived attendance to sheets:', e);
+    return { success: false, message: e.message || 'Failed to sync archived attendance.' };
+  }
+}
+
+/**
+ * Fetches Archived Attendance from Archive_Attendance sheet
+ */
+export async function fetchArchivedAttendanceFromSheets(
+  spreadsheetId: string,
+  token: string
+): Promise<Attendance[]> {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Attendance!A2:J10000`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const rows: any[][] = data.values || [];
+    if (rows.length === 0) return [];
+
+    return rows.map((row) => ({
+      date: row[1] || '',
+      employeeId: row[2] || '',
+      status: (row[3] as any) || 'Present',
+      checkIn: row[4] || '',
+      checkOut: row[5] || '',
+      overtimeHours: Number(row[6]) || 0,
+      remarks: row[7] || '',
+      approvalStatus: (row[8] as any) || 'Approved',
+      punchInOutlet: row[9] || ''
+    })).filter(a => a.employeeId && a.date);
+  } catch (e) {
+    console.error('Failed to fetch archived attendance from sheets:', e);
+    return [];
+  }
+}
+
+/**
+ * Appends a log entry to the Archive_Logs sheet
+ */
+export async function appendArchiveLogToSheets(
+  spreadsheetId: string,
+  token: string,
+  operation: string,
+  recordsMoved: number,
+  status: 'SUCCESS' | 'WARNING' | 'FAILED',
+  details: string
+) {
+  try {
+    const logUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Archive_Logs!A2:E2:append?valueInputOption=USER_ENTERED`;
+    await fetch(logUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        range: 'Archive_Logs!A2:E2',
+        majorDimension: 'ROWS',
+        values: [[
+          new Date().toISOString(),
+          operation,
+          String(recordsMoved),
+          status,
+          details
+        ]]
+      })
+    });
+  } catch (e) {
+    console.warn('Failed to append to Archive_Logs:', e);
+  }
+}
+
+

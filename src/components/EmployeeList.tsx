@@ -3,6 +3,8 @@ import { Plus, Search, Edit2, Check, X, Filter, UserX, UserCheck, CreditCard, Ca
 import { Employee, AdminSettings, getCurrentBasicSalary } from '../types';
 import { getCostCenterPrefix, generateNextEmployeeId } from '../utils/costCenterUtils';
 import { parseGoogleDriveImageUrl } from '../utils/driveUtils';
+import { isRoleColumnAllowed } from './Settings';
+import EmployeeBulkImportModal from './EmployeeBulkImportModal';
 
 interface EmployeeListProps {
   employees: Employee[];
@@ -82,33 +84,31 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
       { key: 'bloodGroup', labelEn: 'Blood Group', labelHi: "", default: false },
       { key: 'emergencyContactNo', labelEn: 'Emergency Contact', labelHi: "", default: false },
       { key: 'bankDetails', labelEn: 'Bank Account Details', labelHi: "", default: false, restricted: true },
-      { key: 'identityDetails', labelEn: 'AadhaarPAN', labelHi: "", default: false, restricted: true },
-      { key: 'pfEsicDetails', labelEn: 'PFESIC Account Numbers', labelHi: "", default: false, restricted: true },
+      { key: 'identityDetails', labelEn: 'Aadhaar / PAN', labelHi: "", default: false, restricted: true },
+      { key: 'pfEsicDetails', labelEn: 'PF / ESIC Account Numbers', labelHi: "", default: false, restricted: true },
       { key: 'gpsAndMobile', labelEn: 'GPS & Mobile Attendance', labelHi: "", default: true, restricted: true },
     ];
-    if (isRecruiter) {
-      return cols.filter(c => !['salary', 'paymentMethod', 'status', 'bankDetails', 'identityDetails', 'pfEsicDetails', 'gpsAndMobile'].includes(c.key));
-    }
-    if (isAssetManager) {
-      return cols.filter(c => !['joiningDate', 'salary', 'paymentMethod', 'bankDetails', 'identityDetails', 'pfEsicDetails'].includes(c.key));
-    }
-    return cols;
-  }, [isRecruiter, isAssetManager]);
+
+    return cols.filter(c => {
+      const colPermissionKey = ['personalMobileNo', 'personalEmail', 'dob', 'gender', 'bloodGroup', 'emergencyContactNo'].includes(c.key)
+        ? 'personalDetails'
+        : c.key;
+      return isRoleColumnAllowed(portalUser?.role, colPermissionKey, adminSettings);
+    });
+  }, [portalUser?.role, adminSettings]);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     ALL_COLUMNS.filter(c => c.default).map(c => c.key)
   );
 
   const activeVisibleColumns = useMemo(() => {
-    let cols = visibleColumns;
-    if (isRecruiter) {
-      cols = cols.filter(col => !['salary', 'paymentMethod', 'status', 'bankDetails', 'identityDetails', 'pfEsicDetails', 'gpsAndMobile'].includes(col));
-    }
-    if (isAssetManager) {
-      cols = cols.filter(col => !['joiningDate', 'salary', 'paymentMethod', 'bankDetails', 'identityDetails', 'pfEsicDetails'].includes(col));
-    }
-    return cols;
-  }, [visibleColumns, isRecruiter, isAssetManager]);
+    return visibleColumns.filter(colKey => {
+      const colPermissionKey = ['personalMobileNo', 'personalEmail', 'dob', 'gender', 'bloodGroup', 'emergencyContactNo'].includes(colKey)
+        ? 'personalDetails'
+        : colKey;
+      return isRoleColumnAllowed(portalUser?.role, colPermissionKey, adminSettings);
+    });
+  }, [visibleColumns, portalUser?.role, adminSettings]);
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
 
   //CSV Bulk Import States
@@ -401,12 +401,19 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
   }, [employees, searchTerm, selectedDept, selectedBranch, selectedEmployeeId, selectedStatus, sortField, sortDirection]);
 
   //Paginated Sliced list
+  const totalPages = Math.ceil(filteredEmployees.length / pageSize) || 1;
+
+  // Auto-adjust current page if it exceeds total pages
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedEmployees = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredEmployees.slice(start, start + pageSize);
   }, [filteredEmployees, currentPage, pageSize]);
-
-  const totalPages = Math.ceil(filteredEmployees.lengthpageSize) || 1;
 
   //CSV Utility functions
   const parseCSV = (text: string) => {
@@ -1509,7 +1516,7 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
     <div className="space-y-6">
       
       {/* 2026 Admin Navigation Tabs for Employee Section */}
-      {!isRecruiter && (
+      {!isRecruiter && isRoleColumnAllowed(portalUser?.role, 'increments_tab', adminSettings) && isRoleColumnAllowed(portalUser?.role, 'salary', adminSettings) && (
         <div className="flex border-b border-gray-200 bg-white p-1 rounded-xl border shadow-xs">
           <button
             onClick={() => setActiveSubTab('directory')}
@@ -1772,55 +1779,57 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
             )}
           </div>
 
+          {/* Export InactiveLeft Employees Backup CSV Button */}
+          {hasPermission('add') && inactiveEmps.length > 0 && isRoleColumnAllowed(portalUser?.role, 'export_inactive', adminSettings) && (
+            <button
+              type="button"
+              onClick={() => exportEmployeesCSV(inactiveEmps, 'inactive_employees_backup')}
+              className="border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xxs"
+              title={`Export backup CSV for ${inactiveEmps.length} inactive/left employees`}
+              id="btn-export-inactive-csv"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-700" />
+              {`Export Inactive (${inactiveEmps.length})`}
+            </button>
+          )}
+
+          {/* Export All Employees CSV Button */}
+          {hasPermission('add') && isRoleColumnAllowed(portalUser?.role, 'export_csv', adminSettings) && (
+            <button
+              type="button"
+              onClick={() => exportEmployeesCSV(employees)}
+              className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
+              title={'Export all employee records for bulk editing'}
+              id="btn-export-csv-trigger"
+            >
+              <Download className="w-4 h-4 text-emerald-700" />
+              {t.exportDataBtn}
+            </button>
+          )}
+
+          {/* Bulk Import Button */}
+          {hasPermission('add') && isRoleColumnAllowed(portalUser?.role, 'bulk_import', adminSettings) && (
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
+              id="btn-bulk-import-trigger"
+            >
+              <Upload className="w-4 h-4 text-gray-500" />
+              {t.bulkImportBtn}
+            </button>
+          )}
+
+          {/* Add Employee Button */}
           {hasPermission('add') && (
-            <>
-              {/* Export InactiveLeft Employees Backup CSV Button */}
-              {inactiveEmps.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => exportEmployeesCSV(inactiveEmps, 'inactive_employees_backup')}
-                  className="border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xxs"
-                  title={`Export backup CSV for ${inactiveEmps.length} inactive/left employees`}
-                  id="btn-export-inactive-csv"
-                >
-                  <Download className="w-3.5 h-3.5 text-amber-700" />
-                  {`Export Inactive (${inactiveEmps.length})`}
-                </button>
-              )}
-
-              {/* Export All Employees CSV Button */}
-              <button
-                type="button"
-                onClick={() => exportEmployeesCSV(employees)}
-                className="border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-                title={'Export all employee records for bulk editing'}
-                id="btn-export-csv-trigger"
-              >
-                <Download className="w-4 h-4 text-emerald-700" />
-                {t.exportDataBtn}
-              </button>
-
-              {/* Bulk Import Button */}
-              <button
-                type="button"
-                onClick={() => setIsImportModalOpen(true)}
-                className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-                id="btn-bulk-import-trigger"
-              >
-                <Upload className="w-4 h-4 text-gray-500" />
-                {t.bulkImportBtn}
-              </button>
-
-              {/* Add Employee Button */}
-              <button
-                onClick={openAddModal}
-                className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
-                id="btn-add-emp"
-              >
-                <Plus className="w-4 h-4" />
-                {t.addBtn}
-              </button>
-            </>
+            <button
+              onClick={openAddModal}
+              className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xxs"
+              id="btn-add-emp"
+            >
+              <Plus className="w-4 h-4" />
+              {t.addBtn}
+            </button>
           )}
         </div>
       </div>
@@ -2830,215 +2839,17 @@ export default function EmployeeList({ employees, onAddEmployee, onUpdateEmploye
         </div>
       )}
 
-      {/* Beautiful Bulk Import Modal */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-2xl max-w-3xl w-full p-6 flex flex-col max-h-[90vh] overflow-hidden">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <Upload className="w-5 h-5 text-blue-600" />
-                <h3 className="text-base font-bold text-gray-900 font-display">
-                  {t.bulkImportTitle}
-                </h3>
-              </div>
-              <button
-                onClick={() => {
-                  setIsImportModalOpen(false);
-                  setImportedEmployees([]);
-                  setImportErrors([]);
-                }}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content body */}
-            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
-              
-              {/* Top Banner with Download Link and instructions */}
-              <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-blue-800">
-                    {t.requiredHeaderWarning}
-                  </p>
-                  <p className="text-[11px] text-gray-500 font-medium">
-                    {'Tip: You can export all existing employee data, edit/correct the values in Excel, and upload the updated file back to sync modifications.'}
-                  </p>
-                </div>
-                <div className="shrink-0 flex flex-wrap sm:flex-nowrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => exportEmployeesCSV(employees)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-xxs"
-                    title="Export existing employee data to edit & re-upload"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    {t.exportExistingBtn.replace('{count}', String(employees.length))}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={downloadTemplate}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 border border-blue-200 text-xs font-bold text-blue-700 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    {t.downloadTemplate}
-                  </button>
-                </div>
-              </div>
-
-              {/* Drag & Drop File Zone */}
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
-                  isDragging 
-                    ? 'border-blue-500 bg-blue-50/40 scale-[0.99]' 
-                    : 'border-gray-200 hover:border-blue-500 hover:bg-gray-50/50'
-                }`}
-              >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept=".csv"
-                  className="hidden" />
-                <div className="p-3 bg-gray-50 text-gray-400 rounded-full group-hover:bg-blue-50 group-hover:text-blue-500 transition-all">
-                  <Upload className="w-6 h-6" />
-                </div>
-                <p className="text-xs font-semibold text-gray-700">
-                  {t.dragDropText}
-                </p>
-                <p className="text-[10px] text-gray-400 font-medium font-mono">
-                  CSV (Comma Separated Values)
-                </p>
-              </div>
-
-              {/* SuccessWarning logs */}
-              {importedEmployees.length > 0 && (
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2.5">
-                  <div className="bg-emerald-500 text-white p-1 rounded-full shrink-0">
-                    <Check className="w-3 h-3" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-emerald-800">
-                      {t.importSuccess.replace('{count}', String(importedEmployees.length))}
-                    </h4>
-                  </div>
-                </div>
-              )}
-
-              {importErrors.length > 0 && (
-                <div className="bg-red-50 border border-red-100 rounded-xl p-3 space-y-1.5">
-                  <div className="flex items-start gap-2.5">
-                    <div className="bg-red-500 text-white p-1 rounded-full shrink-0">
-                      <AlertCircle className="w-3 h-3" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-red-800">
-                        {t.importErrors}
-                      </h4>
-                    </div>
-                  </div>
-                  <div className="max-h-24 overflow-y-auto pl-7 space-y-0.5">
-                    {importErrors.map((err, i) => (
-                      <p key={i} className="text-[11px] font-mono font-medium text-red-600">
-                        &bull; {err}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Data Preview Table */}
-              {importedEmployees.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider pl-1">
-                    {t.previewTitle}
-                  </h4>
-                  <div className="border border-gray-100 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100 font-semibold text-gray-500">
-                          <th className="py-2 px-3">{t.colId}</th>
-                          <th className="py-2 px-3">{t.colName}</th>
-                          <th className="py-2 px-3">{t.colRole}</th>
-                          {!isAssetManager && <th className="py-2 px-3">{t.colJoining}</th>}
-                          {!isAssetManager && !isRecruiter && <th className="py-2 px-3 text-right">{t.colSalary}</th>}
-                          {!isAssetManager && !isRecruiter && <th className="py-2 px-3">{t.colPayment}</th>}
-                          <th className="py-2 px-3 text-center">{t.colStatus}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 font-medium">
-                        {importedEmployees.map((emp) => (
-                          <tr key={emp.id} className="hover:bg-gray-50/50">
-                            <td className="py-2 px-3 font-mono text-gray-500 font-semibold">{emp.id}</td>
-                            <td className="py-2 px-3 font-bold text-gray-900">{emp.name}</td>
-                            <td className="py-2 px-3 text-gray-600">
-                              {emp.designation} <span className="text-gray-400 text-[10px]">({emp.department})</span>
-                            </td>
-                            {!isAssetManager && <td className="py-2 px-3 font-mono text-gray-500 text-[10px]">{emp.joiningDate}</td>}
-                            {!isAssetManager && !isRecruiter && <td className="py-2 px-3 text-right text-gray-900 font-bold">₹{emp.basicSalary.toLocaleString('en-IN')}</td>}
-                            {!isAssetManager && !isRecruiter && <td className="py-2 px-3 text-gray-600">{emp.paymentMethod}</td>}
-                            <td className="py-2 px-3 text-center">
-                              <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                                emp.isActive 
-                                  ? 'bg-green-50 text-green-700 border border-green-200' 
-                                  : 'bg-gray-50 text-gray-600 border border-gray-200'
-                              }`}>
-                                {emp.isActive ? t.active : t.inactive}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-            {/* Footer */}
-            <div className="pt-4 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsImportModalOpen(false);
-                  setImportedEmployees([]);
-                  setImportErrors([]);
-                }}
-                className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
-              >
-                {t.cancel}
-              </button>
-              <button
-                type="button"
-                disabled={importedEmployees.length === 0 || isImportSaving}
-                onClick={handleConfirmImport}
-                className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {isImportSaving ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    {t.saving}
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    {t.btnConfirmImport.replace('{count}', String(importedEmployees.length))}
-                  </>
-                )}
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      {/* Beautiful Advanced Bulk Import Modal with Column Mapping & Skip Blanks */}
+      <EmployeeBulkImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportSuccess={async (importedList) => {
+          await onBulkAddEmployees(importedList);
+        }}
+        existingEmployees={employees}
+        language={language}
+        onExportExisting={() => exportEmployeesCSV(employees)}
+      />
         </>
       ) : (
         <div className="space-y-4">
