@@ -141,6 +141,10 @@ export default function ExitManagementModule({ employees, language = 'en' }: Exi
   const [selectedLetterExit, setSelectedLetterExit] = useState<ExitRecord | null>(null);
   const [selectedCertificateExit, setSelectedCertificateExit] = useState<ExitRecord | null>(null);
 
+  //Employee Search & Selection State inside Log Resignation Modal
+  const [empSearchText, setEmpSearchText] = useState('');
+  const [isEmpSelectorOpen, setIsEmpSelectorOpen] = useState(false);
+
   //Dynamic Task Modal state
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [targetExitIdForTask, setTargetExitIdForTask] = useState<string | null>(null);
@@ -375,9 +379,18 @@ export default function ExitManagementModule({ employees, language = 'en' }: Exi
 
   //Filtered records
   const filteredExitRecords = exitRecords.filter(rec => {
-    const matchesSearch = rec.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          rec.employeeId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          rec.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch = !q || 
+                          rec.employeeName.toLowerCase().includes(q) ||
+                          rec.employeeId.toLowerCase().includes(q) ||
+                          rec.id.toLowerCase().includes(q) ||
+                          (rec.department && rec.department.toLowerCase().includes(q)) ||
+                          (rec.designation && rec.designation.toLowerCase().includes(q)) ||
+                          (rec.reason && rec.reason.toLowerCase().includes(q)) ||
+                          (rec.customChecklist && rec.customChecklist.some(t => 
+                            t.title.toLowerCase().includes(q) || 
+                            (t.assignedTo && t.assignedTo.toLowerCase().includes(q))
+                          ));
     const matchesDept = deptFilter === 'All' || rec.department === deptFilter;
     const matchesStatus = statusFilter === 'All' || rec.status === statusFilter;
     return matchesSearch && matchesDept && matchesStatus;
@@ -518,24 +531,38 @@ export default function ExitManagementModule({ employees, language = 'en' }: Exi
       {activeTab === 'exits' && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 border border-slate-200 rounded-2xl shadow-sm">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <span className="text-xs font-bold text-slate-700">
-                {'Resignations & Separation Log'} ({exitRecords.length})
+                {'Resignations & Separation Log'} ({filteredExitRecords.length}{filteredExitRecords.length !== exitRecords.length ? ` of ${exitRecords.length}` : ''})
               </span>
-              <div className="relative">
+              <div className="relative flex-1 sm:flex-initial">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Search exit record..."
+                  placeholder="Search name, ID (e.g. RS006), dept, reason..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-500 w-48 sm:w-64" />
+                  className="pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-500 w-full sm:w-72" />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 
             <button
-              onClick={() => setShowExitModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+              onClick={() => {
+                setEmpSearchText('');
+                setIsEmpSelectorOpen(true);
+                setShowExitModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" />
               {'Log New Resignation'}
@@ -637,18 +664,28 @@ export default function ExitManagementModule({ employees, language = 'en' }: Exi
         <div className="space-y-6">
           {/* Controls & Filter bar */}
           <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
               <span className="text-xs font-bold text-slate-700 shrink-0">
-                {'Employee Clearance Checklists'}
+                {'Employee Clearance Checklists'} ({filteredExitRecords.length}{filteredExitRecords.length !== exitRecords.length ? ` of ${exitRecords.length}` : ''})
               </span>
               <div className="relative flex-1 md:flex-initial">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Search by name, ID or task..."
+                  placeholder="Search name, ID (e.g. RS006), dept, or task..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-500 w-full md:w-64" />
+                  className="pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-500 w-full md:w-72" />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -909,94 +946,242 @@ export default function ExitManagementModule({ employees, language = 'en' }: Exi
       )}
 
       {/* CREATE EXIT MODAL */}
-      {showExitModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl text-slate-900 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                <UserX className="w-5 h-5 text-rose-600" />
-                Log ResignationExit
-              </h3>
-              <button onClick={() => setShowExitModal(false)}>
-                <X className="w-5 h-5 text-slate-400 hover:text-slate-600" />
-              </button>
+      {showExitModal && (() => {
+        const selectedEmp = employees.find(e => e.id === newExit.employeeId);
+        const filteredModalEmployees = employees.filter(emp => {
+          if (!empSearchText.trim()) return true;
+          const q = empSearchText.toLowerCase().trim();
+          return emp.name.toLowerCase().includes(q) ||
+                 emp.id.toLowerCase().includes(q) ||
+                 (emp.department && emp.department.toLowerCase().includes(q)) ||
+                 (emp.designation && emp.designation.toLowerCase().includes(q));
+        });
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-slate-900 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                  <UserX className="w-5 h-5 text-rose-600" />
+                  Log Resignation / Exit
+                </h3>
+                <button 
+                  onClick={() => setShowExitModal(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateExit} className="space-y-4 text-xs">
+                {/* Searchable Employee Selector */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-slate-700 font-bold block text-xs">
+                      Select Employee <span className="text-rose-600">*</span>
+                    </label>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {employees.length} Active Employees
+                    </span>
+                  </div>
+
+                  {/* Selected Employee Card */}
+                  {selectedEmp && !isEmpSelectorOpen ? (
+                    <div className="bg-rose-50/70 border border-rose-200 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-3xs">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-rose-700 text-white font-black text-sm flex items-center justify-center shadow-xs shrink-0">
+                          {selectedEmp.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-slate-900 text-xs truncate">{selectedEmp.name}</span>
+                            <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-white text-rose-700 border border-rose-200 rounded-md">
+                              {selectedEmp.id}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 font-medium truncate mt-0.5">
+                            {selectedEmp.designation || 'Staff'} • <strong className="text-rose-800">{selectedEmp.department || 'General'}</strong>
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEmpSelectorOpen(true);
+                          setEmpSearchText('');
+                        }}
+                        className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 hover:border-rose-300 text-slate-700 hover:text-rose-700 font-bold text-xs rounded-xl transition-all shadow-3xs cursor-pointer shrink-0"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {/* Search Input & List Popover / Dropdown */}
+                  {(!selectedEmp || isEmpSelectorOpen) && (
+                    <div className="space-y-2 mt-1">
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="text"
+                          autoFocus={isEmpSelectorOpen}
+                          placeholder="Search employee by name, ID (e.g. RS006), dept..."
+                          value={empSearchText}
+                          onChange={e => setEmpSearchText(e.target.value)}
+                          className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-rose-600 focus:ring-2 focus:ring-rose-100 focus:outline-none transition-all"
+                        />
+                        {empSearchText && (
+                          <button
+                            type="button"
+                            onClick={() => setEmpSearchText('')}
+                            className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white shadow-md">
+                        {filteredModalEmployees.length === 0 ? (
+                          <div className="p-4 text-center text-slate-500 text-xs">
+                            {employees.length === 0 
+                              ? 'No employees found in the directory. Please add employees first.' 
+                              : 'No matching employees found for your search term.'}
+                          </div>
+                        ) : (
+                          filteredModalEmployees.map(emp => {
+                            const isSelected = newExit.employeeId === emp.id;
+                            return (
+                              <button
+                                type="button"
+                                key={emp.id}
+                                onClick={() => {
+                                  setNewExit({ ...newExit, employeeId: emp.id });
+                                  setIsEmpSelectorOpen(false);
+                                  setEmpSearchText('');
+                                }}
+                                className={`w-full p-2.5 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                                  isSelected ? 'bg-rose-50 text-rose-950 font-bold' : 'hover:bg-slate-50 text-slate-800'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0 border border-slate-200">
+                                    {emp.name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-xs font-bold text-slate-900 truncate">{emp.name}</span>
+                                      <span className="px-1.5 py-0.2 text-[9px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200 rounded">
+                                        {emp.id}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 truncate">
+                                      {emp.designation || 'Staff'} • {emp.department || 'General'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {isSelected ? (
+                                  <CheckCircle2 className="w-4 h-4 text-rose-600 shrink-0" />
+                                ) : (
+                                  <span className="text-[10px] font-bold text-rose-600 hover:underline shrink-0">Select</span>
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {selectedEmp && (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setIsEmpSelectorOpen(false)}
+                            className="text-[11px] text-slate-500 hover:text-slate-700 font-medium cursor-pointer"
+                          >
+                            Cancel selection
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-600 font-medium block mb-1">Resignation Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={newExit.resignationDate}
+                      onChange={e => setNewExit({ ...newExit, resignationDate: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-slate-600 font-medium block mb-1">Last Working Day</label>
+                    <input
+                      type="date"
+                      required
+                      value={newExit.lastWorkingDay}
+                      onChange={e => setNewExit({ ...newExit, lastWorkingDay: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-600 font-medium block mb-1">Notice Period (Days)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newExit.noticePeriodDays}
+                      onChange={e => setNewExit({ ...newExit, noticePeriodDays: Number(e.target.value) })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-slate-600 font-medium block mb-1">Reason for Leaving</label>
+                    <select
+                      value={newExit.reason}
+                      onChange={e => setNewExit({ ...newExit, reason: e.target.value as any })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none"
+                    >
+                      <option value="Better Opportunity">Better Opportunity</option>
+                      <option value="Personal Reasons">Personal Reasons</option>
+                      <option value="Relocation">Relocation</option>
+                      <option value="Higher Studies">Higher Studies</option>
+                      <option value="Health">Health</option>
+                      <option value="Performance / Termination">Performance / Termination</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-600 font-medium block mb-1">Exit Notes / Comments</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Exit interview remarks, handover notes, comments..."
+                    value={newExit.exitInterviewNotes}
+                    onChange={e => setNewExit({ ...newExit, exitInterviewNotes: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none" />
+                </div>
+
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-800">
+                  ✨ <strong>Automated Checklist Builder:</strong> Submitting will automatically initialize standard clearance tasks for IT, HR, Finance, Operations & Security.
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!newExit.employeeId}
+                  className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  Log Resignation & Build Checklist
+                </button>
+              </form>
             </div>
-            <form onSubmit={handleCreateExit} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-600 font-medium block mb-1">Select Employee</label>
-                <select
-                  required
-                  value={newExit.employeeId}
-                  onChange={e => setNewExit({ ...newExit, employeeId: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none"
-                >
-                  <option value="">Choose Employee...</option>
-                  {employees.map(e => (
-                    <option key={e.id} value={e.id}>{e.name} ({e.id}) - {e.department}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-600 font-medium block mb-1">Resignation Date</label>
-                  <input
-                    type="date"
-                    value={newExit.resignationDate}
-                    onChange={e => setNewExit({ ...newExit, resignationDate: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none" />
-                </div>
-                <div>
-                  <label className="text-slate-600 font-medium block mb-1">Last Working Day</label>
-                  <input
-                    type="date"
-                    value={newExit.lastWorkingDay}
-                    onChange={e => setNewExit({ ...newExit, lastWorkingDay: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-600 font-medium block mb-1">Reason for Leaving</label>
-                <select
-                  value={newExit.reason}
-                  onChange={e => setNewExit({ ...newExit, reason: e.target.value as any })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none"
-                >
-                  <option value="Better Opportunity">Better Opportunity</option>
-                  <option value="Personal Reasons">Personal Reasons</option>
-                  <option value="Relocation">Relocation</option>
-                  <option value="Higher Studies">Higher Studies</option>
-                  <option value="Health">Health</option>
-                  <option value="PerformanceTermination">PerformanceTermination</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-slate-600 font-medium block mb-1">Exit NotesComments</label>
-                <textarea
-                  rows={2}
-                  placeholder="Exit interview remarks, handover notes..."
-                  value={newExit.exitInterviewNotes}
-                  onChange={e => setNewExit({ ...newExit, exitInterviewNotes: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-rose-600 focus:outline-none" />
-              </div>
-
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-800">
-                ✨ <strong>Automated Checklist Builder:</strong> Submitting will automatically initialize standard clearance tasks for IT, HR, Finance, Operations & Security.
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md transition-all cursor-pointer"
-              >
-                Log Resignation & Build Checklist
-              </button>
-            </form>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* CREATE DYNAMIC TASK MODAL */}
       {showTaskModal && (
@@ -1014,7 +1199,7 @@ export default function ExitManagementModule({ employees, language = 'en' }: Exi
 
             <form onSubmit={handleAddCustomTask} className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-600 font-medium block mb-1">Task TitleDescription</label>
+                <label className="text-slate-600 font-medium block mb-1">Task Title / Description</label>
                 <input
                   type="text"
                   required
@@ -1054,7 +1239,7 @@ export default function ExitManagementModule({ employees, language = 'en' }: Exi
               </div>
 
               <div>
-                <label className="text-slate-600 font-medium block mb-1">NotesInstructions</label>
+                <label className="text-slate-600 font-medium block mb-1">Notes / Instructions</label>
                 <input
                   type="text"
                   placeholder="Special instructions, condition checks..."

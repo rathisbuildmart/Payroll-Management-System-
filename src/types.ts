@@ -272,6 +272,53 @@ export interface AdminSettings {
   archiveSpreadsheetName?: string;
   archiveSpreadsheetLink?: string;
   useDedicatedArchiveSheet?: boolean;
+  // Attendance Lock & HR Access Permission Settings
+  attendanceLockSettings?: {
+    isLocked: boolean; // Default true: Attendance editing requires approval
+    hrDirectAccessEnabled?: boolean; // Admin can toggle HR direct edit access
+    hrAccessExpiresAt?: string; // Optional expiry timestamp for timed access (ISO string)
+    hrAccessGrantedBy?: string;
+    hrAccessGrantedAt?: string;
+    requireReasonAndRemarks?: boolean; // Always record reason & remarks for audit
+  };
+  // Time-Bound Employee Dashboard Salary Visibility Settings
+  salaryVisibilitySettings?: {
+    enabled?: boolean; // Default true: show latest calculated salary breakdown on employee dashboard
+    visibilityDurationDays?: number; // Days to keep visible after payroll cycle (e.g. 3, 5, 7, 10, 15, 30; 0 for permanent)
+    autoHideAfterDays?: boolean; // Auto hide breakdown once time limit duration expires
+    showEarningsAndDeductionsBreakdown?: boolean; // Show itemized gross vs deductions
+    customNoticeWhenExpired?: string; // Optional custom message to display once expired
+  };
+}
+
+export interface AttendanceChangeRequest {
+  id: string;
+  attendanceDate: string; // YYYY-MM-DD
+  employeeId: string;
+  employeeName: string;
+  department?: string;
+  branch?: string;
+  designation?: string;
+  currentStatus: Attendance['status'];
+  currentCheckIn: string;
+  currentCheckOut: string;
+  currentOvertimeHours: number;
+  requestedStatus: Attendance['status'];
+  requestedCheckIn: string;
+  requestedCheckOut: string;
+  requestedOvertimeHours: number;
+  reason: string; // e.g. "Biometric Machine Issue", "Forgot to Punch", "Official Duty (OD)", "Manager Manual Approval", "Medical Reason", "Other"
+  remarks: string;
+  requestedByUsername: string;
+  requestedByName: string;
+  requestedByRole: string;
+  requestedAt: string; // ISO String
+  status: 'Pending' | 'Approved' | 'Rejected';
+  actionType?: 'change_request' | 'direct_admin_edit';
+  reviewedBy?: string;
+  reviewedByRole?: string;
+  reviewedAt?: string;
+  reviewerRemarks?: string;
 }
 
 export interface Attendance {

@@ -211,11 +211,11 @@ export const DEFAULT_ROLE_COLUMN_PERMISSIONS: Record<string, string[]> = {
   admin: ['all'],
   director: ['all'],
   hr: ['all'],
-  sub_admin: ['id', 'name', 'role', 'branch', 'joiningDate', 'status', 'mobileNo', 'personalDetails', 'gpsAndMobile', 'deviceInfo', 'export_csv', 'export_inactive', 'bulk_import'],
-  branch_manager: ['id', 'name', 'role', 'branch', 'joiningDate', 'status', 'mobileNo', 'personalDetails', 'gpsAndMobile', 'deviceInfo', 'export_csv', 'export_inactive'],
-  recruiter: ['id', 'name', 'role', 'branch', 'joiningDate', 'mobileNo', 'personalDetails', 'bulk_import'],
+  sub_admin: ['id', 'name', 'role', 'branch', 'joiningDate', 'status', 'mobileNo', 'personalDetails', 'addresses', 'gpsAndMobile', 'deviceInfo', 'export_csv', 'export_inactive', 'export_profile_pdf', 'export_payslip_pdf', 'export_attendance', 'bulk_import'],
+  branch_manager: ['id', 'name', 'role', 'branch', 'joiningDate', 'status', 'mobileNo', 'personalDetails', 'addresses', 'gpsAndMobile', 'deviceInfo', 'export_csv', 'export_inactive', 'export_profile_pdf', 'export_attendance'],
+  recruiter: ['id', 'name', 'role', 'branch', 'joiningDate', 'mobileNo', 'personalDetails', 'addresses', 'export_profile_pdf', 'bulk_import'],
   asset_manager: ['id', 'name', 'role', 'branch', 'status', 'mobileNo', 'deviceInfo'],
-  employee: ['id', 'name', 'role', 'branch']
+  employee: ['id', 'name', 'role', 'branch', 'personalDetails', 'addresses', 'salary', 'bankDetails', 'identityDetails', 'pfEsicDetails', 'export_profile_pdf', 'export_payslip_pdf', 'export_attendance']
 };
 
 export interface PermissionColumnCategory {
@@ -232,14 +232,21 @@ export interface PermissionColumnCategory {
 export const PERMISSION_COLUMNS: PermissionColumnCategory[] = [
   {
     category: 'Basic Identity & Profile Info',
-    description: 'General identification and departmental attributes',
+    description: 'General identification, contact, and personal details',
     items: [
       { id: 'id', label: 'Employee ID', desc: 'Employee Code / Badge Number (e.g. EMP001)' },
       { id: 'name', label: 'Name & Profile Photo', desc: 'Full Name, Avatar and Work Email' },
       { id: 'role', label: 'Designation & Department', desc: 'Job Title, Department & Employee Group' },
       { id: 'branch', label: 'Branch & Cost Center', desc: 'Assigned Branch location & Cost center tag' },
-      { id: 'mobileNo', label: 'Work Mobile & Contact', desc: 'Official phone number & contact info' },
+      { id: 'mobileNo', label: 'Work Mobile & Official Contact', desc: 'Official phone number & contact info' },
       { id: 'personalDetails', label: 'Personal Information', desc: 'Personal Mobile, Personal Email, DOB, Gender, Blood Group & Emergency Contact' },
+    ]
+  },
+  {
+    category: 'Residential & Permanent Addresses',
+    description: 'Home address registry, street, city, state, pin code & country',
+    items: [
+      { id: 'addresses', label: 'Residential & Permanent Addresses', desc: 'Residential and Permanent Address Lines, City, State, Country and Pin Code', sensitive: true },
     ]
   },
   {
@@ -252,21 +259,21 @@ export const PERMISSION_COLUMNS: PermissionColumnCategory[] = [
     ]
   },
   {
-    category: 'Salary & Financials (Highly Sensitive)',
-    description: 'Compensation, breakdown rates, and increment trackers',
+    category: 'Standard Salary Structure & Rates (Highly Sensitive)',
+    description: 'Compensation breakdown, base salary, allowances, deductions & increments',
     items: [
-      { id: 'salary', label: 'Monthly Basic Salary & Allowances', desc: 'Basic Pay, HRA, DA, Allowances, Gross Pay & Hourly Rate', sensitive: true },
+      { id: 'salary', label: 'Standard Salary Structure & Rates', desc: 'Basic Pay, HRA, DA, Allowances, Deductions, Gross Pay & Hourly Rate', sensitive: true },
       { id: 'paymentMethod', label: 'Payment Method Mode', desc: 'Payment mode (Bank Transfer, Cheque, Cash)', sensitive: true },
       { id: 'increments_tab', label: 'Salary Increment Tracker History', desc: 'View past appraisals, revisions & increment tracker tab', sensitive: true },
     ]
   },
   {
-    category: 'Banking, Tax & Statutory (Highly Sensitive)',
-    description: 'Government compliance, identity proof, and disbursement details',
+    category: 'Banking, Tax & Statutory Registry (Highly Sensitive)',
+    description: 'Government compliance, PAN, Aadhaar, Bank Account, PF & ESIC details',
     items: [
-      { id: 'bankDetails', label: 'Bank Account & IFSC Details', desc: 'Bank Name, Account Number & Branch IFSC', sensitive: true },
-      { id: 'identityDetails', label: 'PAN Card & Aadhaar Proof', desc: 'Government identity proof numbers (PAN & Aadhaar)', sensitive: true },
-      { id: 'pfEsicDetails', label: 'PF & ESIC Numbers', desc: 'EPF Account No, UAN & ESIC Insurance Code', sensitive: true },
+      { id: 'bankDetails', label: 'Bank Account & IFSC Details', desc: 'Bank Name, Account Number, Account Holder & Branch IFSC', sensitive: true },
+      { id: 'identityDetails', label: 'Statutory Registry & IDs (PAN & Aadhaar)', desc: 'Government identity proofs (PAN Card & Aadhaar Card Number)', sensitive: true },
+      { id: 'pfEsicDetails', label: 'PF, ESIC & UAN Compliance IDs', desc: 'EPF Account No, UAN & ESIC Insurance Code', sensitive: true },
     ]
   },
   {
@@ -278,12 +285,15 @@ export const PERMISSION_COLUMNS: PermissionColumnCategory[] = [
     ]
   },
   {
-    category: 'Reports & Bulk Action Tools',
-    description: 'Data export files, rosters, and bulk spreadsheet tools',
+    category: 'Reports & Export Controls',
+    description: 'Role-based access to download employee records, slips, and audit rosters',
     items: [
-      { id: 'export_csv', label: 'Export Full Employee CSV Report', desc: 'Ability to download full directory spreadsheet' },
-      { id: 'export_inactive', label: 'Export Inactive Records Archive', desc: 'Ability to export archived ex-employees' },
-      { id: 'bulk_import', label: 'Bulk CSV Import & Upload', desc: 'Ability to bulk import new employee rosters via CSV' },
+      { id: 'export_csv', label: 'Export Full Employee CSV Directory', desc: 'Ability to download full directory spreadsheet', sensitive: true },
+      { id: 'export_inactive', label: 'Export Inactive Records Archive', desc: 'Ability to export archived ex-employees', sensitive: true },
+      { id: 'export_profile_pdf', label: 'Export / Print Employee Profile PDF', desc: 'Ability to print or download employee profile cards' },
+      { id: 'export_payslip_pdf', label: 'Export / Download Monthly Payslips', desc: 'Ability to download monthly salary slips & PDF certificates' },
+      { id: 'export_attendance', label: 'Export Attendance Reports (Excel/CSV/PDF)', desc: 'Ability to export attendance daily logs and monthly summaries' },
+      { id: 'bulk_import', label: 'Bulk CSV Import & Upload', desc: 'Ability to bulk import new employee rosters via CSV', sensitive: true },
     ]
   }
 ];
@@ -408,7 +418,14 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
   whatsappPassword: 'Rathis@ravs#2025!',
   whatsappSenderNo: '8518880943',
   enablePasswordLoginOtp: false,
-  enableAdminWelcomePopup: true
+  enableAdminWelcomePopup: true,
+  salaryVisibilitySettings: {
+    enabled: true,
+    visibilityDurationDays: 7,
+    autoHideAfterDays: true,
+    showEarningsAndDeductionsBreakdown: true,
+    customNoticeWhenExpired: 'Salary breakdown for this pay cycle has completed its active 7-day viewing window. Past statements remain available under the Payslips tab.'
+  }
 };
 
 export default function Settings({ 

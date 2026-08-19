@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   FileSpreadsheet, 
@@ -190,7 +190,14 @@ export default function EmployeeLedger({ employees, payrollRecords, language, ad
   }, [filteredLedger, currentPage, pageSize]);
 
   //Total Pages
-  const totalPages = Math.ceil(filteredLedger.lengthpageSize) || 1;
+  const totalPages = Math.ceil(filteredLedger.length / pageSize) || 1;
+
+  // Auto-adjust current page if it exceeds total pages
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   //Handle page size change reset to page 1
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

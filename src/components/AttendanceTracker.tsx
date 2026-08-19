@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, Check, Save, UserCheck, UserX, AlertTriangle, Clock, RefreshCw, 
   ListCollapse, ThumbsUp, ThumbsDown, CheckCircle, XCircle, AlertCircle, FileSpreadsheet, List,
-  Filter, Building, Users, ChevronLeft, ChevronRight, History, Flame, MessageSquare
+  Filter, Building, Users, ChevronLeft, ChevronRight, History, Flame, MessageSquare,
+  Lock, Unlock, ShieldAlert, ShieldCheck, Key, Settings, Sparkles, CheckCheck, Send, Eye, FileText, ArrowRight, Edit3, FileCheck2
 } from 'lucide-react';
-import { Employee, Attendance, AdminSettings, AuditLog } from '../types';
+import { Employee, Attendance, AdminSettings, AuditLog, AttendanceChangeRequest } from '../types';
 import { 
   getShiftTimings, 
   getHalfDayCheckOut, 
@@ -16,6 +17,9 @@ import PunchImportModal from './PunchImportModal';
 import MonthlyCalendarReport from './MonthlyCalendarReport';
 import AttendanceHeatmap from './AttendanceHeatmap';
 import { WhatsAppModal } from './WhatsAppModal';
+import AttendanceChangeRequestModal from './AttendanceChangeRequestModal';
+import AttendanceChangeRequestsTab from './AttendanceChangeRequestsTab';
+import AttendanceAuditReportTab from './AttendanceAuditReportTab';
 
 interface AttendanceTrackerProps {
   employees: Employee[];
@@ -24,9 +28,12 @@ interface AttendanceTrackerProps {
   onUpdateAttendanceRecords?: (records: Attendance[]) => Promise<void>;
   language: 'en' | 'hi';
   adminSettings?: AdminSettings;
+  onUpdateSettings?: (settings: AdminSettings) => Promise<void>;
   portalUser?: any;
   auditLogs?: AuditLog[];
   onAddAuditLogs?: (logs: AuditLog[]) => void;
+  attendanceChangeRequests?: AttendanceChangeRequest[];
+  onSaveChangeRequests?: (requests: AttendanceChangeRequest[]) => Promise<void>;
 }
 
 export default function AttendanceTracker({ 
@@ -36,9 +43,12 @@ export default function AttendanceTracker({
   onUpdateAttendanceRecords,
   language,
   adminSettings,
+  onUpdateSettings,
   portalUser,
   auditLogs = [],
-  onAddAuditLogs
+  onAddAuditLogs,
+  attendanceChangeRequests = [],
+  onSaveChangeRequests
 }: AttendanceTrackerProps) {
   const hasPermission = (action: 'view' | 'add' | 'edit' | 'approve') => {
     if (!portalUser) return true;
@@ -48,7 +58,26 @@ export default function AttendanceTracker({
     return permissions.includes(`attendance:${action}`);
   };
 
-  const [activeTab, setActiveTab] = useState<'daily' | 'misspunch' | 'halfday' | 'calendar' | 'heatmap'>('daily');
+  // Determine user administrative role and direct edit capabilities
+  const isAdminOrDirector = useMemo(() => {
+    if (!portalUser) return true;
+    const r = (portalUser.role || '').toLowerCase();
+    return r.includes('admin') || r.includes('director') || r.includes('super');
+  }, [portalUser]);
+
+  // Evaluate Lock and HR Direct Edit Access
+  const isHrDirectAccessActive = useMemo(() => {
+    const lockSettings = adminSettings?.attendanceLockSettings;
+    if (!lockSettings || !lockSettings.hrDirectAccessEnabled) return false;
+    if (!lockSettings.hrAccessExpiresAt) return true; // permanent
+    return new Date(lockSettings.hrAccessExpiresAt).getTime() > Date.now();
+  }, [adminSettings?.attendanceLockSettings]);
+
+  // Direct edit allowed if Admin/Director OR if HR has active granted access
+  const canDirectEdit = isAdminOrDirector || isHrDirectAccessActive;
+  const isLockedForUser = !canDirectEdit;
+
+  const [activeTab, setActiveTab] = useState<'daily' | 'requests' | 'audit_report' | 'misspunch' | 'halfday' | 'calendar' | 'heatmap'>('daily');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [localRecords, setLocalRecords] = useState<{ [empId: string]: Attendance }>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -57,6 +86,22 @@ export default function AttendanceTracker({
   //States for approvals
   const [pendingChanges, setPendingChanges] = useState<Attendance[]>([]);
   const [isSavingApprovals, setIsSavingApprovals] = useState(false);
+
+  // Change request modal states
+  const [changeModalOpen, setChangeModalOpen] = useState(false);
+  const [selectedEmpForChange, setSelectedEmpForChange] = useState<Employee | null>(null);
+  const [selectedRecordForChange, setSelectedRecordForChange] = useState<Attendance | null>(null);
+
+  // Admin Access Control Modal State
+  const [accessControlModalOpen, setAccessControlModalOpen] = useState(false);
+  const [accessDurationMins, setAccessDurationMins] = useState(60); // default 1 hour
+
+  // Local change requests mirror
+  const [localChangeRequests, setLocalChangeRequests] = useState<AttendanceChangeRequest[]>(attendanceChangeRequests);
+
+  useEffect(() => {
+    setLocalChangeRequests(attendanceChangeRequests);
+  }, [attendanceChangeRequests]);
 
   //WhatsApp modal state
   const [waModalOpen, setWaModalOpen] = useState(false);
@@ -138,7 +183,14 @@ export default function AttendanceTracker({
     return filteredActiveEmployees.slice(start, start + pageSize);
   }, [filteredActiveEmployees, currentPage, pageSize]);
 
-  const totalPages = Math.ceil(filteredActiveEmployees.lengthpageSize) || 1;
+  const totalPages = Math.ceil(filteredActiveEmployees.length / pageSize) || 1;
+
+  // Auto-adjust current page if it exceeds total pages
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const activeEmployees = filteredActiveEmployees;
 
@@ -255,6 +307,13 @@ export default function AttendanceTracker({
       alert('You do not have permission to edit attendance.');
       return;
     }
+
+    // If attendance is locked for this user (e.g. HR without active direct access), open the Change Request Modal
+    if (isLockedForUser) {
+      handleOpenChangeModalForEmp(empId, status);
+      return;
+    }
+
     const emp = employees.find(e => e.id === empId);
     const timings = getShiftTimings(emp?.workTiming, adminSettings?.defaultCheckIn || '09:00', adminSettings?.defaultCheckOut || '18:00');
 
@@ -302,6 +361,12 @@ export default function AttendanceTracker({
       alert('You do not have permission to edit attendance.');
       return;
     }
+
+    if (isLockedForUser) {
+      handleOpenChangeModalForEmp(empId);
+      return;
+    }
+
     setLocalRecords(prev => {
       const rec = prev[empId];
       const updated = { ...rec, [field]: value };
@@ -336,6 +401,10 @@ export default function AttendanceTracker({
       alert('You do not have permission to edit attendance.');
       return;
     }
+    if (isLockedForUser) {
+      handleOpenChangeModalForEmp(empId);
+      return;
+    }
     setLocalRecords(prev => ({
       ...prev,
       [empId]: { ...prev[empId], overtimeHours: Math.max(0, value) }
@@ -347,6 +416,10 @@ export default function AttendanceTracker({
       alert('You do not have permission to edit attendance.');
       return;
     }
+    if (isLockedForUser) {
+      handleOpenChangeModalForEmp(empId);
+      return;
+    }
     setLocalRecords(prev => ({
       ...prev,
       [empId]: { ...prev[empId], remarks: value }
@@ -354,6 +427,11 @@ export default function AttendanceTracker({
   };
 
   const markBulkStatus = (status: Attendance['status']) => {
+    if (isLockedForUser) {
+      alert('Attendance register is currently LOCKED. Individual change requests must be submitted for Director/Admin approval, or request Admin to grant temporary HR Direct Edit Access.');
+      return;
+    }
+
     setLocalRecords(prev => {
       const bulk = { ...prev };
       Object.keys(bulk).forEach(empId => {
@@ -370,6 +448,359 @@ export default function AttendanceTracker({
       });
       return bulk;
     });
+  };
+
+  // Open Change Request modal for a given employee
+  const handleOpenChangeModalForEmp = (empId: string, preselectedStatus?: Attendance['status']) => {
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    const rec = localRecords[empId] || {
+      date: selectedDate,
+      employeeId: empId,
+      status: preselectedStatus || 'Present',
+      checkIn: '',
+      checkOut: '',
+      overtimeHours: 0,
+      remarks: ''
+    };
+
+    const targetRec = preselectedStatus ? { ...rec, status: preselectedStatus } : rec;
+    setSelectedEmpForChange(emp);
+    setSelectedRecordForChange(targetRec);
+    setChangeModalOpen(true);
+  };
+
+  // Submit attendance change request (when locked or requested by user)
+  const handleSubmitChangeRequest = async (requestData: Omit<AttendanceChangeRequest, 'id' | 'requestedAt' | 'status'>) => {
+    const newRequest: AttendanceChangeRequest = {
+      ...requestData,
+      id: `REQ-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      requestedAt: new Date().toISOString(),
+      status: 'Pending',
+      actionType: 'change_request'
+    };
+
+    const updatedList = [newRequest, ...localChangeRequests];
+    setLocalChangeRequests(updatedList);
+
+    if (onSaveChangeRequests) {
+      await onSaveChangeRequests(updatedList);
+    }
+
+    // Add Audit Log
+    if (onAddAuditLogs) {
+      const log: AuditLog = {
+        id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        actorUsername: portalUser?.username || 'hr_user',
+        actorRole: portalUser?.role || 'hr',
+        employeeId: requestData.employeeId,
+        employeeName: requestData.employeeName,
+        date: requestData.attendanceDate,
+        actionType: 'update',
+        fieldChanged: `Attendance Change Request (${requestData.currentStatus} ➔ ${requestData.requestedStatus})`,
+        oldValue: `${requestData.currentStatus} (${requestData.currentCheckIn || '—'} - ${requestData.currentCheckOut || '—'})`,
+        newValue: `${requestData.requestedStatus} (${requestData.requestedCheckIn || '—'} - ${requestData.requestedCheckOut || '—'})`,
+        remarks: `Reason: ${requestData.reason} | Note: ${requestData.remarks}`
+      };
+      onAddAuditLogs([log]);
+    }
+
+    alert(`Attendance change request for ${requestData.employeeName} submitted successfully! It is now pending approval by the Director / Admin.`);
+  };
+
+  // Direct Admin Edit & Audit Record Apply
+  const handleDirectApply = async (updatedRecord: Attendance, reason: string, remarks: string) => {
+    // Update local state
+    setLocalRecords(prev => ({
+      ...prev,
+      [updatedRecord.employeeId]: updatedRecord
+    }));
+
+    // Update global state & Google Sheets
+    const currentList = Object.values({
+      ...localRecords,
+      [updatedRecord.employeeId]: updatedRecord
+    }) as Attendance[];
+
+    await onSaveAttendance(selectedDate, currentList);
+
+    const empName = getEmployeeName(updatedRecord.employeeId);
+
+    // Add Comprehensive Audit Log
+    if (onAddAuditLogs) {
+      const log: AuditLog = {
+        id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        actorUsername: portalUser?.username || 'admin',
+        actorRole: portalUser?.role || 'admin',
+        employeeId: updatedRecord.employeeId,
+        employeeName: empName,
+        date: selectedDate,
+        actionType: 'update',
+        fieldChanged: `Direct Override: ${updatedRecord.status}`,
+        oldValue: `${selectedRecordForChange?.status || 'Present'} (${selectedRecordForChange?.checkIn || '—'} - ${selectedRecordForChange?.checkOut || '—'})`,
+        newValue: `${updatedRecord.status} (${updatedRecord.checkIn || '—'} - ${updatedRecord.checkOut || '—'})`,
+        remarks: `Reason: ${reason} | Remarks: ${remarks}`
+      };
+      onAddAuditLogs([log]);
+    }
+
+    // Also record into change requests log as direct_admin_edit for full reporting transparency
+    const historyItem: AttendanceChangeRequest = {
+      id: `DIR-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      attendanceDate: selectedDate,
+      employeeId: updatedRecord.employeeId,
+      employeeName: empName,
+      department: employees.find(e => e.id === updatedRecord.employeeId)?.department || '',
+      currentStatus: selectedRecordForChange?.status || 'Present',
+      currentCheckIn: selectedRecordForChange?.checkIn || '',
+      currentCheckOut: selectedRecordForChange?.checkOut || '',
+      currentOvertimeHours: selectedRecordForChange?.overtimeHours || 0,
+      requestedStatus: updatedRecord.status,
+      requestedCheckIn: updatedRecord.checkIn || '',
+      requestedCheckOut: updatedRecord.checkOut || '',
+      requestedOvertimeHours: updatedRecord.overtimeHours || 0,
+      reason,
+      remarks,
+      requestedByUsername: portalUser?.username || 'admin',
+      requestedByName: portalUser?.name || portalUser?.username || 'Administrator',
+      requestedByRole: portalUser?.role || 'admin',
+      requestedAt: new Date().toISOString(),
+      status: 'Approved',
+      actionType: 'direct_admin_edit',
+      reviewedBy: portalUser?.name || portalUser?.username || 'Administrator',
+      reviewedByRole: portalUser?.role || 'admin',
+      reviewedAt: new Date().toISOString(),
+      reviewerRemarks: 'Applied via Direct Administrator Override'
+    };
+
+    const updatedList = [historyItem, ...localChangeRequests];
+    setLocalChangeRequests(updatedList);
+    if (onSaveChangeRequests) {
+      await onSaveChangeRequests(updatedList);
+    }
+
+    alert(`Attendance for ${empName} updated successfully and recorded in the Audit History.`);
+  };
+
+  // Approve Change Request
+  const handleApproveRequest = async (request: AttendanceChangeRequest, reviewerRemarks?: string) => {
+    const targetRecord: Attendance = {
+      date: request.attendanceDate,
+      employeeId: request.employeeId,
+      status: request.requestedStatus,
+      checkIn: request.requestedCheckIn,
+      checkOut: request.requestedCheckOut,
+      overtimeHours: request.requestedOvertimeHours,
+      remarks: request.remarks ? `[Approved Request: ${request.reason}] ${request.remarks}` : `Approved: ${request.reason}`,
+      approvalStatus: 'Approved'
+    };
+
+    if (request.attendanceDate === selectedDate) {
+      setLocalRecords(prev => ({
+        ...prev,
+        [request.employeeId]: targetRecord
+      }));
+    }
+
+    if (onUpdateAttendanceRecords) {
+      await onUpdateAttendanceRecords([targetRecord]);
+    } else {
+      const dateRecords = attendanceRecords.filter(r => r.date === request.attendanceDate && r.employeeId !== request.employeeId);
+      await onSaveAttendance(request.attendanceDate, [...dateRecords, targetRecord]);
+    }
+
+    const updatedRequests = localChangeRequests.map(r => {
+      if (r.id === request.id) {
+        return {
+          ...r,
+          status: 'Approved' as const,
+          reviewedBy: portalUser?.name || portalUser?.username || 'Admin/Director',
+          reviewedByRole: portalUser?.role || 'admin',
+          reviewedAt: new Date().toISOString(),
+          reviewerRemarks: reviewerRemarks || 'Approved by Director/Admin'
+        };
+      }
+      return r;
+    });
+
+    setLocalChangeRequests(updatedRequests);
+    if (onSaveChangeRequests) {
+      await onSaveChangeRequests(updatedRequests);
+    }
+
+    if (onAddAuditLogs) {
+      const log: AuditLog = {
+        id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        actorUsername: portalUser?.username || 'admin',
+        actorRole: portalUser?.role || 'admin',
+        employeeId: request.employeeId,
+        employeeName: request.employeeName,
+        date: request.attendanceDate,
+        actionType: 'approve',
+        fieldChanged: `Approved Attendance Change (${request.currentStatus} ➔ ${request.requestedStatus})`,
+        oldValue: `${request.currentStatus} (${request.currentCheckIn || '—'} - ${request.currentCheckOut || '—'})`,
+        newValue: `${request.requestedStatus} (${request.requestedCheckIn || '—'} - ${request.requestedCheckOut || '—'})`,
+        remarks: `Reason: ${request.reason} | Note: ${reviewerRemarks || request.remarks}`
+      };
+      onAddAuditLogs([log]);
+    }
+
+    alert(`Attendance change request for ${request.employeeName} on ${request.attendanceDate} approved and applied!`);
+  };
+
+  // Reject Change Request
+  const handleRejectRequest = async (request: AttendanceChangeRequest, reviewerRemarks?: string) => {
+    const updatedRequests = localChangeRequests.map(r => {
+      if (r.id === request.id) {
+        return {
+          ...r,
+          status: 'Rejected' as const,
+          reviewedBy: portalUser?.name || portalUser?.username || 'Admin/Director',
+          reviewedByRole: portalUser?.role || 'admin',
+          reviewedAt: new Date().toISOString(),
+          reviewerRemarks: reviewerRemarks || 'Declined by reviewer'
+        };
+      }
+      return r;
+    });
+
+    setLocalChangeRequests(updatedRequests);
+    if (onSaveChangeRequests) {
+      await onSaveChangeRequests(updatedRequests);
+    }
+
+    if (onAddAuditLogs) {
+      const log: AuditLog = {
+        id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        actorUsername: portalUser?.username || 'admin',
+        actorRole: portalUser?.role || 'admin',
+        employeeId: request.employeeId,
+        employeeName: request.employeeName,
+        date: request.attendanceDate,
+        actionType: 'reject',
+        fieldChanged: `Rejected Attendance Change Request`,
+        oldValue: `${request.requestedStatus}`,
+        newValue: `Kept: ${request.currentStatus}`,
+        remarks: `Reason: ${reviewerRemarks || 'Disapproved by Director/Admin'}`
+      };
+      onAddAuditLogs([log]);
+    }
+
+    alert(`Attendance change request for ${request.employeeName} rejected.`);
+  };
+
+  // Bulk Approve Change Requests
+  const handleBulkApprove = async (requestIds: string[]) => {
+    const toApprove = localChangeRequests.filter(r => requestIds.includes(r.id) && r.status === 'Pending');
+    if (toApprove.length === 0) return;
+
+    const recordsToUpdate: Attendance[] = [];
+    const auditLogsToCreate: AuditLog[] = [];
+
+    const updatedRequests = localChangeRequests.map(r => {
+      if (requestIds.includes(r.id) && r.status === 'Pending') {
+        const targetRecord: Attendance = {
+          date: r.attendanceDate,
+          employeeId: r.employeeId,
+          status: r.requestedStatus,
+          checkIn: r.requestedCheckIn,
+          checkOut: r.requestedCheckOut,
+          overtimeHours: r.requestedOvertimeHours,
+          remarks: r.remarks ? `[Approved Request: ${r.reason}] ${r.remarks}` : `Approved: ${r.reason}`,
+          approvalStatus: 'Approved'
+        };
+        recordsToUpdate.push(targetRecord);
+
+        auditLogsToCreate.push({
+          id: `audit-${Math.random().toString(36).substring(2, 9)}`,
+          timestamp: new Date().toISOString(),
+          actorUsername: portalUser?.username || 'admin',
+          actorRole: portalUser?.role || 'admin',
+          employeeId: r.employeeId,
+          employeeName: r.employeeName,
+          date: r.attendanceDate,
+          actionType: 'approve',
+          fieldChanged: `Bulk Approved: ${r.currentStatus} ➔ ${r.requestedStatus}`,
+          oldValue: r.currentStatus,
+          newValue: r.requestedStatus,
+          remarks: `Bulk approved by ${portalUser?.username || 'Admin'}`
+        });
+
+        return {
+          ...r,
+          status: 'Approved' as const,
+          reviewedBy: portalUser?.name || portalUser?.username || 'Admin/Director',
+          reviewedByRole: portalUser?.role || 'admin',
+          reviewedAt: new Date().toISOString(),
+          reviewerRemarks: 'Bulk approved by Director/Admin'
+        };
+      }
+      return r;
+    });
+
+    if (onUpdateAttendanceRecords) {
+      await onUpdateAttendanceRecords(recordsToUpdate);
+    }
+
+    setLocalChangeRequests(updatedRequests);
+    if (onSaveChangeRequests) {
+      await onSaveChangeRequests(updatedRequests);
+    }
+
+    if (onAddAuditLogs && auditLogsToCreate.length > 0) {
+      onAddAuditLogs(auditLogsToCreate);
+    }
+
+    alert(`Successfully approved ${toApprove.length} attendance change requests!`);
+  };
+
+  // Admin Lock & Access Control Handlers
+  const handleToggleLockSetting = async (lockState: boolean) => {
+    if (!adminSettings || !onUpdateSettings) return;
+    const updatedSettings: AdminSettings = {
+      ...adminSettings,
+      attendanceLockSettings: {
+        ...(adminSettings.attendanceLockSettings || { isLocked: true }),
+        isLocked: lockState
+      }
+    };
+    await onUpdateSettings(updatedSettings);
+    alert(lockState ? 'Attendance locking is now ENABLED. All HR updates require approval.' : 'Attendance locking is now DISABLED. Direct edits allowed.');
+  };
+
+  const handleGrantTimedHrAccess = async (minutes: number) => {
+    if (!adminSettings || !onUpdateSettings) return;
+    const expiresAt = minutes > 0 ? new Date(Date.now() + minutes * 60000).toISOString() : undefined;
+    const updatedSettings: AdminSettings = {
+      ...adminSettings,
+      attendanceLockSettings: {
+        ...(adminSettings.attendanceLockSettings || { isLocked: true }),
+        hrDirectAccessEnabled: true,
+        hrAccessExpiresAt: expiresAt,
+        hrAccessGrantedBy: portalUser?.username || 'admin',
+        hrAccessGrantedAt: new Date().toISOString()
+      }
+    };
+    await onUpdateSettings(updatedSettings);
+    alert(minutes > 0 ? `HR Direct Edit Access granted for ${minutes} minutes!` : 'HR Direct Edit Access granted permanently!');
+  };
+
+  const handleRevokeHrAccess = async () => {
+    if (!adminSettings || !onUpdateSettings) return;
+    const updatedSettings: AdminSettings = {
+      ...adminSettings,
+      attendanceLockSettings: {
+        ...(adminSettings.attendanceLockSettings || { isLocked: true }),
+        hrDirectAccessEnabled: false,
+        hrAccessExpiresAt: undefined
+      }
+    };
+    await onUpdateSettings(updatedSettings);
+    alert('HR Direct Edit Access has been revoked. Attendance is now strictly locked for HR.');
   };
 
   const handleSave = async () => {
@@ -623,7 +1054,7 @@ export default function AttendanceTracker({
         </div>
 
         {/* Navigation Tabs segment */}
-        <div className="inline-flex p-1 bg-gray-100 rounded-xl gap-1 border border-gray-200/50 max-w-full overflow-x-auto no-scrollbar shrink-0">
+        <div className="inline-flex p-1 bg-gray-100 dark:bg-[#0c1a14] rounded-xl gap-1 border border-gray-200/50 dark:border-[#1e3a2f] max-w-full overflow-x-auto no-scrollbar shrink-0">
           <button
             onClick={() => { setActiveTab('daily'); setPendingChanges([]); }}
             className={`px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg cursor-pointer transition-all whitespace-nowrap shrink-0 ${
@@ -634,6 +1065,41 @@ export default function AttendanceTracker({
           >
             {t.subTabDaily}
           </button>
+
+          {/* Change Requests Tab Button */}
+          <button
+            onClick={() => { setActiveTab('requests'); setPendingChanges([]); }}
+            className={`px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+              activeTab === 'requests' 
+                ? 'bg-white dark:bg-[#11221b] text-indigo-700 dark:text-indigo-300 shadow-xs border border-indigo-200/50 dark:border-indigo-900/40' 
+                : 'text-gray-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>{'Approval Requests'}</span>
+            {localChangeRequests.filter(r => r.status === 'Pending').length > 0 && (
+              <span className="bg-indigo-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
+                {localChangeRequests.filter(r => r.status === 'Pending').length}
+              </span>
+            )}
+          </button>
+
+          {/* Audit & History Report (Admin/Director) */}
+          {(isAdminOrDirector || hasPermission('view')) && (
+            <button
+              onClick={() => { setActiveTab('audit_report'); setPendingChanges([]); }}
+              className={`px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                activeTab === 'audit_report' 
+                  ? 'bg-white dark:bg-[#11221b] text-emerald-800 dark:text-emerald-300 shadow-xs border border-emerald-200/50 dark:border-emerald-900/40' 
+                  : 'text-gray-500 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-300'
+              }`}
+            >
+              <FileCheck2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>{'Audit & History Report'}</span>
+              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded-md">Admin</span>
+            </button>
+          )}
+
           <button
             onClick={() => { setActiveTab('misspunch'); setPendingChanges([]); }}
             className={`px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
@@ -684,6 +1150,75 @@ export default function AttendanceTracker({
           >
             <Flame className="w-3.5 h-3.5 text-amber-500" />
             <span>{(t as any).subTabHeatmap || 'Attendance Heatmap'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Lock & Security Status Banner */}
+      <div className="bg-linear-to-r from-slate-900 via-slate-800 to-indigo-950 text-white p-4 rounded-2xl shadow-sm border border-slate-700 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className={`p-2.5 rounded-xl border ${
+            isLockedForUser
+              ? 'bg-amber-500/20 border-amber-400/40 text-amber-300'
+              : isHrDirectAccessActive
+              ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+              : 'bg-indigo-500/20 border-indigo-400/40 text-indigo-300'
+          }`}>
+            {isLockedForUser ? (
+              <Lock className="w-5 h-5" />
+            ) : (
+              <Unlock className="w-5 h-5" />
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold tracking-wide uppercase">
+                {isLockedForUser
+                  ? 'Attendance Locked (Approval Workflow Enforced)'
+                  : isHrDirectAccessActive
+                  ? 'HR Temporary Direct Access Active'
+                  : 'Direct Admin Control Mode'}
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                isLockedForUser
+                  ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                  : 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30'
+              }`}>
+                {isLockedForUser ? 'Approval Required' : 'Direct Edit Permitted'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {isLockedForUser
+                ? 'Updates from HR require Reason & Remarks with Director/Admin approval before saving.'
+                : isHrDirectAccessActive
+                ? `Admin granted direct editing access to HR (Expires: ${adminSettings?.attendanceLockSettings?.hrAccessExpiresAt ? new Date(adminSettings.attendanceLockSettings.hrAccessExpiresAt).toLocaleTimeString() : 'Session'}).`
+                : 'Directors & Administrators have full direct override privileges with automatic audit tracking.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+          {isAdminOrDirector && (
+            <button
+              onClick={() => setAccessControlModalOpen(true)}
+              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Lock & HR Access Control</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setActiveTab('requests')}
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+          >
+            <Clock className="w-4 h-4" />
+            <span>View Pending Requests</span>
+            {localChangeRequests.filter(r => r.status === 'Pending').length > 0 && (
+              <span className="bg-white text-indigo-700 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                {localChangeRequests.filter(r => r.status === 'Pending').length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -986,6 +1521,21 @@ export default function AttendanceTracker({
                           </td>
                           <td className="py-4 px-6 text-center">
                             <div className="flex items-center justify-center gap-1.5">
+                              {/* Request / Update button */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenChangeModalForEmp(emp.id)}
+                                className={`p-1 px-2.5 border rounded-lg transition-all cursor-pointer inline-flex items-center gap-1 text-[10px] font-bold shadow-3xs ${
+                                  isLockedForUser
+                                    ? 'bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+                                    : 'bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 border-indigo-200 dark:border-indigo-800 text-indigo-800 dark:text-indigo-300'
+                                }`}
+                                title={isLockedForUser ? 'Submit Change Request for Approval' : 'Audit & Direct Override'}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>{isLockedForUser ? 'Request Update' : 'Update & Audit'}</span>
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1501,6 +2051,31 @@ export default function AttendanceTracker({
         </div>
       )}
 
+      {/* ATTENDANCE CHANGE REQUESTS TAB */}
+      {activeTab === 'requests' && (
+        <AttendanceChangeRequestsTab
+          changeRequests={localChangeRequests}
+          employees={employees}
+          attendanceRecords={attendanceRecords}
+          portalUser={portalUser}
+          isAdminOrDirector={isAdminOrDirector}
+          onApproveRequest={handleApproveRequest}
+          onRejectRequest={handleRejectRequest}
+          onBulkApprove={handleBulkApprove}
+        />
+      )}
+
+      {/* ATTENDANCE AUDIT & HISTORY REPORT TAB (Admin Only) */}
+      {activeTab === 'audit_report' && (
+        <AttendanceAuditReportTab
+          auditLogs={auditLogs}
+          changeRequests={localChangeRequests}
+          employees={employees}
+          isAdminOrDirector={isAdminOrDirector}
+          portalUser={portalUser}
+        />
+      )}
+
       {/* CALENDAR VIEW */}
       {activeTab === 'calendar' && (
         <MonthlyCalendarReport
@@ -1532,25 +2107,25 @@ export default function AttendanceTracker({
       {/* Particular Attendance Audit Logs Modal */}
       {historyModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl w-full max-w-2xl border border-gray-100 shadow-2xl flex flex-col max-h-[85vh]">
+          <div className="bg-white dark:bg-[#11221b] rounded-3xl w-full max-w-2xl border border-gray-100 dark:border-[#1e3a2f] shadow-2xl flex flex-col max-h-[85vh]">
             {/* Header */}
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-3xl">
+            <div className="p-6 border-b border-gray-100 dark:border-[#1e3a2f] flex items-center justify-between bg-gray-50/50 dark:bg-[#0c1a14] rounded-t-3xl">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-100 text-emerald-700">
+                <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 rounded-xl border border-emerald-100 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300">
                   <History className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-gray-900 text-sm">
+                  <h3 className="font-extrabold text-gray-900 dark:text-slate-100 text-sm">
                     {'Attendance Audit Trail'}
                   </h3>
-                  <p className="text-xs text-gray-400 font-bold font-mono mt-0.5 uppercase tracking-wide">
+                  <p className="text-xs text-gray-400 dark:text-slate-400 font-bold font-mono mt-0.5 uppercase tracking-wide">
                     {historyModalEmpName} ({historyModalEmpId}) · {historyModalDate}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setHistoryModalOpen(false)}
-                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-[#1e3a2f] flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
               >
                 <XCircle className="w-5 h-5" />
               </button>
@@ -1565,12 +2140,12 @@ export default function AttendanceTracker({
 
                 if (filteredLogs.length === 0) {
                   return (
-                    <div className="text-center py-12 text-gray-400">
-                      <AlertCircle className="w-12 h-12 mx-auto text-gray-200 mb-2" />
+                    <div className="text-center py-12 text-gray-400 dark:text-slate-500">
+                      <AlertCircle className="w-12 h-12 mx-auto text-gray-200 dark:text-slate-700 mb-2" />
                       <p className="text-xs font-bold">
                         {'No manual modifications logged for this attendance record.'}
                       </p>
-                      <p className="text-[10px] text-gray-400 mt-1">
+                      <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">
                         {'Modifications made during this session will be recorded upon saving.'}
                       </p>
                     </div>
@@ -1582,30 +2157,30 @@ export default function AttendanceTracker({
                     {filteredLogs.map((log) => (
                       <div
                         key={log.id}
-                        className="p-4 rounded-2xl border border-gray-100 bg-gray-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-gray-200 transition-all"
+                        className="p-4 rounded-2xl border border-gray-100 dark:border-[#1e3a2f] bg-gray-50/30 dark:bg-[#0b1812] flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-gray-200 dark:hover:border-[#2e5243] transition-all"
                       >
                         <div className="space-y-1 text-left">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-extrabold text-gray-800">
+                            <span className="text-xs font-extrabold text-gray-800 dark:text-slate-200">
                               {log.actorUsername}
                             </span>
-                            <span className="text-[9px] bg-slate-100 text-slate-700 font-black px-1.5 py-0.5 rounded-lg uppercase tracking-wider">
+                            <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black px-1.5 py-0.5 rounded-lg uppercase tracking-wider">
                               {log.actorRole}
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-gray-500 dark:text-slate-400">
                             {'Field Changed: '}
-                            <span className="font-bold text-gray-700 font-mono text-[10px] bg-emerald-50 text-emerald-800 px-1 py-0.5 rounded-md">
+                            <span className="font-bold text-gray-700 dark:text-slate-200 font-mono text-[10px] bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 px-1 py-0.5 rounded-md">
                               {log.fieldChanged}
                             </span>
                           </div>
                           <div className="text-xs flex flex-wrap items-center gap-1.5 mt-1">
-                            <span className="text-gray-400 line-through">{log.oldValue}</span>
+                            <span className="text-gray-400 dark:text-slate-500 line-through">{log.oldValue}</span>
                             <span className="text-gray-400">➔</span>
-                            <span className="font-bold text-emerald-700">{log.newValue}</span>
+                            <span className="font-bold text-emerald-700 dark:text-emerald-400">{log.newValue}</span>
                           </div>
                           {log.remarks && (
-                            <p className="text-[10px] text-gray-400 font-medium italic mt-1 bg-amber-50/50 p-1.5 rounded-lg border border-amber-100">
+                            <p className="text-[10px] text-gray-400 dark:text-slate-400 font-medium italic mt-1 bg-amber-50/50 dark:bg-amber-950/40 p-1.5 rounded-lg border border-amber-100 dark:border-amber-900/50">
                               Remark: {log.remarks}
                             </p>
                           )}
@@ -1615,17 +2190,17 @@ export default function AttendanceTracker({
                           <span
                             className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest ${
                               log.actionType === 'create'
-                                ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                                ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800'
                                 : log.actionType === 'approve'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800'
                                 : log.actionType === 'reject'
-                                ? 'bg-rose-50 text-rose-700 border border-rose-100'
-                                : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-100 dark:border-rose-800'
+                                : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-100 dark:border-amber-800'
                             }`}
                           >
                             {log.actionType}
                           </span>
-                          <span className="text-[10px] font-mono text-gray-400 font-bold">
+                          <span className="text-[10px] font-mono text-gray-400 dark:text-slate-400 font-bold">
                             {new Date(log.timestamp).toLocaleString(
                               'en-US'
                             )}
@@ -1639,12 +2214,208 @@ export default function AttendanceTracker({
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-gray-100 flex justify-end bg-gray-50/30 rounded-b-3xl">
+            <div className="p-4 border-t border-gray-100 dark:border-[#1e3a2f] flex justify-end bg-gray-50/30 dark:bg-[#0c1a14] rounded-b-3xl">
               <button
                 onClick={() => setHistoryModalOpen(false)}
-                className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                className="px-5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
                 {'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance Change Request / Admin Direct Override Modal */}
+      {selectedEmpForChange && selectedRecordForChange && (
+        <AttendanceChangeRequestModal
+          isOpen={changeModalOpen}
+          onClose={() => {
+            setChangeModalOpen(false);
+            setSelectedEmpForChange(null);
+            setSelectedRecordForChange(null);
+          }}
+          employee={selectedEmpForChange}
+          attendanceDate={selectedDate}
+          currentRecord={selectedRecordForChange}
+          portalUser={portalUser}
+          canDirectEdit={canDirectEdit}
+          isLockedForUser={isLockedForUser}
+          onSubmitRequest={handleSubmitChangeRequest}
+          onDirectApply={handleDirectApply}
+        />
+      )}
+
+      {/* Admin Lock & HR Access Delegation Control Modal */}
+      {accessControlModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white dark:bg-[#11221b] rounded-3xl w-full max-w-xl border border-gray-100 dark:border-[#1e3a2f] shadow-2xl overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-6 bg-linear-to-r from-slate-900 via-slate-800 to-indigo-950 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 rounded-2xl border border-white/20">
+                  <ShieldCheck className="w-6 h-6 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black tracking-tight">
+                    Attendance Lock & HR Access Control
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    Manage system-wide lock rules and grant temporary direct access to HR.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAccessControlModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[75vh]">
+              {/* Feature 1: Master Lock Switch */}
+              <div className="p-4 rounded-2xl border border-gray-200 dark:border-[#1e3a2f] bg-gray-50 dark:bg-[#0c1a14] flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-gray-900 dark:text-slate-100">
+                      Attendance Locking (Approval Workflow)
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      adminSettings?.attendanceLockSettings?.isLocked !== false
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                    }`}>
+                      {adminSettings?.attendanceLockSettings?.isLocked !== false ? 'LOCKED' : 'UNLOCKED'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-slate-400">
+                    When locked, HR users cannot modify records directly. Every change requires a Reason, Remark, and Director/Admin approval.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleLockSetting(adminSettings?.attendanceLockSettings?.isLocked === false)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 ${
+                    adminSettings?.attendanceLockSettings?.isLocked !== false
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  {adminSettings?.attendanceLockSettings?.isLocked !== false ? 'Unlock System' : 'Lock System'}
+                </button>
+              </div>
+
+              {/* Feature 2: HR Direct Access Delegation */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Unlock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <span>HR Temporary Direct Edit Delegation</span>
+                  </label>
+                  {isHrDirectAccessActive && (
+                    <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800 animate-pulse">
+                      Active
+                    </span>
+                  )}
+                </div>
+
+                {/* Current Status Box */}
+                {isHrDirectAccessActive ? (
+                  <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold flex items-center gap-1.5">
+                        <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        HR Direct Edit Access is Currently Active
+                      </span>
+                      <button
+                        onClick={handleRevokeHrAccess}
+                        className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-3xs"
+                      >
+                        Revoke Access Now
+                      </button>
+                    </div>
+                    <div className="text-[11px] space-y-0.5 text-emerald-800 dark:text-emerald-300">
+                      <p>• Granted By: <span className="font-bold">{adminSettings?.attendanceLockSettings?.hrAccessGrantedBy || 'Admin'}</span></p>
+                      <p>• Expires At: <span className="font-bold font-mono">{adminSettings?.attendanceLockSettings?.hrAccessExpiresAt ? new Date(adminSettings.attendanceLockSettings.hrAccessExpiresAt).toLocaleString() : 'Permanent Session'}</span></p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#0c1a14] border border-gray-200 dark:border-[#1e3a2f] space-y-3">
+                    <p className="text-xs text-gray-600 dark:text-slate-300">
+                      Grant temporary direct editing access to HR staff (e.g. for bulk corrections or shift changes). When granted, HR can update attendance without submitting individual approval requests.
+                    </p>
+
+                    {/* Quick Access Durations */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <button
+                        onClick={() => handleGrantTimedHrAccess(15)}
+                        className="p-2.5 bg-white dark:bg-[#11221b] hover:bg-indigo-50 dark:hover:bg-indigo-950 border border-gray-200 dark:border-[#1e3a2f] hover:border-indigo-300 text-gray-800 dark:text-slate-100 rounded-xl text-xs font-bold text-center transition-all cursor-pointer shadow-3xs"
+                      >
+                        15 Mins
+                      </button>
+                      <button
+                        onClick={() => handleGrantTimedHrAccess(30)}
+                        className="p-2.5 bg-white dark:bg-[#11221b] hover:bg-indigo-50 dark:hover:bg-indigo-950 border border-gray-200 dark:border-[#1e3a2f] hover:border-indigo-300 text-gray-800 dark:text-slate-100 rounded-xl text-xs font-bold text-center transition-all cursor-pointer shadow-3xs"
+                      >
+                        30 Mins
+                      </button>
+                      <button
+                        onClick={() => handleGrantTimedHrAccess(60)}
+                        className="p-2.5 bg-white dark:bg-[#11221b] hover:bg-indigo-50 dark:hover:bg-indigo-950 border border-gray-200 dark:border-[#1e3a2f] hover:border-indigo-300 text-gray-800 dark:text-slate-100 rounded-xl text-xs font-bold text-center transition-all cursor-pointer shadow-3xs"
+                      >
+                        1 Hour
+                      </button>
+                      <button
+                        onClick={() => handleGrantTimedHrAccess(1440)}
+                        className="p-2.5 bg-white dark:bg-[#11221b] hover:bg-indigo-50 dark:hover:bg-indigo-950 border border-gray-200 dark:border-[#1e3a2f] hover:border-indigo-300 text-gray-800 dark:text-slate-100 rounded-xl text-xs font-bold text-center transition-all cursor-pointer shadow-3xs"
+                      >
+                        Full Day
+                      </button>
+                    </div>
+
+                    {/* Custom Minutes Input */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-[#1e3a2f]">
+                      <span className="text-xs font-bold text-gray-600 dark:text-slate-400">Custom Duration:</span>
+                      <input
+                        type="number"
+                        min="5"
+                        max="4320"
+                        value={accessDurationMins}
+                        onChange={(e) => setAccessDurationMins(Math.max(5, Number(e.target.value)))}
+                        className="w-20 border border-gray-200 dark:border-[#1e3a2f] rounded-lg px-2.5 py-1 text-xs font-bold bg-white dark:bg-[#11221b] text-gray-800 dark:text-slate-100 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                      <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">Minutes</span>
+                      <button
+                        onClick={() => handleGrantTimedHrAccess(accessDurationMins)}
+                        className="ml-auto px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-3xs"
+                      >
+                        Grant Access
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Audit Transparency Notice */}
+              <div className="p-3 bg-slate-100 dark:bg-[#0c1a14] rounded-xl border border-slate-200 dark:border-[#1e3a2f] text-slate-600 dark:text-slate-400 text-[11px] flex items-start gap-2">
+                <FileCheck2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <p>
+                  <strong>Audit Trail Guarantee:</strong> Even when HR direct access is active, every change made to status, times, or remarks is automatically recorded with actor username, timestamp, and before/after values in the <strong>Audit & History Report</strong>.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-100 dark:border-[#1e3a2f] bg-gray-50 dark:bg-[#0c1a14] flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAccessControlModalOpen(false)}
+                className="px-5 py-2.5 bg-gray-200 dark:bg-slate-800 hover:bg-gray-300 dark:hover:bg-slate-700 text-gray-800 dark:text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>

@@ -10,6 +10,7 @@ import LeavesHolidays from './LeavesHolidays';
 import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
 import MonthlyCalendarReport from './MonthlyCalendarReport';
 import { parseGoogleDriveImageUrl } from '../utils/driveUtils';
+import { isRoleColumnAllowed } from './Settings';
 
 interface EmployeePortalProps {
   employee: Employee;
@@ -504,6 +505,25 @@ export default function EmployeePortal({
   const workedDays = daysPresent + (0.5 * daysHalfDay) + daysLeave;
   const overtimeHoursTotal = empAttendanceList.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
 
+  // Granular Column & Feature Permissions for Employee Role
+  const canViewSalary = isRoleColumnAllowed('employee', 'salary', adminSettings);
+  const canViewBankDetails = isRoleColumnAllowed('employee', 'bankDetails', adminSettings);
+  const canViewIdentityDetails = isRoleColumnAllowed('employee', 'identityDetails', adminSettings);
+  const canViewPfEsic = isRoleColumnAllowed('employee', 'pfEsicDetails', adminSettings);
+  const canViewAddresses = isRoleColumnAllowed('employee', 'addresses', adminSettings);
+  const canViewPersonalDetails = isRoleColumnAllowed('employee', 'personalDetails', adminSettings);
+  const canExportProfile = isRoleColumnAllowed('employee', 'export_profile_pdf', adminSettings);
+  const canExportPayslip = isRoleColumnAllowed('employee', 'export_payslip_pdf', adminSettings);
+
+  // Time-Bound Salary Visibility Settings
+  const salaryVisibilityPolicy = adminSettings?.salaryVisibilitySettings || {
+    enabled: true,
+    visibilityDurationDays: 7,
+    autoHideAfterDays: true,
+    showEarningsAndDeductionsBreakdown: true,
+    customNoticeWhenExpired: 'Salary breakdown for this pay cycle has completed its active 7-day viewing window. Past statements remain available under the Payslips tab.'
+  };
+
   //Filter payroll records for this employee
   const empPayslips = payrollRecords
     .filter(r => r.employeeId === employee.id)
@@ -937,6 +957,202 @@ export default function EmployeePortal({
                   </p>
                 </div>
               </div>
+
+              {/* TIME-BOUND SALARY VISIBILITY WIDGET (Configurable Active Window & Auto-Hide Policy) */}
+              {canViewSalary && latestPayslip && (
+                (() => {
+                  let refDate = new Date();
+                  if (latestPayslip.paymentDate) {
+                    refDate = new Date(latestPayslip.paymentDate);
+                  } else if (latestPayslip.monthYear) {
+                    const parts = latestPayslip.monthYear.split('-');
+                    if (parts.length === 2) {
+                      refDate = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+                    }
+                  }
+
+                  const now = new Date();
+                  const diffMs = now.getTime() - refDate.getTime();
+                  const daysElapsed = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+                  const visibilityDays = salaryVisibilityPolicy.visibilityDurationDays ?? 7;
+                  const isSalaryWindowActive = visibilityDays === 0 ? true : (daysElapsed <= visibilityDays || !salaryVisibilityPolicy.autoHideAfterDays);
+                  const daysRemaining = visibilityDays === 0 ? 999 : Math.max(0, visibilityDays - daysElapsed);
+
+                  if (salaryVisibilityPolicy.enabled === false) {
+                    return null;
+                  }
+
+                  if (!isSalaryWindowActive && salaryVisibilityPolicy.autoHideAfterDays) {
+                    return (
+                      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-700/80 rounded-2xl p-4 sm:p-5 text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 text-center sm:text-left">
+                          <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 text-amber-400 flex items-center justify-center shrink-0">
+                            <AlertCircle className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 justify-center sm:justify-start flex-wrap">
+                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-200">
+                                {`Salary Breakdown Auto-Hidden (${latestPayslip.monthYear})`}
+                              </h4>
+                              <span className="text-[9px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono font-bold">
+                                {`${visibilityDays}-Day Window Expired`}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 font-medium mt-0.5 leading-relaxed">
+                              {salaryVisibilityPolicy.customNoticeWhenExpired || "Salary breakdown for this pay cycle has completed its active viewing window. Past statements remain available under the Payslips tab."}
+                            </p>
+                          </div>
+                        </div>
+                        {adminSettings.enableEmployeePayslips === true && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('payslips')}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm shrink-0 cursor-pointer"
+                          >
+                            {"Open Payslips Archive"}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Active Window - Display rich salary & deductions breakdown
+                  const grossPay = latestPayslip.totalSalary || 0;
+                  const netPay = latestPayslip.netSalary !== undefined ? latestPayslip.netSalary : latestPayslip.totalSalary;
+                  const totalDeductions = latestPayslip.deductions !== undefined 
+                    ? latestPayslip.deductions 
+                    : Math.max(0, grossPay - netPay);
+                  const hraVal = latestPayslip.hra !== undefined ? latestPayslip.hra : Math.round(latestPayslip.basicSalary * 0.40);
+                  const pfVal = latestPayslip.providentFund !== undefined ? latestPayslip.providentFund : Math.round(latestPayslip.basicSalary * 0.12);
+
+                  return (
+                    <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 border border-emerald-500/30 rounded-2xl p-5 text-white shadow-xl space-y-4 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                      {/* Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3 relative z-10">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                            <DollarSign className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-sm font-black uppercase tracking-wider text-slate-100">
+                                {`Salary Statement • ${latestPayslip.monthYear}`}
+                              </h3>
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                                latestPayslip.paymentStatus === 'Paid'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              }`}>
+                                {latestPayslip.paymentStatus || 'Disbursed'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-semibold">
+                              {"Active pay cycle calculated salary & deduction breakdown"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Active Window Countdown Badge */}
+                        <div className="flex items-center gap-2 self-start sm:self-auto">
+                          <div className="inline-flex items-center gap-1.5 bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-xl text-[10px] font-extrabold text-slate-300 font-mono">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span>
+                              {visibilityDays === 0 ? "Permanent Dashboard Window" : `Active: ${daysRemaining} days remaining (${visibilityDays}d limit)`}
+                            </span>
+                          </div>
+                          {canExportPayslip && (
+                            <button
+                              type="button"
+                              onClick={() => downloadPayslipPDF(latestPayslip, employee)}
+                              className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors cursor-pointer"
+                              title="Download Payslip PDF"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3-Column Summary Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 relative z-10">
+                        {/* 1. Gross Earnings */}
+                        <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3.5 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                              {"Gross Earnings (Total)"}
+                            </span>
+                            <span className="text-xs font-black text-emerald-400">
+                              {`+₹${grossPay.toLocaleString('en-IN')}`}
+                            </span>
+                          </div>
+                          {salaryVisibilityPolicy.showEarningsAndDeductionsBreakdown !== false && (
+                            <div className="pt-1.5 border-t border-slate-700/60 space-y-1 text-[10px] text-slate-300 font-medium font-mono">
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Basic Earned:</span>
+                                <span>₹{(latestPayslip.basicSalary || 0).toLocaleString('en-IN')}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">HRA Allowance:</span>
+                                <span>₹{hraVal.toLocaleString('en-IN')}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Overtime & Special:</span>
+                                <span>₹{((latestPayslip.overtimePay || 0) + (employee.allowances || 0)).toLocaleString('en-IN')}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. Statutory & Company Deductions */}
+                        <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3.5 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                              {"Deductions Applied"}
+                            </span>
+                            <span className="text-xs font-black text-rose-400">
+                              {`-₹${totalDeductions.toLocaleString('en-IN')}`}
+                            </span>
+                          </div>
+                          {salaryVisibilityPolicy.showEarningsAndDeductionsBreakdown !== false && (
+                            <div className="pt-1.5 border-t border-slate-700/60 space-y-1 text-[10px] text-slate-300 font-medium font-mono">
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">PF (12%):</span>
+                                <span>₹{pfVal.toLocaleString('en-IN')}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">ESIC / PT / TDS:</span>
+                                <span>₹{((latestPayslip.esic || 0) + (latestPayslip.professionalTax || 0) + (latestPayslip.tds || 0)).toLocaleString('en-IN')}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Advances / Misc:</span>
+                                <span>₹{((latestPayslip.advanceDeduction || 0) + (employee.deductions || 0)).toLocaleString('en-IN')}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 3. Net In-Hand Payout */}
+                        <div className="bg-gradient-to-br from-emerald-900/60 to-emerald-950/80 border border-emerald-500/40 rounded-xl p-3.5 space-y-2 flex flex-col justify-between">
+                          <div>
+                            <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest block">
+                              {"Net Disbursed Salary"}
+                            </span>
+                            <p className="text-2xl font-black font-mono text-emerald-400 mt-1">
+                              {`₹${netPay.toLocaleString('en-IN')}`}
+                            </p>
+                          </div>
+                          <div className="pt-1.5 border-t border-emerald-500/30 text-[9.5px] text-slate-300 font-semibold flex items-center justify-between">
+                            <span>{employee.bankName ? `Transfer to ${employee.bankName}` : `Mode: ${employee.paymentMethod || 'Direct'}`}</span>
+                            <span className="text-emerald-300 font-bold">100% Verified</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
 
               {/* Top Row: Quick Attendance Punch Widget & Live Clock */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1666,181 +1882,205 @@ export default function EmployeePortal({
         {activeTab === 'profile' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* Column 1: Personal & Contacts */}
-            <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-4 sm:space-y-5 lg:col-span-2">
-              <div className="flex items-center gap-2 pb-2.5 sm:pb-3 border-b border-slate-100">
-                <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
-                  <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </div>
-                <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.personalInfo}</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.name}</label>
-                  <p className="mt-1 font-bold text-slate-800 text-sm">{employee.name}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.id}</label>
-                  <p className="mt-1 font-bold font-mono text-slate-800 text-sm">{employee.id}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.email}</label>
-                  <p className="mt-1 font-bold text-slate-800 text-sm">{employee.email || t.notSpecified}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.personalEmail}</label>
-                  <p className="mt-1 font-bold text-slate-800 text-sm">{employee.personalEmail || t.notSpecified}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.phone}</label>
-                  <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.mobileNo || t.notSpecified}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.emergencyContact}</label>
-                  <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.emergencyContactNo || t.notSpecified}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.dob}</label>
-                  <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.dob || t.notSpecified}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.bloodGroup}</label>
-                  <p className="mt-1 font-bold text-slate-800 text-sm">{employee.bloodGroup || t.notSpecified}</p>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.gender}</label>
-                  <p className="mt-1 font-bold text-slate-800 text-sm">{employee.gender || t.notSpecified}</p>
-                </div>
-              </div>
+            {/* Column 1: Personal & Contacts & Addresses */}
+            {(canViewPersonalDetails || canViewAddresses) && (
+              <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-4 sm:space-y-5 lg:col-span-2">
+                {canViewPersonalDetails && (
+                  <>
+                    <div className="flex items-center gap-2 pb-2.5 sm:pb-3 border-b border-slate-100">
+                      <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                        <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </div>
+                      <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.personalInfo}</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.name}</label>
+                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.name}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.id}</label>
+                        <p className="mt-1 font-bold font-mono text-slate-800 text-sm">{employee.id}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.email}</label>
+                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.email || t.notSpecified}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.personalEmail}</label>
+                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.personalEmail || t.notSpecified}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.phone}</label>
+                        <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.mobileNo || t.notSpecified}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.emergencyContact}</label>
+                        <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.emergencyContactNo || t.notSpecified}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.dob}</label>
+                        <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.dob || t.notSpecified}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.bloodGroup}</label>
+                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.bloodGroup || t.notSpecified}</p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.gender}</label>
+                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.gender || t.notSpecified}</p>
+                      </div>
+                    </div>
+                  </>
+                )}
 
-              {/* Residential & Permanent Addresses */}
-              <div className="border-t border-slate-100 pt-5 space-y-4">
-                <div className="flex items-center gap-2 pb-1">
-                  <MapPin className="w-4 h-4 text-emerald-600" />
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">{t.addresses}</h3>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.resAddress}</label>
-                    <p className="mt-1.5 text-slate-700 leading-relaxed font-semibold">
-                      {employee.resLine1 ? (
-                        <>
-                          {employee.resLine1}, {employee.resLine2 && `${employee.resLine2}, `}
-                          {employee.resCity}, {employee.resState} - {employee.resPinCode}
-                        </>
-                      ) : t.notSpecified}
-                    </p>
+                {/* Residential & Permanent Addresses */}
+                {canViewAddresses && (
+                  <div className={`${canViewPersonalDetails ? 'border-t border-slate-100 pt-5' : ''} space-y-4`}>
+                    <div className="flex items-center gap-2 pb-1">
+                      <MapPin className="w-4 h-4 text-emerald-600" />
+                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">{t.addresses}</h3>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.resAddress}</label>
+                        <p className="mt-1.5 text-slate-700 leading-relaxed font-semibold">
+                          {employee.resLine1 ? (
+                            <>
+                              {employee.resLine1}, {employee.resLine2 && `${employee.resLine2}, `}
+                              {employee.resCity}, {employee.resState} - {employee.resPinCode}
+                            </>
+                          ) : t.notSpecified}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.permAddress}</label>
+                        <p className="mt-1.5 text-slate-700 leading-relaxed font-semibold">
+                          {employee.permLine1 ? (
+                            <>
+                              {employee.permLine1}, {employee.permLine2 && `${employee.permLine2}, `}
+                              {employee.permCity}, {employee.permState} - {employee.permPinCode}
+                            </>
+                          ) : t.notSpecified}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.permAddress}</label>
-                    <p className="mt-1.5 text-slate-700 leading-relaxed font-semibold">
-                      {employee.permLine1 ? (
-                        <>
-                          {employee.permLine1}, {employee.permLine2 && `${employee.permLine2}, `}
-                          {employee.permCity}, {employee.permState} - {employee.permPinCode}
-                        </>
-                      ) : t.notSpecified}
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
-            </div>
+            )}
 
             {/* Column 2: Salary Structure, Banking, and Statutory info */}
-            <div className="space-y-6">
-              
-              {/* Standard Salary Structure */}
-              <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
-                    <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </div>
-                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.salaryStructure}</h3>
-                </div>
-                <div className="space-y-2.5 text-xs font-semibold text-slate-700">
-                  <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                    <span className="text-slate-500 font-bold">{t.basicSalary}</span>
-                    <span className="font-mono text-slate-950 font-extrabold text-sm">₹{getCurrentBasicSalary(employee).toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                    <span className="text-slate-500 font-bold">{t.allowances}</span>
-                    <span className="font-mono text-emerald-700 font-extrabold">₹{employee.allowances.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                    <span className="text-slate-500 font-bold">{t.deductions}</span>
-                    <span className="font-mono text-rose-600 font-extrabold">₹{employee.deductions.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                    <span className="text-slate-500 font-bold">{t.hourlyRate}</span>
-                    <span className="font-mono text-slate-800 font-bold">₹{employee.hourlyRate || 150} /hr</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5">
-                    <span className="text-slate-500 font-bold">{t.paymentMethod}</span>
-                    <span className="bg-emerald-50 text-emerald-800 text-[10px] px-2 py-0.5 rounded border border-emerald-100 font-extrabold">{employee.paymentMethod}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bank Account details */}
-              <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold shrink-0">
-                    <Building className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </div>
-                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.bankingInfo}</h3>
-                </div>
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.accHolder}</span>
-                    <p className="font-extrabold text-slate-800 mt-0.5">{employee.bankAccountHolderName || employee.name}</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.bankName}</span>
-                    <p className="font-extrabold text-slate-800 mt-0.5">{employee.bankName || t.notSpecified}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.accNo}</span>
-                      <p className="font-mono font-extrabold text-slate-800 mt-0.5 truncate">{employee.bankAccountNo || t.notSpecified}</p>
+            {(canViewSalary || canViewBankDetails || canViewIdentityDetails || canViewPfEsic) && (
+              <div className="space-y-6">
+                
+                {/* Standard Salary Structure */}
+                {canViewSalary && (
+                  <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                      <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                        <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </div>
+                      <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.salaryStructure}</h3>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.ifsc}</span>
-                      <p className="font-mono font-extrabold text-slate-800 mt-0.5">{employee.ifscCode || t.notSpecified}</p>
+                    <div className="space-y-2.5 text-xs font-semibold text-slate-700">
+                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                        <span className="text-slate-500 font-bold">{t.basicSalary}</span>
+                        <span className="font-mono text-slate-950 font-extrabold text-sm">₹{getCurrentBasicSalary(employee).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                        <span className="text-slate-500 font-bold">{t.allowances}</span>
+                        <span className="font-mono text-emerald-700 font-extrabold">₹{employee.allowances.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                        <span className="text-slate-500 font-bold">{t.deductions}</span>
+                        <span className="font-mono text-rose-600 font-extrabold">₹{employee.deductions.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                        <span className="text-slate-500 font-bold">{t.hourlyRate}</span>
+                        <span className="font-mono text-slate-800 font-bold">₹{employee.hourlyRate || 150} /hr</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1.5">
+                        <span className="text-slate-500 font-bold">{t.paymentMethod}</span>
+                        <span className="bg-emerald-50 text-emerald-800 text-[10px] px-2 py-0.5 rounded border border-emerald-100 font-extrabold">{employee.paymentMethod}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Statutory Registry */}
-              <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold shrink-0">
-                    <FileCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                {/* Bank Account details */}
+                {canViewBankDetails && (
+                  <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                      <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold shrink-0">
+                        <Building className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </div>
+                      <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.bankingInfo}</h3>
+                    </div>
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.accHolder}</span>
+                        <p className="font-extrabold text-slate-800 mt-0.5">{employee.bankAccountHolderName || employee.name}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.bankName}</span>
+                        <p className="font-extrabold text-slate-800 mt-0.5">{employee.bankName || t.notSpecified}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.accNo}</span>
+                          <p className="font-mono font-extrabold text-slate-800 mt-0.5 truncate">{employee.bankAccountNo || t.notSpecified}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.ifsc}</span>
+                          <p className="font-mono font-extrabold text-slate-800 mt-0.5">{employee.ifscCode || t.notSpecified}</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.statutoryInfo}</h3>
-                </div>
-                <div className="space-y-2.5 text-xs font-semibold text-slate-700">
-                  <div className="flex justify-between items-center py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-bold">{t.pan}</span>
-                    <span className="font-mono text-slate-900 font-bold uppercase">{employee.panNo || t.notSpecified}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-bold">{t.aadhaar}</span>
-                    <span className="font-mono text-slate-900 font-bold">{employee.aadhaarNo || t.notSpecified}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-bold">{t.uan}</span>
-                    <span className="font-mono text-slate-900 font-bold">{employee.uan || t.notSpecified}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1">
-                    <span className="text-slate-500 font-bold">{t.pfAcc}</span>
-                    <span className="font-mono text-slate-900 font-bold">{employee.pfAccountNo || t.notSpecified}</span>
-                  </div>
-                </div>
-              </div>
+                )}
 
-            </div>
+                {/* Statutory Registry */}
+                {(canViewIdentityDetails || canViewPfEsic) && (
+                  <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                      <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold shrink-0">
+                        <FileCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </div>
+                      <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.statutoryInfo}</h3>
+                    </div>
+                    <div className="space-y-2.5 text-xs font-semibold text-slate-700">
+                      {canViewIdentityDetails && (
+                        <>
+                          <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                            <span className="text-slate-500 font-bold">{t.pan}</span>
+                            <span className="font-mono text-slate-900 font-bold uppercase">{employee.panNo || t.notSpecified}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                            <span className="text-slate-500 font-bold">{t.aadhaar}</span>
+                            <span className="font-mono text-slate-900 font-bold">{employee.aadhaarNo || t.notSpecified}</span>
+                          </div>
+                        </>
+                      )}
+                      {canViewPfEsic && (
+                        <>
+                          <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                            <span className="text-slate-500 font-bold">{t.uan}</span>
+                            <span className="font-mono text-slate-900 font-bold">{employee.uan || t.notSpecified}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-1">
+                            <span className="text-slate-500 font-bold">{t.pfAcc}</span>
+                            <span className="font-mono text-slate-900 font-bold">{employee.pfAccountNo || t.notSpecified}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
           </div>
         )}
 

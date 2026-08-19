@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './auth';
 import { Employee, Attendance, PayrollRecord, AdminSettings, FailedLoginAttempt, TransactionalEmailLog } from '../types';
+import { sanitizeEmployees, sanitizeAttendance, sanitizePayroll } from '../utils/dataSanitizer';
 
 const COLLECTION_NAME = 'payroll_system_data';
 const DOCUMENT_ID = 'shared_db';
@@ -73,7 +74,14 @@ export async function loadFromFirestore(): Promise<{ data: SharedData | null; su
     const docRef = doc(db, COLLECTION_NAME, DOCUMENT_ID);
     const docSnap = await withTimeout(getDoc(docRef), 10000);
     if (docSnap.exists()) {
-      return { data: docSnap.data() as SharedData, success: true };
+      const rawData = docSnap.data() as SharedData;
+      const sanitized: SharedData = {
+        ...rawData,
+        employees: sanitizeEmployees(rawData.employees || []),
+        attendance: sanitizeAttendance(rawData.attendance || []),
+        payroll: sanitizePayroll(rawData.payroll || [])
+      };
+      return { data: sanitized, success: true };
     }
     return { data: null, success: true };
   } catch (error: any) {

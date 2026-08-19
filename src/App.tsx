@@ -63,8 +63,12 @@ import {
   fetchArchivedCandidatesFromSheets,
   fetchArchivedAttendanceFromSheets
 } from './services/sheets';
-import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog, LeaveRequest, TransactionalEmailLog, UserRole, PortalUser, Candidate, ArchivedEmployeeRecord, ArchivedCandidateRecord } from './types';
+import { Employee, Attendance, PayrollRecord, AdminSettings, SyncLog, FailedLoginAttempt, AuditLog, LeaveRequest, TransactionalEmailLog, UserRole, PortalUser, Candidate, ArchivedEmployeeRecord, ArchivedCandidateRecord, AttendanceChangeRequest } from './types';
 import { saveToFirestore, loadFromFirestore } from './services/firestore';
+import { sanitizeEmployees, sanitizeAttendance, sanitizePayroll, scrubMockDataFromStorage } from './utils/dataSanitizer';
+
+// Immediate scrub of residual mock data on script execution
+scrubMockDataFromStorage();
 
 //Unique device fingerprint generator for browser lock
 const getDeviceFingerprint = (): string => {
@@ -732,6 +736,39 @@ export default function App() {
     localStorage.setItem('payroll_password_requests', JSON.stringify(passwordRequests));
   }, [passwordRequests]);
 
+  const [attendanceChangeRequests, setAttendanceChangeRequests] = useState<AttendanceChangeRequest[]>(() => {
+    const saved = localStorage.getItem('payroll_attendance_change_requests');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error("Error parsing attendance change requests", e);
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('payroll_attendance_change_requests', JSON.stringify(attendanceChangeRequests));
+  }, [attendanceChangeRequests]);
+
+  const handleSaveAttendanceChangeRequests = async (updatedRequests: AttendanceChangeRequest[]) => {
+    setAttendanceChangeRequests(updatedRequests);
+    setIsDataModified(true);
+    try {
+      await saveToFirestore({
+        employees,
+        attendance,
+        payroll,
+        adminSettings,
+        failedLogins
+      });
+    } catch (e) {
+      console.warn('Error syncing change requests to firestore:', e);
+    }
+  };
+
   //Live time for login clock
   const [liveTime, setLiveTime] = useState<Date>(new Date());
   useEffect(() => {
@@ -874,7 +911,6 @@ export default function App() {
   const [isSidebarHovered, setIsSidebarHovered] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en'); //Set default to English as bilingual toggle is disabled
-  const [showSeedDialog, setShowSeedDialog] = useState<boolean>(false);
   const [showSheetsNotice, setShowSheetsNotice] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     return localStorage.getItem('dismiss_sheets_notice') !== 'true';
@@ -890,7 +926,6 @@ export default function App() {
 
   //Register Back-Button Handlers for Modals and Mobile Sidebar Drawers
   useModalBackHandler(isMobileMenuOpen, () => setIsMobileMenuOpen(false), 'mobile-menu');
-  useModalBackHandler(showSeedDialog, () => setShowSeedDialog(false), 'seed-dialog');
   useModalBackHandler(showPendingAlertModal, () => setShowPendingAlertModal(false), 'pending-alert-modal');
   useModalBackHandler(!!confirmDialog?.isOpen, () => setConfirmDialog(null), 'confirm-dialog');
 
@@ -1193,8 +1228,6 @@ export default function App() {
       let sheetId = await findSpreadsheet(accessToken);
       if (!sheetId) {
         sheetId = await createSpreadsheet(accessToken);
-        //Newly created spreadsheet is empty, offer to seed demo data
-        setShowSeedDialog(true);
       } else {
         //If the spreadsheet already exists, ensure all new headers/columns are added to row 1
         try {
@@ -1210,14 +1243,18 @@ export default function App() {
       setSpreadsheetLink(webLink);
 
       //3. Load Employees, Attendance, Payroll, and Admin Settings
-      const fetchedEmployees = await fetchEmployees(sheetId, accessToken);
-      const fetchedAttendance = await fetchAttendance(sheetId, accessToken);
-      const fetchedPayroll = await fetchPayrollHistory(sheetId, accessToken);
+      const rawFetchedEmployees = await fetchEmployees(sheetId, accessToken);
+      const rawFetchedAttendance = await fetchAttendance(sheetId, accessToken);
+      const rawFetchedPayroll = await fetchPayrollHistory(sheetId, accessToken);
+
+      const fetchedEmployees = sanitizeEmployees(rawFetchedEmployees);
+      const fetchedAttendance = sanitizeAttendance(rawFetchedAttendance);
+      const fetchedPayroll = sanitizePayroll(rawFetchedPayroll);
 
       //Perform bidirectional merge to preserve offline modifications
-      const mergedEmployees = mergeEmployees(employees, fetchedEmployees);
-      const mergedAttendance = mergeAttendance(attendance, fetchedAttendance);
-      const mergedPayroll = mergePayroll(payroll, fetchedPayroll);
+      const mergedEmployees = sanitizeEmployees(mergeEmployees(employees, fetchedEmployees));
+      const mergedAttendance = sanitizeAttendance(mergeAttendance(attendance, fetchedAttendance));
+      const mergedPayroll = sanitizePayroll(mergePayroll(payroll, fetchedPayroll));
 
       setEmployees(mergedEmployees);
       setAttendance(mergedAttendance);
@@ -1298,11 +1335,6 @@ export default function App() {
           setPortalUser(updatedUser);
           localStorage.setItem('payroll_portal_user', JSON.stringify(updatedUser));
         }
-      }
-
-      //If existing employees are found, hide seed dialog
-      if (fetchedEmployees.length > 0) {
-        setShowSeedDialog(false);
       }
 
       //Force direct, immediate synchronization of loaded real data to central Firestore database
@@ -1655,116 +1687,6 @@ export default function App() {
         }
       }
     });
-  };
-
-  //Seeding sample data
-  const handleSeedDemoData = async () => {
-    setIsLoadingData(true);
-    setSyncStatus('syncing');
-
-    try {
-      const sampleEmployees: Employee[] = [
-        {
-          id: 'EMP001',
-          name: 'Rajesh Kumar',
-          department: 'Management',
-          designation: 'Senior Supervisor',
-          joiningDate: '2025-01-10',
-          basicSalary: 38000,
-          allowances: 3500,
-          deductions: 1500,
-          hourlyRate: 150,
-          paymentMethod: 'Bank Transfer',
-          isActive: true,
-        },
-        {
-          id: 'EMP002',
-          name: 'Sunita Sharma',
-          department: 'Finance',
-          designation: 'Accounts Executive',
-          joiningDate: '2025-06-15',
-          basicSalary: 28000,
-          allowances: 2000,
-          deductions: 1000,
-          hourlyRate: 120,
-          paymentMethod: 'Bank Transfer',
-          isActive: true,
-        },
-        {
-          id: 'EMP003',
-          name: 'Amit Patel',
-          department: 'Operations',
-          designation: 'Dispatch Officer',
-          joiningDate: '2026-02-01',
-          basicSalary: 18000,
-          allowances: 1500,
-          deductions: 800,
-          hourlyRate: 100,
-          paymentMethod: 'Cash',
-          isActive: true,
-        }
-      ];
-
-      //Seed 5 days of attendance for current month
-      const currentMonth = new Date().toISOString().slice(0, 7); //YYYY-MM
-      const sampleAttendance: Attendance[] = [];
-      
-      for (let day = 1; day <= 5; day++) {
-        const dateStr = `${currentMonth}-${String(day).padStart(2, '0')}`;
-        sampleEmployees.forEach((emp, index) => {
-          //Rajesh & Sunita present, Amit absent on day 3
-          const isAbsent = day === 3 && index === 2;
-          const isHalfDay = day === 4 && index === 1;
-
-          sampleAttendance.push({
-            date: dateStr,
-            employeeId: emp.id,
-            status: isAbsent ? 'Absent' : isHalfDay ? 'Half Day' : 'Present',
-            checkIn: isAbsent ? '' : '09:00',
-            checkOut: isAbsent ? '' : isHalfDay ? '13:30' : '18:30', //worked some overtime
-            overtimeHours: (!isAbsent && !isHalfDay && index === 0) ? 0.5 : 0,
-            remarks: isAbsent ? 'Sick leave' : isHalfDay ? 'Personal chore' : 'On-time'
-          });
-        });
-      }
-
-      //Save Employees and Attendance to sheets if connected
-      if (spreadsheetId && token) {
-        addSyncLog(
-          'Seed Database',
-          'syncing',
-          'Writing sample employees and attendance history...'
-        );
-        await saveEmployees(spreadsheetId, sampleEmployees, token);
-        await saveAttendance(spreadsheetId, sampleAttendance, token);
-      }
-
-      //Reload
-      setEmployees(sampleEmployees);
-      setAttendance(sampleAttendance);
-      setIsDataModified(true);
-      setShowSeedDialog(false);
-      setSyncStatus('synced');
-      addSyncLog(
-        'Seed Database',
-        'success',
-        'Seeded 3 demo employees and 5 days of attendance history.'
-      );
-    } catch (err: any) {
-      console.error('Error seeding demo data', err);
-      addSyncLog(
-        'Seed Database Error',
-        'error',
-        `Failed to seed: ${err?.message || err}`
-      );
-      if (spreadsheetId && token) {
-        alert('Failed to seed demo data to Sheets.');
-      } else {
-        alert('Failed to seed demo data.');
-      }
-    } finally {
-      setIsLoadingData(false);
-    }
   };
 
   const handleAddLeaveRequest = (newRequest: LeaveRequest) => {
@@ -5788,9 +5710,12 @@ export default function App() {
                   onUpdateAttendanceRecords={handleUpdateAttendanceRecords}
                   language={language} 
                   adminSettings={adminSettings}
+                  onUpdateSettings={handleSaveSettings}
                   portalUser={portalUser}
                   auditLogs={auditLogs}
-                  onAddAuditLogs={handleAddAuditLogs} />
+                  onAddAuditLogs={handleAddAuditLogs}
+                  attendanceChangeRequests={attendanceChangeRequests}
+                  onSaveChangeRequests={handleSaveAttendanceChangeRequests} />
               )}
               {currentTab === 'payroll' && (
                 <PayrollCalculator 
@@ -5882,38 +5807,6 @@ export default function App() {
           &copy; {new Date().getFullYear()} Payroll Management System | Powered by Google Workspace Integration API
         </footer>
       </div>
-
-      {/* Beautiful Modal Seed Dialog on Newly Created Empty Sheets */}
-      {showSeedDialog && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-lg border border-gray-200 shadow-2xl max-w-sm w-full p-5 text-center space-y-3.5">
-            <div className="inline-flex bg-blue-50 text-blue-600 p-3 rounded-full">
-              <AlertCircle className="w-6 h-6 animate-bounce" />
-            </div>
-            <h3 className="text-sm font-bold text-gray-900 font-display">{uiTexts.seedingTitle}</h3>
-            <p className="text-[11px] text-gray-500 leading-relaxed font-medium">
-              {uiTexts.seedingDesc}
-            </p>
-            <div className="pt-2 flex flex-col sm:flex-row gap-2 justify-center">
-              <button
-                onClick={handleSeedDemoData}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                id="btn-seed"
-              >
-                {uiTexts.seedYes}
-                <ArrowRight className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => setShowSeedDialog(false)}
-                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer"
-                id="btn-cancel-seed"
-              >
-                {uiTexts.seedNo}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Custom Reusable Confirmation Modal */}
       {confirmDialog && confirmDialog.isOpen && (

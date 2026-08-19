@@ -174,7 +174,14 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
     return filteredPayroll.slice(start, start + pageSize);
   }, [filteredPayroll, currentPage, pageSize]);
 
-  const totalPages = Math.ceil(filteredPayroll.lengthpageSize) || 1;
+  const totalPages = Math.ceil(filteredPayroll.length / pageSize) || 1;
+
+  // Auto-adjust current page if it exceeds total pages
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const activeEmployees = employees.filter(e => e.isActive);
   const selectedMonthYear = `${selectedYear}-${selectedMonth}`;
