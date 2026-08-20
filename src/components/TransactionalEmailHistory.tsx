@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { safeFetchJson } from '../utils/apiHelper';
 import { 
   Mail, 
   KeyRound, 
@@ -128,7 +129,7 @@ export default function TransactionalEmailHistory({
         }
       } else {
         //Fallback fetch
-        const res = await fetch('/api/send-otp', {
+        const { data } = await safeFetchJson('/api/send-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -147,11 +148,10 @@ export default function TransactionalEmailHistory({
             }
           })
         });
-        const data = await res.json();
-        if (data.success) {
+        if (data?.success) {
           setActionSuccessMsg(`Resent email successfully!`);
         } else {
-          alert(data.error || 'Failed to resend email');
+          alert(data?.error || 'Failed to resend email');
         }
       }
     } catch (e: any) {
@@ -179,7 +179,7 @@ export default function TransactionalEmailHistory({
           alert(res.error || 'Failed to dispatch email.');
         }
       } else {
-        const res = await fetch('/api/send-otp', {
+        const { data } = await safeFetchJson('/api/send-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -198,13 +198,12 @@ export default function TransactionalEmailHistory({
             }
           })
         });
-        const data = await res.json();
-        if (data.success) {
+        if (data?.success) {
           setActionSuccessMsg(`Transactional message dispatched successfully!`);
           setShowDispatchModal(false);
           setDispatchRecipient('');
         } else {
-          alert(data.error || 'Dispatch error');
+          alert(data?.error || 'Dispatch error');
         }
       }
     } catch (e: any) {

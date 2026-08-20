@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
+import { safeFetchJson } from './utils/apiHelper';
 import { 
   LogOut, 
   RefreshCw, 
@@ -515,7 +516,7 @@ export default function App() {
 
   const handleSendTestEmail = async (recipient: string, type: 'OTP' | 'Welcome Message' | 'Custom Notice', subject: string, customBody?: string) => {
     try {
-      const res = await fetch('/api/send-otp', {
+      const { data } = await safeFetchJson('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -534,11 +535,10 @@ export default function App() {
           }
         })
       });
-      const data = await res.json();
-      if (data.logEntry) {
+      if (data?.logEntry) {
         addEmailLog(data.logEntry);
       }
-      return { success: data.success, message: data.message, error: data.error };
+      return { success: data?.success, message: data?.message, error: data?.error };
     } catch (e: any) {
       return { success: false, error: e.message || 'Network error' };
     }
@@ -578,16 +578,15 @@ export default function App() {
         payload.status = 'Approved';
       }
 
-      const res = await fetch(endpoint, {
+      const { data } = await safeFetchJson(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (data.logEntry) {
+      if (data?.logEntry) {
         addEmailLog(data.logEntry);
       }
-      return { success: data.success, message: data.message, error: data.error };
+      return { success: data?.success, message: data?.message, error: data?.error };
     } catch (e: any) {
       return { success: false, error: e.message || 'Failed to resend email' };
     }
@@ -1063,9 +1062,8 @@ export default function App() {
           
           //Also fetch server-side recorded email logs
           try {
-            const serverRes = await fetch('/api/email-logs');
-            const serverData = await serverRes.json();
-            if (serverData.success && serverData.logs && serverData.logs.length > 0) {
+            const { data: serverData } = await safeFetchJson('/api/email-logs');
+            if (serverData && serverData.success && serverData.logs && serverData.logs.length > 0) {
               setEmailLogs(prev => {
                 const map = new Map();
                 [...serverData.logs, ...prev].forEach(l => map.set(l.id, l));
@@ -1509,7 +1507,7 @@ export default function App() {
     setIsSendingPasswordLoginOtp(true);
 
     try {
-      const res = await fetch('/api/send-otp', {
+      const { data } = await safeFetchJson('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1528,30 +1526,18 @@ export default function App() {
           }
         })
       });
-      
-      let data;
-      try {
-        data = await res.json();
-      } catch (err) {
-        try {
-          const text = await res.text();
-          data = { success: false, error: text || `Server error ${res.status}` };
-        } catch (e2) {
-          data = { success: false, error: `Server error ${res.status}` };
-        }
-      }
 
       setIsSendingPasswordLoginOtp(false);
-      if (data.logEntry) addEmailLog(data.logEntry);
-      if (data.success) {
+      if (data?.logEntry) addEmailLog(data.logEntry);
+      if (data?.success) {
         setPasswordLoginOtpStep('enter_otp');
         if (data.method === 'SIMULATION') {
           setLastSentEmail(data.debugPayload);
           setShowEmailViewer(true);
         }
       } else {
-        setLoginErr(data.error || 'Failed to dispatch login 2FA OTP.');
-        if (data.smtpError && data.debugPayload) {
+        setLoginErr(data?.error || 'Failed to dispatch login 2FA OTP.');
+        if (data?.smtpError && data?.debugPayload) {
           setFallbackOtpPayload(data.debugPayload);
         }
       }
@@ -1792,7 +1778,7 @@ export default function App() {
       const emp = employees.find(e => e.id === affectedReq?.employeeId);
       if (emp && emp.email && emp.email.trim()) {
         try {
-          const res = await fetch('/api/send-leave-update', {
+          const { data } = await safeFetchJson('/api/send-leave-update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1815,9 +1801,8 @@ export default function App() {
               }
             })
           });
-          const data = await res.json();
-          if (data.logEntry) addEmailLog(data.logEntry);
-          if (data.success && data.method === 'SIMULATION') {
+          if (data?.logEntry) addEmailLog(data.logEntry);
+          if (data?.success && data?.method === 'SIMULATION') {
             setLastSentEmail(data.debugPayload);
             setShowEmailViewer(true);
           }
@@ -1832,7 +1817,7 @@ export default function App() {
   const handleAddEmployee = async (newEmp: Employee) => {
     //Dispatch Welcome Email Notification
     if (newEmp.email && newEmp.email.trim()) {
-      fetch('/api/send-welcome', {
+      safeFetchJson('/api/send-welcome', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1851,16 +1836,15 @@ export default function App() {
           }
         })
       })
-      .then(res => res.json())
-      .then(data => {
+      .then(({ data }) => {
         console.log('Welcome email API response:', data);
-        if (data.logEntry) addEmailLog(data.logEntry);
-        if (data.success && data.method === 'SIMULATION') {
+        if (data?.logEntry) addEmailLog(data.logEntry);
+        if (data?.success && data?.method === 'SIMULATION') {
           setLastSentEmail(data.debugPayload);
           setShowEmailViewer(true);
         }
       })
-      .catch(err => console.error('Welcome email dispatch error:', err));
+      .catch(e => console.warn('Could not dispatch welcome email:', e));
     }
 
     const updated = [...employees, newEmp];
@@ -2737,7 +2721,7 @@ export default function App() {
                           setFirstLoginSendingOtp(true);
 
                           try {
-                            const res = await fetch('/api/send-otp', {
+                            const { data } = await safeFetchJson('/api/send-otp', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
@@ -2756,30 +2740,18 @@ export default function App() {
                                 }
                               })
                             });
-                            
-                            let data;
-                            try {
-                              data = await res.json();
-                            } catch (err) {
-                              try {
-                                const text = await res.text();
-                                data = { success: false, error: text || `Server error ${res.status}` };
-                              } catch (e2) {
-                                data = { success: false, error: `Server error ${res.status}` };
-                              }
-                            }
 
                             setFirstLoginSendingOtp(false);
-                            if (data.logEntry) addEmailLog(data.logEntry);
-                            if (data.success) {
+                            if (data?.logEntry) addEmailLog(data.logEntry);
+                            if (data?.success) {
                               setFirstLoginStep('email_otp');
                               if (data.method === 'SIMULATION') {
                                 setLastSentEmail(data.debugPayload);
                                 setShowEmailViewer(true);
                               }
                             } else {
-                              setLoginErr(data.error || 'Failed to dispatch verification OTP.');
-                              if (data.smtpError && data.debugPayload) {
+                              setLoginErr(data?.error || 'Failed to dispatch verification OTP.');
+                              if (data?.smtpError && data?.debugPayload) {
                                 setFallbackOtpPayload(data.debugPayload);
                               }
                             }
@@ -3593,7 +3565,7 @@ export default function App() {
 
                       const triggerSendOtp = async () => {
                         try {
-                          const res = await fetch('/api/send-otp', {
+                          const { data } = await safeFetchJson('/api/send-otp', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -3612,30 +3584,18 @@ export default function App() {
                               }
                             })
                           });
-                          
-                          let data;
-                          try {
-                            data = await res.json();
-                          } catch (err) {
-                            try {
-                              const text = await res.text();
-                              data = { success: false, error: text || `Server error ${res.status}` };
-                            } catch (e2) {
-                              data = { success: false, error: `Server error ${res.status}` };
-                            }
-                          }
 
                           setIsSendingLoginOtp(false);
-                          if (data.logEntry) addEmailLog(data.logEntry);
-                          if (data.success) {
+                          if (data?.logEntry) addEmailLog(data.logEntry);
+                          if (data?.success) {
                             setLoginOtpStep('enter_otp');
                             if (data.method === 'SIMULATION') {
                               setLastSentEmail(data.debugPayload);
                               setShowEmailViewer(true);
                             }
                           } else {
-                            setLoginErr(data.error || 'Failed to dispatch login OTP.');
-                            if (data.smtpError && data.debugPayload) {
+                            setLoginErr(data?.error || 'Failed to dispatch login OTP.');
+                            if (data?.smtpError && data?.debugPayload) {
                               setFallbackOtpPayload(data.debugPayload);
                             }
                           }
@@ -4049,7 +4009,7 @@ export default function App() {
 
                       const triggerForgotSendOtp = async () => {
                         try {
-                          const res = await fetch('/api/send-otp', {
+                          const { data } = await safeFetchJson('/api/send-otp', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -4068,30 +4028,18 @@ export default function App() {
                               }
                             })
                           });
-                          
-                          let data;
-                          try {
-                            data = await res.json();
-                          } catch (err) {
-                            try {
-                              const text = await res.text();
-                              data = { success: false, error: text || `Server error ${res.status}` };
-                            } catch (e2) {
-                              data = { success: false, error: `Server error ${res.status}` };
-                            }
-                          }
 
                           setIsSendingForgotOtp(false);
-                          if (data.logEntry) addEmailLog(data.logEntry);
-                          if (data.success) {
+                          if (data?.logEntry) addEmailLog(data.logEntry);
+                          if (data?.success) {
                             setForgotStep('verify_otp');
                             if (data.method === 'SIMULATION') {
                               setLastSentEmail(data.debugPayload);
                               setShowEmailViewer(true);
                             }
                           } else {
-                            setForgotError(data.error || 'Failed to dispatch OTP. Please check SMTP settings.');
-                            if (data.smtpError && data.debugPayload) {
+                            setForgotError(data?.error || 'Failed to dispatch OTP. Please check SMTP settings.');
+                            if (data?.smtpError && data?.debugPayload) {
                               setFallbackOtpPayload(data.debugPayload);
                             }
                           }

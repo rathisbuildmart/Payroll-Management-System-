@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { safeFetchJson } from '../utils/apiHelper';
 import { 
   Settings as SettingsIcon, 
   Building, 
@@ -1552,7 +1553,7 @@ export default function Settings({
     setTestResult(null);
     
     try {
-      const response = await fetch('/api/test-smtp', {
+      const { data: resData } = await safeFetchJson('/api/test-smtp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1569,8 +1570,7 @@ export default function Settings({
         })
       });
       
-      const resData = await response.json();
-      if (resData.success) {
+      if (resData?.success) {
         setTestResult({
           success: true,
           message: `Live SMTP Dispatch Success! A secure test verification email has been successfully delivered to ${testRecipient.trim()} via ${localSettings.smtpHost}.`
@@ -1578,7 +1578,7 @@ export default function Settings({
       } else {
         setTestResult({
           success: false,
-          message: resData.error || ("SMTP dispatch failed. Please verify credentials.")
+          message: resData?.error || ("SMTP dispatch failed. Please verify credentials.")
         });
       }
     } catch (error: any) {
