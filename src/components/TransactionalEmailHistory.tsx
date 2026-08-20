@@ -128,7 +128,7 @@ export default function TransactionalEmailHistory({
         }
       } else {
         //Fallback fetch
-        const res = await fetch(' //api/send-otp', {
+        const res = await fetch('/api/send-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -179,7 +179,7 @@ export default function TransactionalEmailHistory({
           alert(res.error || 'Failed to dispatch email.');
         }
       } else {
-        const res = await fetch(' //api/send-otp', {
+        const res = await fetch('/api/send-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -507,7 +507,7 @@ export default function App() {
     localStorage.setItem('cached_email_logs', JSON.stringify([]));
     setIsDataModified(true);
     try {
-      await fetch(' //api/email-logs/clear', { method: 'POST' });
+      await fetch('/api/email-logs/clear', { method: 'POST' });
     } catch (e) {
       console.warn('Failed to clear server email logs:', e);
     }
@@ -515,7 +515,7 @@ export default function App() {
 
   const handleSendTestEmail = async (recipient: string, type: 'OTP' | 'Welcome Message' | 'Custom Notice', subject: string, customBody?: string) => {
     try {
-      const res = await fetch(' //api/send-otp', {
+      const res = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -547,10 +547,10 @@ export default function App() {
   const handleResendEmail = async (log: TransactionalEmailLog) => {
     try {
       const endpoint = log.type === 'Welcome Message' 
-        ? ' //api/send-welcome' 
+        ? '/api/send-welcome' 
         : log.type === 'Leave Update' 
-        ? ' //api/send-leave-update' 
-        : ' //api/send-otp';
+        ? '/api/send-leave-update' 
+        : '/api/send-otp';
       
       const payload: any = {
         email: log.recipientEmail,
@@ -1063,7 +1063,7 @@ export default function App() {
           
           //Also fetch server-side recorded email logs
           try {
-            const serverRes = await fetch(' //api/email-logs');
+            const serverRes = await fetch('/api/email-logs');
             const serverData = await serverRes.json();
             if (serverData.success && serverData.logs && serverData.logs.length > 0) {
               setEmailLogs(prev => {
@@ -1509,7 +1509,7 @@ export default function App() {
     setIsSendingPasswordLoginOtp(true);
 
     try {
-      const res = await fetch(' //api/send-otp', {
+      const res = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1792,7 +1792,7 @@ export default function App() {
       const emp = employees.find(e => e.id === affectedReq?.employeeId);
       if (emp && emp.email && emp.email.trim()) {
         try {
-          const res = await fetch(' //api/send-leave-update', {
+          const res = await fetch('/api/send-leave-update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1832,7 +1832,7 @@ export default function App() {
   const handleAddEmployee = async (newEmp: Employee) => {
     //Dispatch Welcome Email Notification
     if (newEmp.email && newEmp.email.trim()) {
-      fetch(' //api/send-welcome', {
+      fetch('/api/send-welcome', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2737,7 +2737,7 @@ export default function App() {
                           setFirstLoginSendingOtp(true);
 
                           try {
-                            const res = await fetch(' //api/send-otp', {
+                            const res = await fetch('/api/send-otp', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
@@ -3593,7 +3593,7 @@ export default function App() {
 
                       const triggerSendOtp = async () => {
                         try {
-                          const res = await fetch(' //api/send-otp', {
+                          const res = await fetch('/api/send-otp', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -4049,7 +4049,7 @@ export default function App() {
 
                       const triggerForgotSendOtp = async () => {
                         try {
-                          const res = await fetch(' //api/send-otp', {
+                          const res = await fetch('/api/send-otp', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({

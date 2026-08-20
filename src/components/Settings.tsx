@@ -1552,7 +1552,7 @@ export default function Settings({
     setTestResult(null);
     
     try {
-      const response = await fetch(' //api/test-smtp', {
+      const response = await fetch('/api/test-smtp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
