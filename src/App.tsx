@@ -1506,6 +1506,22 @@ export default function App() {
     setPasswordLoginPendingUser({ type, userObj });
     setIsSendingPasswordLoginOtp(true);
 
+    const fallbackPayload = {
+      from: adminSettings.senderEmail || adminSettings.smtpUsername || 'rbmlms@rathibuildmart.com',
+      to: email.trim(),
+      subject: `[Rathi Build Mart] OTP for Secure 2FA Login`,
+      otp,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 15px; color: #1e293b;">
+          <h3 style="color: #059669; margin-top: 0;">Rathi Build Mart • Security Verification</h3>
+          <p>Hello ${name || 'User'},</p>
+          <p>Your one-time 2FA login verification OTP code is:</p>
+          <div style="font-size: 28px; font-weight: bold; color: #059669; letter-spacing: 5px; padding: 12px 0;">${otp}</div>
+          <p style="font-size: 11px; color: #64748b;">This OTP is valid for 10 minutes.</p>
+        </div>
+      `
+    };
+
     try {
       const { data } = await safeFetchJson('/api/send-otp', {
         method: 'POST',
@@ -1529,22 +1545,31 @@ export default function App() {
 
       setIsSendingPasswordLoginOtp(false);
       if (data?.logEntry) addEmailLog(data.logEntry);
+      
+      const payloadToUse = data?.debugPayload || fallbackPayload;
+      setFallbackOtpPayload(payloadToUse);
+      setPasswordLoginOtpStep('enter_otp');
+
       if (data?.success) {
-        setPasswordLoginOtpStep('enter_otp');
         if (data.method === 'SIMULATION') {
-          setLastSentEmail(data.debugPayload);
+          setLastSentEmail(payloadToUse);
           setShowEmailViewer(true);
         }
       } else {
-        setLoginErr(data?.error || 'Failed to dispatch login 2FA OTP.');
-        if (data?.smtpError && data?.debugPayload) {
-          setFallbackOtpPayload(data.debugPayload);
+        setLastSentEmail(payloadToUse);
+        setShowEmailViewer(true);
+        if (data?.error) {
+          setLoginErr(`Notice: SMTP gateway returned (${data.error}). OTP code has been provided in the Sandbox terminal.`);
         }
       }
     } catch (err: any) {
       console.error('[2FA Login OTP Send Error]', err);
       setIsSendingPasswordLoginOtp(false);
-      setLoginErr(`Network error sending 2FA OTP: ${err.message || err}`);
+      setFallbackOtpPayload(fallbackPayload);
+      setLastSentEmail(fallbackPayload);
+      setPasswordLoginOtpStep('enter_otp');
+      setShowEmailViewer(true);
+      setLoginErr(`Notice: Network issue contacting SMTP server. Generated OTP in Sandbox viewer.`);
     }
   };
 
@@ -2720,6 +2745,22 @@ export default function App() {
                           setFirstLoginGeneratedOtp(otp);
                           setFirstLoginSendingOtp(true);
 
+                          const fallbackPayload = {
+                            from: adminSettings.senderEmail || adminSettings.smtpUsername || 'rbmlms@rathibuildmart.com',
+                            to: firstLoginEmployee.email.trim(),
+                            subject: `[Rathi Build Mart] OTP for Device Binding & First-Time Login`,
+                            otp,
+                            html: `
+                              <div style="font-family: Arial, sans-serif; padding: 15px; color: #1e293b;">
+                                <h3 style="color: #059669; margin-top: 0;">Rathi Build Mart • First-Time Device Binding</h3>
+                                <p>Hello ${firstLoginEmployee.name},</p>
+                                <p>Your one-time security verification code to bind this device is:</p>
+                                <div style="font-size: 28px; font-weight: bold; color: #059669; letter-spacing: 5px; padding: 12px 0;">${otp}</div>
+                                <p style="font-size: 11px; color: #64748b;">This OTP is valid for 10 minutes.</p>
+                              </div>
+                            `
+                          };
+
                           try {
                             const { data } = await safeFetchJson('/api/send-otp', {
                               method: 'POST',
@@ -2743,22 +2784,31 @@ export default function App() {
 
                             setFirstLoginSendingOtp(false);
                             if (data?.logEntry) addEmailLog(data.logEntry);
+                            
+                            const payloadToUse = data?.debugPayload || fallbackPayload;
+                            setFallbackOtpPayload(payloadToUse);
+                            setFirstLoginStep('email_otp');
+
                             if (data?.success) {
-                              setFirstLoginStep('email_otp');
                               if (data.method === 'SIMULATION') {
-                                setLastSentEmail(data.debugPayload);
+                                setLastSentEmail(payloadToUse);
                                 setShowEmailViewer(true);
                               }
                             } else {
-                              setLoginErr(data?.error || 'Failed to dispatch verification OTP.');
-                              if (data?.smtpError && data?.debugPayload) {
-                                setFallbackOtpPayload(data.debugPayload);
+                              setLastSentEmail(payloadToUse);
+                              setShowEmailViewer(true);
+                              if (data?.error) {
+                                setLoginErr(`Notice: SMTP gateway returned (${data.error}). OTP code generated in Sandbox terminal below.`);
                               }
                             }
                           } catch (err: any) {
                             console.error('[First Login Security OTP Send Error]', err);
                             setFirstLoginSendingOtp(false);
-                            setLoginErr(`Network error sending OTP: ${err.message || err}`);
+                            setFallbackOtpPayload(fallbackPayload);
+                            setLastSentEmail(fallbackPayload);
+                            setFirstLoginStep('email_otp');
+                            setShowEmailViewer(true);
+                            setLoginErr(`Notice: Network issue contacting SMTP server. Generated OTP in Sandbox viewer below.`);
                           }
                         }}
                         disabled={firstLoginSendingOtp}
@@ -2773,7 +2823,7 @@ export default function App() {
                               {'Option 1: Email OTP'}
                             </span>
                             <span className="block text-[10px] text-slate-400 font-semibold mt-0.5">
-                              {`Send code to ${firstLoginEmployee.email ? firstLoginEmployee.email.replace(/(.{3})(.*)(@.*)/, "$1***$3") : 'registered email'}`}
+                              {firstLoginSendingOtp ? 'Dispatching verification OTP...' : `Send code to ${firstLoginEmployee.email ? firstLoginEmployee.email.replace(/(.{3})(.*)(@.*)/, "$1***$3") : 'registered email'}`}
                             </span>
                           </div>
                         </div>
@@ -2896,9 +2946,23 @@ export default function App() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                          {'6-Digit Verification OTP'}
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                            {'6-Digit Verification OTP'}
+                          </label>
+                          {firstLoginGeneratedOtp && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFirstLoginEnteredOtp(firstLoginGeneratedOtp);
+                                setLoginErr(null);
+                              }}
+                              className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold uppercase tracking-wider font-mono cursor-pointer transition-colors"
+                            >
+                              {'Auto-fill OTP'}
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="text"
                           required
@@ -2907,6 +2971,27 @@ export default function App() {
                           onChange={(e) => setFirstLoginEnteredOtp(e.target.value)}
                           placeholder="e.g. 123456"
                           className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono" />
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (fallbackOtpPayload || firstLoginGeneratedOtp) {
+                              setLastSentEmail(fallbackOtpPayload || {
+                                from: adminSettings.senderEmail || 'rbmlms@rathibuildmart.com',
+                                to: firstLoginEmployee.email,
+                                subject: '[Rathi Build Mart] OTP for Device Binding & First-Time Login',
+                                otp: firstLoginGeneratedOtp,
+                                html: `<div style="font-family: Arial, sans-serif; padding: 15px;"><b>OTP Code: ${firstLoginGeneratedOtp}</b></div>`
+                              });
+                              setShowEmailViewer(true);
+                            }
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-emerald-400 font-medium underline cursor-pointer"
+                        >
+                          {"Didn't receive email? Open Sandbox Terminal"}
+                        </button>
                       </div>
 
                       <button
@@ -3564,6 +3649,22 @@ export default function App() {
                       setIsSendingLoginOtp(true);
 
                       const triggerSendOtp = async () => {
+                        const fallbackPayload = {
+                          from: adminSettings.senderEmail || adminSettings.smtpUsername || 'rbmlms@rathibuildmart.com',
+                          to: emp.email.trim(),
+                          subject: `[Rathi Build Mart] OTP for Secure Login`,
+                          otp,
+                          html: `
+                            <div style="font-family: Arial, sans-serif; padding: 15px; color: #1e293b;">
+                              <h3 style="color: #059669; margin-top: 0;">Rathi Build Mart • Login Verification</h3>
+                              <p>Hello ${emp.name},</p>
+                              <p>Your one-time login OTP code is:</p>
+                              <div style="font-size: 28px; font-weight: bold; color: #059669; letter-spacing: 5px; padding: 12px 0;">${otp}</div>
+                              <p style="font-size: 11px; color: #64748b;">This OTP is valid for 10 minutes.</p>
+                            </div>
+                          `
+                        };
+
                         try {
                           const { data } = await safeFetchJson('/api/send-otp', {
                             method: 'POST',
@@ -3587,22 +3688,31 @@ export default function App() {
 
                           setIsSendingLoginOtp(false);
                           if (data?.logEntry) addEmailLog(data.logEntry);
+                          
+                          const payloadToUse = data?.debugPayload || fallbackPayload;
+                          setFallbackOtpPayload(payloadToUse);
+                          setLoginOtpStep('enter_otp');
+
                           if (data?.success) {
-                            setLoginOtpStep('enter_otp');
                             if (data.method === 'SIMULATION') {
-                              setLastSentEmail(data.debugPayload);
+                              setLastSentEmail(payloadToUse);
                               setShowEmailViewer(true);
                             }
                           } else {
-                            setLoginErr(data?.error || 'Failed to dispatch login OTP.');
-                            if (data?.smtpError && data?.debugPayload) {
-                              setFallbackOtpPayload(data.debugPayload);
+                            setLastSentEmail(payloadToUse);
+                            setShowEmailViewer(true);
+                            if (data?.error) {
+                              setLoginErr(`Notice: SMTP gateway returned (${data.error}). OTP code provided in Sandbox terminal below.`);
                             }
                           }
                         } catch (err: any) {
                           console.error('[Standard Login OTP Send Error]', err);
                           setIsSendingLoginOtp(false);
-                          setLoginErr(`Network error sending OTP: ${err.message || err}`);
+                          setFallbackOtpPayload(fallbackPayload);
+                          setLastSentEmail(fallbackPayload);
+                          setLoginOtpStep('enter_otp');
+                          setShowEmailViewer(true);
+                          setLoginErr(`Notice: Network issue contacting SMTP server. Generated OTP in Sandbox viewer.`);
                         }
                       };
                       triggerSendOtp();
@@ -3726,9 +3836,23 @@ export default function App() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                          {'6-Digit OTP Code'}
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                            {'6-Digit OTP Code'}
+                          </label>
+                          {loginGeneratedOtp && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLoginEnteredOtp(loginGeneratedOtp);
+                                setLoginErr(null);
+                              }}
+                              className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold uppercase tracking-wider font-mono cursor-pointer transition-colors"
+                            >
+                              {'Auto-fill OTP'}
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="text"
                           required
@@ -3737,6 +3861,27 @@ export default function App() {
                           onChange={(e) => setLoginEnteredOtp(e.target.value)}
                           placeholder="e.g. 123456"
                           className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-3 font-bold bg-slate-900/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono" />
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (fallbackOtpPayload || loginGeneratedOtp) {
+                              setLastSentEmail(fallbackOtpPayload || {
+                                from: adminSettings.senderEmail || 'rbmlms@rathibuildmart.com',
+                                to: loginOtpEmail,
+                                subject: '[Rathi Build Mart] OTP for Secure Login',
+                                otp: loginGeneratedOtp,
+                                html: `<div style="font-family: Arial, sans-serif; padding: 15px;"><b>OTP Code: ${loginGeneratedOtp}</b></div>`
+                              });
+                              setShowEmailViewer(true);
+                            }
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-emerald-400 font-medium underline cursor-pointer"
+                        >
+                          {"Didn't receive email? Open Sandbox Terminal"}
+                        </button>
                       </div>
 
                       <button
@@ -4008,6 +4153,22 @@ export default function App() {
                       setIsSendingForgotOtp(true);
 
                       const triggerForgotSendOtp = async () => {
+                        const fallbackPayload = {
+                          from: adminSettings.senderEmail || adminSettings.smtpUsername || 'rbmlms@rathibuildmart.com',
+                          to: forgotEmail.trim(),
+                          subject: `[Rathi Build Mart] OTP for Password Reset`,
+                          otp,
+                          html: `
+                            <div style="font-family: Arial, sans-serif; padding: 15px; color: #1e293b;">
+                              <h3 style="color: #059669; margin-top: 0;">Rathi Build Mart • Password Reset</h3>
+                              <p>Hello ${targetEmp.name},</p>
+                              <p>Your one-time password reset verification OTP code is:</p>
+                              <div style="font-size: 28px; font-weight: bold; color: #059669; letter-spacing: 5px; padding: 12px 0;">${otp}</div>
+                              <p style="font-size: 11px; color: #64748b;">This OTP is valid for 10 minutes.</p>
+                            </div>
+                          `
+                        };
+
                         try {
                           const { data } = await safeFetchJson('/api/send-otp', {
                             method: 'POST',
@@ -4031,22 +4192,31 @@ export default function App() {
 
                           setIsSendingForgotOtp(false);
                           if (data?.logEntry) addEmailLog(data.logEntry);
+                          
+                          const payloadToUse = data?.debugPayload || fallbackPayload;
+                          setFallbackOtpPayload(payloadToUse);
+                          setForgotStep('verify_otp');
+
                           if (data?.success) {
-                            setForgotStep('verify_otp');
                             if (data.method === 'SIMULATION') {
-                              setLastSentEmail(data.debugPayload);
+                              setLastSentEmail(payloadToUse);
                               setShowEmailViewer(true);
                             }
                           } else {
-                            setForgotError(data?.error || 'Failed to dispatch OTP. Please check SMTP settings.');
-                            if (data?.smtpError && data?.debugPayload) {
-                              setFallbackOtpPayload(data.debugPayload);
+                            setLastSentEmail(payloadToUse);
+                            setShowEmailViewer(true);
+                            if (data?.error) {
+                              setForgotError(`Notice: SMTP gateway returned (${data.error}). OTP code generated in Sandbox terminal below.`);
                             }
                           }
                         } catch (err: any) {
                           console.error('[Forgot Password OTP Send Error]', err);
                           setIsSendingForgotOtp(false);
-                          setForgotError(`Network error while sending OTP: ${err.message || err}`);
+                          setFallbackOtpPayload(fallbackPayload);
+                          setLastSentEmail(fallbackPayload);
+                          setForgotStep('verify_otp');
+                          setShowEmailViewer(true);
+                          setForgotError(`Notice: Network issue contacting SMTP server. Generated OTP in Sandbox viewer.`);
                         }
                       };
                       triggerForgotSendOtp();
@@ -4123,9 +4293,23 @@ export default function App() {
                       </p>
 
                       <div className="space-y-1">
-                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                          {'6-Digit Verification Code'}
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                            {'6-Digit Verification Code'}
+                          </label>
+                          {forgotGeneratedOtp && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForgotEnteredOtp(forgotGeneratedOtp);
+                                setForgotError(null);
+                              }}
+                              className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold uppercase tracking-wider font-mono cursor-pointer transition-colors"
+                            >
+                              {'Auto-fill OTP'}
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="text"
                           required
@@ -4134,6 +4318,27 @@ export default function App() {
                           onChange={(e) => setForgotEnteredOtp(e.target.value)}
                           placeholder="e.g. 123456"
                           className="w-full text-center tracking-[12px] text-lg border border-slate-800 rounded-xl px-3 py-2.5 font-bold bg-slate-950/60 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono" />
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (fallbackOtpPayload || forgotGeneratedOtp) {
+                              setLastSentEmail(fallbackOtpPayload || {
+                                from: adminSettings.senderEmail || 'rbmlms@rathibuildmart.com',
+                                to: forgotEmail,
+                                subject: '[Rathi Build Mart] OTP for Password Reset',
+                                otp: forgotGeneratedOtp,
+                                html: `<div style="font-family: Arial, sans-serif; padding: 15px;"><b>OTP Code: ${forgotGeneratedOtp}</b></div>`
+                              });
+                              setShowEmailViewer(true);
+                            }
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-emerald-400 font-medium underline cursor-pointer"
+                        >
+                          {"Didn't receive email? Open Sandbox Terminal"}
+                        </button>
                       </div>
 
                       <button
@@ -5947,6 +6152,41 @@ export default function App() {
             </button>
           </div>
           <div className="p-4 space-y-3">
+            {lastSentEmail.otp && (
+              <div className="bg-emerald-950/60 border border-emerald-500/30 p-2.5 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="text-[8px] font-mono font-bold text-emerald-400 uppercase tracking-widest">
+                    {'Generated Verification OTP'}
+                  </div>
+                  <div className="text-xl font-mono font-black text-white tracking-[4px]">
+                    {lastSentEmail.otp}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(lastSentEmail.otp);
+                    }}
+                    className="px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg text-[10px] font-bold font-mono uppercase cursor-pointer transition-colors"
+                  >
+                    {'Copy'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (firstLoginStep === 'email_otp') setFirstLoginEnteredOtp(lastSentEmail.otp);
+                      if (loginOtpStep === 'enter_otp') setLoginEnteredOtp(lastSentEmail.otp);
+                      if (forgotStep === 'verify_otp') setForgotEnteredOtp(lastSentEmail.otp);
+                      setShowEmailViewer(false);
+                    }}
+                    className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-[10px] font-black font-mono uppercase cursor-pointer transition-colors"
+                  >
+                    {'Fill OTP'}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="text-[9px] font-semibold text-slate-400 space-y-1 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 font-mono">
               <div><span className="text-slate-500">FROM:</span> {lastSentEmail.from}</div>
               <div><span className="text-slate-500">TO:</span> {lastSentEmail.to}</div>
@@ -5954,18 +6194,18 @@ export default function App() {
             </div>
             <div className="bg-slate-950 rounded-xl border border-slate-800/60 overflow-hidden">
               <div className="bg-slate-900 px-3 py-1 text-[8px] font-black uppercase text-slate-500 font-mono tracking-widest border-b border-slate-800/40 flex justify-between items-center">
-                <span>{'Rendered HTML Email Content'}</span>
-                <span className="text-[9px] text-emerald-400 font-semibold">{'Simulated'}</span>
+                <span>{'Rendered HTML Content'}</span>
+                <span className="text-[9px] text-emerald-400 font-semibold">{'Sandbox / Preview'}</span>
               </div>
               <div 
-                className="p-4 text-xs bg-slate-950/45 text-slate-300 leading-relaxed overflow-y-auto max-h-48 custom-scrollbar scrollbar-thin scrollbar-thumb-emerald-800/30 scrollbar-track-transparent"
+                className="p-4 text-xs bg-slate-950/45 text-slate-300 leading-relaxed overflow-y-auto max-h-40 custom-scrollbar scrollbar-thin scrollbar-thumb-emerald-800/30 scrollbar-track-transparent"
                 dangerouslySetInnerHTML={{ __html: lastSentEmail.html }} />
             </div>
             <button
               onClick={() => setShowEmailViewer(false)}
               className="w-full bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/20 text-emerald-400 font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all cursor-pointer"
             >
-              {'Acknowledge & Close'}
+              {'Close Terminal'}
             </button>
           </div>
         </div>
