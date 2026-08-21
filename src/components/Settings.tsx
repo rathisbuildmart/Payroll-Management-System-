@@ -56,7 +56,10 @@ import {
   Check,
   ShieldCheck,
   FolderLock,
-  Archive
+  Archive,
+  DollarSign,
+  CreditCard,
+  FileCheck
 } from 'lucide-react';
 import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog, TransactionalEmailLog, CustomRole } from '../types';
 import AdminWelcomeModal from './AdminWelcomeModal';
@@ -306,6 +309,16 @@ export const isRoleColumnAllowed = (
 ): boolean => {
   if (!role) return false;
   if (role === 'super_admin' || role === 'admin') return true;
+
+  // Specific employee self-service profile checks if role is 'employee'
+  if (role === 'employee' && adminSettings?.employeeProfileVisibility) {
+    const prof = adminSettings.employeeProfileVisibility;
+    if (columnKey === 'salary' && prof.showSalaryStructure === false) return false;
+    if (columnKey === 'bankDetails' && prof.showBankDetails === false) return false;
+    if ((columnKey === 'identityDetails' || columnKey === 'pfEsicDetails') && prof.showStatutoryIds === false) return false;
+    if (columnKey === 'personalDetails' && prof.showPersonalInfo === false) return false;
+    if (columnKey === 'addresses' && prof.showAddresses === false) return false;
+  }
   
   const configured = adminSettings?.roleColumnPermissions?.[role];
   if (configured && Array.isArray(configured)) {
@@ -426,6 +439,13 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
     autoHideAfterDays: true,
     showEarningsAndDeductionsBreakdown: true,
     customNoticeWhenExpired: 'Salary breakdown for this pay cycle has completed its active 7-day viewing window. Past statements remain available under the Payslips tab.'
+  },
+  employeeProfileVisibility: {
+    showSalaryStructure: true,
+    showBankDetails: true,
+    showStatutoryIds: true,
+    showPersonalInfo: true,
+    showAddresses: true,
   }
 };
 
@@ -1230,6 +1250,78 @@ export default function Settings({
       roleColumnPermissions: {
         ...roleColumnPermissions,
         [role]: defaultCols
+      }
+    });
+  };
+
+  const handleToggleEmployeeProfileSection = (
+    sectionKey: 'showSalaryStructure' | 'showBankDetails' | 'showStatutoryIds' | 'showPersonalInfo' | 'showAddresses',
+    value: boolean
+  ) => {
+    const currentVis = localSettings.employeeProfileVisibility || {
+      showSalaryStructure: true,
+      showBankDetails: true,
+      showStatutoryIds: true,
+      showPersonalInfo: true,
+      showAddresses: true,
+    };
+    const updatedVis = {
+      ...currentVis,
+      [sectionKey]: value,
+    };
+
+    // Also sync the employee role column permission list
+    const currentEmpCols = [...(roleColumnPermissions['employee'] || DEFAULT_ROLE_COLUMN_PERMISSIONS['employee'] || [])];
+    const keyMap: Record<string, string[]> = {
+      showSalaryStructure: ['salary', 'paymentMethod'],
+      showBankDetails: ['bankDetails'],
+      showStatutoryIds: ['identityDetails', 'pfEsicDetails'],
+      showPersonalInfo: ['personalDetails'],
+      showAddresses: ['addresses'],
+    };
+
+    const targetKeys = keyMap[sectionKey] || [];
+    let updatedEmpCols: string[];
+    if (value) {
+      updatedEmpCols = Array.from(new Set([...currentEmpCols, ...targetKeys]));
+    } else {
+      updatedEmpCols = currentEmpCols.filter(k => !targetKeys.includes(k));
+    }
+
+    setLocalSettings({
+      ...localSettings,
+      employeeProfileVisibility: updatedVis,
+      roleColumnPermissions: {
+        ...roleColumnPermissions,
+        employee: updatedEmpCols,
+      }
+    });
+  };
+
+  const handleSetAllEmployeeProfileSections = (visible: boolean) => {
+    const updatedVis = {
+      showSalaryStructure: visible,
+      showBankDetails: visible,
+      showStatutoryIds: visible,
+      showPersonalInfo: visible,
+      showAddresses: visible,
+    };
+
+    const currentEmpCols = [...(roleColumnPermissions['employee'] || DEFAULT_ROLE_COLUMN_PERMISSIONS['employee'] || [])];
+    const allSectionKeys = ['salary', 'paymentMethod', 'bankDetails', 'identityDetails', 'pfEsicDetails', 'personalDetails', 'addresses'];
+    let updatedEmpCols: string[];
+    if (visible) {
+      updatedEmpCols = Array.from(new Set([...currentEmpCols, ...allSectionKeys]));
+    } else {
+      updatedEmpCols = currentEmpCols.filter(k => !allSectionKeys.includes(k));
+    }
+
+    setLocalSettings({
+      ...localSettings,
+      employeeProfileVisibility: updatedVis,
+      roleColumnPermissions: {
+        ...roleColumnPermissions,
+        employee: updatedEmpCols,
       }
     });
   };
@@ -2547,6 +2639,309 @@ export default function Settings({
                       <Sparkles className="w-3 h-3 text-amber-600" />
                       {"Preview Animation"}
                     </button>
+                  </div>
+                </div>
+
+                {/* Employee Self-Service Profile Section Access Controls */}
+                <div className="border-t border-gray-200/80 pt-4 mt-4 bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+                    <div>
+                      <h5 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                        <span className="p-1 rounded-md bg-emerald-50 text-emerald-700">
+                          <Users className="w-3.5 h-3.5" />
+                        </span>
+                        {"Employee Self-Service Profile Access Controls"}
+                        <span className="text-[10px] font-bold text-slate-400 font-normal lowercase tracking-normal">
+                          (कर्मचारी प्रोफाइल दृश्यता विकल्प)
+                        </span>
+                      </h5>
+                      <p className="text-[10px] text-slate-500 font-medium mt-1 leading-relaxed">
+                        {"Select exactly which profile sections logged-in employees are allowed to see in their 'My Profile' tab. Uncheck to hide sensitive data anytime."}
+                      </p>
+                    </div>
+
+                    {/* Quick Preset Buttons */}
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllEmployeeProfileSections(true)}
+                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-3xs flex items-center gap-1"
+                        title="Enable all 5 profile sections for employees"
+                      >
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        {"Allow All (Show)"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentVis = localSettings.employeeProfileVisibility || {
+                            showSalaryStructure: true,
+                            showBankDetails: true,
+                            showStatutoryIds: true,
+                            showPersonalInfo: true,
+                            showAddresses: true,
+                          };
+                          setLocalSettings({
+                            ...localSettings,
+                            employeeProfileVisibility: {
+                              ...currentVis,
+                              showSalaryStructure: false,
+                              showStatutoryIds: false,
+                              showBankDetails: true,
+                              showPersonalInfo: true,
+                              showAddresses: true,
+                            }
+                          });
+                        }}
+                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-3xs flex items-center gap-1"
+                        title="Hide Salary Structure & Statutory IDs, keep Personal & Address"
+                      >
+                        <Lock className="w-3 h-3 text-amber-600" />
+                        {"Hide Salary & Statutory"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetAllEmployeeProfileSections(false)}
+                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-3xs flex items-center gap-1"
+                        title="Hide all 5 profile sections from employees"
+                      >
+                        <EyeOff className="w-3 h-3 text-rose-600" />
+                        {"Hide All"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 5 Profile Section Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 mt-4">
+                    {/* 1. Standard Salary Structure */}
+                    {(() => {
+                      const isVisible = localSettings.employeeProfileVisibility?.showSalaryStructure !== false;
+                      return (
+                        <div className={`p-3.5 rounded-xl border transition-all ${
+                          isVisible 
+                            ? 'bg-emerald-50/40 border-emerald-200 shadow-3xs' 
+                            : 'bg-slate-50/80 border-slate-200 opacity-80'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                                isVisible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+                              }`}>
+                                <DollarSign className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <span className="block text-xs font-black text-slate-900">
+                                  {"Standard Salary Structure"}
+                                </span>
+                                <span className="text-[9px] font-bold text-slate-400 block">
+                                  {"Basic, Allowances, Deductions & Hourly Rate"}
+                                </span>
+                              </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                              <input 
+                                type="checkbox" 
+                                checked={isVisible}
+                                onChange={(e) => handleToggleEmployeeProfileSection('showSalaryStructure', e.target.checked)}
+                                className="sr-only peer" />
+                              <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                          </div>
+                          <div className="mt-2.5 pt-2 border-t border-slate-150/60 flex items-center justify-between text-[9px] font-semibold">
+                            <span className="text-slate-500">Employee Access:</span>
+                            <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                              isVisible ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {isVisible ? "Visible (दिखेगा)" : "Hidden (बंद है)"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 2. Bank Account Details */}
+                    {(() => {
+                      const isVisible = localSettings.employeeProfileVisibility?.showBankDetails !== false;
+                      return (
+                        <div className={`p-3.5 rounded-xl border transition-all ${
+                          isVisible 
+                            ? 'bg-indigo-50/40 border-indigo-200 shadow-3xs' 
+                            : 'bg-slate-50/80 border-slate-200 opacity-80'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                                isVisible ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-500'
+                              }`}>
+                                <Building className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <span className="block text-xs font-black text-slate-900">
+                                  {"Bank Account Details"}
+                                </span>
+                                <span className="text-[9px] font-bold text-slate-400 block">
+                                  {"Account Holder, Bank Name, A/C No & IFSC"}
+                                </span>
+                              </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                              <input 
+                                type="checkbox" 
+                                checked={isVisible}
+                                onChange={(e) => handleToggleEmployeeProfileSection('showBankDetails', e.target.checked)}
+                                className="sr-only peer" />
+                              <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                          </div>
+                          <div className="mt-2.5 pt-2 border-t border-slate-150/60 flex items-center justify-between text-[9px] font-semibold">
+                            <span className="text-slate-500">Employee Access:</span>
+                            <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                              isVisible ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {isVisible ? "Visible (दिखेगा)" : "Hidden (बंद है)"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 3. Statutory Registry & IDs */}
+                    {(() => {
+                      const isVisible = localSettings.employeeProfileVisibility?.showStatutoryIds !== false;
+                      return (
+                        <div className={`p-3.5 rounded-xl border transition-all ${
+                          isVisible 
+                            ? 'bg-amber-50/40 border-amber-200 shadow-3xs' 
+                            : 'bg-slate-50/80 border-slate-200 opacity-80'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                                isVisible ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'
+                              }`}>
+                                <FileCheck className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <span className="block text-xs font-black text-slate-900">
+                                  {"Statutory Registry & IDs"}
+                                </span>
+                                <span className="text-[9px] font-bold text-slate-400 block">
+                                  {"PAN Number, Aadhaar Card, UAN & PF Account"}
+                                </span>
+                              </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                              <input 
+                                type="checkbox" 
+                                checked={isVisible}
+                                onChange={(e) => handleToggleEmployeeProfileSection('showStatutoryIds', e.target.checked)}
+                                className="sr-only peer" />
+                              <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                          </div>
+                          <div className="mt-2.5 pt-2 border-t border-slate-150/60 flex items-center justify-between text-[9px] font-semibold">
+                            <span className="text-slate-500">Employee Access:</span>
+                            <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                              isVisible ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {isVisible ? "Visible (दिखेगा)" : "Hidden (बंद है)"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 4. Personal & Contact Information */}
+                    {(() => {
+                      const isVisible = localSettings.employeeProfileVisibility?.showPersonalInfo !== false;
+                      return (
+                        <div className={`p-3.5 rounded-xl border transition-all ${
+                          isVisible 
+                            ? 'bg-emerald-50/40 border-emerald-200 shadow-3xs' 
+                            : 'bg-slate-50/80 border-slate-200 opacity-80'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                                isVisible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+                              }`}>
+                                <UserPlus className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <span className="block text-xs font-black text-slate-900">
+                                  {"Personal & Contact Information"}
+                                </span>
+                                <span className="text-[9px] font-bold text-slate-400 block">
+                                  {"Email, Mobile, Emergency Contact, DOB & Gender"}
+                                </span>
+                              </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                              <input 
+                                type="checkbox" 
+                                checked={isVisible}
+                                onChange={(e) => handleToggleEmployeeProfileSection('showPersonalInfo', e.target.checked)}
+                                className="sr-only peer" />
+                              <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                          </div>
+                          <div className="mt-2.5 pt-2 border-t border-slate-150/60 flex items-center justify-between text-[9px] font-semibold">
+                            <span className="text-slate-500">Employee Access:</span>
+                            <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                              isVisible ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {isVisible ? "Visible (दिखेगा)" : "Hidden (बंद है)"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 5. Residential & Permanent Addresses */}
+                    {(() => {
+                      const isVisible = localSettings.employeeProfileVisibility?.showAddresses !== false;
+                      return (
+                        <div className={`p-3.5 rounded-xl border transition-all ${
+                          isVisible 
+                            ? 'bg-blue-50/40 border-blue-200 shadow-3xs' 
+                            : 'bg-slate-50/80 border-slate-200 opacity-80'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                                isVisible ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-500'
+                              }`}>
+                                <MapPin className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <span className="block text-xs font-black text-slate-900">
+                                  {"Residential & Permanent Addresses"}
+                                </span>
+                                <span className="text-[9px] font-bold text-slate-400 block">
+                                  {"Residential Address, Permanent Address & PIN"}
+                                </span>
+                              </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                              <input 
+                                type="checkbox" 
+                                checked={isVisible}
+                                onChange={(e) => handleToggleEmployeeProfileSection('showAddresses', e.target.checked)}
+                                className="sr-only peer" />
+                              <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                          </div>
+                          <div className="mt-2.5 pt-2 border-t border-slate-150/60 flex items-center justify-between text-[9px] font-semibold">
+                            <span className="text-slate-500">Employee Access:</span>
+                            <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                              isVisible ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {isVisible ? "Visible (दिखेगा)" : "Hidden (बंद है)"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 

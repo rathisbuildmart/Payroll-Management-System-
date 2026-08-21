@@ -289,6 +289,22 @@ export interface AdminSettings {
     showEarningsAndDeductionsBreakdown?: boolean; // Show itemized gross vs deductions
     customNoticeWhenExpired?: string; // Optional custom message to display once expired
   };
+  // Employee Portal Profile Section Visibility Access Settings
+  employeeProfileVisibility?: {
+    showSalaryStructure?: boolean; // Standard Salary Structure
+    showBankDetails?: boolean; // Bank Account Details
+    showStatutoryIds?: boolean; // Statutory Registry & IDs (PAN, Aadhaar, UAN, PF)
+    showPersonalInfo?: boolean; // Personal & Contact Information
+    showAddresses?: boolean; // Residential & Permanent Addresses
+  };
+}
+
+export interface EmployeeProfileVisibilitySettings {
+  showSalaryStructure?: boolean;
+  showBankDetails?: boolean;
+  showStatutoryIds?: boolean;
+  showPersonalInfo?: boolean;
+  showAddresses?: boolean;
 }
 
 export interface AttendanceChangeRequest {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   User, Calendar, CreditCard, Check, Printer, FileText, AlertCircle, 
   TrendingUp, Users, ShieldCheck, Building, Sparkles, MapPin, Briefcase, Phone, Mail, FileCheck, DollarSign,
-  CalendarDays, Plus, Locate, ChevronLeft
+  CalendarDays, Plus, Locate, ChevronLeft, ShieldAlert, Lock
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Employee, Attendance, PayrollRecord, AdminSettings, LeaveRequest, getCurrentBasicSalary } from '../types';
@@ -506,12 +506,12 @@ export default function EmployeePortal({
   const overtimeHoursTotal = empAttendanceList.reduce((sum, curr) => sum + (curr.overtimeHours || 0), 0);
 
   // Granular Column & Feature Permissions for Employee Role
-  const canViewSalary = isRoleColumnAllowed('employee', 'salary', adminSettings);
-  const canViewBankDetails = isRoleColumnAllowed('employee', 'bankDetails', adminSettings);
-  const canViewIdentityDetails = isRoleColumnAllowed('employee', 'identityDetails', adminSettings);
-  const canViewPfEsic = isRoleColumnAllowed('employee', 'pfEsicDetails', adminSettings);
-  const canViewAddresses = isRoleColumnAllowed('employee', 'addresses', adminSettings);
-  const canViewPersonalDetails = isRoleColumnAllowed('employee', 'personalDetails', adminSettings);
+  const canViewSalary = (adminSettings?.employeeProfileVisibility?.showSalaryStructure !== false) && isRoleColumnAllowed('employee', 'salary', adminSettings);
+  const canViewBankDetails = (adminSettings?.employeeProfileVisibility?.showBankDetails !== false) && isRoleColumnAllowed('employee', 'bankDetails', adminSettings);
+  const canViewIdentityDetails = (adminSettings?.employeeProfileVisibility?.showStatutoryIds !== false) && isRoleColumnAllowed('employee', 'identityDetails', adminSettings);
+  const canViewPfEsic = (adminSettings?.employeeProfileVisibility?.showStatutoryIds !== false) && isRoleColumnAllowed('employee', 'pfEsicDetails', adminSettings);
+  const canViewAddresses = (adminSettings?.employeeProfileVisibility?.showAddresses !== false) && isRoleColumnAllowed('employee', 'addresses', adminSettings);
+  const canViewPersonalDetails = (adminSettings?.employeeProfileVisibility?.showPersonalInfo !== false) && isRoleColumnAllowed('employee', 'personalDetails', adminSettings);
   const canExportProfile = isRoleColumnAllowed('employee', 'export_profile_pdf', adminSettings);
   const canExportPayslip = isRoleColumnAllowed('employee', 'export_payslip_pdf', adminSettings);
 
@@ -1880,205 +1880,228 @@ export default function EmployeePortal({
 
         {/* PROFILE TAB */}
         {activeTab === 'profile' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Column 1: Personal & Contacts & Addresses */}
-            {(canViewPersonalDetails || canViewAddresses) && (
-              <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-4 sm:space-y-5 lg:col-span-2">
-                {canViewPersonalDetails && (
-                  <>
-                    <div className="flex items-center gap-2 pb-2.5 sm:pb-3 border-b border-slate-100">
-                      <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
-                        <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </div>
-                      <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.personalInfo}</h3>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.name}</label>
-                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.name}</p>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.id}</label>
-                        <p className="mt-1 font-bold font-mono text-slate-800 text-sm">{employee.id}</p>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.email}</label>
-                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.email || t.notSpecified}</p>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.personalEmail}</label>
-                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.personalEmail || t.notSpecified}</p>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.phone}</label>
-                        <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.mobileNo || t.notSpecified}</p>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.emergencyContact}</label>
-                        <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.emergencyContactNo || t.notSpecified}</p>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.dob}</label>
-                        <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.dob || t.notSpecified}</p>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.bloodGroup}</label>
-                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.bloodGroup || t.notSpecified}</p>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.gender}</label>
-                        <p className="mt-1 font-bold text-slate-800 text-sm">{employee.gender || t.notSpecified}</p>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Residential & Permanent Addresses */}
-                {canViewAddresses && (
-                  <div className={`${canViewPersonalDetails ? 'border-t border-slate-100 pt-5' : ''} space-y-4`}>
-                    <div className="flex items-center gap-2 pb-1">
-                      <MapPin className="w-4 h-4 text-emerald-600" />
-                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">{t.addresses}</h3>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.resAddress}</label>
-                        <p className="mt-1.5 text-slate-700 leading-relaxed font-semibold">
-                          {employee.resLine1 ? (
-                            <>
-                              {employee.resLine1}, {employee.resLine2 && `${employee.resLine2}, `}
-                              {employee.resCity}, {employee.resState} - {employee.resPinCode}
-                            </>
-                          ) : t.notSpecified}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.permAddress}</label>
-                        <p className="mt-1.5 text-slate-700 leading-relaxed font-semibold">
-                          {employee.permLine1 ? (
-                            <>
-                              {employee.permLine1}, {employee.permLine2 && `${employee.permLine2}, `}
-                              {employee.permCity}, {employee.permState} - {employee.permPinCode}
-                            </>
-                          ) : t.notSpecified}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+          <div>
+            {!(canViewPersonalDetails || canViewAddresses || canViewSalary || canViewBankDetails || canViewIdentityDetails || canViewPfEsic) ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center max-w-lg mx-auto my-8 shadow-xs space-y-4">
+                <div className="w-14 h-14 bg-slate-100 text-slate-500 rounded-2xl flex items-center justify-center mx-auto">
+                  <Lock className="w-7 h-7" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-black text-slate-800">
+                    {"Profile Information Restricted"}
+                  </h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {"Detailed profile sections (Salary Structure, Banking, Statutory IDs, Personal Info, Addresses) have been configured as private by the organization administrator."}
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">
+                  <ShieldCheck className="w-4 h-4 text-slate-500" />
+                  <span>{"Basic Identity: " + employee.name + " (" + employee.id + ")"}</span>
+                </div>
               </div>
-            )}
-
-            {/* Column 2: Salary Structure, Banking, and Statutory info */}
-            {(canViewSalary || canViewBankDetails || canViewIdentityDetails || canViewPfEsic) && (
-              <div className="space-y-6">
-                
-                {/* Standard Salary Structure */}
-                {canViewSalary && (
-                  <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
-                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                      <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
-                        <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </div>
-                      <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.salaryStructure}</h3>
-                    </div>
-                    <div className="space-y-2.5 text-xs font-semibold text-slate-700">
-                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                        <span className="text-slate-500 font-bold">{t.basicSalary}</span>
-                        <span className="font-mono text-slate-950 font-extrabold text-sm">₹{getCurrentBasicSalary(employee).toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                        <span className="text-slate-500 font-bold">{t.allowances}</span>
-                        <span className="font-mono text-emerald-700 font-extrabold">₹{employee.allowances.toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                        <span className="text-slate-500 font-bold">{t.deductions}</span>
-                        <span className="font-mono text-rose-600 font-extrabold">₹{employee.deductions.toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
-                        <span className="text-slate-500 font-bold">{t.hourlyRate}</span>
-                        <span className="font-mono text-slate-800 font-bold">₹{employee.hourlyRate || 150} /hr</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5">
-                        <span className="text-slate-500 font-bold">{t.paymentMethod}</span>
-                        <span className="bg-emerald-50 text-emerald-800 text-[10px] px-2 py-0.5 rounded border border-emerald-100 font-extrabold">{employee.paymentMethod}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Bank Account details */}
-                {canViewBankDetails && (
-                  <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
-                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                      <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold shrink-0">
-                        <Building className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </div>
-                      <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.bankingInfo}</h3>
-                    </div>
-                    <div className="space-y-3 text-xs">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.accHolder}</span>
-                        <p className="font-extrabold text-slate-800 mt-0.5">{employee.bankAccountHolderName || employee.name}</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.bankName}</span>
-                        <p className="font-extrabold text-slate-800 mt-0.5">{employee.bankName || t.notSpecified}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.accNo}</span>
-                          <p className="font-mono font-extrabold text-slate-800 mt-0.5 truncate">{employee.bankAccountNo || t.notSpecified}</p>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Column 1: Personal & Contacts & Addresses */}
+                {(canViewPersonalDetails || canViewAddresses) && (
+                  <div className={`bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-4 sm:space-y-5 ${
+                    (canViewSalary || canViewBankDetails || canViewIdentityDetails || canViewPfEsic) ? 'lg:col-span-2' : 'lg:col-span-3'
+                  }`}>
+                    {canViewPersonalDetails && (
+                      <>
+                        <div className="flex items-center gap-2 pb-2.5 sm:pb-3 border-b border-slate-100">
+                          <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </div>
+                          <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.personalInfo}</h3>
                         </div>
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.ifsc}</span>
-                          <p className="font-mono font-extrabold text-slate-800 mt-0.5">{employee.ifscCode || t.notSpecified}</p>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.name}</label>
+                            <p className="mt-1 font-bold text-slate-800 text-sm">{employee.name}</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.id}</label>
+                            <p className="mt-1 font-bold font-mono text-slate-800 text-sm">{employee.id}</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.email}</label>
+                            <p className="mt-1 font-bold text-slate-800 text-sm">{employee.email || t.notSpecified}</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.personalEmail}</label>
+                            <p className="mt-1 font-bold text-slate-800 text-sm">{employee.personalEmail || t.notSpecified}</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.phone}</label>
+                            <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.mobileNo || t.notSpecified}</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.emergencyContact}</label>
+                            <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.emergencyContactNo || t.notSpecified}</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.dob}</label>
+                            <p className="mt-1 font-bold text-slate-800 text-sm font-mono">{employee.dob || t.notSpecified}</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.bloodGroup}</label>
+                            <p className="mt-1 font-bold text-slate-800 text-sm">{employee.bloodGroup || t.notSpecified}</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.gender}</label>
+                            <p className="mt-1 font-bold text-slate-800 text-sm">{employee.gender || t.notSpecified}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Residential & Permanent Addresses */}
+                    {canViewAddresses && (
+                      <div className={`${canViewPersonalDetails ? 'border-t border-slate-100 pt-5' : ''} space-y-4`}>
+                        <div className="flex items-center gap-2 pb-1">
+                          <MapPin className="w-4 h-4 text-emerald-600" />
+                          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">{t.addresses}</h3>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.resAddress}</label>
+                            <p className="mt-1.5 text-slate-700 leading-relaxed font-semibold">
+                              {employee.resLine1 ? (
+                                <>
+                                  {employee.resLine1}, {employee.resLine2 && `${employee.resLine2}, `}
+                                  {employee.resCity}, {employee.resState} - {employee.resPinCode}
+                                </>
+                              ) : t.notSpecified}
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.permAddress}</label>
+                            <p className="mt-1.5 text-slate-700 leading-relaxed font-semibold">
+                              {employee.permLine1 ? (
+                                <>
+                                  {employee.permLine1}, {employee.permLine2 && `${employee.permLine2}, `}
+                                  {employee.permCity}, {employee.permState} - {employee.permPinCode}
+                                </>
+                              ) : t.notSpecified}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
-                {/* Statutory Registry */}
-                {(canViewIdentityDetails || canViewPfEsic) && (
-                  <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
-                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                      <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold shrink-0">
-                        <FileCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                {/* Column 2: Salary Structure, Banking, and Statutory info */}
+                {(canViewSalary || canViewBankDetails || canViewIdentityDetails || canViewPfEsic) && (
+                  <div className={`space-y-6 ${!(canViewPersonalDetails || canViewAddresses) ? 'lg:col-span-3' : ''}`}>
+                    
+                    {/* Standard Salary Structure */}
+                    {canViewSalary && (
+                      <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                          <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                            <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </div>
+                          <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.salaryStructure}</h3>
+                        </div>
+                        <div className="space-y-2.5 text-xs font-semibold text-slate-700">
+                          <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                            <span className="text-slate-500 font-bold">{t.basicSalary}</span>
+                            <span className="font-mono text-slate-950 font-extrabold text-sm">₹{getCurrentBasicSalary(employee).toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                            <span className="text-slate-500 font-bold">{t.allowances}</span>
+                            <span className="font-mono text-emerald-700 font-extrabold">₹{employee.allowances.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                            <span className="text-slate-500 font-bold">{t.deductions}</span>
+                            <span className="font-mono text-rose-600 font-extrabold">₹{employee.deductions.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                            <span className="text-slate-500 font-bold">{t.hourlyRate}</span>
+                            <span className="font-mono text-slate-800 font-bold">₹{employee.hourlyRate || 150} /hr</span>
+                          </div>
+                          <div className="flex justify-between items-center py-1.5">
+                            <span className="text-slate-500 font-bold">{t.paymentMethod}</span>
+                            <span className="bg-emerald-50 text-emerald-800 text-[10px] px-2 py-0.5 rounded border border-emerald-100 font-extrabold">{employee.paymentMethod}</span>
+                          </div>
+                        </div>
                       </div>
-                      <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.statutoryInfo}</h3>
-                    </div>
-                    <div className="space-y-2.5 text-xs font-semibold text-slate-700">
-                      {canViewIdentityDetails && (
-                        <>
-                          <div className="flex justify-between items-center py-1 border-b border-slate-50">
-                            <span className="text-slate-500 font-bold">{t.pan}</span>
-                            <span className="font-mono text-slate-900 font-bold uppercase">{employee.panNo || t.notSpecified}</span>
+                    )}
+
+                    {/* Bank Account details */}
+                    {canViewBankDetails && (
+                      <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                          <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold shrink-0">
+                            <Building className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </div>
-                          <div className="flex justify-between items-center py-1 border-b border-slate-50">
-                            <span className="text-slate-500 font-bold">{t.aadhaar}</span>
-                            <span className="font-mono text-slate-900 font-bold">{employee.aadhaarNo || t.notSpecified}</span>
+                          <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.bankingInfo}</h3>
+                        </div>
+                        <div className="space-y-3 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.accHolder}</span>
+                            <p className="font-extrabold text-slate-800 mt-0.5">{employee.bankAccountHolderName || employee.name}</p>
                           </div>
-                        </>
-                      )}
-                      {canViewPfEsic && (
-                        <>
-                          <div className="flex justify-between items-center py-1 border-b border-slate-50">
-                            <span className="text-slate-500 font-bold">{t.uan}</span>
-                            <span className="font-mono text-slate-900 font-bold">{employee.uan || t.notSpecified}</span>
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.bankName}</span>
+                            <p className="font-extrabold text-slate-800 mt-0.5">{employee.bankName || t.notSpecified}</p>
                           </div>
-                          <div className="flex justify-between items-center py-1">
-                            <span className="text-slate-500 font-bold">{t.pfAcc}</span>
-                            <span className="font-mono text-slate-900 font-bold">{employee.pfAccountNo || t.notSpecified}</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.accNo}</span>
+                              <p className="font-mono font-extrabold text-slate-800 mt-0.5 truncate">{employee.bankAccountNo || t.notSpecified}</p>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.ifsc}</span>
+                              <p className="font-mono font-extrabold text-slate-800 mt-0.5">{employee.ifscCode || t.notSpecified}</p>
+                            </div>
                           </div>
-                        </>
-                      )}
-                    </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Statutory Registry */}
+                    {(canViewIdentityDetails || canViewPfEsic) && (
+                      <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-xl shadow-xs space-y-3.5 sm:space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                          <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold shrink-0">
+                            <FileCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </div>
+                          <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider leading-tight">{t.statutoryInfo}</h3>
+                        </div>
+                        <div className="space-y-2.5 text-xs font-semibold text-slate-700">
+                          {canViewIdentityDetails && (
+                            <>
+                              <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                                <span className="text-slate-500 font-bold">{t.pan}</span>
+                                <span className="font-mono text-slate-900 font-bold uppercase">{employee.panNo || t.notSpecified}</span>
+                              </div>
+                              <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                                <span className="text-slate-500 font-bold">{t.aadhaar}</span>
+                                <span className="font-mono text-slate-900 font-bold">{employee.aadhaarNo || t.notSpecified}</span>
+                              </div>
+                            </>
+                          )}
+                          {canViewPfEsic && (
+                            <>
+                              <div className="flex justify-between items-center py-1 border-b border-slate-50">
+                                <span className="text-slate-500 font-bold">{t.uan}</span>
+                                <span className="font-mono text-slate-900 font-bold">{employee.uan || t.notSpecified}</span>
+                              </div>
+                              <div className="flex justify-between items-center py-1">
+                                <span className="text-slate-500 font-bold">{t.pfAcc}</span>
+                                <span className="font-mono text-slate-900 font-bold">{employee.pfAccountNo || t.notSpecified}</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 )}
-
               </div>
             )}
           </div>
