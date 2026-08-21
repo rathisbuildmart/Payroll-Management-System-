@@ -332,7 +332,7 @@ export default function TransactionalEmailHistory({
             <Mail className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div className="text-2xl font-black text-slate-900 dark:text-white">
-            {stats.total}
+            {stats.total || 0}
           </div>
           <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block">
             {'Recorded in system'}
@@ -345,10 +345,10 @@ export default function TransactionalEmailHistory({
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-            {stats.smtpSent}
+            {stats.smtpSent || 0}
           </div>
           <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 mt-1 block">
-            {stats.total > 0 ? `${Math.round((stats.smtpSentstats.total) * 100)}% delivery rate` : 'Live Gateway'}
+            {(stats.total || 0) > 0 ? `${Math.round(((stats.smtpSent || 0) / stats.total) * 100)}% delivery rate` : 'Live Gateway'}
           </span>
         </div>
 
@@ -358,10 +358,10 @@ export default function TransactionalEmailHistory({
             <Server className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
-            {stats.simulated}
+            {stats.simulated || 0}
           </div>
           <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80 mt-1 block">
-            {'LocalTerminal mode'}
+            {'Local / Terminal mode'}
           </span>
         </div>
 

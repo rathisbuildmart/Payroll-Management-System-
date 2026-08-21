@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   User, Calendar, CreditCard, Check, Printer, FileText, AlertCircle, 
   TrendingUp, Users, ShieldCheck, Building, Sparkles, MapPin, Briefcase, Phone, Mail, FileCheck, DollarSign,
-  CalendarDays, Plus, Locate, ChevronLeft, ShieldAlert, Lock
+  CalendarDays, Plus, Locate, ChevronLeft, ShieldAlert, Lock, Download
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Employee, Attendance, PayrollRecord, AdminSettings, LeaveRequest, getCurrentBasicSalary } from '../types';
@@ -514,6 +514,8 @@ export default function EmployeePortal({
   const canViewPersonalDetails = (adminSettings?.employeeProfileVisibility?.showPersonalInfo !== false) && isRoleColumnAllowed('employee', 'personalDetails', adminSettings);
   const canExportProfile = isRoleColumnAllowed('employee', 'export_profile_pdf', adminSettings);
   const canExportPayslip = isRoleColumnAllowed('employee', 'export_payslip_pdf', adminSettings);
+  const canExportAttendance = isRoleColumnAllowed('employee', 'export_attendance', adminSettings) || isRoleColumnAllowed('employee', 'export_csv', adminSettings);
+  const canExportCsv = isRoleColumnAllowed('employee', 'export_csv', adminSettings);
 
   // Time-Bound Salary Visibility Settings
   const salaryVisibilityPolicy = adminSettings?.salaryVisibilitySettings || {
@@ -753,6 +755,185 @@ export default function EmployeePortal({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  // Official Profile PDF Generation
+  const downloadProfilePDF = (emp: Employee) => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let currentY = 20;
+
+    // Header Banner
+    doc.setFillColor(3, 98, 60); // Emerald brand color
+    doc.rect(0, 0, pageWidth, 24, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text((adminSettings?.companyName || 'RATHI BUILDMART').toUpperCase(), 14, 11);
+    
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('OFFICIAL EMPLOYEE PROFILE & VERIFIED RECORD CARD', 14, 17);
+
+    currentY = 32;
+
+    // Basic Identity Box
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, currentY, pageWidth - 28, 36, 2, 2, 'FD');
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(emp.name, 18, currentY + 8);
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Employee ID: ${emp.id}  |  Department: ${emp.department || 'N/A'}  |  Designation: ${emp.designation || 'N/A'}`, 18, currentY + 16);
+    doc.text(`Branch: ${emp.branch || 'Head Office'}  |  Joining Date: ${emp.joiningDate || 'N/A'}  |  Status: ${emp.isActive !== false ? 'Active' : 'Inactive'}`, 18, currentY + 23);
+    doc.text(`Work Email: ${emp.email || 'N/A'}  |  Official Mobile: ${emp.mobileNo || 'N/A'}`, 18, currentY + 30);
+
+    currentY += 43;
+
+    // Personal Information (if allowed)
+    if (canViewPersonalDetails) {
+      doc.setFillColor(241, 245, 249);
+      doc.rect(14, currentY, pageWidth - 28, 6.5, 'F');
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('1. PERSONAL & CONTACT INFORMATION', 18, currentY + 4.5);
+      currentY += 11;
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      doc.text(`Personal Email: ${emp.personalEmail || 'N/A'}`, 18, currentY);
+      doc.text(`Personal Mobile: ${emp.personalMobileNo || 'N/A'}`, 110, currentY);
+      currentY += 6.5;
+      doc.text(`Emergency Contact: ${emp.emergencyContactNo || 'N/A'}`, 18, currentY);
+      doc.text(`Date of Birth: ${emp.dob || 'N/A'}`, 110, currentY);
+      currentY += 6.5;
+      doc.text(`Blood Group: ${emp.bloodGroup || 'N/A'}`, 18, currentY);
+      doc.text(`Gender: ${emp.gender || 'N/A'}`, 110, currentY);
+      currentY += 10;
+    }
+
+    // Addresses (if allowed)
+    if (canViewAddresses) {
+      doc.setFillColor(241, 245, 249);
+      doc.rect(14, currentY, pageWidth - 28, 6.5, 'F');
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('2. RESIDENTIAL & PERMANENT ADDRESSES', 18, currentY + 4.5);
+      currentY += 11;
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      doc.text(`Residential Address: ${[emp.resLine1, emp.resLine2, emp.resCity, emp.resState, emp.resPinCode].filter(Boolean).join(', ') || 'N/A'}`, 18, currentY);
+      currentY += 6.5;
+      doc.text(`Permanent Address: ${[emp.permLine1, emp.permLine2, emp.permCity, emp.permState, emp.permPinCode].filter(Boolean).join(', ') || 'N/A'}`, 18, currentY);
+      currentY += 10;
+    }
+
+    // Salary Structure (if allowed)
+    if (canViewSalary) {
+      doc.setFillColor(241, 245, 249);
+      doc.rect(14, currentY, pageWidth - 28, 6.5, 'F');
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('3. STANDARD SALARY STRUCTURE & RATES', 18, currentY + 4.5);
+      currentY += 11;
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      const basic = getCurrentBasicSalary(emp);
+      doc.text(`Basic Pay: Rs. ${basic.toLocaleString('en-IN')}`, 18, currentY);
+      doc.text(`Standard Allowances: Rs. ${(emp.allowances || 0).toLocaleString('en-IN')}`, 110, currentY);
+      currentY += 6.5;
+      doc.text(`Standard Deductions: Rs. ${(emp.deductions || 0).toLocaleString('en-IN')}`, 18, currentY);
+      doc.text(`Hourly Overtime Rate: Rs. ${(emp.hourlyRate || 0).toLocaleString('en-IN')}/hr`, 110, currentY);
+      currentY += 10;
+    }
+
+    // Bank & Statutory (if allowed)
+    if (canViewBankDetails || canViewIdentityDetails || canViewPfEsic) {
+      doc.setFillColor(241, 245, 249);
+      doc.rect(14, currentY, pageWidth - 28, 6.5, 'F');
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('4. BANKING & STATUTORY REGISTRY', 18, currentY + 4.5);
+      currentY += 11;
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      if (canViewBankDetails) {
+        doc.text(`Bank Name: ${emp.bankName || 'N/A'}  |  A/C Number: ${emp.bankAccountNo || 'N/A'}  |  IFSC: ${emp.ifscCode || 'N/A'}`, 18, currentY);
+        currentY += 6.5;
+      }
+      if (canViewIdentityDetails || canViewPfEsic) {
+        doc.text(`PAN: ${emp.panNo || 'N/A'}  |  Aadhaar: ${emp.aadhaarNo ? emp.aadhaarNo.replace(/\d(?=\d{4})/g, '*') : 'N/A'}  |  UAN: ${emp.uan || 'N/A'}`, 18, currentY);
+        currentY += 6.5;
+      }
+      currentY += 4;
+    }
+
+    // Footer
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Generated on ${new Date().toLocaleString()} | Employee Self-Service Portal | Verified Record`, 14, 285);
+
+    doc.save(`Profile_${emp.name.replace(/\s+/g, '_')}_${emp.id}.pdf`);
+  };
+
+  // Export Monthly Attendance Log to CSV
+  const handleExportAttendanceCSV = () => {
+    if (!canExportAttendance) return;
+    const headers = ['Date', 'Day', 'Employee ID', 'Employee Name', 'Department', 'Status', 'In Time', 'Out Time', 'Overtime (Hours)', 'Late In', 'Early Going', 'Remarks'];
+    const rows: string[][] = [headers];
+
+    empAttendanceList.forEach(rec => {
+      const isLate = isAttendanceLate(rec, employee.workTiming, adminSettings?.defaultCheckIn || '09:00') ? 'Yes' : 'No';
+      const isEarly = isAttendanceEarlyGoing(rec, employee.workTiming, adminSettings?.defaultCheckOut || '18:00') ? 'Yes' : 'No';
+      const dayOfWeek = new Date(rec.date).toLocaleDateString('en-US', { weekday: 'short' });
+
+      rows.push([
+        `"${rec.date}"`,
+        `"${dayOfWeek}"`,
+        `"${employee.id}"`,
+        `"${(employee.name || '').replace(/"/g, '""')}"`,
+        `"${(employee.department || '').replace(/"/g, '""')}"`,
+        `"${rec.status || ''}"`,
+        `"${rec.checkIn || ''}"`,
+        `"${rec.checkOut || ''}"`,
+        `"${rec.overtimeHours || 0}"`,
+        `"${isLate}"`,
+        `"${isEarly}"`,
+        `"${(rec.remarks || '').replace(/"/g, '""')}"`
+      ]);
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map(e => e.join(',')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Attendance_Log_${employee.name.replace(/\s+/g, '_')}_${selectedPeriod}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -1466,10 +1647,16 @@ export default function EmployeePortal({
                         </div>
                       </button>
 
-                      {/* Action 3: Download Last Payslip */}
+                      {/* Action 3: Download/View Last Payslip */}
                       {latestPayslip ? (
                         <button
-                          onClick={() => downloadPayslipPDF(latestPayslip, employee)}
+                          onClick={() => {
+                            if (canExportPayslip) {
+                              downloadPayslipPDF(latestPayslip, employee);
+                            } else {
+                              handleOpenPayslip(latestPayslip);
+                            }
+                          }}
                           className="p-3 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-900 border border-slate-150 rounded-xl text-left text-xs font-bold text-slate-700 transition-all flex items-center gap-2.5 cursor-pointer group"
                         >
                           <div className="p-1.5 bg-white border border-slate-200 text-slate-500 group-hover:border-indigo-200 group-hover:text-indigo-700 rounded-lg shrink-0">
@@ -1477,7 +1664,7 @@ export default function EmployeePortal({
                           </div>
                           <div>
                             <span className="block font-black text-slate-800 group-hover:text-indigo-900">
-                              {`Get ${latestPayslip.monthYear} Payslip PDF`}
+                              {canExportPayslip ? `Get ${latestPayslip.monthYear} Payslip PDF` : `View ${latestPayslip.monthYear} Payslip`}
                             </span>
                             <span className="text-[9px] text-slate-400 group-hover:text-indigo-650 font-bold">
                               ₹{latestPayslip.netSalary !== undefined ? latestPayslip.netSalary.toLocaleString('en-IN') : latestPayslip.totalSalary.toLocaleString('en-IN')} payout • {latestPayslip.paymentStatus}
@@ -1880,7 +2067,40 @@ export default function EmployeePortal({
 
         {/* PROFILE TAB */}
         {activeTab === 'profile' && (
-          <div>
+          <div className="space-y-5">
+            {/* Profile Action Bar with Export */}
+            <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-2xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0 border border-emerald-100">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-800 flex items-center gap-2">
+                    <span>{employee.name}</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold border border-slate-200">
+                      {employee.id}
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-400 font-semibold">
+                    {employee.designation || 'Staff'} • {employee.department || 'General'} • {employee.branch || 'Head Office'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {canExportProfile && (
+                  <button
+                    onClick={() => downloadProfilePDF(employee)}
+                    className="px-4 py-2 bg-[#03623c] hover:bg-[#024a2d] text-white text-xs font-bold rounded-xl shadow-3xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="Export Official Profile PDF"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-200" />
+                    <span>{"Export Profile PDF"}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
             {!(canViewPersonalDetails || canViewAddresses || canViewSalary || canViewBankDetails || canViewIdentityDetails || canViewPfEsic) ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center max-w-lg mx-auto my-8 shadow-xs space-y-4">
                 <div className="w-14 h-14 bg-slate-100 text-slate-500 rounded-2xl flex items-center justify-center mx-auto">
@@ -2147,8 +2367,20 @@ export default function EmployeePortal({
 
               </div>
 
-              <div className="text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200/60 px-4 py-2.5 rounded-lg">
-                Showing logs for: <span className="text-emerald-700">{selectedPeriod}</span>
+              <div className="flex items-center gap-2">
+                <div className="text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200/60 px-4 py-2.5 rounded-lg">
+                  Showing logs for: <span className="text-emerald-700 font-mono font-black">{selectedPeriod}</span>
+                </div>
+                {canExportAttendance && (
+                  <button
+                    onClick={handleExportAttendanceCSV}
+                    className="px-3.5 py-2.5 bg-[#03623c] hover:bg-[#024a2d] text-white text-xs font-bold rounded-lg shadow-xxs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                    title="Export Monthly Attendance Log to CSV"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-200" />
+                    <span>{"Export CSV"}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2714,7 +2946,9 @@ export default function EmployeePortal({
             attendanceRecords={attendanceRecords}
             adminSettings={adminSettings}
             language={language}
-            currentEmployee={employee} />
+            currentEmployee={employee}
+            canExport={canExportAttendance}
+          />
         )}
 
       </div>
@@ -2927,20 +3161,24 @@ export default function EmployeePortal({
 
             {/* Controls */}
             <div className="border-t border-slate-100 pt-4 sm:pt-5 flex flex-col sm:flex-row justify-end gap-2 no-print">
-              <button
-                onClick={() => downloadPayslipPDF(activePayslip.record, activePayslip.employee)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97 w-full sm:w-auto"
-              >
-                <FileText className="w-3.5 h-3.5 text-white" />
-                <span>{t.downloadPDF}</span>
-              </button>
-              <button
-                onClick={handlePrint}
-                className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97 w-full sm:w-auto"
-              >
-                <Printer className="w-3.5 h-3.5 text-slate-500" />
-                <span>{t.printSlip}</span>
-              </button>
+              {canExportPayslip && (
+                <>
+                  <button
+                    onClick={() => downloadPayslipPDF(activePayslip.record, activePayslip.employee)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97 w-full sm:w-auto"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-white" />
+                    <span>{t.downloadPDF}</span>
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-3xs active:scale-97 w-full sm:w-auto"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{t.printSlip}</span>
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => setActivePayslip(null)}
                 className="bg-slate-900 hover:bg-slate-850 text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-3xs cursor-pointer active:scale-97 w-full sm:w-auto text-center"

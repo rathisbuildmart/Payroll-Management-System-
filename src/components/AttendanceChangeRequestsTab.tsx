@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { 
   CheckCircle2, XCircle, Clock, Search, Filter, AlertCircle, ShieldCheck, 
   ArrowRight, UserCheck, UserX, Calendar, Building, Check, X, MessageSquare, 
-  Sparkles, RefreshCw, FileText, Send, CheckCheck
+  Sparkles, RefreshCw, FileText, Send, CheckCheck, Download, Printer
 } from 'lucide-react';
-import { AttendanceChangeRequest, Attendance, Employee } from '../types';
+import { AttendanceChangeRequest, Attendance, Employee, AdminSettings } from '../types';
+import MonthlyApprovalReportModal from './MonthlyApprovalReportModal';
 
 interface AttendanceChangeRequestsTabProps {
   changeRequests: AttendanceChangeRequest[];
@@ -12,6 +13,7 @@ interface AttendanceChangeRequestsTabProps {
   attendanceRecords: Attendance[];
   portalUser?: any;
   isAdminOrDirector: boolean;
+  adminSettings?: AdminSettings;
   onApproveRequest: (request: AttendanceChangeRequest, reviewerRemarks?: string) => Promise<void>;
   onRejectRequest: (request: AttendanceChangeRequest, reviewerRemarks?: string) => Promise<void>;
   onBulkApprove?: (requestIds: string[]) => Promise<void>;
@@ -23,6 +25,7 @@ export default function AttendanceChangeRequestsTab({
   attendanceRecords,
   portalUser,
   isAdminOrDirector,
+  adminSettings,
   onApproveRequest,
   onRejectRequest,
   onBulkApprove
@@ -30,11 +33,29 @@ export default function AttendanceChangeRequestsTab({
   const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Approved' | 'Rejected'>('Pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
+  const [selectedMonth, setSelectedMonth] = useState('All');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [rejectModalReq, setRejectModalReq] = useState<AttendanceChangeRequest | null>(null);
   const [rejectionRemarks, setRejectionRemarks] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [monthlyModalOpen, setMonthlyModalOpen] = useState(false);
+
+  // Extract distinct available months from changeRequests
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    changeRequests.forEach(r => {
+      if (r.attendanceDate && r.attendanceDate.length >= 7) {
+        set.add(r.attendanceDate.substring(0, 7));
+      } else if (r.requestedAt && r.requestedAt.length >= 7) {
+        set.add(r.requestedAt.substring(0, 7));
+      }
+    });
+    // Add current month if empty
+    const currentM = new Date().toISOString().substring(0, 7);
+    set.add(currentM);
+    return ['All', ...Array.from(set).sort().reverse()];
+  }, [changeRequests]);
 
   // Departments list for filtering
   const departments = useMemo(() => {
@@ -59,6 +80,10 @@ export default function AttendanceChangeRequestsTab({
       .filter(req => {
         const matchesStatus = filterStatus === 'All' || req.status === filterStatus;
         const matchesDept = selectedDept === 'All' || req.department === selectedDept;
+        const matchesMonth = selectedMonth === 'All' || 
+          (req.attendanceDate && req.attendanceDate.startsWith(selectedMonth)) ||
+          (req.requestedAt && req.requestedAt.startsWith(selectedMonth));
+
         const q = searchTerm.toLowerCase().trim();
         const matchesSearch = !q || 
           req.employeeName.toLowerCase().includes(q) ||
@@ -68,7 +93,7 @@ export default function AttendanceChangeRequestsTab({
           req.requestedByName.toLowerCase().includes(q) ||
           req.attendanceDate.includes(q);
 
-        return matchesStatus && matchesDept && matchesSearch;
+        return matchesStatus && matchesDept && matchesMonth && matchesSearch;
       })
       .sort((a, b) => {
         // Pending first, then newest
@@ -76,7 +101,7 @@ export default function AttendanceChangeRequestsTab({
         if (a.status !== 'Pending' && b.status === 'Pending') return 1;
         return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
       });
-  }, [changeRequests, filterStatus, selectedDept, searchTerm]);
+  }, [changeRequests, filterStatus, selectedDept, selectedMonth, searchTerm]);
 
   const handleToggleSelect = (id: string) => {
     setSelectedIds(prev => 
@@ -131,7 +156,33 @@ export default function AttendanceChangeRequestsTab({
   return (
     <div className="space-y-6 animate-fadeIn">
       
-      {/* Top Banner with Stats & Quick Actions */}
+      {/* Top Banner with Monthly Report Trigger */}
+      <div className="bg-gradient-to-r from-slate-900 via-[#03623c] to-slate-900 p-5 rounded-2xl text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-md text-[11px] font-mono font-bold uppercase tracking-wider">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>{'Monthly Signable Approval Report'}</span>
+          </div>
+          <h3 className="text-lg sm:text-xl font-black text-white">
+            {'Attendance Approval Requests & Director Verification'}
+          </h3>
+          <p className="text-xs text-emerald-100/80 max-w-2xl">
+            {'Generate month-wise consolidated reports for all employees, review pending approval requests, download signable PDFs with HR & Director signature blocks, or export to Excel.'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setMonthlyModalOpen(true)}
+          className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer shrink-0"
+        >
+          <FileText className="w-4 h-4 text-slate-950" />
+          <span>{'Open Monthly Report & PDF'}</span>
+          <Download className="w-3.5 h-3.5 ml-1 text-slate-900" />
+        </button>
+      </div>
+
+      {/* Stats & Quick Filter Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <button
           onClick={() => setFilterStatus('Pending')}
@@ -229,6 +280,22 @@ export default function AttendanceChangeRequestsTab({
             )}
           </div>
 
+          {/* Month Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-slate-500 uppercase font-mono">Month:</span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] text-xs font-semibold text-slate-700 dark:text-slate-200 px-2.5 py-1.5 rounded-xl focus:outline-none cursor-pointer font-mono"
+            >
+              {availableMonths.map(m => (
+                <option key={m} value={m} className="dark:bg-[#11221b]">
+                  {m === 'All' ? 'All Months' : m}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Department Filter */}
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] font-bold text-slate-500 uppercase font-mono">Dept:</span>
@@ -244,29 +311,40 @@ export default function AttendanceChangeRequestsTab({
           </div>
         </div>
 
-        {/* Bulk Action for Admin/Director */}
-        {isAdminOrDirector && counts.pending > 0 && (
-          <div className="flex items-center gap-2">
-            {selectedIds.length > 0 && (
+        {/* Action Buttons: Bulk Approve + Monthly Report Trigger */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMonthlyModalOpen(true)}
+            className="px-3.5 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-[#03623c] dark:text-emerald-300 text-xs font-bold rounded-xl shadow-2xs flex items-center gap-1.5 hover:bg-emerald-100 transition-all cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Monthly PDF Report</span>
+          </button>
+
+          {isAdminOrDirector && counts.pending > 0 && (
+            <div className="flex items-center gap-2">
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={handleExecuteBulkApprove}
+                  disabled={isBulkProcessing}
+                  className="px-4 py-1.5 bg-[#03623c] hover:bg-[#024d2e] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  <span>Approve Selected ({selectedIds.length})</span>
+                </button>
+              )}
               <button
-                onClick={handleExecuteBulkApprove}
-                disabled={isBulkProcessing}
-                className="px-4 py-1.5 bg-[#03623c] hover:bg-[#024d2e] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                onClick={handleSelectAllPending}
+                className="px-3 py-1.5 bg-slate-100 dark:bg-[#0b1812] hover:bg-slate-200 border border-slate-200 dark:border-[#1e3a2f] text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition-all cursor-pointer"
               >
-                <CheckCheck className="w-4 h-4" />
-                <span>Approve Selected ({selectedIds.length})</span>
+                {selectedIds.length === filteredRequests.filter(r => r.status === 'Pending').length && selectedIds.length > 0
+                  ? 'Deselect All'
+                  : 'Select All Pending'}
               </button>
-            )}
-            <button
-              onClick={handleSelectAllPending}
-              className="px-3 py-1.5 bg-slate-100 dark:bg-[#0b1812] hover:bg-slate-200 border border-slate-200 dark:border-[#1e3a2f] text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition-all cursor-pointer"
-            >
-              {selectedIds.length === filteredRequests.filter(r => r.status === 'Pending').length && selectedIds.length > 0
-                ? 'Deselect All'
-                : 'Select All Pending'}
-            </button>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Requests List */}
@@ -504,6 +582,22 @@ export default function AttendanceChangeRequestsTab({
           </div>
         </div>
       )}
+
+      {/* Monthly Approval Report & Signable PDF Modal */}
+      <MonthlyApprovalReportModal
+        isOpen={monthlyModalOpen}
+        onClose={() => setMonthlyModalOpen(false)}
+        changeRequests={changeRequests}
+        attendanceRecords={attendanceRecords}
+        employees={employees}
+        adminSettings={adminSettings}
+        portalUser={portalUser}
+        isAdminOrDirector={isAdminOrDirector}
+        onApproveRequest={onApproveRequest}
+        onRejectRequest={onRejectRequest}
+        onBulkApprove={onBulkApprove}
+        initialMonth={selectedMonth !== 'All' ? selectedMonth : undefined}
+      />
 
     </div>
   );

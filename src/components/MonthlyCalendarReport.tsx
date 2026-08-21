@@ -13,6 +13,7 @@ interface MonthlyCalendarReportProps {
   adminSettings: AdminSettings;
   language: 'en' | 'hi';
   currentEmployee?: Employee; //Required if !isAdmin
+  canExport?: boolean;
 }
 
 export default function MonthlyCalendarReport({
@@ -21,7 +22,8 @@ export default function MonthlyCalendarReport({
   attendanceRecords,
   adminSettings,
   language,
-  currentEmployee
+  currentEmployee,
+  canExport = true
 }: MonthlyCalendarReportProps) {
   //Determine who we are viewing
   const initialEmpId = isAdmin 
@@ -31,6 +33,8 @@ export default function MonthlyCalendarReport({
   const [selectedEmpId, setSelectedEmpId] = useState<string>(initialEmpId);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1); //1-12
+
+  const isExportAllowed = isAdmin || canExport !== false;
 
   //Multi-language translation dictionary
   const t = {
@@ -180,6 +184,7 @@ export default function MonthlyCalendarReport({
   };
 
   const handleExportCSV = () => {
+    if (!isExportAllowed) return;
     const formattedPeriod = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     const empName = selectedEmployee ? selectedEmployee.name : 'All_Employees';
     const headers = ['Date', 'Employee ID', 'Employee Name', 'Status', 'In Time', 'Out Time', 'Late In', 'Early Going', 'Remarks'];
@@ -195,13 +200,13 @@ export default function MonthlyCalendarReport({
       rows.push([
         `"${r.date}"`,
         `"${r.employeeId}"`,
-        `"${(emp?.name || '').replace(/" /g, '""')}"`,
+        `"${(emp?.name || '').replace(/"/g, '""')}"`,
         `"${r.status || ''}"`,
         `"${r.checkIn || ''}"`,
         `"${r.checkOut || ''}"`,
         `"${late}"`,
         `"${early}"`,
-        `"${(r.remarks || '').replace(/" /g, '""')}"`
+        `"${(r.remarks || '').replace(/"/g, '""')}"`
       ]);
     });
 
@@ -209,7 +214,7 @@ export default function MonthlyCalendarReport({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Attendance_Report_${empName}_${formattedPeriod}.csv`);
+    link.setAttribute('download', `Attendance_Report_${empName.replace(/\s+/g, '_')}_${formattedPeriod}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -278,14 +283,16 @@ export default function MonthlyCalendarReport({
               ))}
             </select>
 
-            <button
-              onClick={handleExportCSV}
-              className="px-3.5 py-1.5 bg-[#03623c] hover:bg-[#024a2d] text-white text-xs font-bold rounded-xl shadow-3xs transition-all flex items-center gap-1.5 cursor-pointer ml-1"
-              title="Download Monthly Attendance CSV"
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-200" />
-              <span>{'Export CSV'}</span>
-            </button>
+            {isExportAllowed && (
+              <button
+                onClick={handleExportCSV}
+                className="px-3.5 py-1.5 bg-[#03623c] hover:bg-[#024a2d] text-white text-xs font-bold rounded-xl shadow-3xs transition-all flex items-center gap-1.5 cursor-pointer ml-1"
+                title="Download Monthly Attendance CSV"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-200" />
+                <span>{'Export CSV'}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

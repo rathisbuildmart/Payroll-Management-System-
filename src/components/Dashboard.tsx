@@ -122,278 +122,7 @@ export default function Dashboard({
   }, [userBranchDefault]);
 
   const pendingPasswordReqs = useMemo(() => {
-    if (userRole === 'recruiter') {
-    return (
-      <div className="space-y-6 animate-fadeIn pb-12 font-sans">
-        {/* Recruiter Header Banner */}
-        <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-emerald-800/40 relative overflow-hidden">
-          <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-10 pointer-events-none">
-            <Users className="w-64 h-64 text-white" />
-          </div>
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider mb-2">
-                <Briefcase className="w-3.5 h-3.5" />
-                <span>{'Recruiter Control Hub'}</span>
-              </div>
-              <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">
-                {'Recruitment & Exit Operations Dashboard'}
-              </h1>
-              <p className="text-xs text-emerald-100/80 mt-1 max-w-2xl leading-relaxed">
-                {'Manage end-to-end recruitment pipelines, open job postings, candidate scorecards, offer letters, onboarding progress, resignations, and No-Dues clearances.'}
-              </p>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <button
-                onClick={() => onNavigate?.('hiring_onboarding')}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-              >
-                <UserCheck className="w-4 h-4" />
-                <span>{'Hiring & Onboarding Hub'}</span>
-              </button>
-              <button
-                onClick={() => onNavigate?.('exit_management')}
-                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-              >
-                <UserX className="w-4 h-4 text-rose-400" />
-                <span>{'Exit & Clearance Hub'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Recruiter Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                {'Open Job Postings'}
-              </span>
-              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                <Briefcase className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-900 font-mono">
-              {recruitmentStats.openJobsCount}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
-              {'Active hiring drives across branches'}
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                {'Candidate Pipeline'}
-              </span>
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                <Users className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-900 font-mono">
-              {recruitmentStats.candidatesCount}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
-              {'Applicants in screening & interview'}
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                {'Offers & Onboarding'}
-              </span>
-              <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
-                <UserCheck className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-900 font-mono">
-              {recruitmentStats.offersCount}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
-              {'Issued offers and onboarding tasks'}
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                {'Exit Clearances'}
-              </span>
-              <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
-                <UserX className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl font-black text-slate-900 font-mono">
-              {recruitmentStats.activeExitsCount}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-1 font-semibold">
-              {'Resignations & No-Dues in clearance'}
-            </div>
-          </div>
-        </div>
-
-        {/* Two Main Functional Workflows: 1. Hiring & Onboarding, 2. Exit & Clearance */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Module 1: Hiring & Onboarding Hub */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl font-black">
-                  1
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {'Hiring & Onboarding Management'}
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-medium">
-                    {'Open jobs, applicant stages & onboarding checklists'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate?.('hiring_onboarding')}
-                className="text-xs font-black text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition-all"
-              >
-                <span>{'Open Module'}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Open Jobs List Preview */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
-                {'Active Job Openings'}
-              </span>
-              {recruitmentData.jobs.length === 0 ? (
-                <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 italic">
-                  {'No active job postings created yet.'}
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {recruitmentData.jobs.slice(0, 4).map((job: any) => (
-                    <div key={job.id} className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 flex items-center justify-between transition-colors">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-extrabold text-slate-900">{job.title}</span>
-                          <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-mono">
-                            {job.openings} {'Openings'}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                          📍 {job.location} • 🏢 {job.department} • 📅 {job.postedDate}
-                        </p>
-                      </div>
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase font-mono ${
-                        job.status === 'Open' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
-                      }`}>
-                        {job.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Module 2: Exit & Clearance Hub */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-rose-100 text-rose-800 rounded-xl font-black">
-                  2
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {'Exit & No-Dues Clearance'}
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-medium">
-                    {'Resignations, department clearances & final settlements'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate?.('exit_management')}
-                className="text-xs font-black text-rose-700 hover:text-rose-800 flex items-center gap-1 cursor-pointer bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-100 transition-all"
-              >
-                <span>{'Open Module'}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Exit Records List Preview */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
-                {'Active Resignations & Clearances'}
-              </span>
-              {recruitmentData.exits.length === 0 ? (
-                <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 italic">
-                  {'No exit or resignation requests recorded.'}
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {recruitmentData.exits.slice(0, 4).map((ext: any) => (
-                    <div key={ext.id} className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/80 flex items-center justify-between transition-colors">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-extrabold text-slate-900">{ext.employeeName}</span>
-                          <span className="text-[9px] font-mono text-slate-500 font-bold">({ext.employeeId})</span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                          🏢 {ext.department} • 📅 Last Day: {ext.lastWorkingDay}
-                        </p>
-                      </div>
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase font-mono ${
-                        ext.status === 'Relieved' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {ext.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Recruitment & Separation Analytics Chart */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                {'Hiring vs Separation Trends'}
-              </h3>
-              <p className="text-[10px] text-slate-400 font-medium">
-                {'Visual overview of candidate sourcing, hires & staff exits'}
-              </p>
-            </div>
-            <div className="flex items-center gap-3 text-xs font-bold font-mono">
-              <span className="flex items-center gap-1 text-emerald-600">
-                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span>
-                {'Overview'}
-              </span>
-            </div>
-          </div>
-
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={recruitmentChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="category" tick={{ fontSize: 11, fontWeight: 700 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold' }} />
-                <Bar dataKey="count" fill="#10b981" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (passwordRequests || []).filter((r: any) => r.status === 'Pending');
+    return (passwordRequests || []).filter((r: any) => r.status === 'Pending');
   }, [passwordRequests]);
 
   const pendingHrTkts = useMemo(() => {
@@ -1434,20 +1163,23 @@ export default function Dashboard({
                 <Tooltip 
                   cursor={{ fill: 'rgba(241, 245, 249, 0.4)' }}
                   content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
+                    if (active && payload && payload.length && payload[0]?.payload) {
                       const data = payload[0].payload;
-                      const hasRecords = data.total > 0;
+                      const total = data?.total || 0;
+                      const present = data?.present || 0;
+                      const rate = data?.rate ?? 0;
+                      const hasRecords = total > 0;
                       return (
                         <div className="bg-white/95 backdrop-blur-md p-2 rounded-lg border border-gray-200 shadow-md text-[10px] font-sans">
-                          <p className="font-bold text-gray-800 mb-0.5">Date: {data.date}</p>
+                          <p className="font-bold text-gray-800 mb-0.5">Date: {data?.date || ''}</p>
                           {hasRecords ? (
                             <>
                               <p className="text-[#03623c] font-semibold flex items-center gap-1">
                                 <span className="w-1 bg-[#03623c] rounded-full h-1"></span>
-                                Attendance: {data.rate}%
+                                Attendance: {rate}%
                               </p>
                               <p className="text-gray-500 font-medium">
-                                Present: {data.present}{data.total}
+                                Present: {present} / {total}
                               </p>
                             </>
                           ) : (
@@ -1499,11 +1231,13 @@ export default function Dashboard({
                     </Pie>
                     <Tooltip 
                       content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
+                        if (active && payload && payload.length && payload[0]) {
                           const data = payload[0];
+                          const name = data?.name || '';
+                          const value = Number(data?.value) || 0;
                           return (
                             <div className="bg-white/95 backdrop-blur-md p-1.5 rounded-lg border border-gray-200 shadow-md text-[9px] font-mono">
-                              <span className="font-bold text-gray-800">{data.name}:</span> ₹{data.value.toLocaleString('en-IN')}
+                              <span className="font-bold text-gray-800">{name}:</span> ₹{value.toLocaleString('en-IN')}
                             </div>
                           );
                         }
@@ -1585,13 +1319,17 @@ export default function Dashboard({
                   <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={9} fontWeight={600} tickLine={false} axisLine={false} />
                   <Tooltip 
                     content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
+                      if (active && payload && payload.length && payload[0]?.payload) {
                         const data = payload[0].payload;
+                        const name = data?.name || '';
+                        const employees = data?.employees || 0;
+                        const activeCount = data?.active || 0;
+                        const salary = data?.salary || 0;
                         return (
                           <div className="bg-white/95 backdrop-blur-md p-2 rounded-lg border border-gray-200 shadow-md text-[10px]">
-                            <p className="font-bold text-gray-800 border-b border-gray-100 pb-0.5 mb-1">{data.name}</p>
-                            <p className="text-[#03623c] font-semibold">Staff: {data.employees} ({data.active} Active)</p>
-                            <p className="text-emerald-700 font-semibold font-mono">Salary Pool: ₹{data.salary.toLocaleString('en-IN')}</p>
+                            <p className="font-bold text-gray-800 border-b border-gray-100 pb-0.5 mb-1">{name}</p>
+                            <p className="text-[#03623c] font-semibold">Staff: {employees} ({activeCount} Active)</p>
+                            <p className="text-emerald-700 font-semibold font-mono">Salary Pool: ₹{salary.toLocaleString('en-IN')}</p>
                           </div>
                         );
                       }

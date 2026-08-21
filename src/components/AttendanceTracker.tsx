@@ -20,6 +20,7 @@ import { WhatsAppModal } from './WhatsAppModal';
 import AttendanceChangeRequestModal from './AttendanceChangeRequestModal';
 import AttendanceChangeRequestsTab from './AttendanceChangeRequestsTab';
 import AttendanceAuditReportTab from './AttendanceAuditReportTab';
+import MonthlyApprovalReportModal from './MonthlyApprovalReportModal';
 
 interface AttendanceTrackerProps {
   employees: Employee[];
@@ -95,6 +96,7 @@ export default function AttendanceTracker({
   // Admin Access Control Modal State
   const [accessControlModalOpen, setAccessControlModalOpen] = useState(false);
   const [accessDurationMins, setAccessDurationMins] = useState(60); // default 1 hour
+  const [monthlyApprovalModalOpen, setMonthlyApprovalModalOpen] = useState(false);
 
   // Local change requests mirror
   const [localChangeRequests, setLocalChangeRequests] = useState<AttendanceChangeRequest[]>(attendanceChangeRequests);
@@ -1198,6 +1200,15 @@ export default function AttendanceTracker({
         </div>
 
         <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+          <button
+            onClick={() => setMonthlyApprovalModalOpen(true)}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+            title="Open Monthly Approval Requests & Signable Report"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Monthly Approval Report</span>
+          </button>
+
           {isAdminOrDirector && (
             <button
               onClick={() => setAccessControlModalOpen(true)}
@@ -2059,6 +2070,7 @@ export default function AttendanceTracker({
           attendanceRecords={attendanceRecords}
           portalUser={portalUser}
           isAdminOrDirector={isAdminOrDirector}
+          adminSettings={adminSettings}
           onApproveRequest={handleApproveRequest}
           onRejectRequest={handleRejectRequest}
           onBulkApprove={handleBulkApprove}
@@ -2432,6 +2444,21 @@ export default function AttendanceTracker({
           defaultCategory={waCategory}
           variables={waVars} />
       )}
+
+      {/* Monthly Approval Requests & Signable Report Modal */}
+      <MonthlyApprovalReportModal
+        isOpen={monthlyApprovalModalOpen}
+        onClose={() => setMonthlyApprovalModalOpen(false)}
+        changeRequests={localChangeRequests}
+        attendanceRecords={attendanceRecords}
+        employees={employees}
+        adminSettings={adminSettings}
+        portalUser={portalUser}
+        isAdminOrDirector={isAdminOrDirector}
+        onApproveRequest={handleApproveRequest}
+        onRejectRequest={handleRejectRequest}
+        onBulkApprove={handleBulkApprove}
+      />
 
     </div>
   );

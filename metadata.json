@@ -1,6 +1,6 @@
 {
   "name": "Payroll Management System",
-  "description": "Comprehensive Payroll & HRMS system with Active/Inactive employee filtering, dynamic remaining-days retention policies (4-30+ days), and automated multi-sheet archive storage.",
+  "description": "Comprehensive Payroll & HRMS system with monthly signable attendance approval reports, Director-level verification workflows, Active/Inactive employee filtering, dynamic retention policies, and automated multi-sheet archive storage.",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
