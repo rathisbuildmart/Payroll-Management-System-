@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { CompanyAsset, Employee, AssetMaintenanceLog, AssetAllocationHistory, UserRole, PortalUser, AdminSettings } from '../types';
 import { syncAssetsToSheets, fetchAssetsFromSheets } from '../services/sheets';
+import SearchableEmployeeSelect from './SearchableEmployeeSelect';
 
 interface AssetManagementModuleProps {
   employees: Employee[];
@@ -1382,31 +1383,14 @@ export default function AssetManagementModule({
             </div>
 
             <form onSubmit={handleAssignAsset} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">Select Staff / Employee *</label>
-                <select
-                  value={assignForm.employeeId}
-                  onChange={(e) => setAssignForm({ ...assignForm, employeeId: e.target.value })}
-                  required
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0b1812] border border-slate-200 dark:border-[#1e3a2f] rounded-xl font-bold text-xs"
-                >
-                  <option value="">-- Choose Employee --</option>
-                  <optgroup label="🟢 Active Employees">
-                    {employees.filter(emp => emp.isActive !== false).map(emp => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.id}) - {emp.department}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="🔴 Inactive / Exited Employees">
-                    {employees.filter(emp => emp.isActive === false).map(emp => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.id}) - {emp.department} [INACTIVE / EXITED]
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
+              <SearchableEmployeeSelect
+                label="Select Staff / Employee"
+                required
+                value={assignForm.employeeId}
+                employees={employees}
+                placeholder="Search staff to assign asset..."
+                onChange={(empId) => setAssignForm({ ...assignForm, employeeId: empId })}
+              />
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

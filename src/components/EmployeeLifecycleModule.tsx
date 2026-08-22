@@ -22,6 +22,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { PerformanceReview, CompanyAsset, TransferPromotionRecord, Employee } from '../types';
+import SearchableEmployeeSelect from './SearchableEmployeeSelect';
 
 interface EmployeeLifecycleProps {
   employees: Employee[];
@@ -436,18 +437,14 @@ export default function EmployeeLifecycleModule({ employees, language = 'en' }: 
               <button onClick={() => setShowReviewModal(false)}><X className="w-5 h-5 text-slate-400 hover:text-slate-600" /></button>
             </div>
             <form onSubmit={handleCreateReview} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-600 font-medium block mb-1">Select Employee</label>
-                <select
-                  required
-                  value={newReview.employeeId}
-                  onChange={e => setNewReview({ ...newReview, employeeId: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-emerald-600 focus:outline-none"
-                >
-                  <option value="">Choose Employee...</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.id})</option>)}
-                </select>
-              </div>
+              <SearchableEmployeeSelect
+                label="Select Employee"
+                required
+                value={newReview.employeeId}
+                employees={employees}
+                placeholder="Search employee by name, ID (e.g. RS001)..."
+                onChange={(empId) => setNewReview({ ...newReview, employeeId: empId })}
+              />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-600 font-medium block mb-1">Review Period</label>
@@ -536,17 +533,15 @@ export default function EmployeeLifecycleModule({ employees, language = 'en' }: 
                   onChange={e => setNewAsset({ ...newAsset, name: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-emerald-600 focus:outline-none" />
               </div>
-              <div>
-                <label className="text-slate-600 font-medium block mb-1">Assign to Employee (Optional)</label>
-                <select
-                  value={newAsset.assignedToEmployeeId}
-                  onChange={e => setNewAsset({ ...newAsset, assignedToEmployeeId: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-emerald-600 focus:outline-none"
-                >
-                  <option value="">Keep Unassigned (In Inventory)</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.id})</option>)}
-                </select>
-              </div>
+              <SearchableEmployeeSelect
+                label="Assign to Employee (Optional)"
+                allowClear
+                emptyOptionLabel="Keep Unassigned (In Inventory)"
+                value={newAsset.assignedToEmployeeId || ''}
+                employees={employees}
+                placeholder="Search staff to assign asset..."
+                onChange={(empId) => setNewAsset({ ...newAsset, assignedToEmployeeId: empId })}
+              />
               <button
                 type="submit"
                 className="w-full py-2.5 bg-[#004d3d] hover:bg-[#064e3b] text-white font-bold rounded-xl shadow-md transition-all"
@@ -567,27 +562,23 @@ export default function EmployeeLifecycleModule({ employees, language = 'en' }: 
               <button onClick={() => setShowTransferModal(false)}><X className="w-5 h-5 text-slate-400 hover:text-slate-600" /></button>
             </div>
             <form onSubmit={handleCreateTransfer} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-600 font-medium block mb-1">Select Employee</label>
-                <select
-                  required
-                  value={newTransfer.employeeId}
-                  onChange={e => {
-                    const emp = employees.find(x => x.id === e.target.value);
-                    setNewTransfer({
-                      ...newTransfer,
-                      employeeId: e.target.value,
-                      currentDepartment: emp?.department || '',
-                      currentDesignation: emp?.designation || '',
-                      currentSalary: emp?.basicSalary || 0
-                    });
-                  }}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900 focus:bg-white focus:border-emerald-600 focus:outline-none"
-                >
-                  <option value="">Choose Employee...</option>
-                  {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.id})</option>)}
-                </select>
-              </div>
+              <SearchableEmployeeSelect
+                label="Select Employee"
+                required
+                value={newTransfer.employeeId}
+                employees={employees}
+                placeholder="Search employee by name, ID..."
+                onChange={(empId, emp) => {
+                  const targetEmp = emp || employees.find(x => x.id === empId);
+                  setNewTransfer({
+                    ...newTransfer,
+                    employeeId: empId,
+                    currentDepartment: targetEmp?.department || '',
+                    currentDesignation: targetEmp?.designation || '',
+                    currentSalary: targetEmp?.basicSalary || 0
+                  });
+                }}
+              />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-600 font-medium block mb-1">Type</label>

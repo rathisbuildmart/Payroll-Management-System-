@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Employee, Attendance, AdminSettings, Holiday, LeaveRequest } from '../types';
 import { WhatsAppModal } from './WhatsAppModal';
+import SearchableEmployeeSelect from './SearchableEmployeeSelect';
 
 interface LeavesHolidaysProps {
   employees: Employee[];
@@ -1536,21 +1537,15 @@ export default function LeavesHolidays({
               {/* Employee Selector (Admins only) */}
               {!isEmployeeView ? (
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    {'Apply For Employee *'}
-                  </label>
-                  <select
+                  <SearchableEmployeeSelect
+                    label="Apply For Employee"
                     required
                     value={applyEmployeeId}
-                    onChange={(e) => setApplyEmployeeId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                  >
-                    {employees.filter(emp => emp.isActive !== false).map(emp => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.id})
-                      </option>
-                    ))}
-                  </select>
+                    employees={employees}
+                    onlyActive={true}
+                    placeholder="Search employee by name, ID (e.g. RS001)..."
+                    onChange={(empId) => setApplyEmployeeId(empId)}
+                  />
                 </div>
               ) : (
                 <div>

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Employee, Attendance, AdminSettings } from '../types';
 import { isAttendanceLate, isAttendanceEarlyGoing } from '../utils/shift';
+import SearchableEmployeeSelect from './SearchableEmployeeSelect';
 
 interface MonthlyCalendarReportProps {
   isAdmin: boolean;
@@ -311,18 +312,12 @@ export default function MonthlyCalendarReport({
           </div>
 
           <div className="flex-1 max-w-sm">
-            <select
+            <SearchableEmployeeSelect
               value={selectedEmpId}
-              onChange={(e) => setSelectedEmpId(e.target.value)}
-              className="w-full border border-slate-200 dark:border-[#1e3a2f] px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-[#11221b] text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#03623c] cursor-pointer"
-            >
-              <option value="" className="dark:bg-[#11221b]">-- {t.selectEmployee} --</option>
-              {employeeList.map(emp => (
-                <option key={emp.id} value={emp.id} className="dark:bg-[#11221b]">
-                  {emp.name} ({emp.id}) - {emp.department}
-                </option>
-              ))}
-            </select>
+              employees={employeeList}
+              placeholder={`-- ${t.selectEmployee} --`}
+              onChange={(empId) => setSelectedEmpId(empId)}
+            />
           </div>
         </div>
       )}
