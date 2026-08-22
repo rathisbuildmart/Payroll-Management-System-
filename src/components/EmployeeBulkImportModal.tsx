@@ -4,7 +4,7 @@ import {
   FileSpreadsheet, Filter, CheckCircle2, AlertTriangle, RefreshCw, FileText, 
   Search, ShieldCheck, Sparkles, ChevronRight, HelpCircle
 } from 'lucide-react';
-import { Employee } from '../types';
+import { Employee, SalaryIncrement } from '../types';
 
 export interface EmployeeFieldDefinition {
   key: keyof Employee | 'skip';
@@ -14,6 +14,17 @@ export interface EmployeeFieldDefinition {
   type: 'string' | 'number' | 'boolean' | 'date';
   required?: boolean;
   aliases: string[];
+}
+
+export interface ParsedRowMeta {
+  employee: Employee;
+  isExisting: boolean;
+  isNew: boolean;
+  changes: { field: string; label: string; oldValue: any; newValue: any }[];
+  isSalaryModified: boolean;
+  oldSalary: number;
+  newSalary: number;
+  salaryDiff: number;
 }
 
 export const EMPLOYEE_FIELDS: EmployeeFieldDefinition[] = [
@@ -228,6 +239,7 @@ export interface EmployeeBulkImportModalProps {
   existingEmployees: Employee[];
   language?: 'en' | 'hi';
   onExportExisting?: () => void;
+  onOpenLiveEditor?: () => void;
 }
 
 export default function EmployeeBulkImportModal({
@@ -237,7 +249,8 @@ export default function EmployeeBulkImportModal({
   onImportSuccess,
   existingEmployees,
   language = 'en',
-  onExportExisting
+  onExportExisting,
+  onOpenLiveEditor
 }: EmployeeBulkImportModalProps) {
   // Step navigation: 1 = Upload, 2 = Heading Selection & Column Mapping, 3 = Data Preview & Validation
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -258,10 +271,11 @@ export default function EmployeeBulkImportModal({
   
   // Preview and Import States
   const [parsedEmployees, setParsedEmployees] = useState<Employee[]>([]);
+  const [parsedRowsMeta, setParsedRowsMeta] = useState<ParsedRowMeta[]>([]);
   const [parsingErrors, setParsingErrors] = useState<string[]>([]);
   const [parsingWarnings, setParsingWarnings] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState<boolean>(false);
-  const [previewFilter, setPreviewFilter] = useState<'all' | 'ready' | 'warnings'>('all');
+  const [previewFilter, setPreviewFilter] = useState<'all' | 'updated' | 'new' | 'salary_changed'>('all');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -273,11 +287,13 @@ export default function EmployeeBulkImportModal({
       setRawRows([]);
       setColumnMappings({});
       setParsedEmployees([]);
+      setParsedRowsMeta([]);
       setParsingErrors([]);
       setParsingWarnings([]);
       setFileName('');
       setPastedCsvText('');
       setShowPasteArea(false);
+      setPreviewFilter('all');
     }
   }, [isOpen]);
 
@@ -456,80 +472,41 @@ export default function EmployeeBulkImportModal({
   // Compile final employee objects based on active column mappings
   const compileEmployeesFromMapping = () => {
     const emps: Employee[] = [];
+    const metaList: ParsedRowMeta[] = [];
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    // Check if ID and Name are mapped
+    // Check if ID is mapped (mandatory for both new & updates)
     const hasIdMapped = Object.values(columnMappings).includes('id');
     const hasNameMapped = Object.values(columnMappings).includes('name');
 
-    if (!hasIdMapped || !hasNameMapped) {
-      errors.push('Both "Employee ID *" and "Full Name *" must be mapped to proceed.');
+    if (!hasIdMapped) {
+      errors.push('The "Employee ID *" column must be mapped to identify each employee.');
       setParsingErrors(errors);
       return false;
     }
 
+    // Build quick lookup map of existing employees by normalized ID
+    const existingMap = new Map<string, Employee>();
+    existingEmployees.forEach(e => {
+      if (e.id) existingMap.set(e.id.trim().toLowerCase(), e);
+    });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
     rawRows.forEach((row, rowIndex) => {
       const rowNum = rowIndex + 2; // +1 for 1-based index, +1 for header
-      const empData: any = {
-        isActive: true,
-        basicSalary: 25000,
-        allowances: 0,
-        deductions: 0,
-        hourlyRate: 150,
-        paymentMethod: 'Bank Transfer',
-        department: 'General',
-        designation: 'Staff',
-        joiningDate: new Date().toISOString().split('T')[0],
-        gender: 'Male',
-        employmentType: 'Fresher'
-      };
-
+      
+      // Step 1: Extract raw ID
       let rawId = '';
       let rawName = '';
 
-      // Extract values according to mappings
       Object.entries(columnMappings).forEach(([colIdxStr, fieldKey]) => {
         if (!fieldKey || fieldKey === 'skip') return;
-        const key = fieldKey as keyof Employee;
         const colIdx = parseInt(colIdxStr, 10);
         const rawVal = row[colIdx]?.trim() || '';
-
-        if (!rawVal) return; // Skip empty cells
-
-        const fieldDef = EMPLOYEE_FIELDS.find(f => f.key === key);
-        if (!fieldDef) return;
-
-        if (fieldDef.type === 'number') {
-          const cleaned = rawVal.replace(/[^0-9.]/g, '');
-          (empData as Record<string, any>)[key] = parseFloat(cleaned) || 0;
-        } else if (fieldDef.type === 'boolean') {
-          const lower = rawVal.toLowerCase();
-          (empData as Record<string, any>)[key] = !(lower === 'false' || lower === '0' || lower === 'no' || lower === 'inactive');
-        } else if (fieldDef.type === 'date') {
-          (empData as Record<string, any>)[key] = parseFlexibleDate(rawVal);
-        } else {
-          // String
-          if (key === 'mobileNo' && rawVal.includes('/')) {
-            // Handle dual phone numbers e.g. 9109090326/9131217791
-            const parts = rawVal.split('/').map(p => p.trim()).filter(Boolean);
-            empData.mobileNo = parts[0] || '';
-            if (parts[1] && !empData.personalMobileNo) {
-              empData.personalMobileNo = parts[1];
-            }
-          } else if (key === 'gender') {
-            const low = rawVal.toLowerCase();
-            empData.gender = low.includes('fem') ? 'Female' : low.includes('oth') ? 'Other' : 'Male';
-          } else if (key === 'paymentMethod') {
-            const low = rawVal.toLowerCase();
-            empData.paymentMethod = low.includes('cash') ? 'Cash' : low.includes('cheque') || low.includes('check') ? 'Cheque' : 'Bank Transfer';
-          } else {
-            (empData as Record<string, any>)[key] = rawVal;
-          }
-        }
-
-        if (key === 'id') rawId = rawVal;
-        if (key === 'name') rawName = rawVal;
+        if (fieldKey === 'id') rawId = rawVal;
+        if (fieldKey === 'name') rawName = rawVal;
       });
 
       if (!rawId) {
@@ -537,10 +514,110 @@ export default function EmployeeBulkImportModal({
         return;
       }
 
-      if (!rawName) {
-        errors.push(`Row #${rowNum} (ID: ${rawId}): Missing Full Name. Row was skipped.`);
+      const cleanId = rawId.trim().toLowerCase();
+      const existing = existingMap.get(cleanId);
+      const isExisting = !!existing;
+
+      // If new employee, name is mandatory
+      if (!isExisting && !rawName) {
+        errors.push(`Row #${rowNum} (New ID: ${rawId}): Missing Full Name for newly registered employee. Row was skipped.`);
         return;
       }
+
+      // Base employee object:
+      // If existing employee -> start from the existing complete record to preserve all unmapped data!
+      // If new employee -> start with comprehensive defaults
+      let empData: any = isExisting
+        ? { ...existing }
+        : {
+            id: rawId,
+            name: rawName || 'Employee',
+            isActive: true,
+            basicSalary: 25000,
+            allowances: 0,
+            deductions: 0,
+            hourlyRate: 150,
+            paymentMethod: 'Bank Transfer',
+            department: 'General',
+            designation: 'Staff',
+            joiningDate: todayStr,
+            gender: 'Male',
+            employmentType: 'Fresher'
+          };
+
+      const changes: { field: string; label: string; oldValue: any; newValue: any }[] = [];
+      let isSalaryModified = false;
+      const oldSalary = isExisting ? (existing?.basicSalary || 0) : 0;
+
+      // Extract values according to mappings and update empData
+      Object.entries(columnMappings).forEach(([colIdxStr, fieldKey]) => {
+        if (!fieldKey || fieldKey === 'skip') return;
+        const key = fieldKey as keyof Employee;
+        const colIdx = parseInt(colIdxStr, 10);
+        const rawVal = row[colIdx]?.trim() || '';
+
+        // If empty in CSV and existing employee, keep existing value!
+        if (rawVal === '') return;
+
+        const fieldDef = EMPLOYEE_FIELDS.find(f => f.key === key);
+        if (!fieldDef) return;
+
+        const prevVal = isExisting ? (existing as any)[key] : undefined;
+        let finalVal: any = rawVal;
+
+        if (fieldDef.type === 'number') {
+          const cleaned = rawVal.replace(/[^0-9.]/g, '');
+          finalVal = parseFloat(cleaned) || 0;
+          (empData as Record<string, any>)[key] = finalVal;
+        } else if (fieldDef.type === 'boolean') {
+          const lower = rawVal.toLowerCase();
+          finalVal = !(lower === 'false' || lower === '0' || lower === 'no' || lower === 'inactive');
+          (empData as Record<string, any>)[key] = finalVal;
+        } else if (fieldDef.type === 'date') {
+          finalVal = parseFlexibleDate(rawVal);
+          (empData as Record<string, any>)[key] = finalVal;
+        } else {
+          // String
+          if (key === 'mobileNo' && rawVal.includes('/')) {
+            // Handle dual phone numbers e.g. 9109090326/9131217791
+            const parts = rawVal.split('/').map(p => p.trim()).filter(Boolean);
+            finalVal = parts[0] || '';
+            empData.mobileNo = finalVal;
+            if (parts[1] && !empData.personalMobileNo) {
+              empData.personalMobileNo = parts[1];
+            }
+          } else if (key === 'gender') {
+            const low = rawVal.toLowerCase();
+            finalVal = low.includes('fem') ? 'Female' : low.includes('oth') ? 'Other' : 'Male';
+            empData.gender = finalVal;
+          } else if (key === 'paymentMethod') {
+            const low = rawVal.toLowerCase();
+            finalVal = low.includes('cash') ? 'Cash' : low.includes('cheque') || low.includes('check') ? 'Cheque' : 'Bank Transfer';
+            empData.paymentMethod = finalVal;
+          } else {
+            finalVal = rawVal;
+            (empData as Record<string, any>)[key] = finalVal;
+          }
+        }
+
+        // Track difference for existing employees
+        if (isExisting && prevVal !== finalVal && prevVal !== undefined) {
+          changes.push({
+            field: key,
+            label: fieldDef.label,
+            oldValue: prevVal,
+            newValue: finalVal
+          });
+
+          if (key === 'basicSalary') {
+            isSalaryModified = true;
+          }
+        }
+      });
+
+      // ID and Name fallback guarantees
+      if (rawId) empData.id = rawId;
+      if (rawName) empData.name = rawName;
 
       // Auto compute first/last name if not provided
       if (!empData.firstName && empData.name) {
@@ -559,10 +636,38 @@ export default function EmployeeBulkImportModal({
         empData.bankAccountHolderName = empData.name;
       }
 
-      emps.push(empData as Employee);
+      // If salary modified on an existing employee, attach SalaryIncrement history
+      const newSalary = Number(empData.basicSalary) || 0;
+      if (isExisting && isSalaryModified && newSalary !== oldSalary && newSalary > 0) {
+        const currentIncrements = Array.isArray(empData.increments) ? [...empData.increments] : [];
+        const newInc: SalaryIncrement = {
+          id: String(Date.now() + Math.floor(Math.random() * 1000)),
+          date: todayStr,
+          amount: newSalary - oldSalary,
+          previousSalary: oldSalary,
+          newSalary: newSalary,
+          remarks: 'CSV Bulk Salary Revision'
+        };
+        empData.increments = [newInc, ...currentIncrements];
+      }
+
+      const finalEmp = empData as Employee;
+      emps.push(finalEmp);
+
+      metaList.push({
+        employee: finalEmp,
+        isExisting,
+        isNew: !isExisting,
+        changes,
+        isSalaryModified,
+        oldSalary,
+        newSalary,
+        salaryDiff: isSalaryModified ? newSalary - oldSalary : 0
+      });
     });
 
     setParsedEmployees(emps);
+    setParsedRowsMeta(metaList);
     setParsingErrors(errors);
     setParsingWarnings(warnings);
     return true;
@@ -608,6 +713,47 @@ export default function EmployeeBulkImportModal({
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", `HRMS_Employee_Import_Template.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Download pre-filled salary revision & bulk update CSV with all active employees
+  const downloadBulkSalaryRevisionTemplate = () => {
+    const activeExisting = existingEmployees.filter(e => e.isActive !== false);
+    const headers = [
+      'Employee ID *',
+      'Full Name *',
+      'Department',
+      'Designation / Role',
+      'Branch / Location',
+      'Basic Salary (Monthly)',
+      'Allowances (Monthly)',
+      'Deductions (Monthly)',
+      'Work Timing / Shift',
+      'Bank Account Number',
+      'IFSC Code'
+    ];
+
+    const rows = activeExisting.map(emp => [
+      `"${emp.id}"`,
+      `"${emp.name}"`,
+      `"${emp.department || ''}"`,
+      `"${emp.designation || ''}"`,
+      `"${emp.branch || ''}"`,
+      emp.basicSalary || 0,
+      emp.allowances || 0,
+      emp.deductions || 0,
+      `"${emp.workTiming || ''}"`,
+      `"${emp.bankAccountNo || ''}"`,
+      `"${emp.ifscCode || ''}"`
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `HRMS_Bulk_Salary_Revision_Template_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -740,6 +886,15 @@ export default function EmployeeBulkImportModal({
           <div className="hidden sm:flex items-center gap-2">
             <button
               type="button"
+              onClick={downloadBulkSalaryRevisionTemplate}
+              title="Download pre-filled CSV with existing active employee IDs & salaries for instant revision"
+              className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg shadow-xxs cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-600" />
+              <span>Salary Revision Template</span>
+            </button>
+            <button
+              type="button"
               onClick={exportExistingEmployees}
               className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg shadow-xxs cursor-pointer"
             >
@@ -752,7 +907,7 @@ export default function EmployeeBulkImportModal({
               className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Sample Template</span>
+              <span>Full Template</span>
             </button>
           </div>
         </div>
@@ -764,27 +919,72 @@ export default function EmployeeBulkImportModal({
           {currentStep === 1 && (
             <div className="space-y-5 animate-in fade-in duration-150">
               
-              {/* Instructions banner */}
-              <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
-                <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                  <span>Smart CSV Import with Flexible Columns & Date Parsing</span>
+              {/* Dual Mode Action Banner */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Mode A: Live Interactive Editor */}
+                <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-2xl shadow-xs flex flex-col justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-emerald-950 font-bold text-sm">
+                      <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
+                      <span>Option 1: Live Interactive Bulk Editor (No CSV Needed)</span>
+                    </div>
+                    <p className="text-xs text-emerald-800 leading-relaxed">
+                      Edit salaries, designations, departments & shifts directly in an interactive spreadsheet table with instant <strong>+10% hike</strong> or <strong>custom batch updates</strong>.
+                    </p>
+                  </div>
+                  {onOpenLiveEditor && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenLiveEditor();
+                      }}
+                      className="w-full py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Open Interactive Bulk Editor ➔</span>
+                    </button>
+                  )}
                 </div>
-                <p className="text-xs text-blue-800 leading-relaxed">
-                  Upload your employee list in CSV format. Any custom column names, date styles (e.g. <code className="bg-blue-100 px-1 py-0.5 rounded font-mono text-[11px]">1/5/2015</code>, <code className="bg-blue-100 px-1 py-0.5 rounded font-mono text-[11px]">18-Nov-94</code>, <code className="bg-blue-100 px-1 py-0.5 rounded font-mono text-[11px]">25/11/2024</code>), and phone numbers will be automatically analyzed. On the next screen, you can choose exactly which headings to include and skip blank columns.
-                </p>
-                <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-600 font-medium">
-                  <span className="flex items-center gap-1 text-emerald-700 font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Auto-ignores empty columns
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1 text-emerald-700 font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Multi-phone separator support (e.g. 9109090326/9131217791)
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1 text-emerald-700 font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Converts Day-Month-Year dates into standard ISO
-                  </span>
+
+                {/* Mode B: CSV Bulk Update / New Employees */}
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-2xl shadow-xs flex flex-col justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-blue-950 font-bold text-sm">
+                      <Download className="w-4 h-4 text-blue-600" />
+                      <span>Option 2: CSV Salary Revision & Update</span>
+                    </div>
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      Download pre-filled template with existing employee IDs, edit in Excel/Google Sheets, and upload below to auto-sync.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={downloadBulkSalaryRevisionTemplate}
+                    className="w-full py-2 px-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download Salary Revision CSV Template</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Instructions banner */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700">
+                <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <HelpCircle className="w-4 h-4 text-blue-600" />
+                  <span>How CSV Bulk Update Works:</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-600 pt-1">
+                  <div className="p-2 bg-white border border-slate-100 rounded-lg">
+                    <strong>1. Employee ID Match:</strong> Matches records automatically by Employee ID (e.g. RS001).
+                  </div>
+                  <div className="p-2 bg-white border border-slate-100 rounded-lg">
+                    <strong>2. Safe Merging:</strong> Only mapped columns get updated; unmapped profile info is kept safe.
+                  </div>
+                  <div className="p-2 bg-white border border-slate-100 rounded-lg">
+                    <strong>3. Salary History:</strong> Salary changes automatically log an increment audit entry.
+                  </div>
                 </div>
               </div>
 
@@ -1132,15 +1332,19 @@ export default function EmployeeBulkImportModal({
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2 font-bold text-amber-900">
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span>Mandatory Field Check:</span>
+                    <span>Mapping Check:</span>
                   </div>
                   <div className="flex items-center gap-3 text-[11px] text-amber-800">
                     <span className="flex items-center gap-1 font-semibold">
-                      Employee ID: {Object.values(columnMappings).includes('id') ? <span className="text-emerald-700 font-bold">✓ Mapped</span> : <span className="text-rose-700 font-bold">✗ Not Mapped</span>}
+                      Employee ID *: {Object.values(columnMappings).includes('id') ? <span className="text-emerald-700 font-bold">✓ Mapped</span> : <span className="text-rose-700 font-bold">✗ Required</span>}
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1 font-semibold">
-                      Full Name: {Object.values(columnMappings).includes('name') ? <span className="text-emerald-700 font-bold">✓ Mapped</span> : <span className="text-rose-700 font-bold">✗ Not Mapped</span>}
+                      Full Name: {Object.values(columnMappings).includes('name') ? <span className="text-emerald-700 font-bold">✓ Mapped</span> : <span className="text-gray-600 font-medium">(Auto-kept for existing)</span>}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 font-semibold">
+                      Salary: {Object.values(columnMappings).includes('basicSalary') ? <span className="text-blue-700 font-bold">✓ Mapped for Revision</span> : <span className="text-gray-500">Unmapped</span>}
                     </span>
                   </div>
                 </div>
@@ -1148,7 +1352,7 @@ export default function EmployeeBulkImportModal({
                 <button
                   type="button"
                   onClick={handleProceedToPreview}
-                  disabled={!Object.values(columnMappings).includes('id') || !Object.values(columnMappings).includes('name')}
+                  disabled={!Object.values(columnMappings).includes('id')}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <span>Preview Parsed Data ➔</span>
@@ -1162,26 +1366,38 @@ export default function EmployeeBulkImportModal({
           {currentStep === 3 && (
             <div className="space-y-4 animate-in fade-in duration-150">
               
-              {/* Summary Banner */}
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                    <span>Ready to import {parsedEmployees.length} employees</span>
-                  </div>
-                  <p className="text-xs text-emerald-800">
-                    Dates have been converted to standard format, multi-phone numbers separated, and default values applied.
-                  </p>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total in File</div>
+                  <div className="text-xl font-bold text-gray-900 mt-0.5">{parsedEmployees.length}</div>
+                  <div className="text-[10px] text-gray-500">Rows processed</div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep(2)}
-                    className="px-3 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
-                  >
-                    ← Adjust Headings
-                  </button>
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                  <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">Profile Updates</div>
+                  <div className="text-xl font-bold text-blue-900 mt-0.5">
+                    {parsedRowsMeta.filter(m => m.isExisting && m.changes.length > 0).length}
+                  </div>
+                  <div className="text-[10px] text-blue-600">Existing records modified</div>
+                </div>
+
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Salary Revisions</div>
+                  <div className="text-xl font-bold text-amber-900 mt-0.5">
+                    {parsedRowsMeta.filter(m => m.isSalaryModified).length}
+                  </div>
+                  <div className="text-[10px] text-amber-700 font-semibold">
+                    Net Impact: {parsedRowsMeta.reduce((acc, m) => acc + (m.salaryDiff || 0), 0) >= 0 ? '+' : ''}₹{parsedRowsMeta.reduce((acc, m) => acc + (m.salaryDiff || 0), 0).toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">New Employees</div>
+                  <div className="text-xl font-bold text-emerald-900 mt-0.5">
+                    {parsedRowsMeta.filter(m => m.isNew).length}
+                  </div>
+                  <div className="text-[10px] text-emerald-600">New IDs added</div>
                 </div>
               </div>
 
@@ -1200,15 +1416,55 @@ export default function EmployeeBulkImportModal({
                 </div>
               )}
 
-              {/* Parsed Data Preview Table */}
+              {/* Filter Tabs and Data Table Preview */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    Parsed Employee Table Preview ({parsedEmployees.length} Records)
-                  </h4>
-                  <div className="text-xs text-gray-500 font-medium">
-                    Showing all fields formatted for HRMS database
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-lg text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFilter('all')}
+                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                        previewFilter === 'all' ? 'bg-white text-gray-900 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      All ({parsedRowsMeta.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFilter('salary_changed')}
+                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                        previewFilter === 'salary_changed' ? 'bg-amber-500 text-white font-bold shadow-2xs' : 'text-amber-800 hover:text-amber-950'
+                      }`}
+                    >
+                      💰 Salary Revisions ({parsedRowsMeta.filter(m => m.isSalaryModified).length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFilter('updated')}
+                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                        previewFilter === 'updated' ? 'bg-blue-600 text-white font-bold shadow-2xs' : 'text-blue-700 hover:text-blue-900'
+                      }`}
+                    >
+                      🔄 Profile Updates ({parsedRowsMeta.filter(m => m.isExisting && m.changes.length > 0).length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFilter('new')}
+                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                        previewFilter === 'new' ? 'bg-emerald-600 text-white font-bold shadow-2xs' : 'text-emerald-700 hover:text-emerald-900'
+                      }`}
+                    >
+                      🆕 New ({parsedRowsMeta.filter(m => m.isNew).length})
+                    </button>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(2)}
+                    className="px-3 py-1 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                  >
+                    ← Adjust Headings
+                  </button>
                 </div>
 
                 <div className="border border-gray-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto shadow-2xs">
@@ -1217,42 +1473,91 @@ export default function EmployeeBulkImportModal({
                       <tr>
                         <th className="py-2 px-3">ID</th>
                         <th className="py-2 px-3">Full Name</th>
+                        <th className="py-2 px-3">Action Status</th>
+                        <th className="py-2 px-3 text-right">Basic Salary</th>
                         <th className="py-2 px-3">Department</th>
                         <th className="py-2 px-3">Designation</th>
-                        <th className="py-2 px-3">Joining Date</th>
-                        <th className="py-2 px-3">DOB</th>
-                        <th className="py-2 px-3 text-right">Basic Salary</th>
-                        <th className="py-2 px-3">Payment</th>
+                        <th className="py-2 px-3">Branch</th>
                         <th className="py-2 px-3">Mobile No</th>
-                        <th className="py-2 px-3">Branch / Cost Center</th>
-                        <th className="py-2 px-3">Work Shift</th>
+                        <th className="py-2 px-3">Changes Detected</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white font-medium">
-                      {parsedEmployees.map((emp, idx) => (
-                        <tr key={emp.id || idx} className="hover:bg-slate-50">
-                          <td className="py-2 px-3 font-mono font-bold text-blue-700">{emp.id}</td>
-                          <td className="py-2 px-3 font-bold text-gray-900">{emp.name}</td>
-                          <td className="py-2 px-3 text-gray-600">{emp.department || '-'}</td>
-                          <td className="py-2 px-3 text-gray-600">{emp.designation || '-'}</td>
-                          <td className="py-2 px-3 font-mono text-gray-600 text-[11px]">{emp.joiningDate || '-'}</td>
-                          <td className="py-2 px-3 font-mono text-gray-600 text-[11px]">{emp.dob || '-'}</td>
-                          <td className="py-2 px-3 text-right font-mono font-bold text-gray-900">
-                            ₹{emp.basicSalary.toLocaleString('en-IN')}
-                          </td>
-                          <td className="py-2 px-3 text-gray-600">{emp.paymentMethod}</td>
-                          <td className="py-2 px-3 font-mono text-gray-600 text-[11px]">
-                            {emp.mobileNo || '-'}
-                            {emp.personalMobileNo && <span className="block text-[10px] text-gray-400">Alt: {emp.personalMobileNo}</span>}
-                          </td>
-                          <td className="py-2 px-3 text-gray-600 text-[11px]">
-                            {emp.branch || '-'} {emp.costCenter ? `(${emp.costCenter})` : ''}
-                          </td>
-                          <td className="py-2 px-3 text-gray-600 text-[11px] max-w-[140px] truncate" title={emp.workTiming}>
-                            {emp.workTiming || '-'}
-                          </td>
-                        </tr>
-                      ))}
+                      {parsedRowsMeta
+                        .filter(meta => {
+                          if (previewFilter === 'salary_changed') return meta.isSalaryModified;
+                          if (previewFilter === 'updated') return meta.isExisting && meta.changes.length > 0;
+                          if (previewFilter === 'new') return meta.isNew;
+                          return true;
+                        })
+                        .map((meta, idx) => {
+                          const emp = meta.employee;
+                          return (
+                            <tr key={emp.id || idx} className="hover:bg-slate-50">
+                              <td className="py-2 px-3 font-mono font-bold text-blue-700">{emp.id}</td>
+                              <td className="py-2 px-3 font-bold text-gray-900">{emp.name}</td>
+                              <td className="py-2 px-3">
+                                {meta.isNew ? (
+                                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px]">
+                                    🆕 New Employee
+                                  </span>
+                                ) : meta.isSalaryModified ? (
+                                  <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-full font-bold text-[10px]">
+                                    💰 Salary Revision
+                                  </span>
+                                ) : meta.changes.length > 0 ? (
+                                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold text-[10px]">
+                                    🔄 {meta.changes.length} Updated
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-semibold text-[10px]">
+                                    ⏸️ Unchanged
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono">
+                                {meta.isSalaryModified ? (
+                                  <div>
+                                    <span className="line-through text-gray-400 text-[10px] mr-1">
+                                      ₹{meta.oldSalary.toLocaleString('en-IN')}
+                                    </span>
+                                    <span className="font-bold text-emerald-700">
+                                      ₹{emp.basicSalary.toLocaleString('en-IN')}
+                                    </span>
+                                    <span className="block text-[10px] font-bold text-emerald-600">
+                                      ({meta.salaryDiff >= 0 ? '+' : ''}₹{meta.salaryDiff.toLocaleString('en-IN')})
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="font-bold text-gray-900">
+                                    ₹{emp.basicSalary.toLocaleString('en-IN')}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-gray-700">{emp.department || '-'}</td>
+                              <td className="py-2 px-3 text-gray-700">{emp.designation || '-'}</td>
+                              <td className="py-2 px-3 text-gray-700">{emp.branch || '-'}</td>
+                              <td className="py-2 px-3 font-mono text-gray-600 text-[11px]">
+                                {emp.mobileNo || '-'}
+                              </td>
+                              <td className="py-2 px-3 text-[11px]">
+                                {meta.changes.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1 max-w-xs">
+                                    {meta.changes.map((ch, i) => (
+                                      <span key={i} className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded text-[10px]">
+                                        {ch.label}: <strong className="text-gray-900">{String(ch.newValue)}</strong>
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : meta.isNew ? (
+                                  <span className="text-gray-400 italic text-[10px]">New Record</span>
+                                ) : (
+                                  <span className="text-gray-400 text-[10px]">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>

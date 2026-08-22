@@ -5,6 +5,7 @@ import { Employee, Attendance, PayrollRecord, OneTimeDeduction, AdminSettings, g
 import { WhatsAppModal } from './WhatsAppModal';
 import { parseGoogleDriveImageUrl } from '../utils/driveUtils';
 import MasterAttendanceSalarySheetModal from './MasterAttendanceSalarySheetModal';
+import SearchableEmployeeSelect from './SearchableEmployeeSelect';
 
 interface PayrollCalculatorProps {
   employees: Employee[];
@@ -2362,22 +2363,15 @@ export default function PayrollCalculator({ employees, attendanceRecords, payrol
               </h3>
 
               <form onSubmit={handleAddDeductionPlan} className="space-y-4 font-sans">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Select Employee</label>
-                  <select
-                    value={newDeductEmpId}
-                    onChange={(e) => setNewDeductEmpId(e.target.value)}
-                    required
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-[#03623c] bg-white cursor-pointer"
-                  >
-                    <option value="">-- Choose Employee --</option>
-                    {employees.filter(emp => emp.isActive !== false).map(emp => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.id}) - {emp.designation}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableEmployeeSelect
+                  label="Select Employee"
+                  required
+                  value={newDeductEmpId}
+                  employees={employees}
+                  onlyActive={true}
+                  placeholder="Search employee by name, ID (e.g. RS001)..."
+                  onChange={(empId) => setNewDeductEmpId(empId)}
+                />
 
                 <div className="space-y-1">
                   <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Deduction Type</label>

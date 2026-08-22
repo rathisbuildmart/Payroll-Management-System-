@@ -38,6 +38,7 @@ import {
   Clock,
   UserCheck,
   PhoneCall,
+  Search,
   Monitor,
   Sun,
   Moon,
@@ -145,7 +146,7 @@ import Dashboard from './components/Dashboard';
 import EmployeeList from './components/EmployeeList';
 import AttendanceTracker from './components/AttendanceTracker';
 import PayrollCalculator from './components/PayrollCalculator';
-import Settings, { INITIAL_ADMIN_SETTINGS, DEFAULT_ROLE_PERMISSIONS } from './components/Settings';
+import Settings, { INITIAL_ADMIN_SETTINGS, DEFAULT_ROLE_PERMISSIONS, mergeFieldsWithDefaults } from './components/Settings';
 import EmployeePortal from './components/EmployeePortal';
 import LeavesHolidays from './components/LeavesHolidays';
 import EmployeeLedger from './components/EmployeeLedger';
@@ -157,6 +158,7 @@ import HiringOnboarding from './components/HiringOnboarding';
 import EmployeeLifecycleModule from './components/EmployeeLifecycleModule';
 import ExitManagementModule from './components/ExitManagementModule';
 import AssetManagementModule from './components/AssetManagementModule';
+import GlobalQuickSearchModal from './components/GlobalQuickSearchModal';
 import { useModalBackHandler } from './utils/useHistoryBackHandler';
 
 //PortalUser imported from ./types
@@ -922,10 +924,24 @@ export default function App() {
   } | null>(null);
 
   const [showPendingAlertModal, setShowPendingAlertModal] = useState<boolean>(false);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState<boolean>(false);
+
+  // Global Keyboard Shortcut listener (Ctrl+K or Cmd+K) for instant Global Search
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsGlobalSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   //Register Back-Button Handlers for Modals and Mobile Sidebar Drawers
   useModalBackHandler(isMobileMenuOpen, () => setIsMobileMenuOpen(false), 'mobile-menu');
   useModalBackHandler(showPendingAlertModal, () => setShowPendingAlertModal(false), 'pending-alert-modal');
+  useModalBackHandler(isGlobalSearchOpen, () => setIsGlobalSearchOpen(false), 'global-search-modal');
   useModalBackHandler(!!confirmDialog?.isOpen, () => setConfirmDialog(null), 'confirm-dialog');
 
   useEffect(() => {
@@ -952,7 +968,12 @@ export default function App() {
     const saved = localStorage.getItem('payroll_admin_settings');
     if (saved) {
       try {
-        return { ...INITIAL_ADMIN_SETTINGS, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        return {
+          ...INITIAL_ADMIN_SETTINGS,
+          ...parsed,
+          fields: mergeFieldsWithDefaults(parsed.fields)
+        };
       } catch (e) {
         console.error('Failed to parse admin settings', e);
       }
@@ -1037,6 +1058,7 @@ export default function App() {
           if (globalData.adminSettings) {
             setAdminSettings(prev => {
               const merged = { ...INITIAL_ADMIN_SETTINGS, ...prev, ...globalData.adminSettings };
+              merged.fields = mergeFieldsWithDefaults(merged.fields);
               localStorage.setItem('payroll_admin_settings', JSON.stringify(merged));
               return merged;
             });
@@ -1288,6 +1310,7 @@ export default function App() {
         const fetchedSettings = await fetchAdminSettings(sheetId, accessToken);
         if (fetchedSettings) {
           activeSettings = { ...INITIAL_ADMIN_SETTINGS, ...adminSettings, ...fetchedSettings };
+          activeSettings.fields = mergeFieldsWithDefaults(activeSettings.fields);
           setAdminSettings(activeSettings);
           localStorage.setItem('payroll_admin_settings', JSON.stringify(activeSettings));
           //Ensure all 52 setting keys (SMTP, Rules, Roles, Automation) are populated in Google Sheets
@@ -1872,7 +1895,15 @@ export default function App() {
       .catch(e => console.warn('Could not dispatch welcome email:', e));
     }
 
-    const updated = [...employees, newEmp];
+    const updated = [...employees];
+    const existingIdx = updated.findIndex(
+      emp => emp.id.trim().toLowerCase() === newEmp.id.trim().toLowerCase()
+    );
+    if (existingIdx > -1) {
+      updated[existingIdx] = newEmp;
+    } else {
+      updated.push(newEmp);
+    }
     setEmployees(updated);
     setIsDataModified(true);
     if (!spreadsheetId || !token) {
@@ -5394,8 +5425,24 @@ export default function App() {
           </div>
 
           {/* Controls Area */}
-          <div className="flex items-center gap-3 relative">
+          <div className="flex items-center gap-2.5 sm:gap-3 relative">
             
+            {/* Global Quick Search Button (Ctrl + K) */}
+            <button
+              onClick={() => setIsGlobalSearchOpen(true)}
+              className="flex items-center gap-2 px-2.5 sm:px-3 py-1 bg-slate-100 hover:bg-slate-200/90 dark:bg-[#162c22] dark:hover:bg-[#1e3e31] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#254637] rounded-xl text-xs font-semibold shadow-3xs transition-all cursor-pointer group active:scale-95"
+              title="Global Quick Search (Ctrl+K)"
+              id="btn-global-quick-search"
+            >
+              <Search className="w-3.5 h-3.5 text-[#03623c] dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                Quick Search...
+              </span>
+              <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-mono font-black text-slate-500 dark:text-emerald-300 bg-white dark:bg-[#11221b] border border-slate-200 dark:border-[#254637] rounded-md shadow-xxs">
+                Ctrl K
+              </kbd>
+            </button>
+
             {/* Super Admin Role Switcher Dropdown - ONLY Visible to Super Admin */}
             {(portalUser?.isPrimarySuperAdmin || portalUser?.role === 'super_admin' || portalUser?.id === 'admin') && (
               <div className="relative inline-flex items-center">
@@ -6221,6 +6268,22 @@ export default function App() {
           language={language}
           companyName={adminSettings.companyName} />
       )}
+
+      {/* Global Quick Search Spotlight Modal (Ctrl+K) */}
+      <GlobalQuickSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        employees={employees}
+        onNavigateTab={(tab) => {
+          navigateToTab(tab as any);
+        }}
+        onSelectEmployee={(emp) => {
+          navigateToTab('employees');
+        }}
+        onOpenEmployeeLedger={(emp) => {
+          navigateToTab('ledger');
+        }}
+      />
 
     </div>
   );

@@ -61,7 +61,7 @@ import {
   CreditCard,
   FileCheck
 } from 'lucide-react';
-import { AdminSettings, FieldSetting, FailedLoginAttempt, UserRoleAccount, AuditLog, TransactionalEmailLog, CustomRole } from '../types';
+import { AdminSettings, FieldSetting, JobOpeningFieldSetting, JobPosting, FailedLoginAttempt, UserRoleAccount, AuditLog, TransactionalEmailLog, CustomRole, Employee } from '../types';
 import AdminWelcomeModal from './AdminWelcomeModal';
 import { getCostCenterPrefix } from '../utils/costCenterUtils';
 import TransactionalEmailHistory from './TransactionalEmailHistory';
@@ -120,64 +120,148 @@ interface SettingsProps {
 }
 
 export const DEFAULT_FIELDS_CONFIG: FieldSetting[] = [
-  //Employee Detail
-  { id: 'firstName', label: 'First Name', group: 'detail', isHidden: false, isMandatory: true },
+  // 1. Employee Detail / Basic Profile
+  { id: 'id', label: 'Employee ID', group: 'detail', isHidden: false, isMandatory: true },
+  { id: 'name', label: 'Full Name', group: 'detail', isHidden: false, isMandatory: true },
+  { id: 'firstName', label: 'First Name', group: 'detail', isHidden: false, isMandatory: false },
   { id: 'lastName', label: 'Last Name', group: 'detail', isHidden: false, isMandatory: false },
-  { id: 'email', label: 'Email', group: 'detail', isHidden: false, isMandatory: true },
-  { id: 'mobileNo', label: 'Mobile No.', group: 'detail', isHidden: false, isMandatory: false },
+  { id: 'email', label: 'Official Email', group: 'detail', isHidden: false, isMandatory: true },
+  { id: 'mobileNo', label: 'Official Mobile No.', group: 'detail', isHidden: false, isMandatory: false },
   { id: 'personalMobileNo', label: 'Personal Mobile No.', group: 'detail', isHidden: false, isMandatory: false },
   { id: 'personalEmail', label: 'Personal Email', group: 'detail', isHidden: false, isMandatory: false },
   { id: 'dob', label: 'Date of Birth', group: 'detail', isHidden: false, isMandatory: false },
   { id: 'bloodGroup', label: 'Blood Group', group: 'detail', isHidden: false, isMandatory: false },
   { id: 'emergencyContactNo', label: 'Emergency Contact No.', group: 'detail', isHidden: false, isMandatory: false },
-  { id: 'ctcOffered', label: 'CTC Offered', group: 'detail', isHidden: false, isMandatory: false },
+  { id: 'ctcOffered', label: 'CTC Offered (₹)', group: 'detail', isHidden: false, isMandatory: false },
   { id: 'gender', label: 'Gender', group: 'detail', isHidden: false, isMandatory: true },
   { id: 'employmentType', label: 'Employment Type', group: 'detail', isHidden: false, isMandatory: false },
   { id: 'linkUser', label: 'Link User', group: 'detail', isHidden: true, isMandatory: false },
   { id: 'probationDate', label: 'Probation Date', group: 'detail', isHidden: false, isMandatory: false },
 
-  //Residential Address
+  // 2. Residential Address
   { id: 'resLine1', label: 'Residential Line 1', group: 'residential', isHidden: false, isMandatory: false },
   { id: 'resLine2', label: 'Residential Line 2', group: 'residential', isHidden: false, isMandatory: false },
-  { id: 'resCountry', label: 'Residential Country', group: 'residential', isHidden: false, isMandatory: false },
-  { id: 'resState', label: 'Residential State', group: 'residential', isHidden: false, isMandatory: false },
   { id: 'resCity', label: 'Residential City', group: 'residential', isHidden: false, isMandatory: false },
+  { id: 'resState', label: 'Residential State', group: 'residential', isHidden: false, isMandatory: false },
+  { id: 'resCountry', label: 'Residential Country', group: 'residential', isHidden: false, isMandatory: false },
   { id: 'resPinCode', label: 'Residential PIN/ZIP Code', group: 'residential', isHidden: false, isMandatory: false },
 
-  //Permanent Address
+  // 3. Permanent Address
   { id: 'permLine1', label: 'Permanent Line 1', group: 'permanent', isHidden: false, isMandatory: false },
   { id: 'permLine2', label: 'Permanent Line 2', group: 'permanent', isHidden: false, isMandatory: false },
-  { id: 'permCountry', label: 'Permanent Country', group: 'permanent', isHidden: false, isMandatory: false },
-  { id: 'permState', label: 'Permanent State', group: 'permanent', isHidden: false, isMandatory: false },
   { id: 'permCity', label: 'Permanent City', group: 'permanent', isHidden: false, isMandatory: false },
+  { id: 'permState', label: 'Permanent State', group: 'permanent', isHidden: false, isMandatory: false },
+  { id: 'permCountry', label: 'Permanent Country', group: 'permanent', isHidden: false, isMandatory: false },
   { id: 'permPinCode', label: 'Permanent PIN/ZIP Code', group: 'permanent', isHidden: false, isMandatory: false },
 
-  //Bank Detail
+  // 4. Bank Detail
   { id: 'bankAccountNo', label: 'Bank Account No.', group: 'bank', isHidden: false, isMandatory: false },
-  { id: 'bankAccountHolderName', label: 'Bank Account Holder name', group: 'bank', isHidden: false, isMandatory: false },
+  { id: 'bankAccountHolderName', label: 'Bank Account Holder Name', group: 'bank', isHidden: false, isMandatory: false },
   { id: 'bankName', label: 'Bank Name', group: 'bank', isHidden: false, isMandatory: false },
-  { id: 'ifscCode', label: 'IFSC code', group: 'bank', isHidden: false, isMandatory: false },
+  { id: 'ifscCode', label: 'IFSC Code', group: 'bank', isHidden: false, isMandatory: false },
 
-  //Other Detail
-  { id: 'panNo', label: 'PAN No.', group: 'other', isHidden: false, isMandatory: false },
+  // 5. Other Detail / Statutory Tax IDs
+  { id: 'panNo', label: 'PAN Card No.', group: 'other', isHidden: false, isMandatory: false },
   { id: 'pfAccountNo', label: 'PF Account No.', group: 'other', isHidden: false, isMandatory: false },
-  { id: 'esicNo', label: 'ESIC No.', group: 'other', isHidden: false, isMandatory: false },
-  { id: 'aadhaarNo', label: 'Aadhaar No.', group: 'other', isHidden: false, isMandatory: false },
-  { id: 'uan', label: 'UAN', group: 'other', isHidden: false, isMandatory: false },
+  { id: 'esicNo', label: 'ESIC Insurance No.', group: 'other', isHidden: false, isMandatory: false },
+  { id: 'aadhaarNo', label: 'Aadhaar Card No.', group: 'other', isHidden: false, isMandatory: false },
+  { id: 'uan', label: 'Universal Account Number (UAN)', group: 'other', isHidden: false, isMandatory: false },
 
-  //Employment Detail
+  // 6. Employment Detail
+  { id: 'photoUrl', label: 'Profile Photo (Drive URL)', group: 'employment', isHidden: false, isMandatory: false },
+  { id: 'joiningDate', label: 'Joining Date', group: 'employment', isHidden: false, isMandatory: true },
   { id: 'confirmationDate', label: 'Confirmation Date', group: 'employment', isHidden: false, isMandatory: false },
-  { id: 'branch', label: 'Branch', group: 'employment', isHidden: false, isMandatory: false },
+  { id: 'designation', label: 'Designation / Role', group: 'employment', isHidden: false, isMandatory: true },
+  { id: 'department', label: 'Department', group: 'employment', isHidden: false, isMandatory: true },
+  { id: 'branch', label: 'Branch Location', group: 'employment', isHidden: false, isMandatory: false },
   { id: 'costCenter', label: 'Cost Center', group: 'employment', isHidden: false, isMandatory: false },
-  { id: 'reportingTo', label: 'Reporting To', group: 'employment', isHidden: false, isMandatory: false },
+  { id: 'reportingTo', label: 'Reporting To (Manager)', group: 'employment', isHidden: false, isMandatory: false },
   { id: 'noticePeriod', label: 'Notice Period', group: 'employment', isHidden: false, isMandatory: false },
-  { id: 'workTiming', label: 'Work Timing', group: 'employment', isHidden: false, isMandatory: false },
-  { id: 'employeeGroup', label: 'Employee group', group: 'employment', isHidden: false, isMandatory: false },
+  { id: 'workTiming', label: 'Work Timing / Shift', group: 'employment', isHidden: false, isMandatory: false },
+  { id: 'employeeGroup', label: 'Employee Group', group: 'employment', isHidden: false, isMandatory: false },
   { id: 'weeklyOffProfile', label: 'Weekly Off Profile', group: 'employment', isHidden: false, isMandatory: false },
-  { id: 'leaveType', label: 'Leave Type', group: 'employment', isHidden: false, isMandatory: false },
-  { id: 'referenceNumber', label: 'Reference Number', group: 'employment', isHidden: false, isMandatory: false },
-  { id: 'photoUrl', label: 'Profile Photo', group: 'employment', isHidden: false, isMandatory: false },
+  { id: 'leaveType', label: 'Leave Type Policy', group: 'employment', isHidden: false, isMandatory: false },
+  { id: 'referenceNumber', label: 'Reference Number / Emp Code', group: 'employment', isHidden: false, isMandatory: false },
+
+  // 7. Salary Structure & Payroll
+  { id: 'basicSalary', label: 'Basic Salary (₹)', group: 'salary', isHidden: false, isMandatory: true },
+  { id: 'allowances', label: 'Standard Allowances (₹)', group: 'salary', isHidden: false, isMandatory: false },
+  { id: 'deductions', label: 'Standard Deductions (₹)', group: 'salary', isHidden: false, isMandatory: false },
+  { id: 'hourlyRate', label: 'Overtime Hourly Rate (₹)', group: 'salary', isHidden: false, isMandatory: false },
+  { id: 'paymentMethod', label: 'Payment Method', group: 'salary', isHidden: false, isMandatory: true },
+
+  // 8. Advanced Allowances
+  { id: 'hra', label: 'House Rent (HRA) (₹)', group: 'advanced_allowances', isHidden: false, isMandatory: false },
+  { id: 'da', label: 'Dearness (DA) (₹)', group: 'advanced_allowances', isHidden: false, isMandatory: false },
+  { id: 'conveyanceAllowance', label: 'Conveyance Allowance (₹)', group: 'advanced_allowances', isHidden: false, isMandatory: false },
+
+  // 9. Advance & Loan
+  { id: 'advanceSalaryBalance', label: 'Advance Outstanding (₹)', group: 'loan', isHidden: false, isMandatory: false },
+  { id: 'advanceSalaryDeduction', label: 'Monthly EMI / Deduct (₹)', group: 'loan', isHidden: false, isMandatory: false },
+
+  // 10. Leaves Balance
+  { id: 'clBalance', label: 'CL Balance (Casual Leave)', group: 'leaves', isHidden: false, isMandatory: false },
+  { id: 'elBalance', label: 'EL Balance (Earned Leave)', group: 'leaves', isHidden: false, isMandatory: false },
 ];
+
+export const mergeFieldsWithDefaults = (currentFields?: FieldSetting[]): FieldSetting[] => {
+  if (!currentFields || !Array.isArray(currentFields) || currentFields.length === 0) {
+    return DEFAULT_FIELDS_CONFIG;
+  }
+  const currentMap = new Map(currentFields.map(f => [f.id, f]));
+  return DEFAULT_FIELDS_CONFIG.map(defaultField => {
+    const existing = currentMap.get(defaultField.id);
+    if (existing) {
+      return {
+        ...defaultField,
+        label: existing.label || defaultField.label,
+        isHidden: existing.isHidden !== undefined ? existing.isHidden : defaultField.isHidden,
+        isMandatory: existing.isMandatory !== undefined ? existing.isMandatory : defaultField.isMandatory,
+        group: defaultField.group, // ensure canonical grouping
+      };
+    }
+    return defaultField;
+  });
+};
+
+export const DEFAULT_JOB_OPENING_FIELDS: JobOpeningFieldSetting[] = [
+  { id: 'title', label: 'Job Designation Title', group: 'basic', isHidden: false, isMandatory: true },
+  { id: 'department', label: 'Department', group: 'basic', isHidden: false, isMandatory: false },
+  { id: 'location', label: 'Branch / Job Location', group: 'basic', isHidden: false, isMandatory: true },
+  { id: 'type', label: 'Job Type', group: 'details', isHidden: false, isMandatory: false },
+  { id: 'openings', label: 'No. of Openings', group: 'details', isHidden: false, isMandatory: true },
+  { id: 'urgency', label: 'Urgency Level', group: 'details', isHidden: false, isMandatory: false },
+  { id: 'targetCtcMin', label: 'Min Monthly Salary (₹)', group: 'compensation', isHidden: false, isMandatory: false },
+  { id: 'targetCtcMax', label: 'Max Monthly Salary (₹)', group: 'compensation', isHidden: false, isMandatory: false },
+  { id: 'directorName', label: 'Director Name', group: 'assignment', isHidden: false, isMandatory: false },
+  { id: 'targetDate', label: 'Target Closing Date', group: 'assignment', isHidden: false, isMandatory: false },
+  { id: 'hiringManager', label: 'Hiring Manager / HR Desk', group: 'assignment', isHidden: false, isMandatory: false },
+  { id: 'experienceLevel', label: 'Experience Level', group: 'details', isHidden: false, isMandatory: false },
+  { id: 'description', label: 'Description & Key Duties', group: 'details', isHidden: false, isMandatory: false },
+  { id: 'requirements', label: 'Requirements & Skills', group: 'details', isHidden: false, isMandatory: false },
+];
+
+export const mergeJobOpeningFieldsWithDefaults = (currentFields?: JobOpeningFieldSetting[]): JobOpeningFieldSetting[] => {
+  if (!currentFields || !Array.isArray(currentFields) || currentFields.length === 0) {
+    return DEFAULT_JOB_OPENING_FIELDS;
+  }
+  const currentMap = new Map(currentFields.map(f => [f.id, f]));
+  return DEFAULT_JOB_OPENING_FIELDS.map(defaultField => {
+    const existing = currentMap.get(defaultField.id);
+    if (existing) {
+      return {
+        ...defaultField,
+        label: existing.label || defaultField.label,
+        isHidden: existing.isHidden !== undefined ? existing.isHidden : defaultField.isHidden,
+        isMandatory: existing.isMandatory !== undefined ? existing.isMandatory : defaultField.isMandatory,
+        group: defaultField.group,
+      };
+    }
+    return defaultField;
+  });
+};
+
+export type MasterCategoryKey = keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes' | 'jobOpeningsList' | 'directorsList'>;
 
 export interface RoleDefinition {
   id: string;
@@ -446,7 +530,30 @@ export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
     showStatutoryIds: true,
     showPersonalInfo: true,
     showAddresses: true,
-  }
+  },
+  directorsList: [
+    'Mr. Rajesh Rathi',
+    'Mr. Amit Rathi',
+    'Mr. Vikas Rathi',
+    'Minakshee Banjre',
+    'Amisha Patel',
+    'Board of Directors',
+    'HR Director'
+  ],
+  jobOpeningsList: [
+    'Senior Sales Executive',
+    'Accountant / Billing Clerk',
+    'Warehouse & Logistics Supervisor',
+    'IT & Tally Administrator',
+    'Store Manager',
+    'Dispatch Officer',
+    'Civil Engineer / Site Supervisor',
+    'Area Sales Manager',
+    'HR Executive & Recruiter',
+    'Billing & Accounts Assistant',
+    'Purchase & Stock Manager'
+  ],
+  jobOpeningFields: DEFAULT_JOB_OPENING_FIELDS
 };
 
 export default function Settings({ 
@@ -487,11 +594,23 @@ export default function Settings({
   onResendEmail
 }: SettingsProps) {
   const [activeSubTab, setActiveSubTab] = useState<'company' | 'fields' | 'masters' | 'policy' | 'security' | 'database' | 'archive_storage' | 'roles_permissions' | 'audit_logs' | 'email_smtp' | 'whatsapp_auto' | 'email_logs'>('company');
-  const [localSettings, setLocalSettings] = useState<AdminSettings>(settings);
+  const [localSettings, setLocalSettings] = useState<AdminSettings>(() => ({
+    ...settings,
+    fields: mergeFieldsWithDefaults(settings.fields),
+    jobOpeningFields: mergeJobOpeningFieldsWithDefaults(settings.jobOpeningFields),
+    directorsList: settings.directorsList && settings.directorsList.length > 0 ? settings.directorsList : INITIAL_ADMIN_SETTINGS.directorsList,
+    jobOpeningsList: settings.jobOpeningsList && settings.jobOpeningsList.length > 0 ? settings.jobOpeningsList : INITIAL_ADMIN_SETTINGS.jobOpeningsList,
+  }));
   const [showWelcomePreviewModal, setShowWelcomePreviewModal] = useState(false);
 
   useEffect(() => {
-    setLocalSettings(settings);
+    setLocalSettings({
+      ...settings,
+      fields: mergeFieldsWithDefaults(settings.fields),
+      jobOpeningFields: mergeJobOpeningFieldsWithDefaults(settings.jobOpeningFields),
+      directorsList: settings.directorsList && settings.directorsList.length > 0 ? settings.directorsList : INITIAL_ADMIN_SETTINGS.directorsList,
+      jobOpeningsList: settings.jobOpeningsList && settings.jobOpeningsList.length > 0 ? settings.jobOpeningsList : INITIAL_ADMIN_SETTINGS.jobOpeningsList,
+    });
   }, [settings]);
   
   //WhatsApp test states
@@ -515,7 +634,25 @@ export default function Settings({
   const [editingAccountPassword, setEditingAccountPassword] = useState<string>('');
   const [editingAccount, setEditingAccount] = useState<UserRoleAccount | null>(null);
   const [newMasterVal, setNewMasterVal] = useState<string>('');
-  const [activeMasterList, setActiveMasterList] = useState<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes' | 'jobOpeningsList'>>('departments');
+  const [newCostCenterPrefix, setNewCostCenterPrefix] = useState<string>('');
+  const [activeMasterList, setActiveMasterList] = useState<MasterCategoryKey>('departments');
+  const [masterSearchQuery, setMasterSearchQuery] = useState<string>('');
+  const [masterCategoryFilter, setMasterCategoryFilter] = useState<string>('all');
+  const [editingMasterItem, setEditingMasterItem] = useState<{
+    category: MasterCategoryKey;
+    oldVal: string;
+    newVal: string;
+    prefixCode?: string;
+  } | null>(null);
+
+  // Field Settings tab selector & inline editing states
+  const [fieldSettingsSection, setFieldSettingsSection] = useState<'employee' | 'job_openings'>('employee');
+  const [jobFilterGroup, setJobFilterGroup] = useState<string>('all');
+  const [editingFieldId, setEditingFieldId] = useState<keyof Employee | null>(null);
+  const [editingFieldLabel, setEditingFieldLabel] = useState<string>('');
+  const [editingJobFieldId, setEditingJobFieldId] = useState<keyof JobPosting | null>(null);
+  const [editingJobFieldLabel, setEditingJobFieldLabel] = useState<string>('');
+
   const [activeConfigRole, setActiveConfigRole] = useState<string>('super_admin');
   const [rolesSubSection, setRolesSubSection] = useState<'columns' | 'matrix' | 'accounts' | 'custom_roles'>('columns');
   
@@ -532,6 +669,7 @@ export default function Settings({
 
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
+  const [fieldSearchQuery, setFieldSearchQuery] = useState<string>('');
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
   //SMTP Tester states
@@ -751,8 +889,12 @@ export default function Settings({
       groupResidential: "Residential Address",
       groupPermanent: "Permanent Address",
       groupBank: "Bank Details",
-      groupOther: "OtherTax Details",
+      groupOther: "Statutory & Tax IDs",
       groupEmployment: "Employment Details",
+      groupSalary: "Salary Structure & Payroll",
+      groupAllowances: "Advanced Allowances",
+      groupLoan: "Advance & Loan",
+      groupLeaves: "Leaves Balance",
 
       //Masters
       masterSelect: "Select List to Manage:",
@@ -821,12 +963,16 @@ export default function Settings({
 
       //Groups
       groupAll: "All Fields",
-      groupDetail: "Employee Details",
-      groupResidential: "Residential Address",
-      groupPermanent: "Permanent Address",
-      groupBank: "Bank Details",
-      groupOther: "OtherTax Details",
-      groupEmployment: "Employment Details",
+      groupDetail: "व्यक्तिगत विवरण",
+      groupResidential: "वर्तमान पता",
+      groupPermanent: "स्थायी पता",
+      groupBank: "बैंक विवरण",
+      groupOther: "पहचान व कर विवरण (PAN/Aadhaar/PF)",
+      groupEmployment: "रोज़गार विवरण",
+      groupSalary: "वेतन संरचना व पेरोल",
+      groupAllowances: "अतिरिक्त भत्ते (HRA/DA/Conveyance)",
+      groupLoan: "अग्रिम वेतन व ऋण",
+      groupLeaves: "छुट्टी शेष (CL/EL)",
 
       //Masters
       masterSelect: "Select List to Manage:",
@@ -863,13 +1009,24 @@ export default function Settings({
     }
   }[language];
 
-  const handleFieldToggle = (fieldId: keyof Pick<AdminSettings, 'fields'>['fields'][number]['id'], property: 'isHidden' | 'isMandatory') => {
-    const updatedFields = localSettings.fields.map(field => {
+  const handleFieldToggle = (fieldId: keyof Employee, property: 'isHidden' | 'isMandatory') => {
+    const currentFields = mergeFieldsWithDefaults(localSettings.fields);
+    const updatedFields = currentFields.map(field => {
       if (field.id === fieldId) {
-        return {
+        const nextVal = !field[property];
+        const updated = {
           ...field,
-          [property]: !field[property],
+          [property]: nextVal,
         };
+        // If hiding field, automatically uncheck isMandatory
+        if (property === 'isHidden' && nextVal === true) {
+          updated.isMandatory = false;
+        }
+        // If making mandatory, ensure it is not hidden
+        if (property === 'isMandatory' && nextVal === true) {
+          updated.isHidden = false;
+        }
+        return updated;
       }
       return field;
     });
@@ -904,16 +1061,26 @@ export default function Settings({
       valToAdd = newMasterVal.trim();
     }
 
-    const currentList = localSettings[activeMasterList] as string[];
-    if (currentList.includes(valToAdd)) {
-      alert("Option already exists!");
+    const currentList = (localSettings[activeMasterList] as string[]) || [];
+    if (currentList.some(item => item.toLowerCase() === valToAdd.toLowerCase())) {
+      alert(`Option "${valToAdd}" already exists!`);
       return;
     }
     const updatedList = [...currentList, valToAdd];
-    setLocalSettings({
+    const updatedSettings: AdminSettings = {
       ...localSettings,
       [activeMasterList]: updatedList
-    });
+    };
+
+    if (activeMasterList === 'costCenters' && newCostCenterPrefix.trim()) {
+      updatedSettings.costCenterCodes = {
+        ...(localSettings.costCenterCodes || {}),
+        [valToAdd]: newCostCenterPrefix.trim().toUpperCase(),
+      };
+      setNewCostCenterPrefix('');
+    }
+
+    setLocalSettings(updatedSettings);
     
     if (activeMasterList === 'workTimings') {
       setShiftName('');
@@ -922,13 +1089,166 @@ export default function Settings({
     }
   };
 
-  const handleRemoveMasterItem = (itemToRemove: string) => {
-    const currentList = localSettings[activeMasterList] as string[];
-    const updatedList = currentList.filter(item => item !== itemToRemove);
-    setLocalSettings({
-      ...localSettings,
-      [activeMasterList]: updatedList
+  const handleJobFieldToggle = (fieldId: keyof JobPosting, property: 'isHidden' | 'isMandatory') => {
+    const currentFields = mergeJobOpeningFieldsWithDefaults(localSettings.jobOpeningFields);
+    const updatedFields = currentFields.map(field => {
+      if (field.id === fieldId) {
+        const nextVal = !field[property];
+        const updated = {
+          ...field,
+          [property]: nextVal,
+        };
+        // If hiding field, automatically uncheck isMandatory
+        if (property === 'isHidden' && nextVal === true) {
+          updated.isMandatory = false;
+        }
+        // If making mandatory, ensure it is not hidden
+        if (property === 'isMandatory' && nextVal === true) {
+          updated.isHidden = false;
+        }
+        return updated;
+      }
+      return field;
     });
+    setLocalSettings({ ...localSettings, jobOpeningFields: updatedFields });
+  };
+
+  const handleStartEditJobField = (f: JobOpeningFieldSetting) => {
+    setEditingJobFieldId(f.id);
+    setEditingJobFieldLabel(f.label);
+  };
+
+  const handleSaveEditJobField = () => {
+    if (!editingJobFieldId) return;
+    const trimmed = editingJobFieldLabel.trim();
+    if (!trimmed) {
+      alert("Field label cannot be empty!");
+      return;
+    }
+    const currentFields = mergeJobOpeningFieldsWithDefaults(localSettings.jobOpeningFields);
+    const updatedFields = currentFields.map(field => {
+      if (field.id === editingJobFieldId) {
+        return {
+          ...field,
+          label: trimmed,
+        };
+      }
+      return field;
+    });
+    setLocalSettings({ ...localSettings, jobOpeningFields: updatedFields });
+    setEditingJobFieldId(null);
+  };
+
+  const handleCancelEditJobField = () => {
+    setEditingJobFieldId(null);
+  };
+
+  const handleStartEditMasterItem = (
+    category: MasterCategoryKey,
+    item: string
+  ) => {
+    let prefix = '';
+    if (category === 'costCenters') {
+      prefix = getCostCenterPrefix(item, localSettings.costCenterCodes);
+    }
+    setEditingMasterItem({
+      category,
+      oldVal: item,
+      newVal: item,
+      prefixCode: prefix,
+    });
+  };
+
+  const handleSaveEditMasterItem = () => {
+    if (!editingMasterItem) return;
+    const { category, oldVal, newVal, prefixCode } = editingMasterItem;
+    const trimmedVal = newVal.trim();
+    if (!trimmedVal) {
+      alert("Option name cannot be empty!");
+      return;
+    }
+    const currentList = (localSettings[category] as string[]) || [];
+    if (trimmedVal.toLowerCase() !== oldVal.toLowerCase() && currentList.some(x => x.toLowerCase() === trimmedVal.toLowerCase())) {
+      alert(`Option "${trimmedVal}" already exists in this list!`);
+      return;
+    }
+    const updatedList = currentList.map(item => item === oldVal ? trimmedVal : item);
+    const updatedSettings: AdminSettings = {
+      ...localSettings,
+      [category]: updatedList,
+    };
+
+    if (category === 'costCenters') {
+      const updatedCodes = { ...(localSettings.costCenterCodes || {}) };
+      if (oldVal in updatedCodes) {
+        delete updatedCodes[oldVal];
+      }
+      if (prefixCode && prefixCode.trim()) {
+        updatedCodes[trimmedVal] = prefixCode.trim().toUpperCase();
+      }
+      updatedSettings.costCenterCodes = updatedCodes;
+    }
+
+    setLocalSettings(updatedSettings);
+    setEditingMasterItem(null);
+  };
+
+  const handleCancelEditMasterItem = () => {
+    setEditingMasterItem(null);
+  };
+
+  const handleRemoveMasterItem = (
+    itemToRemove: string,
+    category: MasterCategoryKey = activeMasterList
+  ) => {
+    if (!window.confirm(`Are you sure you want to delete "${itemToRemove}" from the master list?`)) {
+      return;
+    }
+    const currentList = (localSettings[category] as string[]) || [];
+    const updatedList = currentList.filter(item => item !== itemToRemove);
+    const updatedSettings: AdminSettings = {
+      ...localSettings,
+      [category]: updatedList
+    };
+    if (category === 'costCenters' && localSettings.costCenterCodes) {
+      const updatedCodes = { ...localSettings.costCenterCodes };
+      delete updatedCodes[itemToRemove];
+      updatedSettings.costCenterCodes = updatedCodes;
+    }
+    setLocalSettings(updatedSettings);
+    if (editingMasterItem && editingMasterItem.oldVal === itemToRemove) {
+      setEditingMasterItem(null);
+    }
+  };
+
+  const handleStartEditField = (f: FieldSetting) => {
+    setEditingFieldId(f.id);
+    setEditingFieldLabel(f.label);
+  };
+
+  const handleSaveEditField = () => {
+    if (!editingFieldId) return;
+    const trimmed = editingFieldLabel.trim();
+    if (!trimmed) {
+      alert("Field label cannot be empty!");
+      return;
+    }
+    const currentFields = mergeFieldsWithDefaults(localSettings.fields);
+    const updatedFields = currentFields.map(field => {
+      if (field.id === editingFieldId) {
+        return {
+          ...field,
+          label: trimmed,
+        };
+      }
+      return field;
+    });
+    setLocalSettings({ ...localSettings, fields: updatedFields });
+    setEditingFieldId(null);
+  };
+
+  const handleCancelEditField = () => {
+    setEditingFieldId(null);
   };
 
   const masterFileInputRef = useRef<HTMLInputElement>(null);
@@ -937,7 +1257,7 @@ export default function Settings({
     const headers = ['Category', 'Option Name', 'Cost Center ID Prefix (Optional)'];
     const rows: string[][] = [];
 
-    const categories: Array<{ key: keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes' | 'jobOpeningsList'>; name: string }> = [
+    const categories: Array<{ key: MasterCategoryKey; name: string }> = [
       { key: 'departments', name: 'Departments' },
       { key: 'branches', name: 'Branches' },
       { key: 'costCenters', name: 'Cost Centers' },
@@ -945,7 +1265,8 @@ export default function Settings({
       { key: 'workTimings', name: 'Work Timings' },
       { key: 'weeklyOffProfiles', name: 'Weekly Off Profiles' },
       { key: 'leaveTypes', name: 'Leave Types' },
-      { key: 'jobOpeningsList', name: 'Job OpeningsPositions' }
+      { key: 'jobOpeningsList', name: 'Job OpeningsPositions' },
+      { key: 'directorsList', name: 'Director Names' }
     ];
 
     categories.forEach(cat => {
@@ -984,7 +1305,8 @@ export default function Settings({
       workTimings: 'Work Timings',
       weeklyOffProfiles: 'Weekly Off Profiles',
       leaveTypes: 'Leave Types',
-      jobOpeningsList: 'Job OpeningsPositions'
+      jobOpeningsList: 'Job OpeningsPositions',
+      directorsList: 'Director Names'
     };
 
     const categoryName = listNameMap[activeMasterList] || activeMasterList;
@@ -1024,7 +1346,9 @@ export default function Settings({
       ['Employee Groups', 'Contractual Staff', ''],
       ['Work Timings', 'General Shift (09:00 AM - 06:00 PM)', ''],
       ['Weekly Off Profiles', 'Sunday Only', ''],
-      ['Leave Types', 'Maternity Leave', '']
+      ['Leave Types', 'Maternity Leave', ''],
+      ['Job OpeningsPositions', 'Senior Sales Executive', ''],
+      ['Director Names', 'Mr. Rajesh Rathi', '']
     ];
 
     const csvContent = [
@@ -1084,7 +1408,7 @@ export default function Settings({
       const rows = lines.map(parseCSVLine);
       const firstRow = rows[0] || [];
       const isHeader = firstRow.some(col => 
-        ['category', 'option name', 'name', 'cost center', 'department', 'branch', 'option'].includes(col.toLowerCase())
+        ['category', 'option name', 'name', 'cost center', 'department', 'branch', 'director', 'option'].includes(col.toLowerCase())
       );
 
       const dataRows = isHeader ? rows.slice(1) : rows;
@@ -1097,7 +1421,7 @@ export default function Settings({
         firstRow.forEach((col, idx) => {
           const lower = col.toLowerCase().replace(/[\s_*-]/g, '');
           if (['category', 'type', 'list', 'master'].includes(lower)) catIdx = idx;
-          if (['optionname', 'name', 'title', 'value', 'item', 'option'].includes(lower)) nameIdx = idx;
+          if (['optionname', 'name', 'title', 'value', 'item', 'option', 'director'].includes(lower)) nameIdx = idx;
           if (['costcenteridprefix', 'idprefix', 'prefix', 'code'].includes(lower)) prefixIdx = idx;
         });
       }
@@ -1111,8 +1435,10 @@ export default function Settings({
       const updatedSettings = { ...localSettings };
       const updatedCostCenterCodes = { ...(localSettings.costCenterCodes || {}) };
 
-      const normalizeCat = (catStr: string): keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'> | null => {
+      const normalizeCat = (catStr: string): MasterCategoryKey | null => {
         const s = catStr.toLowerCase().replace(/[\s_-]/g, '');
+        if (s.includes('director')) return 'directorsList';
+        if (s.includes('job') || s.includes('position') || s.includes('opening') || s.includes('designation')) return 'jobOpeningsList';
         if (s.includes('dept') || s.includes('department')) return 'departments';
         if (s.includes('branch')) return 'branches';
         if (s.includes('cost')) return 'costCenters';
@@ -1128,7 +1454,7 @@ export default function Settings({
         const optName = (row[nameIdx] || (catIdx === -1 ? row[0] : '') || '').trim();
         if (!optName) return;
 
-        let targetCat: keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes'> | null = null;
+        let targetCat: MasterCategoryKey | null = null;
         if (catIdx !== -1 && row[catIdx]) {
           targetCat = normalizeCat(row[catIdx]);
         }
@@ -1702,9 +2028,24 @@ export default function Settings({
     setTimeout(() => setSaveSuccess(false), 4000);
   };
 
-  const filteredFields = localSettings.fields.filter(f => {
-    if (filterGroup === 'all') return true;
-    return f.group === filterGroup;
+  const allCurrentFields = mergeFieldsWithDefaults(localSettings.fields);
+
+  const filteredFields = allCurrentFields.filter(f => {
+    const matchesGroup = filterGroup === 'all' || f.group === filterGroup;
+    if (!matchesGroup) return false;
+    if (!fieldSearchQuery.trim()) return true;
+    const q = fieldSearchQuery.toLowerCase().trim();
+    return f.label.toLowerCase().includes(q) || String(f.id).toLowerCase().includes(q);
+  });
+
+  const allCurrentJobFields = mergeJobOpeningFieldsWithDefaults(localSettings.jobOpeningFields);
+
+  const filteredJobFields = allCurrentJobFields.filter(f => {
+    const matchesGroup = jobFilterGroup === 'all' || f.group === jobFilterGroup;
+    if (!matchesGroup) return false;
+    if (!fieldSearchQuery.trim()) return true;
+    const q = fieldSearchQuery.toLowerCase().trim();
+    return f.label.toLowerCase().includes(q) || String(f.id).toLowerCase().includes(q);
   });
 
   return (
@@ -2092,11 +2433,51 @@ export default function Settings({
           {/* Sub Tab: Form Fields configuration */}
           {activeSubTab === 'fields' && (
             <div className="space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded p-3 text-[11px] text-amber-800 leading-relaxed font-semibold flex items-start gap-2">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3.5 text-[11px] text-amber-800 leading-relaxed font-semibold flex items-start gap-2.5 shadow-xs">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div>
+                <div className="space-y-1">
                   <p>{t.mandatoryNote}</p>
-                  <p className="mt-1 text-slate-500 font-medium">Core properties (Employee ID, Name, Department, Designation, Joining Date, Basic Salary) are always visible and system-mandated.</p>
+                  <p className="text-slate-600 font-medium">
+                    All fields from the Add / Edit Employee modal (Personal, Address, Bank, Government IDs, Employment, Salary, Allowances, Loan, and Leaves) are fully configurable here.
+                  </p>
+                </div>
+              </div>
+
+              {/* Search & Quick Controls Toolbar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-gray-50/80 p-3 rounded-lg border border-gray-200">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={fieldSearchQuery}
+                    onChange={(e) => setFieldSearchQuery(e.target.value)}
+                    placeholder="Search field by name or ID (e.g. HRA, PAN, Basic Salary, PIN)..."
+                    className="w-full pl-8 pr-8 py-1.5 bg-white border border-gray-300 rounded-md text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1.5 focus:ring-[#03623c]"
+                  />
+                  {fieldSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setFieldSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] text-gray-500 font-semibold self-end sm:self-center">
+                  <span className="px-2 py-0.5 bg-white border border-gray-200 rounded shadow-2xs">
+                    Total: <strong className="text-gray-800">{allCurrentFields.length}</strong>
+                  </span>
+                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded shadow-2xs">
+                    Visible: <strong>{allCurrentFields.filter(f => !f.isHidden).length}</strong>
+                  </span>
+                  <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded shadow-2xs">
+                    Required: <strong>{allCurrentFields.filter(f => f.isMandatory && !f.isHidden).length}</strong>
+                  </span>
+                  <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded shadow-2xs">
+                    Hidden: <strong>{allCurrentFields.filter(f => f.isHidden).length}</strong>
+                  </span>
                 </div>
               </div>
 
@@ -2109,87 +2490,177 @@ export default function Settings({
                   { id: 'permanent', label: t.groupPermanent },
                   { id: 'bank', label: t.groupBank },
                   { id: 'other', label: t.groupOther },
-                  { id: 'employment', label: t.groupEmployment }
-                ].map(grp => (
-                  <button
-                    key={grp.id}
-                    onClick={() => setFilterGroup(grp.id)}
-                    className={`px-2.5 py-1 text-[10px] font-bold rounded-full border cursor-pointer transition-colors ${
-                      filterGroup === grp.id
-                        ? 'bg-[#03623c] text-white border-[#03623c]'
-                        : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-200'
-                    }`}
-                  >
-                    {grp.label}
-                  </button>
-                ))}
+                  { id: 'employment', label: t.groupEmployment },
+                  { id: 'salary', label: t.groupSalary },
+                  { id: 'advanced_allowances', label: t.groupAllowances },
+                  { id: 'loan', label: t.groupLoan },
+                  { id: 'leaves', label: t.groupLeaves }
+                ].map(grp => {
+                  const count = grp.id === 'all' 
+                    ? allCurrentFields.length 
+                    : allCurrentFields.filter(f => f.group === grp.id).length;
+                  return (
+                    <button
+                      key={grp.id}
+                      onClick={() => setFilterGroup(grp.id)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-full border cursor-pointer transition-colors shadow-2xs ${
+                        filterGroup === grp.id
+                          ? 'bg-[#03623c] text-white border-[#03623c]'
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-200'
+                      }`}
+                    >
+                      <span>{grp.label}</span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                        filterGroup === grp.id ? 'bg-emerald-800 text-white' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Field settings table */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white max-h-[500px] overflow-y-auto shadow-2xs">
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white max-h-[520px] overflow-y-auto shadow-2xs">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 text-slate-700 font-bold border-b border-gray-200 sticky top-0">
+                  <thead className="bg-slate-50 text-slate-700 font-bold border-b border-gray-200 sticky top-0 z-10 shadow-2xs">
                     <tr>
                       <th className="py-2.5 px-4">{t.fieldColName}</th>
                       <th className="py-2.5 px-4">{t.fieldColGroup}</th>
-                      <th className="py-2.5 px-4 text-center w-28">{t.fieldColHidden}</th>
-                      <th className="py-2.5 px-4 text-center w-28">{t.fieldColMandatory}</th>
+                      <th className="py-2.5 px-4 text-center w-32">{t.fieldColHidden}</th>
+                      <th className="py-2.5 px-4 text-center w-32">{t.fieldColMandatory}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredFields.map(f => {
-                      const groupLabels: Record<string, string> = {
-                        detail: t.groupDetail,
-                        residential: t.groupResidential,
-                        permanent: t.groupPermanent,
-                        bank: t.groupBank,
-                        other: t.groupOther,
-                        employment: t.groupEmployment
-                      };
+                    {filteredFields.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-gray-400 font-medium text-xs">
+                          No matching fields found for "{fieldSearchQuery}".
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredFields.map(f => {
+                        const groupLabels: Record<string, string> = {
+                          detail: t.groupDetail,
+                          residential: t.groupResidential,
+                          permanent: t.groupPermanent,
+                          bank: t.groupBank,
+                          other: t.groupOther,
+                          employment: t.groupEmployment,
+                          salary: t.groupSalary,
+                          advanced_allowances: t.groupAllowances,
+                          loan: t.groupLoan,
+                          leaves: t.groupLeaves
+                        };
 
-                      return (
-                        <tr key={f.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="py-2 px-4 font-bold text-gray-800">{f.label}</td>
-                          <td className="py-2 px-4 text-gray-500 font-medium">{groupLabels[f.group]}</td>
-                          
-                          {/* Hide Toggle */}
-                          <td className="py-2 px-4 text-center">
-                            <button
-                              onClick={() => handleFieldToggle(f.id, 'isHidden')}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-extrabold cursor-pointer transition-colors border shadow-2xs ${
-                                f.isHidden
-                                  ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                              }`}
-                              title={t.toggleVisibility}
-                            >
-                              {f.isHidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              {f.isHidden ? t.hidden : t.visible}
-                            </button>
-                          </td>
+                        const isCoreLocked = ['id', 'name'].includes(f.id);
 
-                          {/* Required Toggle */}
-                          <td className="py-2 px-4 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleFieldToggle(f.id, 'isMandatory')}
-                              disabled={f.isHidden}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-extrabold cursor-pointer transition-colors border shadow-2xs ${
-                                f.isHidden
-                                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                                  : f.isMandatory
-                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                              }`}
-                              title={f.isHidden ? "Hidden fields cannot be mandatory" : t.toggleMandatory}
-                            >
-                              {f.isMandatory ? <Lock className="w-3 h-3" /> : null}
-                              {f.isMandatory ? ('Required') : ('Optional')}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                        return (
+                          <tr key={f.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-2.5 px-4">
+                              {editingFieldId === f.id ? (
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    value={editingFieldLabel}
+                                    onChange={(e) => setEditingFieldLabel(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveEditField();
+                                      if (e.key === 'Escape') handleCancelEditField();
+                                    }}
+                                    autoFocus
+                                    className="px-2 py-1 border border-emerald-500 rounded text-xs font-bold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-600 shadow-2xs w-full max-w-[240px]"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveEditField}
+                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer transition-colors shadow-3xs"
+                                    title="Save Field Label"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleCancelEditField}
+                                    className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded cursor-pointer transition-colors"
+                                    title="Cancel"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="group/field flex items-center justify-between gap-2 max-w-[280px]">
+                                  <div>
+                                    <div className="font-bold text-gray-800 text-xs flex items-center gap-1.5">
+                                      {f.label}
+                                      {isCoreLocked && (
+                                        <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded font-semibold">
+                                          Core
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 font-mono">{f.id}</div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditField(f)}
+                                    className="opacity-40 group-hover/field:opacity-100 text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 p-1 rounded transition-all cursor-pointer"
+                                    title="Edit Field Label Name"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span className="inline-block px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px] font-semibold">
+                                {groupLabels[f.group] || f.group}
+                              </span>
+                            </td>
+                            
+                            {/* Hide Toggle */}
+                            <td className="py-2.5 px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleFieldToggle(f.id, 'isHidden')}
+                                disabled={isCoreLocked}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors border shadow-2xs ${
+                                  isCoreLocked
+                                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                    : f.isHidden
+                                      ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                }`}
+                                title={isCoreLocked ? "Core field cannot be hidden" : t.toggleVisibility}
+                              >
+                                {f.isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                {f.isHidden ? t.hidden : t.visible}
+                              </button>
+                            </td>
+
+                            {/* Required Toggle */}
+                            <td className="py-2.5 px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleFieldToggle(f.id, 'isMandatory')}
+                                disabled={f.isHidden}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors border shadow-2xs ${
+                                  f.isHidden
+                                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                    : f.isMandatory
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                                }`}
+                                title={f.isHidden ? "Hidden fields cannot be mandatory" : t.toggleMandatory}
+                              >
+                                {f.isMandatory ? <Lock className="w-3.5 h-3.5 text-emerald-600" /> : null}
+                                {f.isMandatory ? ('Required') : ('Optional')}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -2277,29 +2748,129 @@ export default function Settings({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-2">{t.masterSelect}</label>
-                <select
-                  value={activeMasterList}
-                  onChange={(e) => setActiveMasterList(e.target.value as any)}
-                  className="w-full border border-gray-200 px-3 py-2 rounded text-xs font-semibold bg-white cursor-pointer focus:ring-1 focus:ring-[#03623c] focus:outline-none"
-                >
-                  <option value="departments">{t.listDept}</option>
-                  <option value="branches">{t.listBranches}</option>
-                  <option value="costCenters">{t.listCost}</option>
-                  <option value="employeeGroups">{t.listGroups}</option>
-                  <option value="workTimings">{t.listTimings}</option>
-                  <option value="weeklyOffProfiles">{t.listWeeklyOff}</option>
-                  <option value="leaveTypes">{t.listLeaves}</option>
-                  <option value="jobOpeningsList">{'Job OpeningsRecruitment Positions'}</option>
-                </select>
+              {/* Master Search and Category Switcher */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3.5 shadow-2xs">
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={masterSearchQuery}
+                    onChange={(e) => setMasterSearchQuery(e.target.value)}
+                    placeholder="Global Search dropdown options (e.g. Sales, Mumbai, JPR, Night Shift, Casual Leave)..."
+                    className="w-full pl-9.5 pr-9 py-2 border border-gray-200 rounded-lg text-xs bg-slate-50/50 hover:bg-white focus:bg-white focus:ring-1 focus:ring-[#03623c] focus:border-[#03623c] focus:outline-none transition-all placeholder:text-gray-400 font-medium"
+                  />
+                  {masterSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setMasterSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded cursor-pointer"
+                      title="Clear Search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Pills with Counters */}
+                <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3">
+                  {[
+                    { key: 'all', label: 'All Master Lists' },
+                    { key: 'departments', label: t.listDept },
+                    { key: 'branches', label: t.listBranches },
+                    { key: 'costCenters', label: t.listCost },
+                    { key: 'employeeGroups', label: t.listGroups },
+                    { key: 'workTimings', label: t.listTimings },
+                    { key: 'weeklyOffProfiles', label: t.listWeeklyOff },
+                    { key: 'leaveTypes', label: t.listLeaves },
+                    { key: 'jobOpeningsList', label: 'Job Openings' },
+                  ].map(cat => {
+                    const count = cat.key === 'all'
+                      ? ['departments', 'branches', 'costCenters', 'employeeGroups', 'workTimings', 'weeklyOffProfiles', 'leaveTypes', 'jobOpeningsList'].reduce(
+                          (acc, k) => acc + ((localSettings[k as keyof AdminSettings] as string[]) || []).length, 0
+                        )
+                      : ((localSettings[cat.key as keyof AdminSettings] as string[]) || []).length;
+
+                    const isActive = masterCategoryFilter === cat.key;
+                    return (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        onClick={() => {
+                          setMasterCategoryFilter(cat.key);
+                          if (cat.key !== 'all') {
+                            setActiveMasterList(cat.key as any);
+                          }
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-full border cursor-pointer transition-all shadow-2xs ${
+                          isActive
+                            ? 'bg-[#03623c] text-white border-[#03623c]'
+                            : 'bg-slate-50 hover:bg-slate-100 text-gray-700 border-gray-200'
+                        }`}
+                      >
+                        <span>{cat.label}</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                          isActive ? 'bg-emerald-800 text-white' : 'bg-gray-200/80 text-gray-700'
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Master options listing */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-slate-50/50 space-y-3.5 shadow-2xs">
+              {/* Master options listing & Add panel */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-slate-50/50 space-y-4 shadow-2xs">
+                {/* Active Target Category Selector (if in 'all' view or adding) */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-gray-200/80">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-extrabold text-gray-800 uppercase tracking-wide">
+                      {masterCategoryFilter === 'all' ? 'All Dropdown Categories' : `Managing: ${
+                        {
+                          departments: t.listDept,
+                          branches: t.listBranches,
+                          costCenters: t.listCost,
+                          employeeGroups: t.listGroups,
+                          workTimings: t.listTimings,
+                          weeklyOffProfiles: t.listWeeklyOff,
+                          leaveTypes: t.listLeaves,
+                          jobOpeningsList: 'Job Openings'
+                        }[masterCategoryFilter] || masterCategoryFilter
+                      }`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <span className="text-[11px] font-bold text-gray-500 shrink-0">Add to List:</span>
+                    <select
+                      value={activeMasterList}
+                      onChange={(e) => {
+                        const val = e.target.value as any;
+                        setActiveMasterList(val);
+                        if (masterCategoryFilter !== 'all') {
+                          setMasterCategoryFilter(val);
+                        }
+                      }}
+                      className="border border-gray-200 px-2.5 py-1 rounded-md text-xs font-bold bg-white text-gray-800 cursor-pointer focus:ring-1 focus:ring-[#03623c] focus:outline-none"
+                    >
+                      <option value="departments">{t.listDept}</option>
+                      <option value="branches">{t.listBranches}</option>
+                      <option value="costCenters">{t.listCost}</option>
+                      <option value="employeeGroups">{t.listGroups}</option>
+                      <option value="workTimings">{t.listTimings}</option>
+                      <option value="weeklyOffProfiles">{t.listWeeklyOff}</option>
+                      <option value="leaveTypes">{t.listLeaves}</option>
+                      <option value="jobOpeningsList">{'Job Openings'}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Add new item builder */}
                 {activeMasterList === 'workTimings' ? (
-                  <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-3 shadow-3xs">
-                    <div className="font-extrabold text-[11px] text-[#03623c] uppercase tracking-wider">
+                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-3xs">
+                    <div className="font-extrabold text-[11px] text-[#03623c] uppercase tracking-wider flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5" />
                       {'Shift Timing Builder'}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -2352,18 +2923,73 @@ export default function Settings({
                       </button>
                     </div>
                   </div>
+                ) : activeMasterList === 'costCenters' ? (
+                  <div className="bg-white border border-gray-200 rounded-xl p-3.5 space-y-2.5 shadow-3xs">
+                    <div className="font-extrabold text-[11px] text-[#03623c] uppercase tracking-wider flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5" />
+                      {'Add New Cost Center & Custom ID Prefix'}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                          {'Cost Center Name'}
+                        </label>
+                        <input
+                          type="text"
+                          value={newMasterVal}
+                          placeholder="e.g. Jaipur Distribution Center, Corporate HQ"
+                          onChange={(e) => setNewMasterVal(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddMasterItem()}
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-semibold text-gray-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                          {'ID Prefix (Optional)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={newCostCenterPrefix}
+                          placeholder="e.g. JPR, HQ, DEL"
+                          onChange={(e) => setNewCostCenterPrefix(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddMasterItem()}
+                          maxLength={6}
+                          className="w-full border border-gray-200 px-3 py-1.5 rounded-lg text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-mono font-bold text-gray-800 uppercase"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end pt-1">
+                      <button
+                        onClick={handleAddMasterItem}
+                        className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-3xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {'Add Cost Center'}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 bg-white p-2 border border-gray-200 rounded-lg shadow-3xs">
                     <input
                       type="text"
                       value={newMasterVal}
-                      placeholder={t.masterPlaceholder}
+                      placeholder={`Add new option to ${
+                        {
+                          departments: t.listDept,
+                          branches: t.listBranches,
+                          employeeGroups: t.listGroups,
+                          weeklyOffProfiles: t.listWeeklyOff,
+                          leaveTypes: t.listLeaves,
+                          jobOpeningsList: 'Job Openings'
+                        }[activeMasterList] || activeMasterList
+                      }...`}
                       onChange={(e) => setNewMasterVal(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddMasterItem()}
-                      className="flex-1 border border-gray-200 px-3 py-1.5 rounded text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none" />
+                      className="flex-1 border border-gray-200 px-3 py-1.5 rounded text-xs bg-white focus:ring-1 focus:ring-[#03623c] focus:outline-none font-medium text-gray-800"
+                    />
                     <button
                       onClick={handleAddMasterItem}
-                      className="bg-[#03623c] hover:bg-[#024d2e] text-white px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                      className="bg-[#03623c] hover:bg-[#024d2e] text-white px-4 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 shadow-3xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       {t.masterAdd}
@@ -2371,36 +2997,172 @@ export default function Settings({
                   </div>
                 )}
 
-                <div className="bg-white rounded border border-gray-100 max-h-[250px] overflow-y-auto divide-y divide-gray-100">
-                  {((localSettings[activeMasterList] as string[]) || []).length === 0 ? (
-                    <p className="p-4 text-center text-xs text-gray-400 font-semibold">{t.noOptions}</p>
-                  ) : (
-                    ((localSettings[activeMasterList] as string[]) || []).map((item, index) => {
-                      const prefix = activeMasterList === 'costCenters' ? getCostCenterPrefix(item, localSettings.costCenterCodes) : '';
-                      return (
-                        <div key={index} className="flex items-center justify-between py-2 px-3 hover:bg-slate-50 transition-colors">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-bold text-gray-800">{item}</span>
-                            {activeMasterList === 'costCenters' && (
-                              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
-                                <span className="font-semibold text-gray-500">ID Prefix:</span>
-                                <span className="text-emerald-800 dark:text-emerald-200 font-bold">{prefix}</span>
-                                <span className="text-[9px] text-emerald-600/70 font-normal">({prefix}001, {prefix}002...)</span>
-                              </span>
-                            )}
+                {/* Master options listing */}
+                {(() => {
+                  const categoryLabels: Record<string, string> = {
+                    departments: t.listDept,
+                    branches: t.listBranches,
+                    costCenters: t.listCost,
+                    employeeGroups: t.listGroups,
+                    workTimings: t.listTimings,
+                    weeklyOffProfiles: t.listWeeklyOff,
+                    leaveTypes: t.listLeaves,
+                    jobOpeningsList: 'Job Openings'
+                  };
+
+                  const categoriesToSearch: Array<keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes' | 'jobOpeningsList'>> =
+                    masterCategoryFilter === 'all'
+                      ? ['departments', 'branches', 'costCenters', 'employeeGroups', 'workTimings', 'weeklyOffProfiles', 'leaveTypes', 'jobOpeningsList']
+                      : [masterCategoryFilter as any];
+
+                  const query = masterSearchQuery.trim().toLowerCase();
+                  const allMatchedItems: Array<{
+                    category: keyof Pick<AdminSettings, 'departments' | 'branches' | 'costCenters' | 'employeeGroups' | 'workTimings' | 'weeklyOffProfiles' | 'leaveTypes' | 'jobOpeningsList'>;
+                    item: string;
+                    prefix: string;
+                  }> = [];
+
+                  for (const cat of categoriesToSearch) {
+                    const list = (localSettings[cat] as string[]) || [];
+                    for (const item of list) {
+                      const prefix = cat === 'costCenters' ? getCostCenterPrefix(item, localSettings.costCenterCodes) : '';
+                      const catName = categoryLabels[cat] || cat;
+                      if (!query || item.toLowerCase().includes(query) || catName.toLowerCase().includes(query) || prefix.toLowerCase().includes(query)) {
+                        allMatchedItems.push({ category: cat, item, prefix });
+                      }
+                    }
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-gray-500 px-1">
+                        <span>
+                          {allMatchedItems.length} {allMatchedItems.length === 1 ? 'option' : 'options'} found
+                          {query && ` matching "${masterSearchQuery}"`}
+                        </span>
+                        {masterCategoryFilter === 'all' && (
+                          <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-semibold">
+                            Viewing Across All Categories
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="bg-white rounded-lg border border-gray-200 max-h-[380px] overflow-y-auto divide-y divide-gray-100 shadow-2xs">
+                        {allMatchedItems.length === 0 ? (
+                          <div className="p-8 text-center text-xs text-gray-400 font-semibold space-y-1">
+                            <div>{query ? `No dropdown options matching "${masterSearchQuery}"` : t.noOptions}</div>
+                            <div className="text-[10px] text-gray-400 font-normal">Use the input above to add new options</div>
                           </div>
-                          <button
-                            onClick={() => handleRemoveMasterItem(item)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors cursor-pointer"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                        ) : (
+                          allMatchedItems.map(({ category, item, prefix }, index) => {
+                            const isEditing = editingMasterItem && editingMasterItem.oldVal === item && editingMasterItem.category === category;
+
+                            return (
+                              <div key={`${category}-${index}-${item}`} className="py-2 px-3.5 hover:bg-slate-50/80 transition-colors">
+                                {isEditing ? (
+                                  <div className="space-y-2 bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                                        Editing in {categoryLabels[category] || category}
+                                      </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                      <div className={category === 'costCenters' ? 'sm:col-span-2' : 'sm:col-span-3'}>
+                                        <label className="block text-[10px] font-bold text-gray-600 mb-1">Option Name</label>
+                                        <input
+                                          type="text"
+                                          value={editingMasterItem.newVal}
+                                          onChange={(e) => setEditingMasterItem({ ...editingMasterItem, newVal: e.target.value })}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleSaveEditMasterItem();
+                                            if (e.key === 'Escape') handleCancelEditMasterItem();
+                                          }}
+                                          autoFocus
+                                          className="w-full px-2.5 py-1.5 border border-emerald-500 rounded text-xs font-bold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                                        />
+                                      </div>
+                                      {category === 'costCenters' && (
+                                        <div>
+                                          <label className="block text-[10px] font-bold text-gray-600 mb-1">ID Prefix</label>
+                                          <input
+                                            type="text"
+                                            value={editingMasterItem.prefixCode || ''}
+                                            onChange={(e) => setEditingMasterItem({ ...editingMasterItem, prefixCode: e.target.value.toUpperCase() })}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') handleSaveEditMasterItem();
+                                              if (e.key === 'Escape') handleCancelEditMasterItem();
+                                            }}
+                                            maxLength={6}
+                                            placeholder="e.g. JPR"
+                                            className="w-full px-2.5 py-1.5 border border-emerald-500 rounded text-xs font-mono font-bold text-gray-800 bg-white uppercase focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex justify-end gap-1.5 pt-1">
+                                      <button
+                                        type="button"
+                                        onClick={handleSaveEditMasterItem}
+                                        className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-3xs"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                        Save Changes
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={handleCancelEditMasterItem}
+                                        className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      {(masterCategoryFilter === 'all' || query) && (
+                                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                          {categoryLabels[category] || category}
+                                        </span>
+                                      )}
+                                      <span className="text-xs font-bold text-gray-800">{item}</span>
+                                      {category === 'costCenters' && (
+                                        <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                                          <span className="font-semibold text-gray-500">ID Prefix:</span>
+                                          <span className="font-bold text-emerald-900">{prefix}</span>
+                                          <span className="text-[9px] text-emerald-700 font-normal">({prefix}001, {prefix}002...)</span>
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartEditMasterItem(category, item)}
+                                        className="text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 p-1.5 rounded transition-colors cursor-pointer"
+                                        title={`Edit ${item}`}
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveMasterItem(item, category)}
+                                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors cursor-pointer"
+                                        title={`Delete ${item}`}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

@@ -131,7 +131,15 @@ export const getCurrentBasicSalary = (emp: Employee | null | undefined): number 
 export interface FieldSetting {
   id: keyof Employee;
   label: string;
-  group: 'detail' | 'residential' | 'permanent' | 'bank' | 'other' | 'employment';
+  group: 'detail' | 'residential' | 'permanent' | 'bank' | 'other' | 'employment' | 'salary' | 'advanced_allowances' | 'loan' | 'leaves';
+  isHidden: boolean;
+  isMandatory: boolean;
+}
+
+export interface JobOpeningFieldSetting {
+  id: keyof JobPosting;
+  label: string;
+  group: 'basic' | 'compensation' | 'assignment' | 'details';
   isHidden: boolean;
   isMandatory: boolean;
 }
@@ -217,6 +225,8 @@ export interface AdminSettings {
   defaultInterviewVenue?: string;
   defaultInterviewTime?: string;
   jobOpeningsList?: string[];
+  directorsList?: string[];
+  jobOpeningFields?: JobOpeningFieldSetting[];
   // WhatsApp & Email Automation Settings
   whatsappUsername?: string;
   whatsappPassword?: string;

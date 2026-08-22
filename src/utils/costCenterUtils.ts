@@ -48,10 +48,133 @@ export function getCostCenterPrefix(
   return prefix.toUpperCase() || 'EMP';
 }
 
+export interface AvailableEmployeeIdOption {
+  id: string;
+  type: 'next_sequential' | 'left_employee' | 'sequence_gap';
+  label: string;
+  details?: string;
+  previousEmployeeName?: string;
+  previousDesignation?: string;
+  previousDepartment?: string;
+  leavingDate?: string;
+  numericValue: number;
+}
+
+/**
+ * Finds all available Employee ID options for a given Cost Center / Prefix:
+ * 1. IDs from Left / Inactive employees (prevents ID gap and allows reuse)
+ * 2. Missing numeric sequence gaps (e.g. if RS003 and RS007 are missing)
+ * 3. Fresh next sequential ID (e.g. RS101)
+ */
+export function getAvailableEmployeeIdsWithGaps(
+  costCenterName: string,
+  existingEmployees: Array<{ id: string; name?: string; isActive?: boolean; designation?: string; department?: string; leavingDate?: string }>,
+  customCodes?: Record<string, string>
+): {
+  prefix: string;
+  nextSequentialId: string;
+  options: AvailableEmployeeIdOption[];
+  leftEmployeeIds: AvailableEmployeeIdOption[];
+  gapIds: AvailableEmployeeIdOption[];
+  totalAvailableGaps: number;
+} {
+  const prefix = getCostCenterPrefix(costCenterName, customCodes);
+  const regex = new RegExp(`^${prefix}(\\d+)$`, 'i');
+
+  const activeEmpMap = new Map<number, typeof existingEmployees[0]>();
+  const inactiveEmpMap = new Map<number, typeof existingEmployees[0]>();
+  const allUsedNums = new Set<number>();
+  let maxNum = 0;
+
+  for (const emp of existingEmployees) {
+    if (!emp.id) continue;
+    const match = emp.id.trim().match(regex);
+    if (match && match[1]) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num)) {
+        allUsedNums.add(num);
+        if (num > maxNum) maxNum = num;
+
+        if (emp.isActive === false) {
+          inactiveEmpMap.set(num, emp);
+        } else {
+          activeEmpMap.set(num, emp);
+        }
+      }
+    }
+  }
+
+  // 1. Next Sequential ID
+  const nextNum = maxNum + 1;
+  const nextSequentialId = `${prefix}${String(nextNum).padStart(3, '0')}`;
+
+  const leftEmployeeIds: AvailableEmployeeIdOption[] = [];
+  const gapIds: AvailableEmployeeIdOption[] = [];
+
+  // 2. Identify Inactive / Left Employees
+  inactiveEmpMap.forEach((emp, num) => {
+    const formattedId = `${prefix}${String(num).padStart(3, '0')}`;
+    const descParts = [
+      emp.name ? `Ex-Employee: ${emp.name}` : 'Inactive Record',
+      emp.designation || emp.department || '',
+      emp.leavingDate ? `Left: ${emp.leavingDate}` : 'Status: Inactive'
+    ].filter(Boolean);
+
+    leftEmployeeIds.push({
+      id: formattedId,
+      type: 'left_employee',
+      label: `${formattedId} (Left: ${emp.name || 'Ex-Employee'})`,
+      details: descParts.join(' • '),
+      previousEmployeeName: emp.name,
+      previousDesignation: emp.designation,
+      previousDepartment: emp.department,
+      leavingDate: emp.leavingDate,
+      numericValue: num
+    });
+  });
+
+  // Sort left employees by ID number
+  leftEmployeeIds.sort((a, b) => a.numericValue - b.numericValue);
+
+  // 3. Identify Missing Numeric Sequence Gaps (numbers between 1 and maxNum that have no record at all)
+  for (let n = 1; n < maxNum; n++) {
+    if (!allUsedNums.has(n)) {
+      const formattedId = `${prefix}${String(n).padStart(3, '0')}`;
+      gapIds.push({
+        id: formattedId,
+        type: 'sequence_gap',
+        label: `${formattedId} (Vacant Sequence Gap #${n})`,
+        details: `Missing sequence number ${n} — assigning fills series gap`,
+        numericValue: n
+      });
+    }
+  }
+
+  const allOptions: AvailableEmployeeIdOption[] = [
+    {
+      id: nextSequentialId,
+      type: 'next_sequential',
+      label: `${nextSequentialId} (Fresh Next Sequential ID)`,
+      details: `Next in series (${prefix}${String(maxNum).padStart(3, '0')} ➔ ${nextSequentialId})`,
+      numericValue: nextNum
+    },
+    ...leftEmployeeIds,
+    ...gapIds
+  ];
+
+  return {
+    prefix,
+    nextSequentialId,
+    options: allOptions,
+    leftEmployeeIds,
+    gapIds,
+    totalAvailableGaps: leftEmployeeIds.length + gapIds.length
+  };
+}
+
 /**
  * Generates the next sequential Employee ID for a given Cost Center.
  * E.g., for "Raipur Store" -> "RS001", "RS002", "RS003"...
- * E.g., for "Raipur Store Cash" -> "RSC001", "RSC002"...
  */
 export function generateNextEmployeeId(
   costCenterName: string,
@@ -77,7 +200,7 @@ export function generateNextEmployeeId(
   let nextNum = maxNum + 1;
   let nextId = `${prefix}${String(nextNum).padStart(3, '0')}`;
 
-  //Ensure uniqueness
+  // Ensure uniqueness
   while (existingEmployees.some((e) => e.id.toUpperCase() === nextId.toUpperCase())) {
     nextNum += 1;
     nextId = `${prefix}${String(nextNum).padStart(3, '0')}`;
@@ -85,3 +208,5 @@ export function generateNextEmployeeId(
 
   return nextId;
 }
+
+
